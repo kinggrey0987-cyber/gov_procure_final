@@ -2,7 +2,7 @@ import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import TextInput from '@/Components/TextInput';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { FormEventHandler, useMemo } from 'react';
+import { FormEventHandler, useEffect, useMemo, useState } from 'react';
 
 type Props = {
     email: string;
@@ -15,20 +15,42 @@ export default function TwoFactorChallenge({ email, expiresInSeconds, status }: 
         code: '',
     });
 
+    const [remainingSeconds, setRemainingSeconds] = useState(
+        Math.max(0, Math.floor(Number(expiresInSeconds) || 0)),
+    );
+
+    useEffect(() => {
+        setRemainingSeconds(Math.max(0, Math.floor(Number(expiresInSeconds) || 0)));
+    }, [expiresInSeconds]);
+
+    useEffect(() => {
+        if (remainingSeconds <= 0) {
+            return;
+        }
+
+        const timer = window.setInterval(() => {
+            setRemainingSeconds((current) => Math.max(0, current - 1));
+        }, 1000);
+
+        return () => {
+            window.clearInterval(timer);
+        };
+    }, [remainingSeconds]);
+
+    const countdownLabel = useMemo(() => {
+        const minutes = Math.floor(remainingSeconds / 60);
+        const seconds = remainingSeconds % 60;
+
+        return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }, [remainingSeconds]);
+
     const expirationText = useMemo(() => {
-        if (expiresInSeconds <= 0) {
+        if (remainingSeconds <= 0) {
             return 'Code expired. Request a new code.';
         }
 
-        const minutes = Math.floor(expiresInSeconds / 60);
-        const seconds = expiresInSeconds % 60;
-
-        if (minutes <= 0) {
-            return `Code expires in ${seconds} seconds.`;
-        }
-
-        return `Code expires in ${minutes} minute${minutes > 1 ? 's' : ''} and ${seconds} second${seconds !== 1 ? 's' : ''}.`;
-    }, [expiresInSeconds]);
+        return `Code expires in ${countdownLabel}.`;
+    }, [countdownLabel, remainingSeconds]);
 
     const submit: FormEventHandler = (event) => {
         event.preventDefault();
