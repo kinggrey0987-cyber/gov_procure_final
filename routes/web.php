@@ -24,6 +24,8 @@ use App\Http\Controllers\Inventory\DistributionItemController;
 use App\Http\Controllers\Inventory\DistributionRecordController;
 use App\Http\Controllers\Inventory\InventoryController;
 use App\Http\Controllers\Inventory\InventoryMovementController;
+use App\Http\Controllers\Inventory\ItemCatalogController;
+use App\Http\Controllers\Inventory\ItemCategoryController;
 use App\Http\Controllers\Inventory\RequestWorkflowController;
 use App\Http\Controllers\Executive\AlertController as ExecutiveAlertController;
 use App\Http\Controllers\Executive\AnomalyController;
@@ -196,6 +198,9 @@ Route::middleware('auth')->group(function () {
                 Route::get('/', [OfficeSupplyRequestController::class, 'index'])
                     ->middleware('can:office.supply-request.view-any')
                     ->name('index');
+                Route::get('/ppmp/{ppmp}/items', [OfficeSupplyRequestController::class, 'ppmpItemsForPpmp'])
+                    ->middleware('can:office.supply-request.create')
+                    ->name('ppmp-items');
                 Route::get('/create', [OfficeSupplyRequestController::class, 'create'])
                     ->middleware('can:office.supply-request.create')
                     ->name('create');
@@ -399,6 +404,54 @@ Route::middleware('auth')->group(function () {
                 Route::get('/{movement}', [InventoryMovementController::class, 'show'])
                     ->middleware('can:inventory-movement.view,movement')
                     ->name('show');
+            });
+
+            Route::prefix('item-categories')->name('item-categories.')->group(function () {
+                Route::get('/', [ItemCategoryController::class, 'index'])
+                    ->middleware('can:inventory.catalog.view-any')
+                    ->name('index');
+                Route::get('/create', [ItemCategoryController::class, 'create'])
+                    ->middleware('can:inventory.catalog.manage')
+                    ->name('create');
+                Route::post('/', [ItemCategoryController::class, 'store'])
+                    ->middleware('can:inventory.catalog.manage')
+                    ->name('store');
+                Route::get('/{item_category}', [ItemCategoryController::class, 'show'])
+                    ->middleware('can:inventory.catalog.view-any')
+                    ->name('show');
+                Route::get('/{item_category}/edit', [ItemCategoryController::class, 'edit'])
+                    ->middleware('can:inventory.catalog.manage')
+                    ->name('edit');
+                Route::put('/{item_category}', [ItemCategoryController::class, 'update'])
+                    ->middleware('can:inventory.catalog.manage')
+                    ->name('update');
+                Route::patch('/{item_category}/toggle-status', [ItemCategoryController::class, 'toggleStatus'])
+                    ->middleware('can:inventory.catalog.manage')
+                    ->name('toggle-status');
+            });
+
+            Route::prefix('items')->name('items.')->group(function () {
+                Route::get('/', [ItemCatalogController::class, 'index'])
+                    ->middleware('can:inventory.catalog.view-any')
+                    ->name('index');
+                Route::get('/create', [ItemCatalogController::class, 'create'])
+                    ->middleware('can:inventory.catalog.manage')
+                    ->name('create');
+                Route::post('/', [ItemCatalogController::class, 'store'])
+                    ->middleware('can:inventory.catalog.manage')
+                    ->name('store');
+                Route::get('/{item}', [ItemCatalogController::class, 'show'])
+                    ->middleware('can:inventory.catalog.view-any')
+                    ->name('show');
+                Route::get('/{item}/edit', [ItemCatalogController::class, 'edit'])
+                    ->middleware('can:inventory.catalog.manage')
+                    ->name('edit');
+                Route::put('/{item}', [ItemCatalogController::class, 'update'])
+                    ->middleware('can:inventory.catalog.manage')
+                    ->name('update');
+                Route::patch('/{item}/toggle-status', [ItemCatalogController::class, 'toggleStatus'])
+                    ->middleware('can:inventory.catalog.manage')
+                    ->name('toggle-status');
             });
 
             Route::prefix('alerts')->name('alerts.')->group(function () {

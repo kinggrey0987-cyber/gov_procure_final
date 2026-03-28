@@ -4,6 +4,7 @@ namespace App\Http\Requests\Office;
 
 use App\Models\SupplyRequest;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateSupplyRequestRequest extends FormRequest
 {
@@ -19,7 +20,17 @@ class UpdateSupplyRequestRequest extends FormRequest
 
     public function rules(): array
     {
+        $officeId = (int) $this->user()?->office_id;
+
         return [
+            'ppmp_id' => [
+                'required',
+                'integer',
+                Rule::exists('ppmp', 'ppmp_id')->where(function ($query) use ($officeId): void {
+                    $query->where('office_id', $officeId)
+                        ->whereIn('status', ['DRAFT', 'SUBMITTED', 'APPROVED', 'RETURNED_FOR_REVISION']);
+                }),
+            ],
             'request_date' => ['required', 'date'],
             'needed_by_date' => ['required', 'date', 'after_or_equal:request_date'],
             'request_category' => ['required', 'string', 'max:50'],

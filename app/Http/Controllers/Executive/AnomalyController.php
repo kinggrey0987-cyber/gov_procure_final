@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Executive;
 
 use App\Http\Requests\Anomaly\UpdateAnomalyStatusRequest;
+use App\Models\Alert;
 use App\Models\Anomaly;
 use App\Services\Analytics\AlertService;
 use App\Services\Analytics\AnomalyDetectionService;
@@ -48,6 +49,16 @@ class AnomalyController
         $anomalies = $this->detectionService->runExecutiveDetections(auth()->user());
 
         foreach ($anomalies as $anomaly) {
+            $alertAlreadyOpen = Alert::query()
+                ->where('alert_type', 'ANOMALY_DETECTED')
+                ->where('anomaly_id', (int) $anomaly->anomaly_id)
+                ->whereIn('status', ['OPEN', 'IN_REVIEW'])
+                ->exists();
+
+            if ($alertAlreadyOpen) {
+                continue;
+            }
+
             $this->alertService->create(auth()->user(), [
                 'alert_type' => 'ANOMALY_DETECTED',
                 'severity' => $anomaly->severity,

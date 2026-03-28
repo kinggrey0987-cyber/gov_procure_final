@@ -2,7 +2,11 @@
 
 namespace App\Http\Requests\Office;
 
+use App\Models\PpmpItem;
+use App\Models\SupplyRequestItem;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class StoreSupplyRequestRequest extends FormRequest
 {
@@ -13,7 +17,18 @@ class StoreSupplyRequestRequest extends FormRequest
 
     public function rules(): array
     {
+        $officeId = (int) $this->user()?->office_id;
+        $ppmpId = (int) $this->input('ppmp_id');
+
         return [
+            'ppmp_id' => [
+                'required',
+                'integer',
+                Rule::exists('ppmp', 'ppmp_id')->where(function ($query) use ($officeId): void {
+                    $query->where('office_id', $officeId)
+                        ->whereIn('status', ['DRAFT', 'SUBMITTED', 'APPROVED', 'RETURNED_FOR_REVISION']);
+                }),
+            ],
             'request_date' => ['required', 'date'],
             'needed_by_date' => ['required', 'date', 'after_or_equal:request_date'],
             'request_category' => ['required', 'string', 'max:50'],
@@ -21,11 +36,98 @@ class StoreSupplyRequestRequest extends FormRequest
             'priority_level' => ['required', 'string', 'max:30'],
             'review_notes' => ['nullable', 'string', 'max:2000'],
             'items' => ['nullable', 'array'],
-            'items.*.item_id' => ['required_with:items', 'integer', 'exists:items,item_id'],
-            'items.*.ppmp_item_id' => ['required_with:items', 'integer', 'exists:ppmp_items,ppmp_item_id'],
-            'items.*.item_name_snapshot' => ['required_with:items', 'string', 'max:200'],
+            'items.*.item_id' => ['nullable', 'integer'],
+            'items.*.ppmp_item_id' => [
+                'required_with:items',
+                'integer',
+                Rule::exists('ppmp_items', 'ppmp_item_id')->where(function ($query) use ($ppmpId): void {
+                    if ($ppmpId > 0) {
+                        $query->where('ppmp_id', $ppmpId);
+                    }
+                }),
+            ],
+            'items.*.item_name_snapshot' => ['nullable', 'string', 'max:200'],
             'items.*.quantity_requested' => ['required_with:items', 'numeric', 'gt:0'],
             'items.*.estimated_unit_cost' => ['required_with:items', 'numeric', 'gte:0'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            $ppmpId = (int) $this->input('ppmp_id');
+            $officeId = (int) $this->user()?->office_id;
+            $items = collect($this->input('items', []));
+
+            if ($ppmpId <= 0 || $items->isEmpty()) {
+                return;
+            }
+
+            $ppmpItemIds = $items
+                ->pluck('ppmp_item_id')
+                ->filter(fn ($value): bool => is_numeric($value))
+                ->map(fn ($value): int => (int) $value)
+                ->values();
+
+            if ($ppmpItemIds->isEmpty()) {
+                return;
+            }
+
+            $ppmpItems = PpmpItem::query()
+                ->with('item:item_id,item_name')
+                ->where('ppmp_id', $ppmpId)
+                ->whereIn('ppmp_item_id', $ppmpItemIds->all())
+                ->get(['ppmp_item_id', 'ppmp_id', 'item_id', 'quantity'])
+                ->keyBy('ppmp_item_id');
+
+            $consumed = SupplyRequestItem::query()
+                ->selectRaw('ppmp_item_id, COALESCE(SUM(quantity_requested), 0) as consumed_quantity')
+                ->whereIn('ppmp_item_id', $ppmpItemIds->all())
+                ->whereHas('supplyRequest', function ($query) use ($officeId, $ppmpId): void {
+                    $query->where('office_id', $officeId)->where('ppmp_id', $ppmpId);
+                })
+                ->groupBy('ppmp_item_id')
+                ->get()
+                ->mapWithKeys(fn ($row): array => [(int) $row->ppmp_item_id => (float) $row->consumed_quantity]);
+
+            $runningRequested = [];
+
+            foreach ($items as $index => $row) {
+                $ppmpItemId = (int) ($row['ppmp_item_id'] ?? 0);
+                $quantity = (float) ($row['quantity_requested'] ?? 0);
+                $payloadItemId = isset($row['item_id']) && is_numeric($row['item_id']) ? (int) $row['item_id'] : null;
+
+                /** @var PpmpItem|null $ppmpItem */
+                $ppmpItem = $ppmpItems->get($ppmpItemId);
+                if (! $ppmpItem) {
+                    $validator->errors()->add("items.$index.ppmp_item_id", 'Selected PPMP item does not belong to the selected PPMP.');
+                    continue;
+                }
+
+                if ($payloadItemId !== null && $payloadItemId !== (int) $ppmpItem->item_id) {
+                    $validator->errors()->add("items.$index.item_id", 'Selected item must match the chosen PPMP item.');
+                }
+
+                $runningRequested[$ppmpItemId] = ($runningRequested[$ppmpItemId] ?? 0.0) + $quantity;
+
+                $planned = (float) $ppmpItem->quantity;
+                $alreadyRequested = (float) ($consumed[$ppmpItemId] ?? 0.0);
+                $remainingBeforeThisRequest = $planned - $alreadyRequested;
+
+                if ($runningRequested[$ppmpItemId] > $remainingBeforeThisRequest) {
+                    $itemName = (string) ($ppmpItem->item?->item_name ?? 'Selected item');
+                    $validator->errors()->add(
+                        "items.$index.quantity_requested",
+                        sprintf(
+                            '%s exceeds remaining PPMP quantity (planned %.2f, already requested %.2f, remaining %.2f).',
+                            $itemName,
+                            $planned,
+                            $alreadyRequested,
+                            max($remainingBeforeThisRequest, 0)
+                        )
+                    );
+                }
+            }
+        });
     }
 }

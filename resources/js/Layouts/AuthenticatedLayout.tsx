@@ -750,6 +750,16 @@ export default function Authenticated({
                 active: route().current('inventory.dashboard'),
             },
             {
+                label: 'Item Categories',
+                href: route('inventory.item-categories.index'),
+                active: route().current('inventory.item-categories.*'),
+            },
+            {
+                label: 'Item Catalog',
+                href: route('inventory.items.index'),
+                active: route().current('inventory.items.*'),
+            },
+            {
                 label: 'Delivery Monitoring',
                 href: route('inventory.deliveries.index'),
                 active: route().current('inventory.deliveries.*'),

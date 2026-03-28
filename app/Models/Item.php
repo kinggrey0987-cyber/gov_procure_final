@@ -14,6 +14,10 @@ class Item extends Model
 
     protected $primaryKey = 'item_id';
 
+    public $incrementing = true;
+
+    protected $keyType = 'int';
+
     protected $fillable = [
         'item_category_id',
         'item_name',

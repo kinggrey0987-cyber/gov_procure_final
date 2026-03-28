@@ -7,10 +7,11 @@ use App\Http\Requests\Office\StoreSupplyRequestRequest;
 use App\Http\Requests\Office\SubmitSupplyRequestRequest;
 use App\Http\Requests\Office\UpdateSupplyRequestRequest;
 use App\Models\DistributionRecord;
-use App\Models\PpmpItem;
+use App\Models\Ppmp;
 use App\Models\SupplyRequest;
 use App\Services\History\HistoryTimelineService;
 use App\Services\Office\SupplyRequestService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -49,8 +50,22 @@ class SupplyRequestController extends Controller
 
     public function create(Request $request): Response
     {
+        $officeId = (int) $request->user()?->office_id;
+        $ppmpOptions = $this->service->ppmpOptionsForOffice($officeId);
+        $selectedPpmpId = (int) $request->query('ppmp_id', 0);
+        $isAllowedSelection = collect($ppmpOptions)
+            ->contains(fn (array $option): bool => (int) $option['ppmp_id'] === $selectedPpmpId);
+
+        if (! $isAllowedSelection) {
+            $selectedPpmpId = 0;
+        }
+
         return Inertia::render('Office/SupplyRequests/Create', [
-            'ppmpItemOptions' => $this->ppmpItemOptions((int) $request->user()?->office_id),
+            'ppmpOptions' => $ppmpOptions,
+            'selectedPpmpId' => $selectedPpmpId > 0 ? $selectedPpmpId : null,
+            'ppmpItemOptions' => $selectedPpmpId > 0
+                ? $this->service->ppmpItemOptionsForRequestContext($officeId, $selectedPpmpId)
+                : [],
         ]);
     }
 
@@ -72,6 +87,41 @@ class SupplyRequestController extends Controller
     {
         abort_unless($request->user()?->can('office.supply-request.view', $supplyRequest), 403);
 
+        $supplyRequest->load(['items.ppmpItem.item', 'office', 'requester', 'approver']);
+
+        $ppmpItemContext = (int) $supplyRequest->ppmp_id > 0
+            ? collect($this->service->ppmpItemOptionsForRequestContext((int) $supplyRequest->office_id, (int) $supplyRequest->ppmp_id))
+                ->keyBy('ppmp_item_id')
+            : collect();
+
+        $supplyRequestData = [
+            'supply_request_id' => (int) $supplyRequest->supply_request_id,
+            'office_id' => (int) $supplyRequest->office_id,
+            'ppmp_id' => $supplyRequest->ppmp_id ? (int) $supplyRequest->ppmp_id : null,
+            'request_code' => (string) $supplyRequest->request_code,
+            'status' => (string) $supplyRequest->status,
+            'request_date' => optional($supplyRequest->request_date)?->toDateString(),
+            'needed_by_date' => optional($supplyRequest->needed_by_date)?->toDateString(),
+            'request_category' => (string) $supplyRequest->request_category,
+            'purpose' => (string) $supplyRequest->purpose,
+            'priority_level' => (string) $supplyRequest->priority_level,
+            'review_notes' => $supplyRequest->review_notes,
+            'items' => $supplyRequest->items->map(function ($item) use ($ppmpItemContext): array {
+                $context = $ppmpItemContext->get((int) $item->ppmp_item_id, []);
+
+                return [
+                    'supply_request_item_id' => (int) $item->supply_request_item_id,
+                    'ppmp_item_id' => (int) $item->ppmp_item_id,
+                    'item_name_snapshot' => (string) ($item->item_name_snapshot ?? ''),
+                    'quantity_requested' => (float) $item->quantity_requested,
+                    'estimated_unit_cost' => $item->estimated_unit_cost !== null ? (float) $item->estimated_unit_cost : null,
+                    'planned_quantity' => isset($context['planned_quantity']) ? (float) $context['planned_quantity'] : null,
+                    'already_requested_quantity' => isset($context['requested_quantity']) ? (float) $context['requested_quantity'] : null,
+                    'remaining_quantity' => isset($context['remaining_quantity']) ? (float) $context['remaining_quantity'] : null,
+                ];
+            })->values()->all(),
+        ];
+
         $history = $this->historyTimelineService->forRecord($request->user(), $supplyRequest);
 
         $distributionRecords = DistributionRecord::query()
@@ -91,7 +141,7 @@ class SupplyRequestController extends Controller
         $canSubmit = $request->user()?->can('office.supply-request.submit', $supplyRequest) ?? false;
 
         return Inertia::render('Office/SupplyRequests/Show', [
-            'supplyRequest' => $supplyRequest->load(['items', 'office', 'requester', 'approver']),
+            'supplyRequest' => $supplyRequestData,
             'canEdit' => $canEdit,
             'canSubmit' => $canSubmit,
             'distributionRecords' => $distributionRecords,
@@ -123,9 +173,30 @@ class SupplyRequestController extends Controller
     {
         abort_unless($request->user()?->can('office.supply-request.update', $supplyRequest), 403);
 
+        $officeId = (int) $request->user()?->office_id;
+        $selectedPpmpId = (int) ($supplyRequest->ppmp_id ?? 0);
+
         return Inertia::render('Office/SupplyRequests/Edit', [
             'supplyRequest' => $supplyRequest->load('items'),
-            'ppmpItemOptions' => $this->ppmpItemOptions((int) $request->user()?->office_id),
+            'ppmpOptions' => $this->service->ppmpOptionsForOffice($officeId),
+            'selectedPpmpId' => $selectedPpmpId > 0 ? $selectedPpmpId : null,
+            'ppmpItemOptions' => $selectedPpmpId > 0
+                ? $this->service->ppmpItemOptionsForRequestContext($officeId, $selectedPpmpId)
+                : [],
+        ]);
+    }
+
+    public function ppmpItemsForPpmp(Request $request, Ppmp $ppmp): JsonResponse
+    {
+        abort_unless($request->user()?->can('office.supply-request.create'), 403);
+
+        $officeId = (int) $request->user()?->office_id;
+        if ((int) $ppmp->office_id !== $officeId) {
+            abort(403);
+        }
+
+        return response()->json([
+            'ppmp_item_options' => $this->service->ppmpItemOptionsForRequestContext($officeId, (int) $ppmp->ppmp_id),
         ]);
     }
 
@@ -174,23 +245,4 @@ class SupplyRequestController extends Controller
         ]);
     }
 
-    private function ppmpItemOptions(int $officeId): array
-    {
-        return PpmpItem::query()
-            ->with('item:item_id,item_name')
-            ->whereHas('ppmp', function ($query) use ($officeId): void {
-                $query->where('office_id', $officeId)->whereIn('status', ['DRAFT', 'SUBMITTED', 'APPROVED', 'RETURNED_FOR_REVISION']);
-            })
-            ->latest('ppmp_item_id')
-            ->limit(300)
-            ->get(['ppmp_item_id', 'item_id', 'quantity', 'unit_cost'])
-            ->map(fn (PpmpItem $ppmpItem): array => [
-                'ppmp_item_id' => (int) $ppmpItem->ppmp_item_id,
-                'item_id' => (int) $ppmpItem->item_id,
-                'item_name' => (string) ($ppmpItem->item?->item_name ?? 'Unknown Item'),
-                'suggested_unit_cost' => (float) $ppmpItem->unit_cost,
-            ])
-            ->values()
-            ->all();
-    }
 }

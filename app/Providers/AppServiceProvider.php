@@ -139,6 +139,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('inventory.view-any', fn (User $user): bool => $user->isGsoOfficer());
         Gate::define('inventory.view', fn (User $user, Inventory $inventory): bool => $user->isGsoOfficer());
         Gate::define('inventory.manage', fn (User $user, ?Inventory $inventory = null): bool => $user->isGsoOfficer());
+        Gate::define('inventory.catalog.view-any', fn (User $user): bool => $user->isGsoOfficer());
+        Gate::define('inventory.catalog.manage', fn (User $user): bool => $user->isGsoOfficer());
 
         Gate::define('inventory-movement.view-any', fn (User $user): bool => $user->isGsoOfficer());
         Gate::define('inventory-movement.view', fn (User $user, InventoryMovement $movement): bool => $user->isGsoOfficer());

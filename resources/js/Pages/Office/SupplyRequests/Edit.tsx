@@ -1,11 +1,23 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { FormEvent, ReactNode, useState } from 'react';
+import { FormEvent, ReactNode, useMemo, useState } from 'react';
+
+type PpmpOption = {
+    ppmp_id: number;
+    label: string;
+    status: string;
+    date_prepared?: string | null;
+};
 
 type Option = {
     ppmp_item_id: number;
+    ppmp_id: number;
     item_id: number;
     item_name: string;
+    planned_quantity: number;
+    requested_quantity: number;
+    remaining_quantity: number;
+    over_requested_quantity: number;
     suggested_unit_cost: number;
 };
 
@@ -22,6 +34,7 @@ type Props = {
     supplyRequest: {
         supply_request_id: number;
         request_code?: string;
+        ppmp_id?: number | null;
         request_date: string;
         needed_by_date: string;
         request_category: string;
@@ -30,11 +43,16 @@ type Props = {
         review_notes: string | null;
         items: ExistingItem[];
     };
+    ppmpOptions: PpmpOption[];
+    selectedPpmpId: number | null;
     ppmpItemOptions: Option[];
 };
 
-export default function SupplyRequestEdit({ supplyRequest, ppmpItemOptions }: Props) {
+export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selectedPpmpId, ppmpItemOptions: initialOptions }: Props) {
+    const [itemOptions, setItemOptions] = useState<Option[]>(initialOptions);
+
     const form = useForm({
+        ppmp_id: selectedPpmpId ? String(selectedPpmpId) : '',
         request_date: supplyRequest.request_date,
         needed_by_date: supplyRequest.needed_by_date,
         request_category: supplyRequest.request_category,
@@ -55,12 +73,22 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpItemOptions }: Pr
         Object.fromEntries(supplyRequest.items.map((item) => [item.supply_request_item_id, item])),
     );
 
+    const hasPpmp = form.data.ppmp_id !== '';
+
+    const optionById = useMemo(() => {
+        return new Map(itemOptions.map((option) => [String(option.ppmp_item_id), option]));
+    }, [itemOptions]);
+
     const submitHeader = (event: FormEvent) => {
         event.preventDefault();
         form.put(route('office.supply-requests.update', supplyRequest.supply_request_id));
     };
 
     const addItem = () => {
+        if (!hasPpmp) {
+            return;
+        }
+
         router.post(route('office.supply-requests.items.store', supplyRequest.supply_request_id), newItem);
     };
 
@@ -74,7 +102,7 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpItemOptions }: Pr
     };
 
     const onNewItemOptionChange = (value: string) => {
-        const option = ppmpItemOptions.find((entry) => String(entry.ppmp_item_id) === value);
+        const option = itemOptions.find((entry) => String(entry.ppmp_item_id) === value);
         if (!option) {
             setNewItem({ ...newItem, ppmp_item_id: '', item_id: '', item_name_snapshot: '', estimated_unit_cost: '' });
             return;
@@ -87,6 +115,28 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpItemOptions }: Pr
             item_name_snapshot: option.item_name,
             estimated_unit_cost: String(option.suggested_unit_cost),
         });
+    };
+
+    const onHeaderPpmpChange = async (value: string) => {
+        form.setData('ppmp_id', value);
+
+        if (!value) {
+            setItemOptions([]);
+            return;
+        }
+
+        const response = await fetch(route('office.supply-requests.ppmp-items', value), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin',
+        });
+
+        if (!response.ok) {
+            setItemOptions([]);
+            return;
+        }
+
+        const payload = (await response.json()) as { ppmp_item_options?: Option[] };
+        setItemOptions(payload.ppmp_item_options ?? []);
     };
 
     return (
@@ -104,6 +154,21 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpItemOptions }: Pr
                             Back to Details
                         </Link>
                     </div>
+
+                    <Field label="Source PPMP">
+                        <select
+                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                            value={form.data.ppmp_id}
+                            onChange={(event) => void onHeaderPpmpChange(event.target.value)}
+                        >
+                            <option value="">Select PPMP</option>
+                            {ppmpOptions.map((option) => (
+                                <option key={option.ppmp_id} value={option.ppmp_id}>
+                                    {option.label} ({option.status})
+                                </option>
+                            ))}
+                        </select>
+                    </Field>
 
                     <div className="grid gap-4 md:grid-cols-2">
                         <Field label="Request Date">
@@ -145,40 +210,57 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpItemOptions }: Pr
                         <div className="space-y-3">
                             {supplyRequest.items.map((item) => {
                                 const row = editingRows[item.supply_request_item_id];
+                                const context = optionById.get(String(row.ppmp_item_id));
+                                const exceeds = context ? Number(row.quantity_requested) > (context.remaining_quantity + Number(item.quantity_requested)) : false;
+
                                 return (
-                                    <div key={item.supply_request_item_id} className="grid gap-3 rounded-xl border border-slate-200 p-4 md:grid-cols-6">
-                                        <input
-                                            className="rounded-lg border border-slate-300 px-3 py-2 text-sm md:col-span-2"
-                                            value={row.item_name_snapshot}
-                                            onChange={(event) => setEditingRows({ ...editingRows, [item.supply_request_item_id]: { ...row, item_name_snapshot: event.target.value } })}
-                                        />
-                                        <input
-                                            type="number"
-                                            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                                            value={row.quantity_requested}
-                                            onChange={(event) => setEditingRows({ ...editingRows, [item.supply_request_item_id]: { ...row, quantity_requested: Number(event.target.value) } })}
-                                        />
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                                            value={row.estimated_unit_cost}
-                                            onChange={(event) => setEditingRows({ ...editingRows, [item.supply_request_item_id]: { ...row, estimated_unit_cost: Number(event.target.value) } })}
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => updateItem(item.supply_request_item_id)}
-                                            className="rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-700"
-                                        >
-                                            Update
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => removeItem(item.supply_request_item_id)}
-                                            className="rounded-lg border border-rose-300 px-3 py-2 text-xs font-semibold text-rose-700"
-                                        >
-                                            Remove
-                                        </button>
+                                    <div key={item.supply_request_item_id} className="rounded-xl border border-slate-200 p-4">
+                                        <div className="grid gap-3 md:grid-cols-6">
+                                            <input
+                                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm md:col-span-2"
+                                                value={row.item_name_snapshot}
+                                                onChange={(event) => setEditingRows({ ...editingRows, [item.supply_request_item_id]: { ...row, item_name_snapshot: event.target.value } })}
+                                            />
+                                            <input
+                                                type="number"
+                                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                                min="1"
+                                                value={row.quantity_requested}
+                                                onChange={(event) => setEditingRows({ ...editingRows, [item.supply_request_item_id]: { ...row, quantity_requested: Number(event.target.value) } })}
+                                            />
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                                value={row.estimated_unit_cost}
+                                                onChange={(event) => setEditingRows({ ...editingRows, [item.supply_request_item_id]: { ...row, estimated_unit_cost: Number(event.target.value) } })}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => updateItem(item.supply_request_item_id)}
+                                                className="rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-700"
+                                            >
+                                                Update
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => removeItem(item.supply_request_item_id)}
+                                                className="rounded-lg border border-rose-300 px-3 py-2 text-xs font-semibold text-rose-700"
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+
+                                        {context ? (
+                                            <div className="mt-2 grid gap-2 text-xs text-slate-600 md:grid-cols-4">
+                                                <div>Planned: <strong>{context.planned_quantity}</strong></div>
+                                                <div>Already requested: <strong>{context.requested_quantity}</strong></div>
+                                                <div>Remaining before this line: <strong>{context.remaining_quantity}</strong></div>
+                                                <div>Suggested unit cost: <strong>{context.suggested_unit_cost}</strong></div>
+                                            </div>
+                                        ) : null}
+
+                                        {exceeds ? <p className="mt-2 text-xs font-semibold text-rose-700">Requested quantity is above remaining PPMP allowance.</p> : null}
                                     </div>
                                 );
                             })}
@@ -188,15 +270,17 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpItemOptions }: Pr
 
                 <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                     <h4 className="text-xl font-semibold text-slate-800">Add New Item</h4>
+                    {!hasPpmp ? <p className="text-sm font-medium text-amber-700">Select a PPMP on the header first.</p> : null}
                     <div className="grid gap-3 md:grid-cols-5">
                         <select
                             className="rounded-lg border border-slate-300 px-3 py-2 text-sm md:col-span-2"
                             value={newItem.ppmp_item_id}
                             onChange={(event) => onNewItemOptionChange(event.target.value)}
+                            disabled={!hasPpmp}
                         >
-                            <option value="">Select PPMP Item</option>
-                            {ppmpItemOptions.map((option) => (
-                                <option key={option.ppmp_item_id} value={option.ppmp_item_id}>{option.item_name}</option>
+                            <option value="">{hasPpmp ? 'Select PPMP Item' : 'Select PPMP first'}</option>
+                            {itemOptions.map((option) => (
+                                <option key={option.ppmp_item_id} value={option.ppmp_item_id}>{option.item_name} (remaining: {option.remaining_quantity})</option>
                             ))}
                         </select>
                         <input
@@ -214,10 +298,16 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpItemOptions }: Pr
                             step="0.01"
                             min="0"
                         />
-                        <button type="button" onClick={addItem} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white">
+                        <button type="button" onClick={addItem} disabled={!hasPpmp} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60">
                             Add Item
                         </button>
                     </div>
+
+                    {newItem.ppmp_item_id ? (
+                        <div className="text-xs text-slate-600">
+                            Remaining quantity: <strong>{optionById.get(newItem.ppmp_item_id)?.remaining_quantity ?? 0}</strong>
+                        </div>
+                    ) : null}
                 </section>
             </div>
         </AuthenticatedLayout>

@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             OfficeSeeder::class,
             AdminUserSeeder::class,
             SampleUsersSeeder::class,
+            ItemCatalogSeeder::class,
         ]);
     }
 }

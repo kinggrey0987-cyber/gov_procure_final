@@ -3,10 +3,12 @@
 namespace App\Services\Analytics;
 
 use App\Models\Anomaly;
+use App\Models\PpmpItem;
 use App\Models\PurchaseOrderItem;
 use App\Models\SupplyRequest;
 use App\Models\SupplyRequestItem;
 use App\Models\User;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
@@ -30,7 +32,10 @@ class AnomalyDetectionService
         return collect()
             ->merge($this->detectPriceZScoreAnomalies($actor))
             ->merge($this->detectFrequentRequestAnomalies($actor))
-            ->merge($this->detectExcessiveQuantityAnomalies($actor));
+            ->merge($this->detectExcessiveQuantityAnomalies($actor))
+            ->merge($this->detectPpmpOverRequestAnomalies($actor))
+            ->merge($this->detectPpmpEarlyDepletionAnomalies($actor))
+            ->merge($this->detectPpmpFrequencyIrregularities($actor));
     }
 
     /**
@@ -187,6 +192,226 @@ class AnomalyDetectionService
                 'detection_method' => 'MEAN_PLUS_2_SIGMA',
                 'severity' => 'HIGH',
                 'remarks' => 'Requested quantity exceeded mean + 2 sigma threshold.',
+            ]));
+        }
+
+        return $created;
+    }
+
+    /**
+     * @return Collection<int, Anomaly>
+     */
+    public function detectPpmpOverRequestAnomalies(User $actor): Collection
+    {
+        $created = collect();
+
+        $ppmpItems = PpmpItem::query()
+            ->with('ppmp:ppmp_id,office_id')
+            ->get(['ppmp_item_id', 'ppmp_id', 'item_id', 'quantity']);
+
+        foreach ($ppmpItems as $ppmpItem) {
+            $plannedQuantity = (float) $ppmpItem->quantity;
+            if ($plannedQuantity <= 0) {
+                continue;
+            }
+
+            $itemRows = SupplyRequestItem::query()
+                ->where('ppmp_item_id', (int) $ppmpItem->ppmp_item_id)
+                ->whereHas('supplyRequest', function ($query) use ($ppmpItem): void {
+                    $query->where('ppmp_id', (int) $ppmpItem->ppmp_id);
+                })
+                ->with('supplyRequest:supply_request_id,ppmp_id,office_id,request_date')
+                ->get(['supply_request_item_id', 'ppmp_item_id', 'item_id', 'supply_request_id', 'quantity_requested']);
+
+            if ($itemRows->isEmpty()) {
+                continue;
+            }
+
+            $totalRequested = (float) $itemRows->sum(fn (SupplyRequestItem $row): float => (float) $row->quantity_requested);
+            if ($totalRequested <= $plannedQuantity) {
+                continue;
+            }
+
+            /** @var SupplyRequestItem|null $latest */
+            $latest = $itemRows->sortByDesc('supply_request_item_id')->first();
+            if (!$latest) {
+                continue;
+            }
+
+            $overRequestAmount = $totalRequested - $plannedQuantity;
+
+            $created->push($this->anomalyService->create($actor, [
+                'anomaly_type' => 'PPMP_OVER_REQUEST',
+                'reference_type' => SupplyRequestItem::class,
+                'reference_id' => (int) $latest->supply_request_item_id,
+                'item_id' => (int) ($ppmpItem->item_id ?: $latest->item_id),
+                'office_id' => (int) ($latest->supplyRequest->office_id ?? $ppmpItem->ppmp?->office_id ?? 0) ?: null,
+                'detected_value' => $totalRequested,
+                'expected_value' => $plannedQuantity,
+                'threshold_value' => $plannedQuantity,
+                'detection_method' => 'PPMP_PLAN_CONSUMPTION',
+                'severity' => $totalRequested >= ($plannedQuantity * 1.25) ? 'HIGH' : 'MEDIUM',
+                'remarks' => sprintf(
+                    'PPMP item requests exceeded plan by %.2f units (requested %.2f vs planned %.2f).',
+                    $overRequestAmount,
+                    $totalRequested,
+                    $plannedQuantity,
+                ),
+            ]));
+        }
+
+        return $created;
+    }
+
+    /**
+     * @return Collection<int, Anomaly>
+     */
+    public function detectPpmpEarlyDepletionAnomalies(User $actor): Collection
+    {
+        $created = collect();
+
+        $ppmpItems = PpmpItem::query()
+            ->with('ppmp:ppmp_id,fiscal_year,office_id')
+            ->get(['ppmp_item_id', 'ppmp_id', 'item_id', 'quantity']);
+
+        foreach ($ppmpItems as $ppmpItem) {
+            $plannedQuantity = (float) $ppmpItem->quantity;
+            if ($plannedQuantity <= 0) {
+                continue;
+            }
+
+            $itemRows = SupplyRequestItem::query()
+                ->where('ppmp_item_id', (int) $ppmpItem->ppmp_item_id)
+                ->whereHas('supplyRequest', function ($query) use ($ppmpItem): void {
+                    $query->where('ppmp_id', (int) $ppmpItem->ppmp_id);
+                })
+                ->with('supplyRequest:supply_request_id,office_id,request_date')
+                ->get(['supply_request_item_id', 'item_id', 'supply_request_id', 'quantity_requested']);
+
+            if ($itemRows->isEmpty()) {
+                continue;
+            }
+
+            $totalRequested = (float) $itemRows->sum(fn (SupplyRequestItem $row): float => (float) $row->quantity_requested);
+            if ($totalRequested < ($plannedQuantity * 0.85)) {
+                continue;
+            }
+
+            $latestRequestDate = $itemRows
+                ->map(fn (SupplyRequestItem $row): ?Carbon => $row->supplyRequest?->request_date instanceof Carbon ? $row->supplyRequest->request_date : null)
+                ->filter()
+                ->sortByDesc(fn (Carbon $date): int => $date->timestamp)
+                ->first();
+
+            if (!$latestRequestDate instanceof Carbon) {
+                continue;
+            }
+
+            $fiscalYear = (int) ($ppmpItem->ppmp?->fiscal_year ?? (int) $latestRequestDate->year);
+            $periodStart = Carbon::create($fiscalYear, 1, 1)->startOfDay();
+            $periodEnd = Carbon::create($fiscalYear, 12, 31)->endOfDay();
+
+            if ($latestRequestDate->lt($periodStart)) {
+                continue;
+            }
+
+            $elapsedDays = max($periodStart->diffInDays($latestRequestDate) + 1, 1);
+            $totalDays = max($periodStart->diffInDays($periodEnd) + 1, 1);
+            $elapsedRatio = min($elapsedDays / $totalDays, 1.0);
+
+            if ($elapsedRatio > 0.50) {
+                continue;
+            }
+
+            /** @var SupplyRequestItem|null $latest */
+            $latest = $itemRows->sortByDesc('supply_request_item_id')->first();
+            if (!$latest) {
+                continue;
+            }
+
+            $expectedConsumptionAtMidpoint = $plannedQuantity * 0.50;
+
+            $created->push($this->anomalyService->create($actor, [
+                'anomaly_type' => 'PPMP_EARLY_DEPLETION',
+                'reference_type' => SupplyRequestItem::class,
+                'reference_id' => (int) $latest->supply_request_item_id,
+                'item_id' => (int) ($ppmpItem->item_id ?: $latest->item_id),
+                'office_id' => (int) ($latest->supplyRequest->office_id ?? $ppmpItem->ppmp?->office_id ?? 0) ?: null,
+                'detected_value' => $totalRequested,
+                'expected_value' => $expectedConsumptionAtMidpoint,
+                'threshold_value' => $plannedQuantity * 0.85,
+                'detection_method' => 'PPMP_EARLY_DEPLETION_WINDOW',
+                'severity' => $totalRequested >= $plannedQuantity ? 'HIGH' : 'MEDIUM',
+                'remarks' => sprintf(
+                    'PPMP item consumed %.2f/%.2f before midpoint of fiscal usage window.',
+                    $totalRequested,
+                    $plannedQuantity,
+                ),
+            ]));
+        }
+
+        return $created;
+    }
+
+    /**
+     * @return Collection<int, Anomaly>
+     */
+    public function detectPpmpFrequencyIrregularities(User $actor): Collection
+    {
+        $created = collect();
+
+        $windowStart = now()->subDays(30)->toDateString();
+
+        $grouped = SupplyRequestItem::query()
+            ->whereNotNull('ppmp_item_id')
+            ->whereHas('supplyRequest', function ($query) use ($windowStart): void {
+                $query->whereDate('request_date', '>=', $windowStart)
+                    ->whereNotNull('ppmp_id');
+            })
+            ->selectRaw('ppmp_item_id, count(*) as request_count')
+            ->groupBy('ppmp_item_id')
+            ->get();
+
+        $counts = $grouped->pluck('request_count')->map(fn ($value): float => (float) $value);
+        if ($counts->count() < 2) {
+            return $created;
+        }
+
+        $mean = $counts->avg();
+        $threshold = $mean * 1.8;
+
+        foreach ($grouped as $row) {
+            $detected = (float) $row->request_count;
+            if ($detected < 3 || $detected <= $threshold) {
+                continue;
+            }
+
+            $latestRequestItem = SupplyRequestItem::query()
+                ->where('ppmp_item_id', (int) $row->ppmp_item_id)
+                ->whereHas('supplyRequest', function ($query) use ($windowStart): void {
+                    $query->whereDate('request_date', '>=', $windowStart)
+                        ->whereNotNull('ppmp_id');
+                })
+                ->with(['supplyRequest:supply_request_id,office_id', 'ppmpItem:ppmp_item_id,item_id'])
+                ->latest('supply_request_item_id')
+                ->first(['supply_request_item_id', 'ppmp_item_id', 'item_id', 'supply_request_id']);
+
+            if (!$latestRequestItem instanceof SupplyRequestItem) {
+                continue;
+            }
+
+            $created->push($this->anomalyService->create($actor, [
+                'anomaly_type' => 'PPMP_FREQUENCY_IRREGULARITY',
+                'reference_type' => SupplyRequestItem::class,
+                'reference_id' => (int) $latestRequestItem->supply_request_item_id,
+                'item_id' => (int) ($latestRequestItem->ppmpItem?->item_id ?: $latestRequestItem->item_id),
+                'office_id' => (int) ($latestRequestItem->supplyRequest->office_id ?? 0) ?: null,
+                'detected_value' => $detected,
+                'expected_value' => $mean,
+                'threshold_value' => $threshold,
+                'detection_method' => 'PPMP_SLIDING_WINDOW_30D',
+                'severity' => $detected >= ($threshold * 1.4) ? 'HIGH' : 'MEDIUM',
+                'remarks' => 'Frequent requests detected against the same PPMP item within 30 days.',
             ]));
         }
 

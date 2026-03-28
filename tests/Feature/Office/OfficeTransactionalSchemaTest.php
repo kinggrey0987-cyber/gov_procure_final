@@ -19,6 +19,9 @@ class OfficeTransactionalSchemaTest extends TestCase
 
     public function test_ppmp_items_and_supply_request_items_use_item_id_and_item_category_id_column_names(): void
     {
+        $this->assertTrue(Schema::hasColumn('supply_requests', 'ppmp_id'));
+        $this->assertFalse(Schema::hasColumn('supply_requests', 'ppmp_item_id'));
+
         $this->assertTrue(Schema::hasColumns('ppmp_items', [
             'item_id',
             'item_category_id',

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PpmpItem extends Model
 {
@@ -52,6 +53,11 @@ class PpmpItem extends Model
     public function itemCategory(): BelongsTo
     {
         return $this->belongsTo(ItemCategory::class, 'item_category_id', 'item_category_id');
+    }
+
+    public function supplyRequestItems(): HasMany
+    {
+        return $this->hasMany(SupplyRequestItem::class, 'ppmp_item_id', 'ppmp_item_id');
     }
 
     public function scopeForOffice(Builder $query, int $officeId): Builder

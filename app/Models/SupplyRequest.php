@@ -24,6 +24,7 @@ class SupplyRequest extends Model
         'request_code',
         'office_id',
         'requested_by',
+        'ppmp_id',
         'request_date',
         'needed_by_date',
         'request_category',
@@ -38,6 +39,7 @@ class SupplyRequest extends Model
     protected $casts = [
         'office_id' => 'integer',
         'requested_by' => 'integer',
+        'ppmp_id' => 'integer',
         'approved_by' => 'integer',
         'request_date' => 'date',
         'needed_by_date' => 'date',
@@ -57,6 +59,11 @@ class SupplyRequest extends Model
     public function approver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function ppmp(): BelongsTo
+    {
+        return $this->belongsTo(Ppmp::class, 'ppmp_id', 'ppmp_id');
     }
 
     public function items(): HasMany

@@ -8,6 +8,7 @@ type Props = {
     supplyRequest: {
         supply_request_id: number;
         office_id: number;
+        ppmp_id?: number | null;
         request_code: string;
         status: string;
         request_date?: string | null;
@@ -18,9 +19,13 @@ type Props = {
         review_notes: string | null;
         items: Array<{
             supply_request_item_id: number;
+            ppmp_item_id: number;
             item_name_snapshot?: string | null;
             quantity_requested: number;
             estimated_unit_cost?: number | null;
+            planned_quantity?: number | null;
+            already_requested_quantity?: number | null;
+            remaining_quantity?: number | null;
         }>;
     };
     distributionRecords: Array<{
@@ -119,6 +124,7 @@ export default function SupplyRequestShow({
                     </div>
 
                     <div className="mt-5 grid gap-4 md:grid-cols-2">
+                        <MetaItem label="PPMP" value={supplyRequest.ppmp_id ? `PPMP #${supplyRequest.ppmp_id}` : '-'} />
                         <MetaItem label="Category" value={supplyRequest.request_category} />
                         <MetaItem label="Priority" value={supplyRequest.priority_level} />
                         <MetaItem label="Purpose" value={supplyRequest.purpose} />
@@ -159,6 +165,10 @@ export default function SupplyRequestShow({
                                 <thead className="bg-slate-50">
                                     <tr>
                                         <th className="px-4 py-3 text-left font-semibold text-slate-700">Item</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">PPMP Item</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Planned</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Already Requested</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Remaining</th>
                                         <th className="px-4 py-3 text-left font-semibold text-slate-700">Quantity</th>
                                         <th className="px-4 py-3 text-left font-semibold text-slate-700">Estimated Unit Cost</th>
                                     </tr>
@@ -167,6 +177,10 @@ export default function SupplyRequestShow({
                                     {supplyRequest.items.map((item) => (
                                         <tr key={item.supply_request_item_id}>
                                             <td className="px-4 py-3 text-slate-700">{item.item_name_snapshot ?? '-'}</td>
+                                            <td className="px-4 py-3 text-slate-700">#{item.ppmp_item_id}</td>
+                                            <td className="px-4 py-3 text-slate-700">{formatNumber(item.planned_quantity)}</td>
+                                            <td className="px-4 py-3 text-slate-700">{formatNumber(item.already_requested_quantity)}</td>
+                                            <td className="px-4 py-3 text-slate-700">{formatNumber(item.remaining_quantity)}</td>
                                             <td className="px-4 py-3 text-slate-700">{item.quantity_requested}</td>
                                             <td className="px-4 py-3 text-slate-700">{formatMoney(item.estimated_unit_cost)}</td>
                                         </tr>
@@ -343,6 +357,14 @@ function formatMoney(value?: number | null): string {
     }
 
     return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(value);
+}
+
+function formatNumber(value?: number | null): string {
+    if (value == null) {
+        return '-';
+    }
+
+    return new Intl.NumberFormat('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 }
 
 function StatusBadge({ status }: { status: string }) {
