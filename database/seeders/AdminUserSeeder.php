@@ -31,6 +31,7 @@ class AdminUserSeeder extends Seeder
                 'email' => 'rienz123123@gmail.com',
                 'name' => 'GovSupply Administrator',
                 'password' => Hash::make('admin12345'),
+                'must_change_password' => true,
                 'role_id' => $adminRole->id,
                 'office_id' => $technicalOffice->id,
                 'email_verified_at' => now(),
