@@ -5,7 +5,9 @@ import {
     Dispatch,
     PropsWithChildren,
     SetStateAction,
+    useEffect,
     useContext,
+    useRef,
     useState,
 } from 'react';
 
@@ -21,32 +23,46 @@ const DropDownContext = createContext<{
 
 const Dropdown = ({ children }: PropsWithChildren) => {
     const [open, setOpen] = useState(false);
+    const containerRef = useRef<HTMLDivElement | null>(null);
 
     const toggleOpen = () => {
         setOpen((previousState) => !previousState);
     };
 
+    useEffect(() => {
+        if (!open) {
+            return;
+        }
+
+        const handlePointerDown = (event: MouseEvent) => {
+            if (!containerRef.current) {
+                return;
+            }
+
+            if (!containerRef.current.contains(event.target as Node)) {
+                setOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handlePointerDown);
+
+        return () => {
+            document.removeEventListener('mousedown', handlePointerDown);
+        };
+    }, [open]);
+
     return (
         <DropDownContext.Provider value={{ open, setOpen, toggleOpen }}>
-            <div className="relative">{children}</div>
+            <div ref={containerRef} className="relative">{children}</div>
         </DropDownContext.Provider>
     );
 };
 
 const Trigger = ({ children }: PropsWithChildren) => {
-    const { open, setOpen, toggleOpen } = useContext(DropDownContext);
+    const { toggleOpen } = useContext(DropDownContext);
 
     return (
-        <>
-            <div onClick={toggleOpen}>{children}</div>
-
-            {open && (
-                <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setOpen(false)}
-                ></div>
-            )}
-        </>
+        <div onClick={toggleOpen}>{children}</div>
     );
 };
 
