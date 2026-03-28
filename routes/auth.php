@@ -8,6 +8,7 @@ use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Http\Controllers\Auth\TwoFactorChallengeController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use Illuminate\Support\Facades\Route;
 
@@ -36,6 +37,18 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware('auth')->group(function () {
+    Route::get('two-factor-challenge', [TwoFactorChallengeController::class, 'show'])
+        ->name('two-factor.challenge.show');
+
+    Route::post('two-factor-challenge/verify', [TwoFactorChallengeController::class, 'verify'])
+        ->name('two-factor.challenge.verify');
+
+    Route::post('two-factor-challenge/resend', [TwoFactorChallengeController::class, 'resend'])
+        ->name('two-factor.challenge.resend');
+
+    Route::post('two-factor-challenge/cancel', [TwoFactorChallengeController::class, 'cancel'])
+        ->name('two-factor.challenge.cancel');
+
     Route::get('verify-email', EmailVerificationPromptController::class)
         ->name('verification.notice');
 

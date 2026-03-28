@@ -58,10 +58,10 @@ Route::get('/', function () {
 });
 
 Route::get('/dashboard', DashboardController::class)
-    ->middleware(['auth', 'verified'])
+    ->middleware(['auth', 'verified', 'twofactor'])
     ->name('dashboard');
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'twofactor'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
@@ -106,6 +106,14 @@ Route::middleware('auth')->group(function () {
                 ->middleware('can:governance.manage-users')
                 ->name('users.index');
 
+            Route::get('/users/create', [UserManagementController::class, 'create'])
+                ->middleware('can:governance.manage-users')
+                ->name('users.create');
+
+            Route::post('/users', [UserManagementController::class, 'store'])
+                ->middleware('can:governance.manage-users')
+                ->name('users.store');
+
             Route::get('/users/{user}/edit', [UserManagementController::class, 'edit'])
                 ->middleware('can:governance.manage-users')
                 ->name('users.edit');
@@ -121,6 +129,14 @@ Route::middleware('auth')->group(function () {
             Route::get('/offices', [OfficeManagementController::class, 'index'])
                 ->middleware('can:governance.manage-offices')
                 ->name('offices.index');
+
+            Route::get('/offices/create', [OfficeManagementController::class, 'create'])
+                ->middleware('can:governance.manage-offices')
+                ->name('offices.create');
+
+            Route::post('/offices', [OfficeManagementController::class, 'store'])
+                ->middleware('can:governance.manage-offices')
+                ->name('offices.store');
 
             Route::get('/offices/{office}/edit', [OfficeManagementController::class, 'edit'])
                 ->middleware('can:governance.manage-offices')

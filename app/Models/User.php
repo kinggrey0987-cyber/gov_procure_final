@@ -170,6 +170,11 @@ class User extends Authenticatable
         return $this->hasMany(Document::class, 'uploaded_by', 'id');
     }
 
+    public function twoFactorChallenges(): HasMany
+    {
+        return $this->hasMany(TwoFactorChallenge::class, 'user_id', 'id');
+    }
+
     public function roleCode(): ?string
     {
         return $this->role?->code;

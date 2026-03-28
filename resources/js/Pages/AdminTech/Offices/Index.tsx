@@ -7,6 +7,9 @@ type OfficeRow = {
     code: string;
     users_count: number;
     is_active: boolean;
+    can_hard_delete: boolean;
+    can_delete_action: boolean;
+    delete_reason: string | null;
 };
 
 type Props = {
@@ -17,23 +20,41 @@ type Props = {
 
 export default function OfficeIndex({ offices }: Props) {
     const page = usePage().props as {
+        flash?: {
+            success?: string;
+        };
         errors?: {
             delete?: string;
         };
     };
 
     const deleteError = page.errors?.delete;
+    const successMessage = page.flash?.success;
 
-    const deleteOffice = (officeId: number, officeName: string) => {
-        if (!window.confirm(`Delete office ${officeName}? This action cannot be undone.`)) {
+    const deleteOffice = (office: OfficeRow) => {
+        if (!office.can_delete_action) {
             return;
         }
 
-        router.delete(route('admin-tech.offices.destroy', officeId), {
+        const actionLabel = office.can_hard_delete ? 'delete' : 'deactivate';
+        const confirmationMessage = office.can_hard_delete
+            ? `Delete office ${office.name}? This action cannot be undone.`
+            : `Office ${office.name} has linked records. Continue to safely deactivate it?`;
+
+        if (!window.confirm(confirmationMessage)) {
+            return;
+        }
+
+        router.delete(route('admin-tech.offices.destroy', office.id), {
             preserveScroll: true,
             onError: (errors) => {
                 if (errors.delete) {
                     window.alert(errors.delete);
+                }
+            },
+            onSuccess: () => {
+                if (!office.can_hard_delete) {
+                    window.alert(`Office ${office.name} has been ${actionLabel}d safely.`);
                 }
             },
         });
@@ -49,10 +70,19 @@ export default function OfficeIndex({ offices }: Props) {
                         <h3 className="text-3xl font-semibold text-slate-800">Office Management</h3>
                         <p className="mt-1 text-lg text-slate-500">Manage municipal offices and departmental access context</p>
                     </div>
-                    <span className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-slate-100 px-4 text-sm font-semibold text-slate-500">
-                        Add Office (Disabled)
-                    </span>
+                    <Link
+                        href={route('admin-tech.offices.create')}
+                        className="inline-flex h-10 items-center justify-center rounded-xl border border-red-300 bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700"
+                    >
+                        Add Office
+                    </Link>
                 </header>
+
+                {successMessage && (
+                    <div className="border-b border-emerald-200 bg-emerald-50 px-6 py-3 text-sm font-medium text-emerald-700">
+                        {successMessage}
+                    </div>
+                )}
 
                 {deleteError && (
                     <div className="border-b border-rose-200 bg-rose-50 px-6 py-3 text-sm font-medium text-rose-700">
@@ -103,10 +133,12 @@ export default function OfficeIndex({ offices }: Props) {
                                             </Link>
                                             <button
                                                 type="button"
-                                                onClick={() => deleteOffice(office.id, office.name)}
-                                                className="inline-flex h-8 items-center rounded-lg border border-rose-300 px-3 text-xs font-semibold text-rose-700 hover:bg-rose-50"
+                                                onClick={() => deleteOffice(office)}
+                                                disabled={!office.can_delete_action}
+                                                className="inline-flex h-8 items-center rounded-lg border border-rose-300 px-3 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                                                title={office.can_delete_action ? (office.can_hard_delete ? 'Delete this office' : 'Safely deactivate this office') : office.delete_reason ?? 'Delete is currently unavailable.'}
                                             >
-                                                Delete
+                                                {office.can_hard_delete ? 'Delete' : 'Deactivate'}
                                             </button>
                                         </div>
                                     </td>

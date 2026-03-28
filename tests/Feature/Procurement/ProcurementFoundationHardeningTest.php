@@ -28,7 +28,7 @@ class ProcurementFoundationHardeningTest extends TestCase
         $this->withoutVite();
     }
 
-    public function test_duplicate_po_number_is_rejected(): void
+    public function test_po_number_payload_is_ignored_and_system_generates_unique_numbers(): void
     {
         $office = $this->createOffice();
         $officeUser = $this->createUser(UserRole::OFFICE_USER, $office);
@@ -40,7 +40,6 @@ class ProcurementFoundationHardeningTest extends TestCase
 
         $payload = [
             'purchase_request_id' => $purchaseRequest->purchase_request_id,
-            'supply_request_id' => $context['supplyRequest']->supply_request_id,
             'supplier_id' => $supplier->supplier_id,
             'po_number' => 'PO-HARD-0001',
             'procurement_method' => 'SHOPPING',
@@ -55,9 +54,14 @@ class ProcurementFoundationHardeningTest extends TestCase
 
         $this->actingAs($procurementOfficer)
             ->post(route('procurement.purchase-orders.store'), $payload)
-            ->assertSessionHasErrors('po_number');
+            ->assertRedirect();
 
-        $this->assertSame(1, PurchaseOrder::query()->count());
+        $this->assertSame(2, PurchaseOrder::query()->count());
+
+        $orders = PurchaseOrder::query()->orderBy('purchase_order_id')->get();
+        $this->assertNotSame('PO-HARD-0001', (string) $orders[0]->po_number);
+        $this->assertNotSame('PO-HARD-0001', (string) $orders[1]->po_number);
+        $this->assertNotSame((string) $orders[0]->po_number, (string) $orders[1]->po_number);
     }
 
     public function test_invalid_status_transitions_are_rejected_for_purchase_requests_and_purchase_orders(): void
@@ -150,7 +154,7 @@ class ProcurementFoundationHardeningTest extends TestCase
         $this->assertSame(1, PurchaseRequest::query()->where('supply_request_id', $submittedContext['supplyRequest']->supply_request_id)->count());
     }
 
-    public function test_purchase_order_creation_rejects_invalid_linked_records_and_inactive_supplier(): void
+    public function test_purchase_order_creation_requires_active_supplier_and_derives_supply_request_from_purchase_request(): void
     {
         $office = $this->createOffice();
         $officeUser = $this->createUser(UserRole::OFFICE_USER, $office);
@@ -170,19 +174,23 @@ class ProcurementFoundationHardeningTest extends TestCase
                 'po_number' => 'PO-LINK-0001',
                 'procurement_method' => 'SHOPPING',
             ])
-            ->assertSessionHasErrors('supply_request_id');
+            ->assertSessionHasErrors('supplier_id');
+
+        $activeSupplier = $this->createSupplier($procurementOfficer, 'ACTIVE');
 
         $this->actingAs($procurementOfficer)
             ->post(route('procurement.purchase-orders.store'), [
                 'purchase_request_id' => $purchaseRequest->purchase_request_id,
-                'supply_request_id' => $primaryContext['supplyRequest']->supply_request_id,
-                'supplier_id' => $inactiveSupplier->supplier_id,
+                'supply_request_id' => $otherContext['supplyRequest']->supply_request_id,
+                'supplier_id' => $activeSupplier->supplier_id,
                 'po_number' => 'PO-LINK-0002',
                 'procurement_method' => 'SHOPPING',
             ])
-            ->assertSessionHasErrors('supplier_id');
+            ->assertRedirect();
 
-        $this->assertSame(0, PurchaseOrder::query()->count());
+        $purchaseOrder = PurchaseOrder::query()->firstOrFail();
+        $this->assertSame((int) $primaryContext['supplyRequest']->supply_request_id, (int) $purchaseOrder->supply_request_id);
+        $this->assertSame(1, PurchaseOrder::query()->count());
     }
 
     public function test_purchase_order_items_must_belong_to_linked_supply_request(): void

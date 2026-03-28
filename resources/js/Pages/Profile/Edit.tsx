@@ -8,16 +8,21 @@ import UpdateProfileInformationForm from './Partials/UpdateProfileInformationFor
 export default function Edit({
     mustVerifyEmail,
     status,
-}: PageProps<{ mustVerifyEmail: boolean; status?: string }>) {
+}: PageProps<{ mustVerifyEmail: boolean; status?: string; twoFactor?: { required: boolean; policy: string } }>) {
     const page = usePage().props as {
         auth: {
             user: {
                 role_code?: string;
             };
         };
+        twoFactor?: {
+            required: boolean;
+            policy: string;
+        };
     };
     const roleCode = page.auth.user.role_code ?? '';
     const canDeleteAccount = !['ADMIN', 'EXEC_OFFICER'].includes(roleCode);
+    const twoFactor = page.twoFactor ?? { required: false, policy: 'optional' };
 
     return (
         <AuthenticatedLayout header="Profile Settings">
@@ -46,6 +51,20 @@ export default function Edit({
                         </div>
                         <div className="p-6 sm:p-8">
                             <UpdatePasswordForm className="max-w-2xl" />
+
+                            <div className="mt-8 max-w-2xl rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                <h4 className="text-sm font-semibold text-slate-900">Two-Factor Authentication</h4>
+                                {twoFactor.required ? (
+                                    <p className="mt-2 text-sm text-slate-600">
+                                        Two-factor authentication is <span className="font-semibold text-emerald-700">enabled and mandatory</span> for your internal role.
+                                        You will be asked to verify an email code on every new sign in.
+                                    </p>
+                                ) : (
+                                    <p className="mt-2 text-sm text-slate-600">
+                                        Two-factor authentication is not currently required for this account role.
+                                    </p>
+                                )}
+                            </div>
                         </div>
                     </section>
 

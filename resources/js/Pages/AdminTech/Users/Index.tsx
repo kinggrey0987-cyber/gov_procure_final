@@ -7,6 +7,8 @@ type UserRow = {
     email: string;
     role: { code: string; name: string } | null;
     office: { code: string; name: string } | null;
+    can_delete: boolean;
+    delete_reason: string | null;
 };
 
 type Props = {
@@ -22,12 +24,16 @@ export default function UserIndex({ users }: Props) {
                 id: number;
             };
         };
+        flash?: {
+            success?: string;
+        };
         errors?: {
             delete?: string;
         };
     };
 
     const deleteError = page.errors?.delete;
+    const successMessage = page.flash?.success;
 
     const deleteUser = (userId: number, userName: string) => {
         if (!window.confirm(`Delete user account for ${userName}? This action cannot be undone.`)) {
@@ -54,10 +60,19 @@ export default function UserIndex({ users }: Props) {
                         <h3 className="text-3xl font-semibold text-slate-800">User Management</h3>
                         <p className="mt-1 text-lg text-slate-500">Manage internal system users and their technical access roles</p>
                     </div>
-                    <span className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-slate-100 px-4 text-sm font-semibold text-slate-500">
-                        Add User (Disabled)
-                    </span>
+                    <Link
+                        href={route('admin-tech.users.create')}
+                        className="inline-flex h-10 items-center justify-center rounded-xl border border-red-300 bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700"
+                    >
+                        Add User
+                    </Link>
                 </header>
+
+                {successMessage && (
+                    <div className="border-b border-emerald-200 bg-emerald-50 px-6 py-3 text-sm font-medium text-emerald-700">
+                        {successMessage}
+                    </div>
+                )}
 
                 {deleteError && (
                     <div className="border-b border-rose-200 bg-rose-50 px-6 py-3 text-sm font-medium text-rose-700">
@@ -115,9 +130,9 @@ export default function UserIndex({ users }: Props) {
                                             <button
                                                 type="button"
                                                 onClick={() => deleteUser(user.id, user.name)}
-                                                disabled={page.auth.user.id === user.id}
+                                                disabled={!user.can_delete}
                                                 className="inline-flex h-8 items-center rounded-lg border border-rose-300 px-3 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
-                                                title={page.auth.user.id === user.id ? 'You cannot delete your own account.' : 'Delete this account'}
+                                                title={user.can_delete ? 'Delete this account' : user.delete_reason ?? 'Delete is currently unavailable.'}
                                             >
                                                 Delete
                                             </button>

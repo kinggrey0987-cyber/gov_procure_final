@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Auth\TwoFactorChallengeService;
 use App\Http\Requests\ProfileUpdateRequest;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
@@ -13,6 +14,10 @@ use Inertia\Response;
 
 class ProfileController extends Controller
 {
+    public function __construct(private readonly TwoFactorChallengeService $twoFactorService)
+    {
+    }
+
     /**
      * Display the user's profile form.
      */
@@ -21,6 +26,10 @@ class ProfileController extends Controller
         return Inertia::render('Profile/Edit', [
             'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
             'status' => session('status'),
+            'twoFactor' => [
+                'required' => $this->twoFactorService->requiresTwoFactor($request->user()),
+                'policy' => 'mandatory_internal_roles',
+            ],
         ]);
     }
 

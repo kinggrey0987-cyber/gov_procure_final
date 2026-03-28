@@ -90,10 +90,14 @@ class GovernanceFoundationHardeningTest extends TestCase
         $this->assertContains('can:public.disclosures.view', $publicRoute->middleware());
 
         $adminUsersRoute = Route::getRoutes()->getByName('admin-tech.users.index');
+        $adminUsersCreateRoute = Route::getRoutes()->getByName('admin-tech.users.create');
+        $adminUsersStoreRoute = Route::getRoutes()->getByName('admin-tech.users.store');
         $adminUsersEditRoute = Route::getRoutes()->getByName('admin-tech.users.edit');
         $adminUsersUpdateRoute = Route::getRoutes()->getByName('admin-tech.users.update');
         $adminUsersDestroyRoute = Route::getRoutes()->getByName('admin-tech.users.destroy');
         $adminOfficesRoute = Route::getRoutes()->getByName('admin-tech.offices.index');
+        $adminOfficesCreateRoute = Route::getRoutes()->getByName('admin-tech.offices.create');
+        $adminOfficesStoreRoute = Route::getRoutes()->getByName('admin-tech.offices.store');
         $adminOfficesEditRoute = Route::getRoutes()->getByName('admin-tech.offices.edit');
         $adminOfficesUpdateRoute = Route::getRoutes()->getByName('admin-tech.offices.update');
         $adminOfficesDestroyRoute = Route::getRoutes()->getByName('admin-tech.offices.destroy');
@@ -104,10 +108,14 @@ class GovernanceFoundationHardeningTest extends TestCase
         $executiveTransparencyMonitoringRoute = Route::getRoutes()->getByName('executive.transparency-monitoring');
 
         $this->assertNotNull($adminUsersRoute);
+        $this->assertNotNull($adminUsersCreateRoute);
+        $this->assertNotNull($adminUsersStoreRoute);
         $this->assertNotNull($adminUsersEditRoute);
         $this->assertNotNull($adminUsersUpdateRoute);
         $this->assertNotNull($adminUsersDestroyRoute);
         $this->assertNotNull($adminOfficesRoute);
+        $this->assertNotNull($adminOfficesCreateRoute);
+        $this->assertNotNull($adminOfficesStoreRoute);
         $this->assertNotNull($adminOfficesEditRoute);
         $this->assertNotNull($adminOfficesUpdateRoute);
         $this->assertNotNull($adminOfficesDestroyRoute);
@@ -119,12 +127,16 @@ class GovernanceFoundationHardeningTest extends TestCase
 
         $this->assertContains('domain:admin-tech', $adminUsersRoute->middleware());
         $this->assertContains('can:governance.manage-users', $adminUsersRoute->middleware());
+        $this->assertContains('can:governance.manage-users', $adminUsersCreateRoute->middleware());
+        $this->assertContains('can:governance.manage-users', $adminUsersStoreRoute->middleware());
         $this->assertContains('can:governance.manage-users', $adminUsersEditRoute->middleware());
         $this->assertContains('can:governance.manage-users', $adminUsersUpdateRoute->middleware());
         $this->assertContains('can:governance.manage-users', $adminUsersDestroyRoute->middleware());
 
         $this->assertContains('domain:admin-tech', $adminOfficesRoute->middleware());
         $this->assertContains('can:governance.manage-offices', $adminOfficesRoute->middleware());
+        $this->assertContains('can:governance.manage-offices', $adminOfficesCreateRoute->middleware());
+        $this->assertContains('can:governance.manage-offices', $adminOfficesStoreRoute->middleware());
         $this->assertContains('can:governance.manage-offices', $adminOfficesEditRoute->middleware());
         $this->assertContains('can:governance.manage-offices', $adminOfficesUpdateRoute->middleware());
         $this->assertContains('can:governance.manage-offices', $adminOfficesDestroyRoute->middleware());
@@ -159,11 +171,15 @@ class GovernanceFoundationHardeningTest extends TestCase
         $managedUser = $this->createUser(UserRole::PROCUREMENT_OFFICER, $office);
 
         $this->actingAs($admin)->get('/admin-tech/users')->assertOk();
+        $this->actingAs($admin)->get('/admin-tech/users/create')->assertOk();
         $this->actingAs($admin)->get('/admin-tech/users/'.$managedUser->id.'/edit')->assertOk();
+        $this->actingAs($admin)->get('/admin-tech/offices/create')->assertOk();
         $this->actingAs($admin)->get('/admin-tech/offices/'.$office->id.'/edit')->assertOk();
         $this->actingAs($officeUser)->get('/admin-tech/users')->assertForbidden();
+        $this->actingAs($officeUser)->get('/admin-tech/users/create')->assertForbidden();
         $this->actingAs($officeUser)->get('/admin-tech/users/'.$managedUser->id.'/edit')->assertForbidden();
         $this->actingAs($officeUser)->get('/admin-tech/offices')->assertForbidden();
+        $this->actingAs($officeUser)->get('/admin-tech/offices/create')->assertForbidden();
         $this->actingAs($officeUser)->get('/admin-tech/offices/'.$office->id.'/edit')->assertForbidden();
         $this->actingAs($officeUser)->get('/admin-tech/roles')->assertForbidden();
     }

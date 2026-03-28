@@ -114,4 +114,16 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    'two_factor' => [
+        'code_expiration_minutes' => env('TWO_FACTOR_CODE_EXPIRATION_MINUTES', 10),
+        'max_attempts' => env('TWO_FACTOR_MAX_ATTEMPTS', 5),
+        'testing_bypass' => env('TWO_FACTOR_TESTING_BYPASS', true),
+        'rate_limit' => [
+            'verify_max_attempts' => env('TWO_FACTOR_VERIFY_RATE_LIMIT_MAX', 10),
+            'verify_decay_seconds' => env('TWO_FACTOR_VERIFY_RATE_LIMIT_DECAY', 60),
+            'resend_max_attempts' => env('TWO_FACTOR_RESEND_RATE_LIMIT_MAX', 3),
+            'resend_decay_seconds' => env('TWO_FACTOR_RESEND_RATE_LIMIT_DECAY', 300),
+        ],
+    ],
+
 ];
