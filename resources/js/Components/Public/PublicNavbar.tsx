@@ -1,5 +1,3 @@
-import { Link } from '@inertiajs/react';
-
 type Props = {
     canLogin: boolean;
 };
@@ -30,22 +28,22 @@ export default function PublicNavbar({ canLogin }: Props) {
                     <a href="#transparency" className="hover:text-red-600">How It Works</a>
                     <a href="#about" className="hover:text-red-600">About</a>
                     {canLogin && (
-                        <Link
+                        <a
                             href={route('login')}
                             className="inline-flex h-10 items-center justify-center rounded-xl bg-red-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-red-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
                         >
                             Login
-                        </Link>
+                        </a>
                     )}
                 </nav>
 
                 {canLogin && (
-                    <Link
+                    <a
                         href={route('login')}
                         className="inline-flex h-10 items-center justify-center rounded-xl bg-red-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-red-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 xl:hidden"
                     >
                         Login
-                    </Link>
+                    </a>
                 )}
             </div>
         </header>

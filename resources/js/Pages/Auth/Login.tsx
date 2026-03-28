@@ -32,13 +32,13 @@ export default function Login({
 
             <header className="border-b border-white/15 bg-red-700/80 backdrop-blur-sm">
                 <div className="mx-auto flex w-full max-w-6xl items-center px-4 py-4 sm:px-6 lg:px-8">
-                    <Link href="/" className="flex items-center gap-3">
+                    <a href="/" className="flex items-center gap-3">
                         <img src="/logo.jpg" alt="Municipality of E.B. Magalona Logo" className="h-12 w-12 rounded border border-white/40 bg-white object-cover" />
                         <div>
                             <p className="text-lg font-bold text-white sm:text-2xl">Municipality of E.B. Magalona</p>
                             <p className="text-sm text-amber-300">Negros Occidental - Municipal Government Portal</p>
                         </div>
-                    </Link>
+                    </a>
                 </div>
             </header>
 
@@ -135,12 +135,12 @@ export default function Login({
                                 {processing ? 'Signing In...' : 'Sign In Securely'}
                             </button>
 
-                            <Link
+                            <a
                                 href="/"
                                 className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2"
                             >
                                 Return to Home
-                            </Link>
+                            </a>
                         </div>
                     </form>
                 </section>
