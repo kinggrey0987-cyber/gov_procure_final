@@ -1,0 +1,30 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::table('users', function (Blueprint $table) {
+            $table->foreignId('role_id')->after('password')->constrained('roles')->restrictOnDelete()->cascadeOnUpdate();
+            $table->foreignId('office_id')->after('role_id')->constrained('offices')->restrictOnDelete()->cascadeOnUpdate();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::table('users', function (Blueprint $table) {
+            $table->dropConstrainedForeignId('office_id');
+            $table->dropConstrainedForeignId('role_id');
+        });
+    }
+};

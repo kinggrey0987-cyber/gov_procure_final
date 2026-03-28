@@ -1,0 +1,106 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+
+class PurchaseOrder extends Model
+{
+    use HasFactory;
+
+    protected $primaryKey = 'purchase_order_id';
+
+    public function getRouteKeyName(): string
+    {
+        return 'purchase_order_id';
+    }
+
+    protected $fillable = [
+        'purchase_request_id',
+        'supply_request_id',
+        'supplier_id',
+        'created_by',
+        'po_number',
+        'procurement_method',
+        'status',
+        'expected_delivery_date',
+        'total_amount',
+        'terms_notes',
+        'remarks',
+    ];
+
+    protected $casts = [
+        'purchase_request_id' => 'integer',
+        'supply_request_id' => 'integer',
+        'supplier_id' => 'integer',
+        'created_by' => 'integer',
+        'expected_delivery_date' => 'date',
+        'total_amount' => 'decimal:2',
+    ];
+
+    public function purchaseRequest(): BelongsTo
+    {
+        return $this->belongsTo(PurchaseRequest::class, 'purchase_request_id', 'purchase_request_id');
+    }
+
+    public function supplyRequest(): BelongsTo
+    {
+        return $this->belongsTo(SupplyRequest::class, 'supply_request_id', 'supply_request_id');
+    }
+
+    public function supplier(): BelongsTo
+    {
+        return $this->belongsTo(Supplier::class, 'supplier_id', 'supplier_id');
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(PurchaseOrderItem::class, 'purchase_order_id', 'purchase_order_id');
+    }
+
+    public function deliveries(): HasMany
+    {
+        return $this->hasMany(Delivery::class, 'purchase_order_id', 'purchase_order_id');
+    }
+
+    public function alerts(): HasMany
+    {
+        return $this->hasMany(Alert::class, 'purchase_order_id', 'purchase_order_id');
+    }
+
+    public function documents(): HasMany
+    {
+        return $this->hasMany(Document::class, 'related_reference_id', 'purchase_order_id')
+            ->where('related_module', 'purchase_orders');
+    }
+
+    public function statusHistory(): MorphMany
+    {
+        return $this->morphMany(StatusHistory::class, 'reference', 'reference_type', 'reference_id');
+    }
+
+    public function approvalHistory(): MorphMany
+    {
+        return $this->morphMany(ApprovalHistory::class, 'reference', 'reference_type', 'reference_id');
+    }
+
+    public function scopeDraft(Builder $query): Builder
+    {
+        return $query->where('status', 'DRAFT');
+    }
+
+    public function scopePlaced(Builder $query): Builder
+    {
+        return $query->where('status', 'PLACED');
+    }
+}

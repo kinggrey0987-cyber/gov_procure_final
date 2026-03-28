@@ -1,0 +1,175 @@
+<?php
+
+namespace App\Services\Delivery;
+
+use App\Models\Delivery;
+use App\Models\DeliveryItem;
+use App\Models\PurchaseOrder;
+use App\Models\StatusHistory;
+use App\Models\User;
+use App\Services\AuditLogService;
+use App\Services\NotificationService;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+
+class DeliveryService
+{
+    public function __construct(
+        private readonly AuditLogService $auditLogService,
+        private readonly NotificationService $notificationService,
+    ) {
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    public function create(User $actor, array $payload): Delivery
+    {
+        $this->assertGsoOfficer($actor);
+
+        $purchaseOrder = PurchaseOrder::query()
+            ->where('purchase_order_id', (int) $payload['purchase_order_id'])
+            ->firstOrFail();
+
+        if ((string) $purchaseOrder->status !== 'PLACED') {
+            throw ValidationException::withMessages([
+                'purchase_order_id' => 'Only PLACED purchase orders can receive deliveries.',
+            ]);
+        }
+
+        if ((int) $purchaseOrder->supplier_id !== (int) $payload['supplier_id']) {
+            throw ValidationException::withMessages([
+                'supplier_id' => 'Delivery supplier must match the supplier linked to the purchase order.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($actor, $payload, $purchaseOrder): Delivery {
+            // Generate delivery code if not provided
+            $deliveryCode = $payload['delivery_code'] ?? $this->generateDeliveryCode();
+
+            $delivery = Delivery::query()->create([
+                'delivery_code' => $deliveryCode,
+                'purchase_order_id' => (int) $purchaseOrder->purchase_order_id,
+                'supplier_id' => (int) $payload['supplier_id'],
+                'actual_delivery_date' => $payload['actual_delivery_date'] ?? null,
+                'expected_arrival_date' => $payload['expected_arrival_date'] ?? null,
+                'received_by' => (int) $actor->id,
+                'receipt_status' => 'PENDING',
+                'remarks' => $payload['remarks'] ?? null,
+            ]);
+
+            $this->recordStatus($delivery, null, 'PENDING', $actor, 'Delivery created.');
+            $this->recordAudit($actor, 'CREATE', $delivery);
+
+            // Send notification to purchaser
+            $requester = User::query()->find($purchaseOrder->purchaseRequest->requested_by);
+            if ($requester instanceof User) {
+                $this->notificationService->notifyUser(
+                    user: $requester,
+                    title: 'Delivery Created',
+                    message: 'GSO has created a delivery record for your purchase order.',
+                    notificationType: 'DELIVERY_CREATED',
+                    referenceType: Delivery::class,
+                    referenceId: (int) $delivery->delivery_id,
+                );
+            }
+
+            return $delivery->fresh(['purchaseOrder', 'supplier', 'receiver', 'items']) ?? $delivery;
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    public function updateReceipt(Delivery $delivery, User $actor, array $payload): Delivery
+    {
+        $this->assertGsoOfficer($actor);
+
+        return DB::transaction(function () use ($delivery, $actor, $payload): Delivery {
+            $delivery->fill([
+                'actual_delivery_date' => $payload['actual_delivery_date'] ?? $delivery->actual_delivery_date,
+                'expected_arrival_date' => $payload['expected_arrival_date'] ?? $delivery->expected_arrival_date,
+                'remarks' => $payload['remarks'] ?? $delivery->remarks,
+            ])->save();
+
+            $this->recordStatus($delivery, (string) $delivery->receipt_status, (string) $delivery->receipt_status, $actor, 'Delivery receipt updated.');
+            $this->recordAudit($actor, 'UPDATE', $delivery);
+
+            return $delivery->fresh(['purchaseOrder', 'supplier', 'receiver', 'items']) ?? $delivery;
+        });
+    }
+
+    public function markReceived(Delivery $delivery, User $actor, ?string $remarks = null): Delivery
+    {
+        $this->assertGsoOfficer($actor);
+
+        if ((string) $delivery->receipt_status !== 'PENDING') {
+            throw ValidationException::withMessages([
+                'receipt_status' => 'Only PENDING deliveries can be marked as received.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($delivery, $actor, $remarks): Delivery {
+            $oldStatus = (string) $delivery->receipt_status;
+
+            $delivery->forceFill([
+                'receipt_status' => 'RECEIVED',
+                'remarks' => $remarks ?? $delivery->remarks,
+            ])->save();
+
+            $this->recordStatus($delivery, $oldStatus, 'RECEIVED', $actor, 'Delivery marked as received.');
+            $this->recordAudit($actor, 'MARK_RECEIVED', $delivery);
+
+            return $delivery->fresh(['purchaseOrder', 'supplier', 'receiver', 'items']) ?? $delivery;
+        });
+    }
+
+    private function generateDeliveryCode(): string
+    {
+        $lastDelivery = Delivery::query()->latest('delivery_id')->first();
+        $nextNumber = ((int) ($lastDelivery?->delivery_id ?? 0)) + 1;
+
+        return sprintf('DEL-%s-%05d', date('Y'), $nextNumber);
+    }
+
+    private function assertGsoOfficer(User $actor): void
+    {
+        if (!$actor->isGsoOfficer()) {
+            throw ValidationException::withMessages([
+                'role' => 'Only GSO officers can manage deliveries.',
+            ]);
+        }
+    }
+
+    private function recordStatus(Delivery $delivery, ?string $oldStatus, string $newStatus, User $actor, string $remarks): void
+    {
+        StatusHistory::query()->create([
+            'reference_type' => Delivery::class,
+            'reference_id' => (int) $delivery->delivery_id,
+            'old_status' => $oldStatus,
+            'new_status' => $newStatus,
+            'changed_by' => (int) $actor->id,
+            'remarks' => $remarks,
+            'changed_at' => now(),
+        ]);
+    }
+
+    private function recordAudit(User $actor, string $actionType, Delivery $delivery): void
+    {
+        $this->auditLogService->log(
+            actor: $actor,
+            moduleName: 'Delivery.Delivery',
+            actionType: $actionType,
+            referenceType: Delivery::class,
+            referenceId: (int) $delivery->delivery_id,
+            details: [
+                'delivery_code' => $delivery->delivery_code,
+                'purchase_order_id' => $delivery->purchase_order_id,
+                'supplier_id' => $delivery->supplier_id,
+                'receipt_status' => $delivery->receipt_status,
+            ],
+            logDomain: 'BUSINESS',
+            officeId: $delivery->purchaseOrder->supplyRequest->office_id ?? null,
+        );
+    }
+}

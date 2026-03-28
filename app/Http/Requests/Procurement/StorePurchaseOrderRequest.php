@@ -1,0 +1,28 @@
+<?php
+
+namespace App\Http\Requests\Procurement;
+
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+class StorePurchaseOrderRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return (bool) $this->user()?->can('procurement.purchase-order.create');
+    }
+
+    public function rules(): array
+    {
+        return [
+            'purchase_request_id' => ['required', 'integer', 'exists:purchase_requests,purchase_request_id'],
+            'supply_request_id' => ['required', 'integer', 'exists:supply_requests,supply_request_id'],
+            'supplier_id' => ['required', 'integer', 'exists:suppliers,supplier_id'],
+            'po_number' => ['required', 'string', 'max:80', Rule::unique('purchase_orders', 'po_number')],
+            'procurement_method' => ['required', 'string', 'max:120'],
+            'expected_delivery_date' => ['nullable', 'date'],
+            'terms_notes' => ['nullable', 'string'],
+            'remarks' => ['nullable', 'string'],
+        ];
+    }
+}
