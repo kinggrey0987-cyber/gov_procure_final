@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Notification\MarkAllNotificationsReadRequest;
+use App\Http\Requests\Notification\MarkNotificationReadRequest;
 use App\Models\Notification;
 use App\Services\Notifications\NotificationCenterService;
 use Illuminate\Http\RedirectResponse;
@@ -47,7 +49,7 @@ class NotificationController extends Controller
         return redirect()->to($target);
     }
 
-    public function markAsRead(Request $request, Notification $notification): RedirectResponse
+    public function markAsRead(MarkNotificationReadRequest $request, Notification $notification): RedirectResponse
     {
         abort_unless($request->user()?->can('notification.update', $notification), 403);
 
@@ -60,7 +62,7 @@ class NotificationController extends Controller
         return back()->with('success', 'Notification marked as read.');
     }
 
-    public function markAllAsRead(Request $request): RedirectResponse
+    public function markAllAsRead(MarkAllNotificationsReadRequest $request): RedirectResponse
     {
         abort_unless($request->user()?->can('notifications.access'), 403);
 

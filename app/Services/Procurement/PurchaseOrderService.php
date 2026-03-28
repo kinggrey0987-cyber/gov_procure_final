@@ -38,22 +38,16 @@ class PurchaseOrderService
             ]);
         }
 
-        if ((int) $purchaseRequest->supply_request_id !== (int) $payload['supply_request_id']) {
-            throw ValidationException::withMessages([
-                'supply_request_id' => 'Supply request must match the selected purchase request.',
-            ]);
-        }
-
         $supplier = Supplier::query()->where('supplier_id', (int) $payload['supplier_id'])->firstOrFail();
         $this->assertSupplierIsAllowed($supplier);
 
         return DB::transaction(function () use ($actor, $payload, $purchaseRequest): PurchaseOrder {
             $purchaseOrder = PurchaseOrder::query()->create([
                 'purchase_request_id' => (int) $payload['purchase_request_id'],
-                'supply_request_id' => (int) $payload['supply_request_id'],
+                'supply_request_id' => (int) $purchaseRequest->supply_request_id,
                 'supplier_id' => (int) $payload['supplier_id'],
                 'created_by' => (int) $actor->id,
-                'po_number' => $payload['po_number'],
+                'po_number' => $this->generateNextPoNumber(),
                 'procurement_method' => $payload['procurement_method'],
                 'status' => 'DRAFT',
                 'expected_delivery_date' => $payload['expected_delivery_date'] ?? null,
@@ -79,6 +73,11 @@ class PurchaseOrderService
 
             return $purchaseOrder->fresh(['supplier', 'creator', 'purchaseRequest', 'supplyRequest', 'items']) ?? $purchaseOrder;
         });
+    }
+
+    public function previewNextPoNumber(): string
+    {
+        return $this->generateNextPoNumber();
     }
 
     /**
@@ -278,6 +277,22 @@ class PurchaseOrderService
                 'item_id' => 'Item must match the selected supply request item.',
             ]);
         }
+    }
+
+    private function generateNextPoNumber(): string
+    {
+        $latest = PurchaseOrder::query()
+            ->where('po_number', 'like', 'PO-'.date('Y').'-%')
+            ->latest('purchase_order_id')
+            ->value('po_number');
+
+        $nextSequence = 1;
+
+        if (is_string($latest) && preg_match('/^PO-\d{4}-(\d+)$/', $latest, $matches) === 1) {
+            $nextSequence = ((int) $matches[1]) + 1;
+        }
+
+        return sprintf('PO-%s-%05d', date('Y'), $nextSequence);
     }
 
     private function recordStatus(PurchaseOrder $purchaseOrder, ?string $oldStatus, string $newStatus, User $actor, string $remarks): void

@@ -170,6 +170,24 @@ class PpmpService
         });
     }
 
+    public function removeItem(Ppmp $ppmp, PpmpItem $item, User $actor): void
+    {
+        $this->assertDraftAndOwned($ppmp, $actor);
+
+        if ((int) $item->ppmp_id !== (int) $ppmp->ppmp_id) {
+            throw ValidationException::withMessages([
+                'ppmp_item_id' => 'Item does not belong to this PPMP.',
+            ]);
+        }
+
+        DB::transaction(function () use ($ppmp, $item, $actor): void {
+            $item->delete();
+            $this->recomputeTotalBudget($ppmp);
+            $this->recordStatus($ppmp, 'DRAFT', 'DRAFT', $actor, 'PPMP item removed');
+            $this->recordAudit($actor, 'REMOVE_ITEM', $ppmp);
+        });
+    }
+
     private function assertDraftAndOwned(Ppmp $ppmp, User $actor): void
     {
         if ((int) $ppmp->office_id !== (int) $actor->office_id) {
@@ -178,9 +196,9 @@ class PpmpService
             ]);
         }
 
-        if ((string) $ppmp->status !== 'DRAFT') {
+        if (! in_array((string) $ppmp->status, ['DRAFT', 'RETURNED_FOR_REVISION'], true)) {
             throw ValidationException::withMessages([
-                'status' => 'Only DRAFT PPMP records can be modified.',
+                'status' => 'Only DRAFT or RETURNED_FOR_REVISION PPMP records can be modified.',
             ]);
         }
     }

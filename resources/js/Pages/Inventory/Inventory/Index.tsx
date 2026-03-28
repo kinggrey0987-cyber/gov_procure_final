@@ -4,6 +4,7 @@ import { Head, Link } from '@inertiajs/react';
 type InventoryRow = {
     inventory_id: number;
     item_id: number;
+    reserved_quantity: string;
     available_stock: string;
     stock_on_hand: string;
     released_quantity: string;
@@ -18,44 +19,53 @@ type Props = {
 
 export default function InventoryIndex({ inventories }: Props) {
     return (
-        <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Inventory</h2>}>
+        <AuthenticatedLayout
+            header={
+                <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-semibold leading-tight text-gray-800">Inventory Monitoring</h2>
+                    <Link href={route('inventory.inventory.index')} className="rounded-lg bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200">
+                        Refresh
+                    </Link>
+                </div>
+            }
+        >
             <Head title="Inventory" />
 
-            <div className="py-10">
-                <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-                    <div className="overflow-hidden rounded border bg-white">
-                        <table className="min-w-full divide-y divide-gray-200 text-sm">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th className="px-4 py-2 text-left">Item ID</th>
-                                    <th className="px-4 py-2 text-left">Available</th>
-                                    <th className="px-4 py-2 text-left">On Hand</th>
-                                    <th className="px-4 py-2 text-left">Released</th>
-                                    <th className="px-4 py-2 text-left">Low Stock Threshold</th>
-                                    <th className="px-4 py-2 text-left">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {inventories.data.map((row) => (
-                                    <tr key={row.inventory_id}>
-                                        <td className="px-4 py-2">{row.item_id}</td>
-                                        <td className="px-4 py-2">{row.available_stock}</td>
-                                        <td className="px-4 py-2">{row.stock_on_hand}</td>
-                                        <td className="px-4 py-2">{row.released_quantity}</td>
-                                        <td className="px-4 py-2">{row.low_stock_threshold}</td>
-                                        <td className="px-4 py-2">
-                                            <Link
-                                                href={route('inventory.inventory.show', row.inventory_id)}
-                                                className="rounded bg-indigo-600 px-3 py-1 text-xs text-white"
-                                            >
+            <div className="py-8">
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                    <table className="min-w-full divide-y divide-slate-200 text-sm">
+                        <thead className="bg-slate-50">
+                            <tr>
+                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Item ID</th>
+                                <th className="px-4 py-3 text-right font-semibold text-slate-700">Available</th>
+                                <th className="px-4 py-3 text-right font-semibold text-slate-700">On Hand</th>
+                                <th className="px-4 py-3 text-right font-semibold text-slate-700">Reserved</th>
+                                <th className="px-4 py-3 text-right font-semibold text-slate-700">Released</th>
+                                <th className="px-4 py-3 text-right font-semibold text-slate-700">Threshold</th>
+                                <th className="px-4 py-3 text-right font-semibold text-slate-700">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {inventories.data.map((row) => {
+                                const isLow = Number(row.available_stock) <= Number(row.low_stock_threshold);
+                                return (
+                                    <tr key={row.inventory_id} className="hover:bg-slate-50/60">
+                                        <td className="px-4 py-3 text-slate-700">{row.item_id}</td>
+                                        <td className={`px-4 py-3 text-right font-semibold ${isLow ? 'text-amber-700' : 'text-slate-700'}`}>{row.available_stock}</td>
+                                        <td className="px-4 py-3 text-right text-slate-700">{row.stock_on_hand}</td>
+                                        <td className="px-4 py-3 text-right text-slate-700">{row.reserved_quantity}</td>
+                                        <td className="px-4 py-3 text-right text-slate-700">{row.released_quantity}</td>
+                                        <td className="px-4 py-3 text-right text-slate-700">{row.low_stock_threshold}</td>
+                                        <td className="px-4 py-3 text-right">
+                                            <Link href={route('inventory.inventory.show', row.inventory_id)} className="text-sm font-semibold text-blue-600 hover:text-blue-800">
                                                 View
                                             </Link>
                                         </td>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                );
+                            })}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </AuthenticatedLayout>

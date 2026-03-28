@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Governance\AuditLogController;
 use App\Http\Controllers\AdminTech\OfficeManagementController;
 use App\Http\Controllers\AdminTech\RoleManagementController;
 use App\Http\Controllers\AdminTech\UserManagementController;
@@ -10,6 +11,7 @@ use App\Http\Controllers\Office\PpmpItemController as OfficePpmpItemController;
 use App\Http\Controllers\Office\SupplyRequestController as OfficeSupplyRequestController;
 use App\Http\Controllers\Office\SupplyRequestItemController as OfficeSupplyRequestItemController;
 use App\Http\Controllers\Procurement\PurchaseOrderController as ProcurementPurchaseOrderController;
+use App\Http\Controllers\Procurement\ProcurementDocumentController;
 use App\Http\Controllers\Procurement\PurchaseOrderItemController as ProcurementPurchaseOrderItemController;
 use App\Http\Controllers\Procurement\PurchaseRequestController as ProcurementPurchaseRequestController;
 use App\Http\Controllers\Procurement\PurchaseRequestItemController as ProcurementPurchaseRequestItemController;
@@ -22,23 +24,34 @@ use App\Http\Controllers\Inventory\DistributionItemController;
 use App\Http\Controllers\Inventory\DistributionRecordController;
 use App\Http\Controllers\Inventory\InventoryController;
 use App\Http\Controllers\Inventory\InventoryMovementController;
+use App\Http\Controllers\Inventory\RequestWorkflowController;
 use App\Http\Controllers\Executive\AlertController as ExecutiveAlertController;
 use App\Http\Controllers\Executive\AnomalyController;
 use App\Http\Controllers\Executive\ExecutiveMonitoringController;
+use App\Http\Controllers\Executive\PpmpApprovalController;
 use App\Http\Controllers\Executive\PublicDisclosureController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\Public\PublicDisclosurePortalController;
 use App\Http\Controllers\ProfileController;
+use App\Services\Public\PublicLandingService;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::get('/', function () {
+    $landingData = app(PublicLandingService::class)->summary();
+
     return Inertia::render('Welcome', [
         'canLogin' => Route::has('login'),
         'canRegister' => Route::has('register'),
         'laravelVersion' => Application::VERSION,
         'phpVersion' => PHP_VERSION,
+        'summaryStats' => $landingData['summaryStats'],
+        'latestDisclosures' => $landingData['latestDisclosures'],
+        'monthlyDisclosures' => $landingData['monthlyDisclosures'],
+        'typeBreakdown' => $landingData['typeBreakdown'],
+        'publicReports' => $landingData['publicReports'],
     ]);
 });
 
@@ -69,6 +82,17 @@ Route::middleware('auth')->group(function () {
             ->name('destroy');
     });
 
+    Route::prefix('notifications')->name('notifications.')->middleware('can:notifications.access')->group(function () {
+        Route::get('/', [NotificationController::class, 'index'])->name('index');
+        Route::get('/{notification}', [NotificationController::class, 'show'])
+            ->middleware('can:notification.view,notification')
+            ->name('show');
+        Route::put('/{notification}/read', [NotificationController::class, 'markAsRead'])
+            ->middleware('can:notification.update,notification')
+            ->name('mark-read');
+        Route::put('/read-all', [NotificationController::class, 'markAllAsRead'])->name('mark-all-read');
+    });
+
     Route::prefix('admin-tech')
         ->name('admin-tech.')
         ->middleware(['verified', 'domain:admin-tech'])
@@ -80,13 +104,41 @@ Route::middleware('auth')->group(function () {
                 ->middleware('can:governance.manage-users')
                 ->name('users.index');
 
+            Route::get('/users/{user}/edit', [UserManagementController::class, 'edit'])
+                ->middleware('can:governance.manage-users')
+                ->name('users.edit');
+
+            Route::put('/users/{user}', [UserManagementController::class, 'update'])
+                ->middleware('can:governance.manage-users')
+                ->name('users.update');
+
+            Route::delete('/users/{user}', [UserManagementController::class, 'destroy'])
+                ->middleware('can:governance.manage-users')
+                ->name('users.destroy');
+
             Route::get('/offices', [OfficeManagementController::class, 'index'])
                 ->middleware('can:governance.manage-offices')
                 ->name('offices.index');
 
+            Route::get('/offices/{office}/edit', [OfficeManagementController::class, 'edit'])
+                ->middleware('can:governance.manage-offices')
+                ->name('offices.edit');
+
+            Route::put('/offices/{office}', [OfficeManagementController::class, 'update'])
+                ->middleware('can:governance.manage-offices')
+                ->name('offices.update');
+
+            Route::delete('/offices/{office}', [OfficeManagementController::class, 'destroy'])
+                ->middleware('can:governance.manage-offices')
+                ->name('offices.destroy');
+
             Route::get('/roles', [RoleManagementController::class, 'index'])
                 ->middleware('can:governance.view-roles')
                 ->name('roles.index');
+
+            Route::get('/audit/technical', [AuditLogController::class, 'technical'])
+                ->middleware('can:audit.technical.view')
+                ->name('audit.technical');
         });
 
     Route::prefix('office')
@@ -98,6 +150,10 @@ Route::middleware('auth')->group(function () {
 
             Route::get('/tracking', [DomainDashboardController::class, 'office'])
                 ->name('tracking');
+
+            Route::get('/supplies-ready-for-claim', [OfficeSupplyRequestController::class, 'suppliesReadyForClaim'])
+                ->middleware('can:office.supply-request.view-any')
+                ->name('supplies-ready.index');
 
             Route::prefix('ppmps')->name('ppmp.')->group(function () {
                 Route::get('/', [OfficePpmpController::class, 'index'])
@@ -131,6 +187,9 @@ Route::middleware('auth')->group(function () {
                 Route::put('/{ppmp}/items/{ppmpItem}', [OfficePpmpItemController::class, 'update'])
                     ->middleware('can:office.ppmp.update,ppmp')
                     ->name('items.update');
+                Route::delete('/{ppmp}/items/{ppmpItem}', [OfficePpmpItemController::class, 'destroy'])
+                    ->middleware('can:office.ppmp.update,ppmp')
+                    ->name('items.destroy');
             });
 
             Route::prefix('supply-requests')->name('supply-requests.')->group(function () {
@@ -165,6 +224,9 @@ Route::middleware('auth')->group(function () {
                 Route::put('/{supply_request}/items/{supplyRequestItem}', [OfficeSupplyRequestItemController::class, 'update'])
                     ->middleware('can:office.supply-request.update,supply_request')
                     ->name('items.update');
+                Route::delete('/{supply_request}/items/{supplyRequestItem}', [OfficeSupplyRequestItemController::class, 'destroy'])
+                    ->middleware('can:office.supply-request.update,supply_request')
+                    ->name('items.destroy');
             });
 
             Route::prefix('distribution-records')->name('distribution-records.')->group(function () {
@@ -201,6 +263,10 @@ Route::middleware('auth')->group(function () {
 
             Route::get('/tracking', [DomainDashboardController::class, 'procurement'])
                 ->name('tracking');
+
+            Route::get('/documents', [ProcurementDocumentController::class, 'index'])
+                ->middleware('can:procurement.documents.view-any')
+                ->name('documents.index');
 
             Route::prefix('purchase-requests')->name('purchase-requests.')->group(function () {
                 Route::get('/', [ProcurementPurchaseRequestController::class, 'index'])
@@ -261,6 +327,9 @@ Route::middleware('auth')->group(function () {
                 Route::get('/', [ProcurementPurchaseOrderController::class, 'index'])
                     ->middleware('can:procurement.purchase-order.view-any')
                     ->name('index');
+                Route::get('/records', [ProcurementPurchaseOrderController::class, 'records'])
+                    ->middleware('can:procurement.purchase-order.view-any')
+                    ->name('records');
                 Route::get('/create', [ProcurementPurchaseOrderController::class, 'create'])
                     ->middleware('can:procurement.purchase-order.create')
                     ->name('create');
@@ -393,6 +462,18 @@ Route::middleware('auth')->group(function () {
                     ->name('update-status');
             });
 
+            Route::prefix('office-supply-requests')->name('office-supply-requests.')->group(function () {
+                Route::get('/', [RequestWorkflowController::class, 'officeSupplyRequests'])
+                    ->middleware('can:inventory.view-any')
+                    ->name('index');
+            });
+
+            Route::prefix('procurement-requests')->name('procurement-requests.')->group(function () {
+                Route::get('/', [RequestWorkflowController::class, 'procurementRequests'])
+                    ->middleware('can:inventory.view-any')
+                    ->name('index');
+            });
+
             Route::prefix('deliveries')->name('deliveries.')->group(function () {
                 Route::get('/', [DeliveryController::class, 'index'])
                     ->middleware('can:delivery.view-any')
@@ -435,15 +516,48 @@ Route::middleware('auth')->group(function () {
         ->name('executive.')
         ->middleware(['verified', 'domain:executive'])
         ->group(function () {
-            Route::get('/', [ExecutiveMonitoringController::class, 'summary'])
+            Route::get('/', [ExecutiveMonitoringController::class, 'dashboard'])
                 ->middleware('can:executive.monitoring.view')
                 ->name('dashboard');
-            Route::get('/monitoring', [ExecutiveMonitoringController::class, 'summary'])
+
+            Route::get('/procurement-analytics', [ExecutiveMonitoringController::class, 'procurementAnalytics'])
+                ->middleware('can:executive.monitoring.view')
+                ->name('procurement-analytics');
+
+            Route::get('/anomalies-monitoring', [ExecutiveMonitoringController::class, 'anomaliesMonitoring'])
+                ->middleware('can:executive.monitoring.view')
+                ->name('anomalies-monitoring');
+
+            Route::get('/reports', [ExecutiveMonitoringController::class, 'reports'])
+                ->middleware('can:executive.monitoring.view')
+                ->name('reports');
+
+            Route::prefix('ppmp-approvals')->name('ppmp-approvals.')->group(function () {
+                Route::get('/', [PpmpApprovalController::class, 'index'])
+                    ->middleware('can:executive.ppmp-approval.view-any')
+                    ->name('index');
+                Route::get('/{ppmp}', [PpmpApprovalController::class, 'show'])
+                    ->middleware('can:executive.ppmp-approval.view,ppmp')
+                    ->name('show');
+                Route::put('/{ppmp}/status', [PpmpApprovalController::class, 'updateStatus'])
+                    ->middleware('can:executive.ppmp-approval.signoff,ppmp')
+                    ->name('update-status');
+            });
+
+            Route::get('/transparency-monitoring', [ExecutiveMonitoringController::class, 'transparencyMonitoring'])
+                ->middleware('can:executive.monitoring.view')
+                ->name('transparency-monitoring');
+
+            Route::get('/monitoring', [ExecutiveMonitoringController::class, 'anomaliesMonitoring'])
                 ->middleware('can:executive.monitoring.view')
                 ->name('monitoring.summary');
 
+            Route::get('/audit/business', [AuditLogController::class, 'business'])
+                ->middleware('can:audit.business.view')
+                ->name('audit.business');
+
             Route::prefix('anomalies')->name('anomalies.')->group(function () {
-                Route::get('/', [AnomalyController::class, 'index'])
+                Route::get('/', [ExecutiveMonitoringController::class, 'anomaliesMonitoring'])
                     ->middleware('can:anomaly.view-any')
                     ->name('index');
                 Route::post('/detect', [AnomalyController::class, 'runDetections'])
@@ -458,7 +572,7 @@ Route::middleware('auth')->group(function () {
             });
 
             Route::prefix('alerts')->name('alerts.')->group(function () {
-                Route::get('/', [ExecutiveAlertController::class, 'index'])
+                Route::get('/', [ExecutiveMonitoringController::class, 'anomaliesMonitoring'])
                     ->middleware('can:alert.view-any')
                     ->name('index');
                 Route::get('/{alert}', [ExecutiveAlertController::class, 'show'])
@@ -471,7 +585,7 @@ Route::middleware('auth')->group(function () {
 
             Route::prefix('disclosures')->name('disclosures.')->group(function () {
                 Route::get('/', [PublicDisclosureController::class, 'index'])
-                    ->middleware('can:public-disclosure.manage')
+                    ->middleware('can:public-disclosure.view')
                     ->name('index');
                 Route::get('/create', [PublicDisclosureController::class, 'create'])
                     ->middleware('can:public-disclosure.manage')
@@ -480,7 +594,7 @@ Route::middleware('auth')->group(function () {
                     ->middleware('can:public-disclosure.manage')
                     ->name('store');
                 Route::get('/{public_disclosure}', [PublicDisclosureController::class, 'show'])
-                    ->middleware('can:public-disclosure.manage')
+                    ->middleware('can:public-disclosure.view')
                     ->name('show');
                 Route::put('/{public_disclosure}/publish', [PublicDisclosureController::class, 'publish'])
                     ->middleware('can:public-disclosure.publish,public_disclosure')

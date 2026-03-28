@@ -63,6 +63,10 @@ class NotificationCenterService
         if ($referenceType === Ppmp::class) {
             $record = Ppmp::query()->where('ppmp_id', $referenceId)->first();
 
+            if ($record && $user->can('executive.ppmp-approval.view', $record)) {
+                return route('executive.ppmp-approvals.show', $record->ppmp_id);
+            }
+
             return $record && $user->can('office.ppmp.view', $record)
                 ? route('office.ppmp.show', $record->ppmp_id)
                 : null;

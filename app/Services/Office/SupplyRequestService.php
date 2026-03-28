@@ -172,6 +172,23 @@ class SupplyRequestService
         });
     }
 
+    public function removeItem(SupplyRequest $supplyRequest, SupplyRequestItem $item, User $actor): void
+    {
+        $this->assertDraftAndOwned($supplyRequest, $actor);
+
+        if ((int) $item->supply_request_id !== (int) $supplyRequest->supply_request_id) {
+            throw ValidationException::withMessages([
+                'supply_request_item_id' => 'Item does not belong to this supply request.',
+            ]);
+        }
+
+        DB::transaction(function () use ($supplyRequest, $item, $actor): void {
+            $item->delete();
+            $this->recordStatus($supplyRequest, 'DRAFT', 'DRAFT', $actor, 'Supply request item removed');
+            $this->recordAudit($actor, 'REMOVE_ITEM', $supplyRequest);
+        });
+    }
+
     private function assertDraftAndOwned(SupplyRequest $supplyRequest, User $actor): void
     {
         if ((int) $supplyRequest->office_id !== (int) $actor->office_id) {

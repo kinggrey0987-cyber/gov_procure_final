@@ -14,14 +14,12 @@ type Props = {
 
 export default function DisclosureIndex({ disclosures }: Props) {
     return (
-        <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Disclosure Management</h2>}>
-            <Head title="Disclosure Management" />
+        <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Disclosure Review</h2>}>
+            <Head title="Disclosure Review" />
             <div className="py-10">
                 <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-                    <div className="mb-4">
-                        <Link href={route('executive.disclosures.create')} className="rounded bg-indigo-600 px-4 py-2 text-sm text-white">
-                            New Draft
-                        </Link>
+                    <div className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                        Executive access is restricted to disclosure monitoring and review.
                     </div>
                     <div className="overflow-hidden rounded border bg-white">
                         <table className="min-w-full divide-y divide-gray-200 text-sm">

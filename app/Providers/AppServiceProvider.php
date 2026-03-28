@@ -82,7 +82,7 @@ class AppServiceProvider extends ServiceProvider
             return $user->isOfficeUser() && $ppmp->office_id === $user->office_id;
         });
         Gate::define('office.ppmp.update', function (User $user, Ppmp $ppmp): bool {
-            return $user->can('office.ppmp.view', $ppmp) && $ppmp->status === 'DRAFT';
+            return $user->can('office.ppmp.view', $ppmp) && in_array((string) $ppmp->status, ['DRAFT', 'RETURNED_FOR_REVISION'], true);
         });
         Gate::define('office.ppmp.submit', function (User $user, Ppmp $ppmp): bool {
             return $user->can('office.ppmp.update', $ppmp);
@@ -125,6 +125,8 @@ class AppServiceProvider extends ServiceProvider
             return $user->isProcurement() && (string) $purchaseOrder->status === 'DRAFT';
         });
 
+        Gate::define('procurement.documents.view-any', fn (User $user): bool => $user->isProcurement());
+
         // Delivery gates: GSO primary owner
         Gate::define('delivery.view-any', fn (User $user): bool => $user->isGsoOfficer());
         Gate::define('delivery.create', fn (User $user): bool => $user->isGsoOfficer());
@@ -162,6 +164,11 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('claim.update', fn (User $user, Claim $claim): bool => $user->isGsoOfficer());
 
         Gate::define('executive.monitoring.view', fn (User $user): bool => $user->isExecutive());
+        Gate::define('executive.ppmp-approval.view-any', fn (User $user): bool => $user->isExecutive());
+        Gate::define('executive.ppmp-approval.view', fn (User $user, Ppmp $ppmp): bool => $user->isExecutive());
+        Gate::define('executive.ppmp-approval.signoff', function (User $user, Ppmp $ppmp): bool {
+            return $user->isExecutive() && (string) $ppmp->status === 'SUBMITTED';
+        });
 
         Gate::define('anomaly.view-any', fn (User $user): bool => $user->isExecutive());
         Gate::define('anomaly.view', fn (User $user, Anomaly $anomaly): bool => $user->isExecutive());
@@ -185,8 +192,9 @@ class AppServiceProvider extends ServiceProvider
         });
         Gate::define('alert.review', fn (User $user, Alert $alert): bool => $user->isExecutive());
 
-        Gate::define('public-disclosure.manage', fn (User $user): bool => $user->isExecutive());
-        Gate::define('public-disclosure.publish', fn (User $user, PublicDisclosure $disclosure): bool => $user->isExecutive());
+        Gate::define('public-disclosure.view', fn (User $user): bool => $user->isExecutive());
+        Gate::define('public-disclosure.manage', fn (User $user): bool => false);
+        Gate::define('public-disclosure.publish', fn (User $user, PublicDisclosure $disclosure): bool => false);
 
         Gate::define('notifications.access', fn (User $user): bool => ! $user->isPublicUser());
         Gate::define('notification.view', fn (User $user, Notification $notification): bool => ! $user->isPublicUser() && (int) $notification->user_id === (int) $user->id);

@@ -1,5 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import AttachmentsPanel from '@/Components/AttachmentsPanel';
+import ApprovalHistoryTimeline from '@/Components/ApprovalHistoryTimeline';
+import StatusHistoryTimeline from '@/Components/StatusHistoryTimeline';
 import { Head } from '@inertiajs/react';
 
 type Props = {
@@ -23,9 +25,24 @@ type Props = {
         upload: boolean;
         delete: boolean;
     };
+    statusHistory: Array<{
+        id: number;
+        old_status?: string | null;
+        new_status: string;
+        remarks?: string | null;
+        changed_at?: string | null;
+        changed_by?: { id: number; name: string } | null;
+    }>;
+    approvalHistory: Array<{
+        id: number;
+        status: string;
+        remarks?: string | null;
+        approved_at?: string | null;
+        approver?: { id: number; name: string } | null;
+    }>;
 };
 
-export default function ClaimShow({ claim, attachments, attachmentPermissions }: Props) {
+export default function ClaimShow({ claim, attachments, attachmentPermissions, statusHistory, approvalHistory }: Props) {
     return (
         <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Claim Detail</h2>}>
             <Head title="Claim Detail" />
@@ -54,6 +71,14 @@ export default function ClaimShow({ claim, attachments, attachmentPermissions }:
                             downloadRouteFor={(documentId: number) => route('documents.show', documentId)}
                             deleteRouteFor={(documentId: number) => route('documents.destroy', documentId)}
                         />
+                    </div>
+
+                    <div className="mt-4">
+                        <StatusHistoryTimeline entries={statusHistory} />
+                    </div>
+
+                    <div className="mt-4">
+                        <ApprovalHistoryTimeline entries={approvalHistory} />
                     </div>
                 </div>
             </div>

@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\Notifications\NotificationCenterService;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -30,6 +31,7 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $user = $request->user();
+        $notificationService = app(NotificationCenterService::class);
 
         return [
             ...parent::share($request),
@@ -47,7 +49,13 @@ class HandleInertiaRequests extends Middleware
                     'procurement' => $user?->can('domain.procurement.access') ?? false,
                     'inventory' => $user?->can('domain.inventory.access') ?? false,
                     'executive' => $user?->can('domain.executive.access') ?? false,
+                    'notifications' => $user?->can('notifications.access') ?? false,
                 ],
+            ],
+            'notifications' => [
+                'unread_count' => $user && $user->can('notifications.access')
+                    ? $notificationService->unreadCountForUser($user)
+                    : 0,
             ],
         ];
     }

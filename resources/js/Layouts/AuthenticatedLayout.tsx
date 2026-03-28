@@ -11,26 +11,914 @@ type AuthCan = {
     procurement: boolean;
     inventory: boolean;
     executive: boolean;
+    notifications: boolean;
 };
 
 type AuthUser = {
     name: string;
     email: string;
+    role_code?: string;
+};
+
+type NotificationState = {
+    unread_count: number;
 };
 
 export default function Authenticated({
     header,
     children,
 }: PropsWithChildren<{ header?: ReactNode }>) {
-    const { auth } = usePage().props as {
+    const pageProps = usePage().props as unknown as {
         auth: {
             user: AuthUser;
             can: AuthCan;
         };
+        notifications?: NotificationState;
     };
+    const { auth } = pageProps;
+    const notifications: NotificationState = pageProps.notifications ?? { unread_count: 0 };
 
     const user = auth.user;
     const [showingNavigationDropdown, setShowingNavigationDropdown] = useState(false);
+    const isAdminTechShell =
+        auth.can.admin_tech &&
+        (route().current('admin-tech.*') ||
+            route().current('profile.*') ||
+            route().current('notifications.*'));
+    const isExecutiveShell =
+        auth.can.executive &&
+        (route().current('executive.*') ||
+            route().current('profile.*') ||
+            route().current('notifications.*'));
+    const isOfficeShell =
+        auth.can.office &&
+        (route().current('office.*') ||
+            route().current('profile.*') ||
+            route().current('notifications.*'));
+    const isProcurementShell =
+        auth.can.procurement &&
+        (route().current('procurement.*') ||
+            route().current('profile.*') ||
+            route().current('notifications.*'));
+    const isInventoryShell =
+        auth.can.inventory &&
+        (route().current('inventory.*') ||
+            route().current('profile.*') ||
+            route().current('notifications.*'));
+
+    if (isAdminTechShell) {
+        const adminLinks = [
+            {
+                label: 'Dashboard',
+                href: route('admin-tech.dashboard'),
+                active: route().current('admin-tech.dashboard'),
+                icon: (
+                    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="3" y="3" width="7" height="7" rx="1" />
+                        <rect x="14" y="3" width="7" height="7" rx="1" />
+                        <rect x="3" y="14" width="7" height="7" rx="1" />
+                        <rect x="14" y="14" width="7" height="7" rx="1" />
+                    </svg>
+                ),
+            },
+            {
+                label: 'User Management',
+                href: route('admin-tech.users.index'),
+                active: route().current('admin-tech.users.*'),
+                icon: (
+                    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="9" cy="8" r="3" />
+                        <path d="M2 20c0-3.2 2.8-5 7-5" />
+                        <circle cx="17" cy="9" r="2" />
+                        <path d="M14 20c.2-2.2 1.8-3.5 4-3.9" />
+                    </svg>
+                ),
+            },
+            {
+                label: 'Office Management',
+                href: route('admin-tech.offices.index'),
+                active: route().current('admin-tech.offices.*'),
+                icon: (
+                    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="4" y="3" width="10" height="18" rx="2" />
+                        <path d="M14 8h6v13h-6" />
+                        <path d="M8 7h2M8 11h2M8 15h2" />
+                    </svg>
+                ),
+            },
+            {
+                label: 'System Monitoring',
+                href: route('admin-tech.roles.index'),
+                active: route().current('admin-tech.roles.*'),
+                icon: (
+                    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="3" />
+                        <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 0 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h.1A1.7 1.7 0 0 0 10 3.2V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.4 1z" />
+                    </svg>
+                ),
+            },
+            {
+                label: 'Profile',
+                href: route('profile.edit'),
+                active: route().current('profile.*'),
+                icon: (
+                    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="8" r="3.5" />
+                        <path d="M5 20c0-3.7 3.1-6 7-6s7 2.3 7 6" />
+                    </svg>
+                ),
+            },
+        ];
+
+        const roleLabel = (user.role_code ?? 'ADMIN')
+            .replaceAll('_', ' ')
+            .toLowerCase()
+            .replace(/\b\w/g, (char) => char.toUpperCase());
+
+        return (
+            <div className="min-h-screen bg-slate-100 md:flex">
+                <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
+                    <div className="border-b border-slate-200 px-5 py-4">
+                        <div className="flex items-center gap-3">
+                            <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover" />
+                            <div>
+                                <p className="text-3 font-bold leading-tight text-red-700">GovSupply Connect</p>
+                                <p className="text-sm text-slate-500">Municipality of E.B. Magalona</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <nav className="space-y-2 px-3 py-4">
+                        {adminLinks.map((item) => (
+                            <Link
+                                key={item.label}
+                                href={item.href}
+                                className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-semibold transition ${
+                                    item.active
+                                        ? 'border-red-300 bg-red-600 text-white shadow-sm'
+                                        : 'border-transparent text-slate-700 hover:border-slate-200 hover:bg-slate-50'
+                                }`}
+                            >
+                                <span>{item.icon}</span>
+                                <span>{item.label}</span>
+                            </Link>
+                        ))}
+                    </nav>
+
+                    <div className="mt-auto border-t border-slate-200 px-4 py-4">
+                        <div className="flex items-center gap-2 text-sm text-slate-600">
+                            <img src="/logo.jpg" alt="GovSupply Connect" className="h-8 w-8 rounded-full border border-slate-300 bg-white object-cover" />
+                            <div>
+                                <p className="font-semibold text-slate-700">GovSupply Connect</p>
+                                <p>Version 2.0.1</p>
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+
+                <div className="flex-1">
+                    <header className="border-b border-slate-200 bg-white">
+                        <div className="mx-auto flex h-20 w-full max-w-[1300px] items-center justify-between px-4 sm:px-6">
+                            <div className="flex items-center gap-3 md:hidden">
+                                <img src="/logo.jpg" alt="GovSupply Connect" className="h-10 w-10 rounded-full border border-slate-300 bg-white object-cover" />
+                                <p className="font-bold text-red-700">GovSupply Connect</p>
+                            </div>
+                            <div className="ms-auto flex items-center gap-5">
+                                <Link href={route('notifications.index')} className="relative text-slate-500 hover:text-slate-700" title="Notifications">
+                                    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
+                                        <path d="M10 21a2 2 0 0 0 4 0" />
+                                    </svg>
+                                    {notifications.unread_count > 0 && (
+                                        <span className="absolute -right-2 -top-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-xs font-bold text-white">
+                                            {notifications.unread_count}
+                                        </span>
+                                    )}
+                                </Link>
+
+                                <div className="flex items-center gap-3">
+                                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-red-600 text-sm font-bold text-white">
+                                        {user.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="hidden text-sm sm:block">
+                                        <p className="font-semibold text-slate-800">{user.name}</p>
+                                        <p className="text-slate-500">{roleLabel}</p>
+                                    </div>
+                                </div>
+
+                                <div className="relative">
+                                    <Dropdown>
+                                        <Dropdown.Trigger>
+                                            <span className="inline-flex rounded-md">
+                                                <button
+                                                    type="button"
+                                                    className="inline-flex items-center rounded-md border border-transparent bg-white px-1 py-2 text-sm text-slate-500 transition hover:text-slate-700 focus:outline-none"
+                                                >
+                                                    <svg className="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path
+                                                            fillRule="evenodd"
+                                                            d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                                                            clipRule="evenodd"
+                                                        />
+                                                    </svg>
+                                                </button>
+                                            </span>
+                                        </Dropdown.Trigger>
+
+                                        <Dropdown.Content>
+                                            <Dropdown.Link href={route('profile.edit')}>Profile</Dropdown.Link>
+                                            <Dropdown.Link href={route('logout')} method="post" as="button">
+                                                Log Out
+                                            </Dropdown.Link>
+                                        </Dropdown.Content>
+                                    </Dropdown>
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    <div className="mx-auto w-full max-w-[1300px] px-4 py-6 sm:px-6">
+                        {header && (
+                            <header className="mb-6">
+                                <div className="text-4xl font-bold text-slate-800">{header}</div>
+                                <p className="mt-1 text-xl text-slate-500">Municipality of E.B. Magalona - {roleLabel}</p>
+                            </header>
+                        )}
+
+                        <main>{children}</main>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (isProcurementShell) {
+        const procurementLinks = [
+            {
+                label: 'Dashboard',
+                href: route('procurement.dashboard'),
+                active: route().current('procurement.dashboard') || route().current('procurement.tracking'),
+            },
+            {
+                label: 'Request Review',
+                href: route('procurement.purchase-requests.index'),
+                active: route().current('procurement.purchase-requests.*'),
+            },
+            {
+                label: 'Purchase Orders',
+                href: route('procurement.purchase-orders.index'),
+                active: route().current('procurement.purchase-orders.*') && !route().current('procurement.purchase-orders.records'),
+            },
+            {
+                label: 'Suppliers',
+                href: route('procurement.suppliers.index'),
+                active: route().current('procurement.suppliers.*'),
+            },
+            {
+                label: 'Procurement Records',
+                href: route('procurement.purchase-orders.records'),
+                active: route().current('procurement.purchase-orders.records'),
+            },
+            {
+                label: 'Documents',
+                href: route('procurement.documents.index'),
+                active: route().current('procurement.documents.*'),
+            },
+            {
+                label: 'Profile',
+                href: route('profile.edit'),
+                active: route().current('profile.*'),
+            },
+        ];
+
+        const roleLabel = (user.role_code ?? 'BAC_OFFICER')
+            .replaceAll('_', ' ')
+            .toLowerCase()
+            .replace(/\b\w/g, (char) => char.toUpperCase());
+
+        return (
+            <div className="min-h-screen bg-slate-100 md:flex">
+                <aside className="hidden w-72 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
+                    <div className="border-b border-slate-200 px-5 py-4">
+                        <div className="flex items-center gap-3">
+                            <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover" />
+                            <div>
+                                <p className="text-3 font-bold leading-tight text-red-700">GovSupply Connect</p>
+                                <p className="text-sm text-slate-500">Municipality of E.B. Magalona</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <nav className="space-y-2 px-3 py-4">
+                        {procurementLinks.map((item) => (
+                            <Link
+                                key={item.label}
+                                href={item.href}
+                                className={`block rounded-xl border px-4 py-3 text-sm font-semibold transition ${
+                                    item.active
+                                        ? 'border-red-600 bg-red-600 text-white shadow-sm'
+                                        : 'border-transparent text-slate-700 hover:border-red-100 hover:bg-red-50'
+                                }`}
+                            >
+                                {item.label}
+                            </Link>
+                        ))}
+                    </nav>
+
+                    <div className="mt-auto border-t border-slate-200 bg-slate-50 px-4 py-4">
+                        <p className="text-sm font-semibold text-slate-800">Procurement Operations Suite</p>
+                        <p className="text-xs text-slate-600">BAC request review, supplier management, and PO execution.</p>
+                    </div>
+                </aside>
+
+                <div className="flex-1">
+                    <header className="border-b border-slate-200 bg-white">
+                        <div className="mx-auto flex h-20 w-full max-w-[1400px] items-center justify-between px-4 sm:px-6">
+                            <div className="flex items-center gap-3">
+                                <img src="/logo.jpg" alt="GovSupply Connect" className="h-11 w-11 rounded-full border border-slate-300 bg-white object-cover" />
+                                <div>
+                                    <p className="text-2xl font-bold leading-tight text-red-700">GovSupply Connect</p>
+                                    <p className="text-sm text-slate-500">Municipality of E.B. Magalona</p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-5">
+                                <Link href={route('notifications.index')} className="relative text-slate-500 hover:text-slate-700" title="Notifications">
+                                    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
+                                        <path d="M10 21a2 2 0 0 0 4 0" />
+                                    </svg>
+                                    {notifications.unread_count > 0 && (
+                                        <span className="absolute -right-2 -top-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-xs font-bold text-white">
+                                            {notifications.unread_count}
+                                        </span>
+                                    )}
+                                </Link>
+
+                                <div className="flex items-center gap-3">
+                                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-red-600 text-sm font-bold text-white">
+                                        {user.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="hidden text-sm sm:block">
+                                        <p className="font-semibold text-slate-800">{user.name}</p>
+                                        <p className="text-slate-500">{roleLabel}</p>
+                                    </div>
+                                </div>
+
+                                <Dropdown>
+                                    <Dropdown.Trigger>
+                                        <span className="inline-flex rounded-md">
+                                            <button
+                                                type="button"
+                                                className="inline-flex items-center rounded-md border border-transparent bg-white px-1 py-2 text-sm text-slate-500 transition hover:text-slate-700 focus:outline-none"
+                                            >
+                                                <svg className="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path
+                                                        fillRule="evenodd"
+                                                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                                                        clipRule="evenodd"
+                                                    />
+                                                </svg>
+                                            </button>
+                                        </span>
+                                    </Dropdown.Trigger>
+
+                                    <Dropdown.Content>
+                                        <Dropdown.Link href={route('profile.edit')}>Profile</Dropdown.Link>
+                                        <Dropdown.Link href={route('logout')} method="post" as="button">
+                                            Log Out
+                                        </Dropdown.Link>
+                                    </Dropdown.Content>
+                                </Dropdown>
+                            </div>
+                        </div>
+                    </header>
+
+                    <div className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6">
+                        {header && (
+                            <header className="mb-6 border-b border-slate-200 pb-4">
+                                <div className="text-4xl font-bold text-slate-800">{header}</div>
+                                <p className="mt-1 text-xl text-slate-500">Municipality of E.B. Magalona - Procurement / BAC Staff</p>
+                            </header>
+                        )}
+
+                        <main>{children}</main>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (isOfficeShell) {
+        const officeLinks = [
+            {
+                label: 'Dashboard',
+                href: route('office.dashboard'),
+                active: route().current('office.dashboard') || route().current('office.tracking'),
+            },
+            {
+                label: 'PPMP',
+                href: route('office.ppmp.index'),
+                active: route().current('office.ppmp.*'),
+            },
+            {
+                label: 'Create Supply Request',
+                href: route('office.supply-requests.create'),
+                active: route().current('office.supply-requests.create'),
+            },
+            {
+                label: 'Request Tracking',
+                href: route('office.supply-requests.index'),
+                active: route().current('office.supply-requests.index') || route().current('office.supply-requests.show'),
+            },
+            {
+                label: 'Supplies Ready for Claim',
+                href: route('office.supplies-ready.index'),
+                active: route().current('office.supplies-ready.*'),
+            },
+            {
+                label: 'Notifications',
+                href: route('notifications.index'),
+                active: route().current('notifications.*'),
+            },
+            {
+                label: 'Profile',
+                href: route('profile.edit'),
+                active: route().current('profile.*'),
+            },
+        ];
+
+        const roleLabel = (user.role_code ?? 'OFFICE_USER')
+            .replaceAll('_', ' ')
+            .toLowerCase()
+            .replace(/\b\w/g, (char) => char.toUpperCase());
+
+        return (
+            <div className="min-h-screen bg-slate-100 md:flex">
+                <aside className="hidden w-72 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
+                    <div className="border-b border-slate-200 px-5 py-4">
+                        <div className="flex items-center gap-3">
+                            <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover" />
+                            <div>
+                                <p className="text-3 font-bold leading-tight text-red-700">GovSupply Connect</p>
+                                <p className="text-sm text-slate-500">Municipality of E.B. Magalona</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <nav className="space-y-2 px-3 py-4">
+                        {officeLinks.map((item) => (
+                            <Link
+                                key={item.label}
+                                href={item.href}
+                                className={`block rounded-xl border px-4 py-3 text-sm font-semibold transition ${
+                                    item.active
+                                        ? 'border-red-300 bg-red-600 text-white shadow-sm'
+                                        : 'border-transparent text-slate-700 hover:border-red-100 hover:bg-red-50'
+                                }`}
+                            >
+                                {item.label}
+                            </Link>
+                        ))}
+                    </nav>
+
+                    <div className="mt-auto border-t border-slate-200 px-4 py-4">
+                        <div className="flex items-center gap-2 text-sm text-slate-600">
+                            <img src="/logo.jpg" alt="GovSupply Connect" className="h-8 w-8 rounded-full border border-slate-300 bg-white object-cover" />
+                            <div>
+                                <p className="font-semibold text-slate-700">GovSupply Connect</p>
+                                <p>Version 2.0.1</p>
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+
+                <div className="flex-1">
+                    <header className="border-b border-slate-200 bg-white">
+                        <div className="mx-auto flex h-20 w-full max-w-[1400px] items-center justify-between px-4 sm:px-6">
+                            <div className="flex items-center gap-3">
+                                <img src="/logo.jpg" alt="GovSupply Connect" className="h-11 w-11 rounded-full border border-slate-300 bg-white object-cover" />
+                                <div>
+                                    <p className="text-2xl font-bold leading-tight text-red-700">GovSupply Connect</p>
+                                    <p className="text-sm text-slate-500">Municipality of E.B. Magalona</p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-5">
+                                <Link href={route('notifications.index')} className="relative text-slate-500 hover:text-slate-700" title="Notifications">
+                                    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
+                                        <path d="M10 21a2 2 0 0 0 4 0" />
+                                    </svg>
+                                    {notifications.unread_count > 0 && (
+                                        <span className="absolute -right-2 -top-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-xs font-bold text-white">
+                                            {notifications.unread_count}
+                                        </span>
+                                    )}
+                                </Link>
+
+                                <div className="flex items-center gap-3">
+                                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-red-600 text-sm font-bold text-white">
+                                        {user.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="hidden text-sm sm:block">
+                                        <p className="font-semibold text-slate-800">{user.name}</p>
+                                        <p className="text-slate-500">{roleLabel}</p>
+                                    </div>
+                                </div>
+
+                                <Dropdown>
+                                    <Dropdown.Trigger>
+                                        <span className="inline-flex rounded-md">
+                                            <button
+                                                type="button"
+                                                className="inline-flex items-center rounded-md border border-transparent bg-white px-1 py-2 text-sm text-slate-500 transition hover:text-slate-700 focus:outline-none"
+                                            >
+                                                <svg className="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path
+                                                        fillRule="evenodd"
+                                                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                                                        clipRule="evenodd"
+                                                    />
+                                                </svg>
+                                            </button>
+                                        </span>
+                                    </Dropdown.Trigger>
+
+                                    <Dropdown.Content>
+                                        <Dropdown.Link href={route('profile.edit')}>Profile</Dropdown.Link>
+                                        <Dropdown.Link href={route('logout')} method="post" as="button">
+                                            Log Out
+                                        </Dropdown.Link>
+                                    </Dropdown.Content>
+                                </Dropdown>
+                            </div>
+                        </div>
+                    </header>
+
+                    <div className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6">
+                        {header && (
+                            <header className="mb-6 border-b border-slate-200 pb-4">
+                                <div className="text-4xl font-bold text-slate-800">{header}</div>
+                                <p className="mt-1 text-xl text-slate-500">Municipality of E.B. Magalona - Municipal Department</p>
+                            </header>
+                        )}
+
+                        <main>{children}</main>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (isExecutiveShell) {
+        const executiveLinks = [
+            {
+                label: 'Executive Dashboard',
+                href: route('executive.dashboard'),
+                active: route().current('executive.dashboard'),
+            },
+            {
+                label: 'Procurement Analytics',
+                href: route('executive.procurement-analytics'),
+                active: route().current('executive.procurement-analytics'),
+            },
+            {
+                label: 'Anomalies and Alerts',
+                href: route('executive.anomalies-monitoring'),
+                active:
+                    route().current('executive.anomalies-monitoring') ||
+                    route().current('executive.monitoring.summary') ||
+                    route().current('executive.anomalies.*') ||
+                    route().current('executive.alerts.*'),
+            },
+            {
+                label: 'Executive Approvals',
+                href: route('executive.ppmp-approvals.index'),
+                active: route().current('executive.ppmp-approvals.*'),
+            },
+            {
+                label: 'Audit Trail',
+                href: route('executive.audit.business'),
+                active: route().current('executive.audit.*'),
+            },
+            {
+                label: 'Reports',
+                href: route('executive.reports'),
+                active: route().current('executive.reports'),
+            },
+            {
+                label: 'Transparency Monitoring',
+                href: route('executive.transparency-monitoring'),
+                active: route().current('executive.transparency-monitoring'),
+            },
+            {
+                label: 'Disclosure Review',
+                href: route('executive.disclosures.index'),
+                active: route().current('executive.disclosures.*'),
+            },
+            {
+                label: 'Profile',
+                href: route('profile.edit'),
+                active: route().current('profile.*'),
+            },
+        ];
+
+        const roleLabel = (user.role_code ?? 'EXEC_OFFICER')
+            .replaceAll('_', ' ')
+            .toLowerCase()
+            .replace(/\b\w/g, (char) => char.toUpperCase());
+
+        return (
+            <div className="min-h-screen bg-slate-100 md:flex">
+                <aside className="hidden w-72 shrink-0 flex-col border-r border-red-200 bg-white md:flex">
+                    <div className="border-b border-slate-200 px-5 py-4">
+                        <div className="flex items-center gap-3">
+                            <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover" />
+                            <div>
+                                <p className="text-3 font-bold leading-tight text-red-700">GovSupply Connect</p>
+                                <p className="text-sm text-slate-500">Municipality of E.B. Magalona</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <nav className="space-y-2 px-3 py-4">
+                        {executiveLinks.map((item) => (
+                            <Link
+                                key={item.label}
+                                href={item.href}
+                                className={`block rounded-xl border px-4 py-3 text-sm font-semibold transition ${
+                                    item.active
+                                        ? 'border-red-600 bg-red-600 text-white shadow-sm'
+                                        : 'border-transparent text-slate-700 hover:border-red-100 hover:bg-red-50'
+                                }`}
+                            >
+                                {item.label}
+                            </Link>
+                        ))}
+                    </nav>
+
+                    <div className="mt-auto border-t border-red-100 bg-red-50/70 px-4 py-4">
+                        <p className="text-sm font-semibold text-red-800">Executive Monitoring Suite</p>
+                        <p className="text-xs text-red-700/80">Oversight-only controls with real-time governance signals.</p>
+                    </div>
+                </aside>
+
+                <div className="flex-1">
+                    <header className="border-b border-slate-200 bg-white">
+                        <div className="mx-auto flex h-20 w-full max-w-[1400px] items-center justify-between px-4 sm:px-6">
+                            <div className="flex items-center gap-3">
+                                <img src="/logo.jpg" alt="GovSupply Connect" className="h-11 w-11 rounded-full border border-slate-300 bg-white object-cover" />
+                                <div>
+                                    <p className="text-2xl font-bold leading-tight text-red-700">GovSupply Connect</p>
+                                    <p className="text-sm text-slate-500">Municipality of E.B. Magalona</p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-5">
+                                <Link href={route('notifications.index')} className="relative text-slate-500 hover:text-slate-700" title="Notifications">
+                                    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
+                                        <path d="M10 21a2 2 0 0 0 4 0" />
+                                    </svg>
+                                    {notifications.unread_count > 0 && (
+                                        <span className="absolute -right-2 -top-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-xs font-bold text-white">
+                                            {notifications.unread_count}
+                                        </span>
+                                    )}
+                                </Link>
+
+                                <div className="flex items-center gap-3">
+                                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-red-600 text-sm font-bold text-white">
+                                        {user.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="hidden text-sm sm:block">
+                                        <p className="font-semibold text-slate-800">{user.name}</p>
+                                        <p className="text-slate-500">{roleLabel}</p>
+                                    </div>
+                                </div>
+
+                                <Dropdown>
+                                    <Dropdown.Trigger>
+                                        <span className="inline-flex rounded-md">
+                                            <button
+                                                type="button"
+                                                className="inline-flex items-center rounded-md border border-transparent bg-white px-1 py-2 text-sm text-slate-500 transition hover:text-slate-700 focus:outline-none"
+                                            >
+                                                <svg className="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path
+                                                        fillRule="evenodd"
+                                                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                                                        clipRule="evenodd"
+                                                    />
+                                                </svg>
+                                            </button>
+                                        </span>
+                                    </Dropdown.Trigger>
+
+                                    <Dropdown.Content>
+                                        <Dropdown.Link href={route('profile.edit')}>Profile</Dropdown.Link>
+                                        <Dropdown.Link href={route('logout')} method="post" as="button">
+                                            Log Out
+                                        </Dropdown.Link>
+                                    </Dropdown.Content>
+                                </Dropdown>
+                            </div>
+                        </div>
+                    </header>
+
+                    <div className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6">
+                        {header && (
+                            <header className="mb-6 border-b border-slate-200 pb-4">
+                                <div className="text-4xl font-bold text-slate-800">{header}</div>
+                                <p className="mt-1 text-xl text-slate-500">Municipality of E.B. Magalona - Executive Oversight</p>
+                            </header>
+                        )}
+
+                        <main>{children}</main>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (isInventoryShell) {
+        const inventoryLinks = [
+            {
+                label: 'Dashboard Overview',
+                href: route('inventory.dashboard'),
+                active: route().current('inventory.dashboard'),
+            },
+            {
+                label: 'Delivery Monitoring',
+                href: route('inventory.deliveries.index'),
+                active: route().current('inventory.deliveries.*'),
+            },
+            {
+                label: 'Supply Distribution',
+                href: route('inventory.distribution-records.create'),
+                active:
+                    route().current('inventory.distribution-records.create') ||
+                    route().current('inventory.distribution-records.store'),
+            },
+            {
+                label: 'Office Supply Requests',
+                href: route('inventory.office-supply-requests.index'),
+                active: route().current('inventory.office-supply-requests.*'),
+            },
+            {
+                label: 'Procurement Requests',
+                href: route('inventory.procurement-requests.index'),
+                active: route().current('inventory.procurement-requests.*'),
+            },
+            {
+                label: 'Distribution Records',
+                href: route('inventory.distribution-records.index'),
+                active:
+                    route().current('inventory.distribution-records.index') ||
+                    route().current('inventory.distribution-records.show') ||
+                    route().current('inventory.distribution-records.edit') ||
+                    route().current('inventory.distribution-records.items.manage'),
+            },
+            {
+                label: 'Claims and Adjustments',
+                href: route('inventory.claims.index'),
+                active: route().current('inventory.claims.*'),
+            },
+            {
+                label: 'Inventory Monitoring',
+                href: route('inventory.inventory.index'),
+                active: route().current('inventory.inventory.*'),
+            },
+            {
+                label: 'Movement Logs',
+                href: route('inventory.inventory-movements.index'),
+                active: route().current('inventory.inventory-movements.*'),
+            },
+            {
+                label: 'Profile',
+                href: route('profile.edit'),
+                active: route().current('profile.*'),
+            },
+        ];
+
+        const roleLabel = (user.role_code ?? 'GSO_OFFICER')
+            .replaceAll('_', ' ')
+            .toLowerCase()
+            .replace(/\b\w/g, (char) => char.toUpperCase());
+
+        return (
+            <div className="min-h-screen bg-slate-100 md:flex">
+                <aside className="hidden w-72 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
+                    <div className="border-b border-slate-200 px-5 py-4">
+                        <div className="flex items-center gap-3">
+                            <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover" />
+                            <div>
+                                <p className="text-3 font-bold leading-tight text-red-700">GovSupply Connect</p>
+                                <p className="text-sm text-slate-500">Municipality of E.B. Magalona</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <nav className="space-y-2 px-3 py-4">
+                        {inventoryLinks.map((item) => (
+                            <Link
+                                key={item.label}
+                                href={item.href}
+                                className={`block rounded-xl border px-4 py-3 text-sm font-semibold transition ${
+                                    item.active
+                                        ? 'border-red-600 bg-red-600 text-white shadow-sm'
+                                        : 'border-transparent text-slate-700 hover:border-red-100 hover:bg-red-50'
+                                }`}
+                            >
+                                {item.label}
+                            </Link>
+                        ))}
+                    </nav>
+
+                    <div className="mt-auto border-t border-slate-200 bg-slate-50 px-4 py-4">
+                        <p className="text-sm font-semibold text-slate-800">Inventory Operations Suite</p>
+                        <p className="text-xs text-slate-600">Delivery, stock, and distribution control. Version 2.0.1</p>
+                    </div>
+                </aside>
+
+                <div className="flex-1">
+                    <header className="border-b border-slate-200 bg-white">
+                        <div className="mx-auto flex h-20 w-full max-w-[1400px] items-center justify-between px-4 sm:px-6">
+                            <div className="flex items-center gap-3">
+                                <img src="/logo.jpg" alt="GovSupply Connect" className="h-11 w-11 rounded-full border border-slate-300 bg-white object-cover" />
+                                <div>
+                                    <p className="text-2xl font-bold leading-tight text-red-700">GovSupply Connect</p>
+                                    <p className="text-sm text-slate-500">Municipality of E.B. Magalona</p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-5">
+                                <Link href={route('notifications.index')} className="relative text-slate-500 hover:text-slate-700" title="Notifications">
+                                    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
+                                        <path d="M10 21a2 2 0 0 0 4 0" />
+                                    </svg>
+                                    {notifications.unread_count > 0 && (
+                                        <span className="absolute -right-2 -top-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-xs font-bold text-white">
+                                            {notifications.unread_count}
+                                        </span>
+                                    )}
+                                </Link>
+
+                                <div className="flex items-center gap-3">
+                                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-red-600 text-sm font-bold text-white">
+                                        {user.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="hidden text-sm sm:block">
+                                        <p className="font-semibold text-slate-800">{user.name}</p>
+                                        <p className="text-slate-500">{roleLabel}</p>
+                                    </div>
+                                </div>
+
+                                <Dropdown>
+                                    <Dropdown.Trigger>
+                                        <span className="inline-flex rounded-md">
+                                            <button
+                                                type="button"
+                                                className="inline-flex items-center rounded-md border border-transparent bg-white px-1 py-2 text-sm text-slate-500 transition hover:text-slate-700 focus:outline-none"
+                                            >
+                                                <svg className="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path
+                                                        fillRule="evenodd"
+                                                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                                                        clipRule="evenodd"
+                                                    />
+                                                </svg>
+                                            </button>
+                                        </span>
+                                    </Dropdown.Trigger>
+
+                                    <Dropdown.Content>
+                                        <Dropdown.Link href={route('profile.edit')}>Profile</Dropdown.Link>
+                                        <Dropdown.Link href={route('logout')} method="post" as="button">
+                                            Log Out
+                                        </Dropdown.Link>
+                                    </Dropdown.Content>
+                                </Dropdown>
+                            </div>
+                        </div>
+                    </header>
+
+                    <div className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6">
+                        {header && (
+                            <header className="mb-6 border-b border-slate-200 pb-4">
+                                <div className="text-4xl font-bold text-slate-800">{header}</div>
+                                <p className="mt-1 text-xl text-slate-500">Municipality of E.B. Magalona - Inventory and Logistics</p>
+                            </header>
+                        )}
+
+                        <main>{children}</main>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gray-100">
@@ -54,6 +942,14 @@ export default function Authenticated({
                                         active={route().current('admin-tech.*')}
                                     >
                                         Admin Tech
+                                    </NavLink>
+                                )}
+                                {auth.can.admin_tech && (
+                                    <NavLink
+                                        href={route('admin-tech.audit.technical')}
+                                        active={route().current('admin-tech.audit.*')}
+                                    >
+                                        Technical Audit
                                     </NavLink>
                                 )}
                                 {auth.can.office && (
@@ -83,6 +979,19 @@ export default function Authenticated({
                                         active={route().current('executive.*')}
                                     >
                                         Executive
+                                    </NavLink>
+                                )}
+                                {auth.can.executive && (
+                                    <NavLink
+                                        href={route('executive.audit.business')}
+                                        active={route().current('executive.audit.*')}
+                                    >
+                                        Business Audit
+                                    </NavLink>
+                                )}
+                                {auth.can.notifications && (
+                                    <NavLink href={route('notifications.index')} active={route().current('notifications.*')}>
+                                        Notifications{notifications.unread_count > 0 ? ` (${notifications.unread_count})` : ''}
                                     </NavLink>
                                 )}
                             </div>
@@ -166,6 +1075,14 @@ export default function Authenticated({
                                 Admin Tech
                             </ResponsiveNavLink>
                         )}
+                        {auth.can.admin_tech && (
+                            <ResponsiveNavLink
+                                href={route('admin-tech.audit.technical')}
+                                active={route().current('admin-tech.audit.*')}
+                            >
+                                Technical Audit
+                            </ResponsiveNavLink>
+                        )}
                         {auth.can.office && (
                             <ResponsiveNavLink href={route('office.dashboard')} active={route().current('office.*')}>
                                 Office
@@ -193,6 +1110,19 @@ export default function Authenticated({
                                 active={route().current('executive.*')}
                             >
                                 Executive
+                            </ResponsiveNavLink>
+                        )}
+                        {auth.can.executive && (
+                            <ResponsiveNavLink
+                                href={route('executive.audit.business')}
+                                active={route().current('executive.audit.*')}
+                            >
+                                Business Audit
+                            </ResponsiveNavLink>
+                        )}
+                        {auth.can.notifications && (
+                            <ResponsiveNavLink href={route('notifications.index')} active={route().current('notifications.*')}>
+                                Notifications{notifications.unread_count > 0 ? ` (${notifications.unread_count})` : ''}
                             </ResponsiveNavLink>
                         )}
                     </div>

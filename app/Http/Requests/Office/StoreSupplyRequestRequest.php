@@ -20,6 +20,12 @@ class StoreSupplyRequestRequest extends FormRequest
             'purpose' => ['required', 'string'],
             'priority_level' => ['required', 'string', 'max:30'],
             'review_notes' => ['nullable', 'string', 'max:2000'],
+            'items' => ['nullable', 'array'],
+            'items.*.item_id' => ['required_with:items', 'integer', 'exists:items,item_id'],
+            'items.*.ppmp_item_id' => ['required_with:items', 'integer', 'exists:ppmp_items,ppmp_item_id'],
+            'items.*.item_name_snapshot' => ['required_with:items', 'string', 'max:200'],
+            'items.*.quantity_requested' => ['required_with:items', 'numeric', 'gt:0'],
+            'items.*.estimated_unit_cost' => ['required_with:items', 'numeric', 'gte:0'],
         ];
     }
 }

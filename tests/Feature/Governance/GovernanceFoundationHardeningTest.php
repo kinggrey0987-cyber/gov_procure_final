@@ -90,21 +90,59 @@ class GovernanceFoundationHardeningTest extends TestCase
         $this->assertContains('can:public.disclosures.view', $publicRoute->middleware());
 
         $adminUsersRoute = Route::getRoutes()->getByName('admin-tech.users.index');
+        $adminUsersEditRoute = Route::getRoutes()->getByName('admin-tech.users.edit');
+        $adminUsersUpdateRoute = Route::getRoutes()->getByName('admin-tech.users.update');
+        $adminUsersDestroyRoute = Route::getRoutes()->getByName('admin-tech.users.destroy');
         $adminOfficesRoute = Route::getRoutes()->getByName('admin-tech.offices.index');
+        $adminOfficesEditRoute = Route::getRoutes()->getByName('admin-tech.offices.edit');
+        $adminOfficesUpdateRoute = Route::getRoutes()->getByName('admin-tech.offices.update');
+        $adminOfficesDestroyRoute = Route::getRoutes()->getByName('admin-tech.offices.destroy');
         $adminRolesRoute = Route::getRoutes()->getByName('admin-tech.roles.index');
+        $executiveProcurementAnalyticsRoute = Route::getRoutes()->getByName('executive.procurement-analytics');
+        $executiveAnomaliesMonitoringRoute = Route::getRoutes()->getByName('executive.anomalies-monitoring');
+        $executiveReportsRoute = Route::getRoutes()->getByName('executive.reports');
+        $executiveTransparencyMonitoringRoute = Route::getRoutes()->getByName('executive.transparency-monitoring');
 
         $this->assertNotNull($adminUsersRoute);
+        $this->assertNotNull($adminUsersEditRoute);
+        $this->assertNotNull($adminUsersUpdateRoute);
+        $this->assertNotNull($adminUsersDestroyRoute);
         $this->assertNotNull($adminOfficesRoute);
+        $this->assertNotNull($adminOfficesEditRoute);
+        $this->assertNotNull($adminOfficesUpdateRoute);
+        $this->assertNotNull($adminOfficesDestroyRoute);
         $this->assertNotNull($adminRolesRoute);
+        $this->assertNotNull($executiveProcurementAnalyticsRoute);
+        $this->assertNotNull($executiveAnomaliesMonitoringRoute);
+        $this->assertNotNull($executiveReportsRoute);
+        $this->assertNotNull($executiveTransparencyMonitoringRoute);
 
         $this->assertContains('domain:admin-tech', $adminUsersRoute->middleware());
         $this->assertContains('can:governance.manage-users', $adminUsersRoute->middleware());
+        $this->assertContains('can:governance.manage-users', $adminUsersEditRoute->middleware());
+        $this->assertContains('can:governance.manage-users', $adminUsersUpdateRoute->middleware());
+        $this->assertContains('can:governance.manage-users', $adminUsersDestroyRoute->middleware());
 
         $this->assertContains('domain:admin-tech', $adminOfficesRoute->middleware());
         $this->assertContains('can:governance.manage-offices', $adminOfficesRoute->middleware());
+        $this->assertContains('can:governance.manage-offices', $adminOfficesEditRoute->middleware());
+        $this->assertContains('can:governance.manage-offices', $adminOfficesUpdateRoute->middleware());
+        $this->assertContains('can:governance.manage-offices', $adminOfficesDestroyRoute->middleware());
 
         $this->assertContains('domain:admin-tech', $adminRolesRoute->middleware());
         $this->assertContains('can:governance.view-roles', $adminRolesRoute->middleware());
+
+        $this->assertContains('domain:executive', $executiveProcurementAnalyticsRoute->middleware());
+        $this->assertContains('can:executive.monitoring.view', $executiveProcurementAnalyticsRoute->middleware());
+
+        $this->assertContains('domain:executive', $executiveAnomaliesMonitoringRoute->middleware());
+        $this->assertContains('can:executive.monitoring.view', $executiveAnomaliesMonitoringRoute->middleware());
+
+        $this->assertContains('domain:executive', $executiveReportsRoute->middleware());
+        $this->assertContains('can:executive.monitoring.view', $executiveReportsRoute->middleware());
+
+        $this->assertContains('domain:executive', $executiveTransparencyMonitoringRoute->middleware());
+        $this->assertContains('can:executive.monitoring.view', $executiveTransparencyMonitoringRoute->middleware());
     }
 
     public function test_admin_tech_subpages_are_not_reachable_by_non_admin_roles(): void
@@ -118,10 +156,15 @@ class GovernanceFoundationHardeningTest extends TestCase
 
         $admin = $this->createUser(UserRole::ADMIN, $office);
         $officeUser = $this->createUser(UserRole::OFFICE_USER, $office);
+        $managedUser = $this->createUser(UserRole::PROCUREMENT_OFFICER, $office);
 
         $this->actingAs($admin)->get('/admin-tech/users')->assertOk();
+        $this->actingAs($admin)->get('/admin-tech/users/'.$managedUser->id.'/edit')->assertOk();
+        $this->actingAs($admin)->get('/admin-tech/offices/'.$office->id.'/edit')->assertOk();
         $this->actingAs($officeUser)->get('/admin-tech/users')->assertForbidden();
+        $this->actingAs($officeUser)->get('/admin-tech/users/'.$managedUser->id.'/edit')->assertForbidden();
         $this->actingAs($officeUser)->get('/admin-tech/offices')->assertForbidden();
+        $this->actingAs($officeUser)->get('/admin-tech/offices/'.$office->id.'/edit')->assertForbidden();
         $this->actingAs($officeUser)->get('/admin-tech/roles')->assertForbidden();
     }
 
@@ -175,7 +218,7 @@ class GovernanceFoundationHardeningTest extends TestCase
         );
 
         $this->assertDatabaseHas('notifications', [
-            'id' => $notification->id,
+            'notification_id' => $notification->notification_id,
             'notification_type' => 'GOVERNANCE_EVENT',
             'reference_type' => User::class,
             'reference_id' => $admin->id,
@@ -184,11 +227,11 @@ class GovernanceFoundationHardeningTest extends TestCase
 
         $this->assertTrue(Schema::hasColumns('audit_logs', ['office_id', 'log_domain']));
         $this->assertTrue(Schema::hasColumns('notifications', [
+            'notification_id',
             'notification_type',
             'reference_type',
             'reference_id',
             'is_read',
-            'read_at',
         ]));
     }
 

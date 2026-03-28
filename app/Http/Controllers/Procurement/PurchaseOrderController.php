@@ -10,6 +10,7 @@ use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequest;
 use App\Models\Supplier;
 use App\Services\Documents\DocumentService;
+use App\Services\History\HistoryTimelineService;
 use App\Services\Procurement\PurchaseOrderService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,6 +22,7 @@ class PurchaseOrderController extends Controller
     public function __construct(
         private readonly PurchaseOrderService $service,
         private readonly DocumentService $documentService,
+        private readonly HistoryTimelineService $historyTimelineService,
     ) {
     }
 
@@ -29,7 +31,8 @@ class PurchaseOrderController extends Controller
         abort_unless($request->user()?->can('procurement.purchase-order.view-any'), 403);
 
         $purchaseOrders = PurchaseOrder::query()
-            ->with(['purchaseRequest', 'supplyRequest', 'supplier'])
+            ->with(['purchaseRequest.office', 'supplyRequest', 'supplier'])
+            ->withCount('deliveries')
             ->latest('purchase_order_id')
             ->paginate(15);
 
@@ -42,16 +45,71 @@ class PurchaseOrderController extends Controller
     {
         abort_unless($request->user()?->can('procurement.purchase-order.create'), 403);
 
-        $purchaseRequests = PurchaseRequest::query()
+        $eligiblePurchaseRequests = PurchaseRequest::query()
             ->processing()
+            ->with([
+                'office:id,code,name',
+                'supplyRequest:supply_request_id,request_code,requested_by',
+                'supplyRequest.requester:id,name',
+            ])
             ->latest('purchase_request_id')
-            ->get(['purchase_request_id', 'supply_request_id', 'office_id', 'status']);
+            ->get(['purchase_request_id', 'supply_request_id', 'office_id', 'status', 'requested_by', 'created_at'])
+            ->map(fn (PurchaseRequest $purchaseRequest): array => [
+                'purchase_request_id' => (int) $purchaseRequest->purchase_request_id,
+                'status' => (string) $purchaseRequest->status,
+                'created_at' => optional($purchaseRequest->created_at)?->toIso8601String(),
+                'office' => $purchaseRequest->office ? [
+                    'id' => (int) $purchaseRequest->office->id,
+                    'code' => (string) $purchaseRequest->office->code,
+                    'name' => (string) $purchaseRequest->office->name,
+                ] : null,
+                'supply_request' => $purchaseRequest->supplyRequest ? [
+                    'supply_request_id' => (int) $purchaseRequest->supplyRequest->supply_request_id,
+                    'request_code' => (string) ($purchaseRequest->supplyRequest->request_code ?? ''),
+                ] : null,
+                'origin_requester' => $purchaseRequest->supplyRequest?->requester ? [
+                    'id' => (int) $purchaseRequest->supplyRequest->requester->id,
+                    'name' => (string) $purchaseRequest->supplyRequest->requester->name,
+                ] : null,
+            ])
+            ->values();
 
-        $suppliers = Supplier::query()->active()->orderBy('supplier_name')->get(['supplier_id', 'supplier_name']);
+        $suppliers = Supplier::query()
+            ->active()
+            ->orderBy('supplier_name')
+            ->get(['supplier_id', 'supplier_name'])
+            ->map(fn (Supplier $supplier): array => [
+                'supplier_id' => (int) $supplier->supplier_id,
+                'supplier_name' => (string) $supplier->supplier_name,
+            ])
+            ->values();
 
         return Inertia::render('Procurement/PurchaseOrders/Create', [
-            'purchaseRequests' => $purchaseRequests,
+            'eligiblePurchaseRequests' => $eligiblePurchaseRequests,
             'suppliers' => $suppliers,
+            'poNumberPreview' => $this->service->previewNextPoNumber(),
+        ]);
+    }
+
+    public function records(Request $request): Response
+    {
+        abort_unless($request->user()?->can('procurement.purchase-order.view-any'), 403);
+
+        $status = trim((string) $request->input('status', ''));
+
+        $records = PurchaseOrder::query()
+            ->with(['supplier', 'purchaseRequest.office'])
+            ->when($status !== '', fn ($query) => $query->where('status', $status))
+            ->where('status', '!=', 'DRAFT')
+            ->latest('purchase_order_id')
+            ->paginate(15)
+            ->withQueryString();
+
+        return Inertia::render('Procurement/Records/Index', [
+            'records' => $records,
+            'filters' => [
+                'status' => $status,
+            ],
         ]);
     }
 
@@ -68,6 +126,8 @@ class PurchaseOrderController extends Controller
     public function show(Request $request, PurchaseOrder $purchaseOrder): Response
     {
         abort_unless($request->user()?->can('procurement.purchase-order.view', $purchaseOrder), 403);
+
+        $history = $this->historyTimelineService->forRecord($request->user(), $purchaseOrder);
 
         $documents = $this->documentService
             ->listForRelated($request->user(), 'purchase_orders', (int) $purchaseOrder->purchase_order_id)
@@ -87,6 +147,27 @@ class PurchaseOrderController extends Controller
                 'upload' => $request->user()?->can('procurement.purchase-order.view', $purchaseOrder) ?? false,
                 'delete' => $request->user()?->can('procurement.purchase-order.view', $purchaseOrder) ?? false,
             ],
+            'statusHistory' => $history['status']->map(fn ($entry): array => [
+                'id' => (int) $entry->id,
+                'old_status' => $entry->old_status,
+                'new_status' => (string) $entry->new_status,
+                'remarks' => $entry->remarks,
+                'changed_at' => optional($entry->changed_at)?->toIso8601String(),
+                'changed_by' => $entry->changedBy ? [
+                    'id' => (int) $entry->changedBy->id,
+                    'name' => (string) $entry->changedBy->name,
+                ] : null,
+            ])->values(),
+            'approvalHistory' => $history['approval']->map(fn ($entry): array => [
+                'id' => (int) $entry->id,
+                'status' => (string) $entry->status,
+                'remarks' => $entry->remarks,
+                'approved_at' => optional($entry->approved_at)?->toIso8601String(),
+                'approver' => $entry->approver ? [
+                    'id' => (int) $entry->approver->id,
+                    'name' => (string) $entry->approver->name,
+                ] : null,
+            ])->values(),
         ]);
     }
 

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Office\StorePpmpRequest;
 use App\Http\Requests\Office\SubmitPpmpRequest;
 use App\Http\Requests\Office\UpdatePpmpRequest;
+use App\Models\Item;
 use App\Models\Ppmp;
 use App\Services\Office\PpmpService;
 use Illuminate\Http\RedirectResponse;
@@ -26,7 +27,15 @@ class PpmpController extends Controller
         $ppmps = Ppmp::query()
             ->forOffice((int) $request->user()?->office_id)
             ->latest('ppmp_id')
-            ->paginate(15);
+            ->paginate(15)
+            ->through(fn (Ppmp $ppmp): array => [
+                'ppmp_id' => (int) $ppmp->ppmp_id,
+                'ppmp_code' => sprintf('PPMP-%d-%04d', (int) $ppmp->fiscal_year, (int) $ppmp->ppmp_id),
+                'fiscal_year' => (int) $ppmp->fiscal_year,
+                'status' => (string) $ppmp->status,
+                'last_updated' => optional($ppmp->updated_at)?->toIso8601String(),
+                'date_prepared' => optional($ppmp->date_prepared)?->toDateString(),
+            ]);
 
         return Inertia::render('Office/Ppmp/Index', [
             'ppmps' => $ppmps,
@@ -35,12 +44,20 @@ class PpmpController extends Controller
 
     public function create(): Response
     {
-        return Inertia::render('Office/Ppmp/Create');
+        return Inertia::render('Office/Ppmp/Create', [
+            'itemOptions' => $this->itemOptions(),
+        ]);
     }
 
     public function store(StorePpmpRequest $request): RedirectResponse
     {
-        $ppmp = $this->service->create($request->user(), $request->validated());
+        $payload = $request->validated();
+        $ppmp = $this->service->create($request->user(), $payload);
+
+        $items = $payload['items'] ?? [];
+        foreach ($items as $item) {
+            $this->service->addItem($ppmp, $request->user(), $item);
+        }
 
         return redirect()->route('office.ppmp.show', $ppmp->ppmp_id)
             ->with('success', 'PPMP created successfully.');
@@ -50,8 +67,14 @@ class PpmpController extends Controller
     {
         abort_unless($request->user()?->can('office.ppmp.view', $ppmp), 403);
 
+        $canEdit = $request->user()?->can('office.ppmp.update', $ppmp) ?? false;
+        $canSubmit = $request->user()?->can('office.ppmp.submit', $ppmp) ?? false;
+
         return Inertia::render('Office/Ppmp/Show', [
-            'ppmp' => $ppmp->load(['items', 'office', 'preparer', 'approver']),
+            'ppmp' => $ppmp->load(['items.item', 'items.itemCategory', 'office', 'preparer', 'approver']),
+            'canEdit' => $canEdit,
+            'canSubmit' => $canSubmit,
+            'itemOptions' => $this->itemOptions(),
         ]);
     }
 
@@ -60,7 +83,8 @@ class PpmpController extends Controller
         abort_unless($request->user()?->can('office.ppmp.update', $ppmp), 403);
 
         return Inertia::render('Office/Ppmp/Edit', [
-            'ppmp' => $ppmp,
+            'ppmp' => $ppmp->load(['items.item', 'items.itemCategory']),
+            'itemOptions' => $this->itemOptions(),
         ]);
     }
 
@@ -78,5 +102,21 @@ class PpmpController extends Controller
 
         return redirect()->route('office.ppmp.show', $ppmp->ppmp_id)
             ->with('success', 'PPMP submitted successfully.');
+    }
+
+    private function itemOptions(): array
+    {
+        return Item::query()
+            ->with('category:item_category_id,category_name')
+            ->orderBy('item_name')
+            ->get(['item_id', 'item_category_id', 'item_name'])
+            ->map(fn (Item $item): array => [
+                'item_id' => (int) $item->item_id,
+                'item_name' => (string) $item->item_name,
+                'item_category_id' => (int) $item->item_category_id,
+                'item_category_name' => (string) ($item->category?->category_name ?? 'Uncategorized'),
+            ])
+            ->values()
+            ->all();
     }
 }

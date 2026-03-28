@@ -22,7 +22,29 @@ class SupplierController extends Controller
     {
         abort_unless($request->user()?->can('procurement.supplier.view-any'), 403);
 
-        $suppliers = Supplier::query()->latest('supplier_id')->paginate(15);
+        $suppliers = Supplier::query()
+            ->with(['purchaseOrders.items.item.category'])
+            ->withCount('purchaseOrders')
+            ->latest('supplier_id')
+            ->paginate(15);
+
+        $suppliers->setCollection(
+            $suppliers->getCollection()->map(function (Supplier $supplier): Supplier {
+                $categoryCounts = [];
+
+                foreach ($supplier->purchaseOrders as $purchaseOrder) {
+                    foreach ($purchaseOrder->items as $item) {
+                        $categoryName = (string) ($item->item?->category?->category_name ?? 'Uncategorized');
+                        $categoryCounts[$categoryName] = ($categoryCounts[$categoryName] ?? 0) + 1;
+                    }
+                }
+
+                arsort($categoryCounts);
+                $supplier->setAttribute('primary_category', (string) (array_key_first($categoryCounts) ?? 'Uncategorized'));
+
+                return $supplier;
+            })
+        );
 
         return Inertia::render('Procurement/Suppliers/Index', [
             'suppliers' => $suppliers,

@@ -1,5 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, useForm } from '@inertiajs/react';
+import ApprovalHistoryTimeline from '@/Components/ApprovalHistoryTimeline';
+import StatusHistoryTimeline from '@/Components/StatusHistoryTimeline';
+import { Head } from '@inertiajs/react';
 
 type Props = {
     disclosure: {
@@ -10,11 +12,24 @@ type Props = {
         description?: string | null;
         file_path?: string | null;
     };
+    statusHistory: Array<{
+        id: number;
+        old_status?: string | null;
+        new_status: string;
+        remarks?: string | null;
+        changed_at?: string | null;
+        changed_by?: { id: number; name: string } | null;
+    }>;
+    approvalHistory: Array<{
+        id: number;
+        status: string;
+        remarks?: string | null;
+        approved_at?: string | null;
+        approver?: { id: number; name: string } | null;
+    }>;
 };
 
-export default function DisclosureShow({ disclosure }: Props) {
-    const form = useForm({ remarks: '' });
-
+export default function DisclosureShow({ disclosure, statusHistory, approvalHistory }: Props) {
     return (
         <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Disclosure Detail</h2>}>
             <Head title="Disclosure Detail" />
@@ -29,18 +44,12 @@ export default function DisclosureShow({ disclosure }: Props) {
                         <p><strong>File:</strong> {disclosure.file_path ?? '-'}</p>
                     </div>
 
-                    {disclosure.status !== 'PUBLISHED' && (
-                        <form
-                            className="space-y-2 rounded border bg-white p-4"
-                            onSubmit={(e) => {
-                                e.preventDefault();
-                                form.put(route('executive.disclosures.publish', disclosure.disclosure_id));
-                            }}
-                        >
-                            <input className="w-full rounded border px-3 py-2" placeholder="Publish remarks" value={form.data.remarks} onChange={(e) => form.setData('remarks', e.target.value)} />
-                            <button type="submit" className="rounded bg-emerald-600 px-4 py-2 text-sm text-white">Publish</button>
-                        </form>
-                    )}
+                    <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                        This view is read-only for executive monitoring.
+                    </div>
+
+                    <StatusHistoryTimeline entries={statusHistory} />
+                    <ApprovalHistoryTimeline entries={approvalHistory} />
                 </div>
             </div>
         </AuthenticatedLayout>

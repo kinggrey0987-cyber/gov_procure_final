@@ -1,5 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import AttachmentsPanel from '@/Components/AttachmentsPanel';
+import ApprovalHistoryTimeline from '@/Components/ApprovalHistoryTimeline';
+import StatusHistoryTimeline from '@/Components/StatusHistoryTimeline';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEvent } from 'react';
 
@@ -24,9 +26,24 @@ type Props = {
         upload: boolean;
         delete: boolean;
     };
+    statusHistory: Array<{
+        id: number;
+        old_status?: string | null;
+        new_status: string;
+        remarks?: string | null;
+        changed_at?: string | null;
+        changed_by?: { id: number; name: string } | null;
+    }>;
+    approvalHistory: Array<{
+        id: number;
+        status: string;
+        remarks?: string | null;
+        approved_at?: string | null;
+        approver?: { id: number; name: string } | null;
+    }>;
 };
 
-export default function PurchaseOrdersShow({ purchaseOrder, attachments, attachmentPermissions }: Props) {
+export default function PurchaseOrdersShow({ purchaseOrder, attachments, attachmentPermissions, statusHistory, approvalHistory }: Props) {
     const placeForm = useForm({ remarks: '' });
 
     const placeOrder = (event: FormEvent) => {
@@ -84,6 +101,9 @@ export default function PurchaseOrdersShow({ purchaseOrder, attachments, attachm
                         downloadRouteFor={(documentId: number) => route('documents.show', documentId)}
                         deleteRouteFor={(documentId: number) => route('documents.destroy', documentId)}
                     />
+
+                    <StatusHistoryTimeline entries={statusHistory} />
+                    <ApprovalHistoryTimeline entries={approvalHistory} />
                 </div>
             </div>
         </AuthenticatedLayout>

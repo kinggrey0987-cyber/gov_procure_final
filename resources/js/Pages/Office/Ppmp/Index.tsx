@@ -3,9 +3,11 @@ import { Head, Link } from '@inertiajs/react';
 
 type PpmpRow = {
     ppmp_id: number;
+    ppmp_code: string;
     fiscal_year: number;
     status: string;
-    date_prepared: string;
+    date_prepared?: string | null;
+    last_updated?: string | null;
 };
 
 type Props = {
@@ -14,50 +16,92 @@ type Props = {
 
 export default function PpmpIndex({ ppmps }: Props) {
     return (
-        <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">PPMP List</h2>}>
-            <Head title="PPMP List" />
+        <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">PPMP</h2>}>
+            <Head title="PPMP" />
 
-            <div className="py-10">
-                <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-                    <div className="mb-4">
-                        <Link href={route('office.ppmp.create')} className="rounded bg-indigo-600 px-4 py-2 text-sm text-white">
+            <div className="space-y-5 py-4">
+                <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h3 className="text-2xl font-semibold text-slate-800">Project Procurement Management Plan</h3>
+                            <p className="text-sm text-slate-600">Prepare and submit annual PPMP plans for your office.</p>
+                        </div>
+                        <Link href={route('office.ppmp.create')} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">
                             Create PPMP
                         </Link>
                     </div>
+                </section>
 
-                    <div className="overflow-hidden rounded-lg border bg-white">
-                        <table className="min-w-full text-sm">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th className="px-4 py-3 text-left">ID</th>
-                                    <th className="px-4 py-3 text-left">Fiscal Year</th>
-                                    <th className="px-4 py-3 text-left">Status</th>
-                                    <th className="px-4 py-3 text-left">Date Prepared</th>
-                                    <th className="px-4 py-3 text-left">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {ppmps.data.map((ppmp) => (
-                                    <tr key={ppmp.ppmp_id} className="border-t">
-                                        <td className="px-4 py-3">{ppmp.ppmp_id}</td>
-                                        <td className="px-4 py-3">{ppmp.fiscal_year}</td>
-                                        <td className="px-4 py-3">{ppmp.status}</td>
-                                        <td className="px-4 py-3">{ppmp.date_prepared}</td>
-                                        <td className="px-4 py-3">
-                                            <Link
-                                                href={route('office.ppmp.show', ppmp.ppmp_id)}
-                                                className="text-indigo-600 hover:underline"
-                                            >
-                                                View
-                                            </Link>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <div className="border-b border-slate-200 px-6 py-4">
+                        <h4 className="text-lg font-semibold text-slate-800">PPMP List</h4>
                     </div>
-                </div>
+                    {ppmps.data.length === 0 ? (
+                        <div className="px-6 py-10 text-sm text-slate-600">No PPMP entries yet.</div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-slate-200 text-sm">
+                                <thead className="bg-slate-50">
+                                    <tr>
+                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">PPMP ID</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Fiscal Year</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Date Prepared</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Status</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Last Updated</th>
+                                        <th className="px-4 py-3 text-right font-semibold text-slate-700">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {ppmps.data.map((ppmp) => (
+                                        <tr key={ppmp.ppmp_id}>
+                                            <td className="px-4 py-3 font-semibold text-red-700">{ppmp.ppmp_code}</td>
+                                            <td className="px-4 py-3 text-slate-700">{ppmp.fiscal_year}</td>
+                                            <td className="px-4 py-3 text-slate-700">{ppmp.date_prepared ?? '-'}</td>
+                                            <td className="px-4 py-3">
+                                                <StatusBadge status={ppmp.status} />
+                                            </td>
+                                            <td className="px-4 py-3 text-slate-700">{formatDateTime(ppmp.last_updated)}</td>
+                                            <td className="px-4 py-3 text-right">
+                                                <Link
+                                                    href={route('office.ppmp.show', ppmp.ppmp_id)}
+                                                    className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
+                                                >
+                                                    View Details
+                                                </Link>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </section>
             </div>
         </AuthenticatedLayout>
     );
+}
+
+function formatDateTime(value?: string | null): string {
+    if (!value) {
+        return '-';
+    }
+
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
+function StatusBadge({ status }: { status: string }) {
+    const normalized = status.toUpperCase();
+    const style =
+        normalized === 'APPROVED'
+            ? 'bg-emerald-100 text-emerald-700'
+            : normalized === 'SUBMITTED'
+                ? 'bg-blue-100 text-blue-700'
+                : normalized === 'RETURNED_FOR_REVISION'
+                    ? 'bg-amber-100 text-amber-700'
+                    : normalized === 'REJECTED'
+                        ? 'bg-rose-100 text-rose-700'
+                        : 'bg-slate-100 text-slate-700';
+
+    return <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${style}`}>{status.replaceAll('_', ' ')}</span>;
 }

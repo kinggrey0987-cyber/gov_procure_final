@@ -3,6 +3,7 @@
 namespace Tests\Feature\Public;
 
 use App\Enums\UserRole;
+use App\Models\Document;
 use App\Models\Office;
 use App\Models\PublicDisclosure;
 use App\Models\Role;
@@ -72,6 +73,64 @@ class PublicDisclosurePortalTest extends TestCase
         $this->actingAs($this->publicUser)
             ->get(route('public.disclosures.show', $draft->disclosure_id))
             ->assertNotFound();
+    }
+
+    public function test_welcome_page_uses_published_public_data_only(): void
+    {
+        $published = PublicDisclosure::query()->create([
+            'title' => 'Published Landing Disclosure',
+            'type' => 'PROCUREMENT',
+            'reference_type' => null,
+            'reference_id' => null,
+            'description' => 'Visible on public landing page',
+            'published_by' => $this->executiveUser->id,
+            'published_at' => now(),
+            'file_path' => '/files/published-landing.pdf',
+            'status' => 'PUBLISHED',
+        ]);
+
+        $draft = PublicDisclosure::query()->create([
+            'title' => 'Draft Landing Disclosure',
+            'type' => 'PROCUREMENT',
+            'reference_type' => null,
+            'reference_id' => null,
+            'description' => 'Should not be visible',
+            'published_by' => null,
+            'published_at' => null,
+            'file_path' => null,
+            'status' => 'DRAFT',
+        ]);
+
+        Document::query()->create([
+            'uploaded_by' => $this->executiveUser->id,
+            'title' => 'Published Attachment',
+            'file_name' => 'published-attachment.pdf',
+            'file_path' => 'public_disclosures/published-attachment.pdf',
+            'related_module' => 'public_disclosures',
+            'related_reference_id' => $published->disclosure_id,
+            'uploaded_at' => now(),
+        ]);
+
+        Document::query()->create([
+            'uploaded_by' => $this->executiveUser->id,
+            'title' => 'Draft Attachment',
+            'file_name' => 'draft-attachment.pdf',
+            'file_path' => 'public_disclosures/draft-attachment.pdf',
+            'related_module' => 'public_disclosures',
+            'related_reference_id' => $draft->disclosure_id,
+            'uploaded_at' => now(),
+        ]);
+
+        $this->get('/')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Welcome')
+                ->where('summaryStats.0.value', '1')
+                ->has('latestDisclosures', 1)
+                ->where('latestDisclosures.0.title', 'Published Landing Disclosure')
+                ->has('publicReports', 1)
+                ->where('publicReports.0.title', 'Published Attachment')
+            );
     }
 
     private function createUser(UserRole $role, Office $office): User

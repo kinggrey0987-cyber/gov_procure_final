@@ -6,6 +6,7 @@ use App\Http\Requests\PublicDisclosure\PublishPublicDisclosureRequest;
 use App\Http\Requests\PublicDisclosure\StorePublicDisclosureRequest;
 use App\Models\PublicDisclosure;
 use App\Services\Analytics\PublicDisclosureService;
+use App\Services\History\HistoryTimelineService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Redirect;
 use Inertia\Inertia;
@@ -13,13 +14,15 @@ use Inertia\Response;
 
 class PublicDisclosureController
 {
-    public function __construct(private readonly PublicDisclosureService $disclosureService)
-    {
+    public function __construct(
+        private readonly PublicDisclosureService $disclosureService,
+        private readonly HistoryTimelineService $historyTimelineService,
+    ) {
     }
 
     public function index(): Response
     {
-        abort_unless(auth()->user()->can('public-disclosure.manage'), 403);
+        abort_unless(auth()->user()->can('public-disclosure.view'), 403);
 
         $disclosures = PublicDisclosure::query()
             ->with('publisher')
@@ -50,12 +53,35 @@ class PublicDisclosureController
 
     public function show(PublicDisclosure $public_disclosure): Response
     {
-        abort_unless(auth()->user()->can('public-disclosure.manage'), 403);
+        abort_unless(auth()->user()->can('public-disclosure.view'), 403);
+
+        $history = $this->historyTimelineService->forRecord(auth()->user(), $public_disclosure);
 
         $public_disclosure->load(['publisher', 'statusHistory.changedBy']);
 
         return Inertia::render('Executive/Disclosures/Show', [
             'disclosure' => $public_disclosure,
+            'statusHistory' => $history['status']->map(fn ($entry): array => [
+                'id' => (int) $entry->id,
+                'old_status' => $entry->old_status,
+                'new_status' => (string) $entry->new_status,
+                'remarks' => $entry->remarks,
+                'changed_at' => optional($entry->changed_at)?->toIso8601String(),
+                'changed_by' => $entry->changedBy ? [
+                    'id' => (int) $entry->changedBy->id,
+                    'name' => (string) $entry->changedBy->name,
+                ] : null,
+            ])->values(),
+            'approvalHistory' => $history['approval']->map(fn ($entry): array => [
+                'id' => (int) $entry->id,
+                'status' => (string) $entry->status,
+                'remarks' => $entry->remarks,
+                'approved_at' => optional($entry->approved_at)?->toIso8601String(),
+                'approver' => $entry->approver ? [
+                    'id' => (int) $entry->approver->id,
+                    'name' => (string) $entry->approver->name,
+                ] : null,
+            ])->values(),
         ]);
     }
 

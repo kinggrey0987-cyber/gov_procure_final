@@ -37,12 +37,35 @@ class DistributionRecordController
     {
         abort_unless(auth()->user()->can('distribution.manage'), 403);
 
-        $supplyRequests = SupplyRequest::query()->submitted()->get();
-        $deliveries = Delivery::query()->verified()->get();
+        $eligibleRows = Delivery::query()
+            ->verified()
+            ->whereHas('purchaseOrder', fn ($query) => $query->whereNotNull('supply_request_id'))
+            ->whereDoesntHave('distributionRecords')
+            ->with(['purchaseOrder.supplyRequest.office'])
+            ->latest('delivery_id')
+            ->get()
+            ->map(function (Delivery $delivery): ?array {
+                $supplyRequest = $delivery->purchaseOrder?->supplyRequest;
+
+                if (!$supplyRequest instanceof SupplyRequest) {
+                    return null;
+                }
+
+                return [
+                    'supply_request_id' => (int) $supplyRequest->supply_request_id,
+                    'request_code' => (string) $supplyRequest->request_code,
+                    'office_id' => (int) $supplyRequest->office_id,
+                    'office_name' => (string) ($supplyRequest->office?->name ?? 'Unknown Office'),
+                    'delivery_id' => (int) $delivery->delivery_id,
+                    'delivery_code' => (string) $delivery->delivery_code,
+                    'receipt_status' => (string) $delivery->receipt_status,
+                ];
+            })
+            ->filter()
+            ->values();
 
         return Inertia::render('Inventory/Distribution/Create', [
-            'supplyRequests' => $supplyRequests,
-            'deliveries' => $deliveries,
+            'eligibleRows' => $eligibleRows,
         ]);
     }
 

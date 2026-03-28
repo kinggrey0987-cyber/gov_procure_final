@@ -47,4 +47,14 @@ class SupplyRequestItemController extends Controller
         return redirect()->route('office.supply-requests.items.index', $supplyRequest->supply_request_id)
             ->with('success', 'Supply request item updated.');
     }
+
+    public function destroy(Request $request, SupplyRequest $supplyRequest, SupplyRequestItem $supplyRequestItem): RedirectResponse
+    {
+        abort_unless($request->user()?->can('office.supply-request.update', $supplyRequest), 403);
+
+        $this->service->removeItem($supplyRequest, $supplyRequestItem, $request->user());
+
+        return redirect()->route('office.supply-requests.show', $supplyRequest->supply_request_id)
+            ->with('success', 'Supply request item removed.');
+    }
 }

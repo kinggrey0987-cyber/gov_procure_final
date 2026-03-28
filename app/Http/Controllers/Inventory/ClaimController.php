@@ -7,6 +7,7 @@ use App\Http\Requests\Claim\UpdateClaimStatusRequest;
 use App\Models\Claim;
 use App\Models\DistributionRecord;
 use App\Services\Documents\DocumentService;
+use App\Services\History\HistoryTimelineService;
 use App\Services\Inventory\ClaimService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Redirect;
@@ -18,6 +19,7 @@ class ClaimController
     public function __construct(
         private readonly ClaimService $claimService,
         private readonly DocumentService $documentService,
+        private readonly HistoryTimelineService $historyTimelineService,
     ) {
     }
 
@@ -65,6 +67,18 @@ class ClaimController
             'distribution_record' => $distributionRecord,
         ]));
 
+        if ($request->hasFile('attachment_file')) {
+            $this->documentService->upload(
+                auth()->user(),
+                'claims',
+                (int) $claim->claims_id,
+                [
+                    'title' => (string) ($validated['attachment_title'] ?? ($validated['claim_type'].' Issue Attachment')),
+                    'file' => $request->file('attachment_file'),
+                ],
+            );
+        }
+
         $showRoute = auth()->user()->isOfficeUser() ? 'office.claims.show' : 'inventory.claims.show';
 
         return Redirect::route($showRoute, $claim->claims_id)
@@ -74,6 +88,8 @@ class ClaimController
     public function show(Claim $claim): Response
     {
         abort_unless(auth()->user()->can('claim.view', $claim), 403);
+
+        $history = $this->historyTimelineService->forRecord(auth()->user(), $claim);
 
         $claim->load(['distributionRecord.items', 'claimant', 'office']);
 
@@ -95,6 +111,27 @@ class ClaimController
                 'upload' => auth()->user()->can('claim.view', $claim),
                 'delete' => auth()->user()->can('claim.view', $claim),
             ],
+            'statusHistory' => $history['status']->map(fn ($entry): array => [
+                'id' => (int) $entry->id,
+                'old_status' => $entry->old_status,
+                'new_status' => (string) $entry->new_status,
+                'remarks' => $entry->remarks,
+                'changed_at' => optional($entry->changed_at)?->toIso8601String(),
+                'changed_by' => $entry->changedBy ? [
+                    'id' => (int) $entry->changedBy->id,
+                    'name' => (string) $entry->changedBy->name,
+                ] : null,
+            ])->values(),
+            'approvalHistory' => $history['approval']->map(fn ($entry): array => [
+                'id' => (int) $entry->id,
+                'status' => (string) $entry->status,
+                'remarks' => $entry->remarks,
+                'approved_at' => optional($entry->approved_at)?->toIso8601String(),
+                'approver' => $entry->approver ? [
+                    'id' => (int) $entry->approver->id,
+                    'name' => (string) $entry->approver->name,
+                ] : null,
+            ])->values(),
         ]);
     }
 

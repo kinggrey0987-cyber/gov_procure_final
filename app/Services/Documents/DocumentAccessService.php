@@ -59,7 +59,7 @@ class DocumentAccessService
         'public_disclosures' => [
             'model' => PublicDisclosure::class,
             'key' => 'disclosure_id',
-            'view_ability' => 'public-disclosure.manage',
+            'view_ability' => 'public-disclosure.view',
             'manage_ability' => 'public-disclosure.manage',
         ],
     ];
@@ -90,6 +90,10 @@ class DocumentAccessService
     {
         $module = $this->normalizeModule($module);
 
+        if ($module === 'ppmp' && $actor instanceof User && $actor->can('executive.ppmp-approval.view-any')) {
+            return true;
+        }
+
         if ($module === 'public_disclosures') {
             $isPublished = (string) ($parent->getAttribute('status') ?? '') === 'PUBLISHED'
                 && (bool) $parent->getAttribute('published_at');
@@ -99,6 +103,10 @@ class DocumentAccessService
             }
 
             if ($actor->can('public-disclosure.manage')) {
+                return true;
+            }
+
+            if ($actor->can('public-disclosure.view')) {
                 return true;
             }
 

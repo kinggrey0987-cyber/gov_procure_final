@@ -25,7 +25,9 @@ class PurchaseRequestController extends Controller
         abort_unless($request->user()?->can('procurement.purchase-request.view-any'), 403);
 
         $purchaseRequests = PurchaseRequest::query()
-            ->with(['office', 'requester', 'supplyRequest'])
+            ->with(['office', 'requester', 'supplyRequest', 'items.item.category'])
+            ->withCount('items')
+            ->withSum('items', 'quantity_requested')
             ->latest('purchase_request_id')
             ->paginate(15);
 

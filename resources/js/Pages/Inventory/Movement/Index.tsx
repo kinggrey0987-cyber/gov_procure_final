@@ -4,6 +4,7 @@ import { Head, Link } from '@inertiajs/react';
 type MovementRow = {
     movement_id: number;
     movement_type: string;
+    inventory_id: number | string;
     quantity: string;
     movement_date: string;
 };
@@ -16,39 +17,39 @@ type Props = {
 
 export default function MovementIndex({ movements }: Props) {
     return (
-        <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Inventory Movements</h2>}>
+        <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Inventory Movement Logs</h2>}>
             <Head title="Inventory Movements" />
-            <div className="py-10">
-                <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-                    <div className="overflow-hidden rounded border bg-white">
-                        <table className="min-w-full divide-y divide-gray-200 text-sm">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th className="px-4 py-2 text-left">Type</th>
-                                    <th className="px-4 py-2 text-left">Quantity</th>
-                                    <th className="px-4 py-2 text-left">Date</th>
-                                    <th className="px-4 py-2 text-left">Actions</th>
+            <div className="py-8">
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                    <table className="min-w-full divide-y divide-slate-200 text-sm">
+                        <thead className="bg-slate-50">
+                            <tr>
+                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Type</th>
+                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Inventory</th>
+                                <th className="px-4 py-3 text-right font-semibold text-slate-700">Quantity</th>
+                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Date</th>
+                                <th className="px-4 py-3 text-right font-semibold text-slate-700">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {movements.data.map((row) => (
+                                <tr key={row.movement_id} className="hover:bg-slate-50/60">
+                                    <td className="px-4 py-3 text-slate-700">{row.movement_type}</td>
+                                    <td className="px-4 py-3 text-slate-700">#{row.inventory_id}</td>
+                                    <td className="px-4 py-3 text-right font-semibold text-slate-700">{row.quantity}</td>
+                                    <td className="px-4 py-3 text-slate-600">{row.movement_date}</td>
+                                    <td className="px-4 py-3 text-right">
+                                        <Link
+                                            href={route('inventory.inventory-movements.show', row.movement_id)}
+                                            className="text-sm font-semibold text-blue-600 hover:text-blue-800"
+                                        >
+                                            View
+                                        </Link>
+                                    </td>
                                 </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {movements.data.map((row) => (
-                                    <tr key={row.movement_id}>
-                                        <td className="px-4 py-2">{row.movement_type}</td>
-                                        <td className="px-4 py-2">{row.quantity}</td>
-                                        <td className="px-4 py-2">{row.movement_date}</td>
-                                        <td className="px-4 py-2">
-                                            <Link
-                                                href={route('inventory.inventory-movements.show', row.movement_id)}
-                                                className="rounded bg-indigo-600 px-3 py-1 text-xs text-white"
-                                            >
-                                                View
-                                            </Link>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </AuthenticatedLayout>

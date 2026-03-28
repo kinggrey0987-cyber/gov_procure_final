@@ -44,4 +44,14 @@ class PpmpItemController extends Controller
         return redirect()->route('office.ppmp.items.index', $ppmp->ppmp_id)
             ->with('success', 'PPMP item updated.');
     }
+
+    public function destroy(Request $request, Ppmp $ppmp, PpmpItem $ppmpItem): RedirectResponse
+    {
+        abort_unless($request->user()?->can('office.ppmp.update', $ppmp), 403);
+
+        $this->service->removeItem($ppmp, $ppmpItem, $request->user());
+
+        return redirect()->route('office.ppmp.show', $ppmp->ppmp_id)
+            ->with('success', 'PPMP item removed.');
+    }
 }
