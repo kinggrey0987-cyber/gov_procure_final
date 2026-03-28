@@ -3,12 +3,17 @@
 namespace App\Http\Requests\Governance;
 
 use App\Enums\UserRole;
+use App\Models\Office;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class UpdateInternalUserRequest extends FormRequest
 {
+    private const TECHNICAL_OFFICE_CODE = 'TECH_ADMIN';
+
     public function authorize(): bool
     {
         return (bool) $this->user()?->can('governance.manage-users');
@@ -31,10 +36,67 @@ class UpdateInternalUserRequest extends FormRequest
                 }),
             ],
             'office_id' => [
-                'required',
+                'nullable',
                 'integer',
                 Rule::exists('offices', 'id')->where(fn ($query) => $query->where('is_active', true)),
             ],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            $roleCode = $this->selectedRoleCode();
+
+            if (! $roleCode || $roleCode === UserRole::PUBLIC->value) {
+                return;
+            }
+
+            $officeId = $this->input('office_id');
+            $officeCode = $this->selectedOfficeCode();
+
+            if ($roleCode === UserRole::ADMIN->value) {
+                if ($officeId !== null && $officeId !== '' && $officeCode !== self::TECHNICAL_OFFICE_CODE) {
+                    $validator->errors()->add(
+                        'office_id',
+                        'Admin accounts are technical-only and cannot be assigned to operational offices.',
+                    );
+                }
+
+                return;
+            }
+
+            if ($officeId === null || $officeId === '') {
+                $validator->errors()->add('office_id', 'Office assignment is required for this role.');
+
+                return;
+            }
+
+            if ($officeCode === self::TECHNICAL_OFFICE_CODE) {
+                $validator->errors()->add('office_id', 'Technical Administration is reserved for Admin accounts.');
+            }
+        });
+    }
+
+    private function selectedRoleCode(): ?string
+    {
+        $roleId = $this->input('role_id');
+
+        if (! is_numeric($roleId)) {
+            return null;
+        }
+
+        return Role::query()->whereKey((int) $roleId)->value('code');
+    }
+
+    private function selectedOfficeCode(): ?string
+    {
+        $officeId = $this->input('office_id');
+
+        if (! is_numeric($officeId)) {
+            return null;
+        }
+
+        return Office::query()->whereKey((int) $officeId)->value('code');
     }
 }

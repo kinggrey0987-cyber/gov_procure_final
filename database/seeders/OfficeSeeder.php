@@ -33,6 +33,11 @@ class OfficeSeeder extends Seeder
                 'code' => 'ENG',
                 'description' => 'Sample requesting office for capstone baseline data.',
             ],
+            [
+                'name' => 'Technical Administration',
+                'code' => 'TECH_ADMIN',
+                'description' => 'Reserved technical office for system administrator accounts.',
+            ],
         ];
 
         foreach ($offices as $office) {

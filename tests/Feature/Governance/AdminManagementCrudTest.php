@@ -15,6 +15,7 @@ class AdminManagementCrudTest extends TestCase
     use RefreshDatabase;
 
     protected Office $office;
+    protected Office $technicalOffice;
     protected User $admin;
 
     protected function setUp(): void
@@ -30,7 +31,14 @@ class AdminManagementCrudTest extends TestCase
             'is_active' => true,
         ]);
 
-        $this->admin = $this->createUser(UserRole::ADMIN, $this->office, 'admin@gsc.local');
+        $this->technicalOffice = Office::query()->create([
+            'name' => 'Technical Administration',
+            'code' => 'TECH_ADMIN',
+            'description' => 'Technical office',
+            'is_active' => true,
+        ]);
+
+        $this->admin = $this->createUser(UserRole::ADMIN, $this->technicalOffice, 'admin@gsc.local');
 
         foreach (UserRole::cases() as $role) {
             $this->ensureRole($role);
@@ -120,8 +128,8 @@ class AdminManagementCrudTest extends TestCase
             ->post(route('admin-tech.users.store'), [
                 'name' => 'Internal Staff',
                 'email' => 'staff@gsc.local',
-                'password' => 'password123',
-                'password_confirmation' => 'password123',
+                'password' => 'TempPass#12345',
+                'password_confirmation' => 'TempPass#12345',
                 'role_id' => $roleOfficeUser->id,
                 'office_id' => $targetOffice->id,
             ])
@@ -129,7 +137,8 @@ class AdminManagementCrudTest extends TestCase
 
         $user = User::query()->where('email', 'staff@gsc.local')->firstOrFail();
 
-        $this->assertTrue(password_verify('password123', $user->password));
+        $this->assertTrue(password_verify('TempPass#12345', $user->password));
+        $this->assertTrue($user->must_change_password);
 
         $this->actingAs($this->admin)
             ->put(route('admin-tech.users.update', $user->id), [
@@ -166,8 +175,8 @@ class AdminManagementCrudTest extends TestCase
         $this->actingAs($officeUser)->post(route('admin-tech.users.store'), [
             'name' => 'Blocked User',
             'email' => 'blocked@gsc.local',
-            'password' => 'password123',
-            'password_confirmation' => 'password123',
+            'password' => 'TempPass#12345',
+            'password_confirmation' => 'TempPass#12345',
             'role_id' => $roleOfficeUser->id,
             'office_id' => $this->office->id,
         ])->assertForbidden();
@@ -215,12 +224,118 @@ class AdminManagementCrudTest extends TestCase
             ->post(route('admin-tech.users.store'), [
                 'name' => 'Public Attempt',
                 'email' => 'public.attempt@gsc.local',
-                'password' => 'password123',
-                'password_confirmation' => 'password123',
+                'password' => 'TempPass#12345',
+                'password_confirmation' => 'TempPass#12345',
                 'role_id' => $publicRole->id,
                 'office_id' => $this->office->id,
             ])
             ->assertSessionHasErrors('role_id');
+    }
+
+    public function test_admin_creation_uses_technical_office_and_rejects_operational_office_selection(): void
+    {
+        $adminRole = $this->roleByCode(UserRole::ADMIN->value);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin-tech.users.store'), [
+                'name' => 'Admin Attempt',
+                'email' => 'admin.attempt@gsc.local',
+                'password' => 'TempPass#12345',
+                'password_confirmation' => 'TempPass#12345',
+                'role_id' => $adminRole->id,
+                'office_id' => $this->office->id,
+            ])
+            ->assertSessionHasErrors('office_id');
+
+        $this->actingAs($this->admin)
+            ->post(route('admin-tech.users.store'), [
+                'name' => 'Admin Technical User',
+                'email' => 'admin.tech@gsc.local',
+                'password' => 'TempPass#12345',
+                'password_confirmation' => 'TempPass#12345',
+                'role_id' => $adminRole->id,
+            ])
+            ->assertRedirect(route('admin-tech.users.index'));
+
+        $adminUser = User::query()->where('email', 'admin.tech@gsc.local')->firstOrFail();
+
+        $this->assertSame($this->technicalOffice->id, $adminUser->office_id);
+        $this->assertTrue($adminUser->must_change_password);
+    }
+
+    public function test_non_admin_roles_require_operational_office_and_reject_technical_office(): void
+    {
+        $roleOfficeUser = $this->roleByCode(UserRole::OFFICE_USER->value);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin-tech.users.store'), [
+                'name' => 'Missing Office',
+                'email' => 'missing.office@gsc.local',
+                'password' => 'TempPass#12345',
+                'password_confirmation' => 'TempPass#12345',
+                'role_id' => $roleOfficeUser->id,
+            ])
+            ->assertSessionHasErrors('office_id');
+
+        $this->actingAs($this->admin)
+            ->post(route('admin-tech.users.store'), [
+                'name' => 'Wrong Office',
+                'email' => 'wrong.office@gsc.local',
+                'password' => 'TempPass#12345',
+                'password_confirmation' => 'TempPass#12345',
+                'role_id' => $roleOfficeUser->id,
+                'office_id' => $this->technicalOffice->id,
+            ])
+            ->assertSessionHasErrors('office_id');
+    }
+
+    public function test_edit_flow_enforces_admin_and_non_admin_office_rules(): void
+    {
+        $roleOfficeUser = $this->roleByCode(UserRole::OFFICE_USER->value);
+        $roleProcurement = $this->roleByCode(UserRole::PROCUREMENT_OFFICER->value);
+        $roleAdmin = $this->roleByCode(UserRole::ADMIN->value);
+
+        $staff = $this->createUser(UserRole::OFFICE_USER, $this->office, 'role.switch@gsc.local');
+
+        $this->actingAs($this->admin)
+            ->put(route('admin-tech.users.update', $staff->id), [
+                'name' => 'Role Switch User',
+                'email' => 'role.switch@gsc.local',
+                'role_id' => $roleAdmin->id,
+                'office_id' => $this->office->id,
+            ])
+            ->assertSessionHasErrors('office_id');
+
+        $this->actingAs($this->admin)
+            ->put(route('admin-tech.users.update', $staff->id), [
+                'name' => 'Role Switch User',
+                'email' => 'role.switch@gsc.local',
+                'role_id' => $roleAdmin->id,
+            ])
+            ->assertRedirect(route('admin-tech.users.index'));
+
+        $staff->refresh();
+        $this->assertSame($this->technicalOffice->id, $staff->office_id);
+
+        $this->actingAs($this->admin)
+            ->put(route('admin-tech.users.update', $staff->id), [
+                'name' => 'Role Switch User',
+                'email' => 'role.switch@gsc.local',
+                'role_id' => $roleProcurement->id,
+            ])
+            ->assertSessionHasErrors('office_id');
+
+        $this->actingAs($this->admin)
+            ->put(route('admin-tech.users.update', $staff->id), [
+                'name' => 'Role Switch User Updated',
+                'email' => 'role.switch.updated@gsc.local',
+                'role_id' => $roleOfficeUser->id,
+                'office_id' => $this->office->id,
+            ])
+            ->assertRedirect(route('admin-tech.users.index'));
+
+        $staff->refresh();
+        $this->assertSame($this->office->id, $staff->office_id);
     }
 
     public function test_self_delete_and_linked_record_delete_protections_work(): void

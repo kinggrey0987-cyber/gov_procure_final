@@ -18,6 +18,12 @@ use Inertia\Response;
 
 class UserManagementController extends Controller
 {
+    private const TECHNICAL_OFFICE_CODE = 'TECH_ADMIN';
+
+    private const TECHNICAL_OFFICE_NAME = 'Technical Administration';
+
+    private const TECHNICAL_OFFICE_DESCRIPTION = 'Reserved technical office for system administrator accounts.';
+
     public function index(): Response
     {
         $actingUserId = auth()->id();
@@ -73,13 +79,18 @@ class UserManagementController extends Controller
     public function store(StoreInternalUserRequest $request): RedirectResponse
     {
         $validated = $request->validated();
+        $roleId = (int) $validated['role_id'];
 
         User::query()->create([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
-            'role_id' => (int) $validated['role_id'],
-            'office_id' => (int) $validated['office_id'],
+            'must_change_password' => true,
+            'role_id' => $roleId,
+            'office_id' => $this->resolveOfficeIdForRole(
+                roleId: $roleId,
+                requestedOfficeId: isset($validated['office_id']) ? (int) $validated['office_id'] : null,
+            ),
             'email_verified_at' => now(),
         ]);
 
@@ -91,7 +102,14 @@ class UserManagementController extends Controller
         $this->ensureManageableUser($user);
 
         return Inertia::render('AdminTech/Users/Edit', [
-            'userRecord' => $user->load(['role:id,code,name', 'office:id,code,name']),
+            'userRecord' => [
+                'id' => (int) $user->id,
+                'name' => (string) $user->name,
+                'email' => (string) $user->email,
+                'role_id' => (int) $user->role_id,
+                'role_code' => (string) ($user->role?->code ?? ''),
+                'office_id' => $user->office_id ? (int) $user->office_id : null,
+            ],
             'roles' => $this->manageableRoles(),
             'offices' => $this->activeOffices(),
         ]);
@@ -101,7 +119,18 @@ class UserManagementController extends Controller
     {
         $this->ensureManageableUser($user);
 
-        $user->update($request->validated());
+        $validated = $request->validated();
+        $roleId = (int) $validated['role_id'];
+
+        $user->update([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'role_id' => $roleId,
+            'office_id' => $this->resolveOfficeIdForRole(
+                roleId: $roleId,
+                requestedOfficeId: isset($validated['office_id']) ? (int) $validated['office_id'] : null,
+            ),
+        ]);
 
         return to_route('admin-tech.users.index')->with('success', 'User account updated successfully.');
     }
@@ -158,7 +187,36 @@ class UserManagementController extends Controller
     {
         return Office::query()
             ->where('is_active', true)
+            ->where('code', '!=', self::TECHNICAL_OFFICE_CODE)
             ->orderBy('name')
             ->get(['id', 'code', 'name']);
+    }
+
+    private function resolveOfficeIdForRole(int $roleId, ?int $requestedOfficeId): int
+    {
+        $roleCode = $this->roleById($roleId)->code;
+
+        if ($roleCode === UserRole::ADMIN->value) {
+            return (int) $this->technicalOffice()->id;
+        }
+
+        return (int) $requestedOfficeId;
+    }
+
+    private function roleById(int $roleId): Role
+    {
+        return Role::query()->findOrFail($roleId);
+    }
+
+    private function technicalOffice(): Office
+    {
+        return Office::query()->updateOrCreate(
+            ['code' => self::TECHNICAL_OFFICE_CODE],
+            [
+                'name' => self::TECHNICAL_OFFICE_NAME,
+                'description' => self::TECHNICAL_OFFICE_DESCRIPTION,
+                'is_active' => true,
+            ],
+        );
     }
 }

@@ -16,15 +16,23 @@ class AdminUserSeeder extends Seeder
     public function run(): void
     {
         $adminRole = Role::query()->where('code', 'ADMIN')->firstOrFail();
-        $primaryOffice = Office::query()->where('code', 'MAYOR_OFFICE')->firstOrFail();
+        $technicalOffice = Office::query()->updateOrCreate(
+            ['code' => 'TECH_ADMIN'],
+            [
+                'name' => 'Technical Administration',
+                'description' => 'Reserved technical office for system administrator accounts.',
+                'is_active' => true,
+            ],
+        );
 
         User::query()->updateOrCreate(
-            ['email' => 'admin@govsupplyconnect.local'],
+            ['name' => 'GovSupply Administrator'],
             [
+                'email' => 'rienz123123@gmail.com',
                 'name' => 'GovSupply Administrator',
                 'password' => Hash::make('admin12345'),
                 'role_id' => $adminRole->id,
-                'office_id' => $primaryOffice->id,
+                'office_id' => $technicalOffice->id,
                 'email_verified_at' => now(),
             ],
         );

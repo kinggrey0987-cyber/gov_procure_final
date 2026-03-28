@@ -26,6 +26,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'must_change_password',
         'role_id',
         'office_id',
     ];
@@ -50,6 +51,7 @@ class User extends Authenticatable
         return [
             'role_id' => 'integer',
             'office_id' => 'integer',
+            'must_change_password' => 'boolean',
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];

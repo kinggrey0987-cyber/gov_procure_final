@@ -4,7 +4,7 @@ import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { FormEvent } from 'react';
+import { FormEvent, useEffect } from 'react';
 
 type RoleOption = {
     id: number;
@@ -23,7 +23,8 @@ type UserRecord = {
     name: string;
     email: string;
     role_id: number;
-    office_id: number;
+    role_code: string;
+    office_id: number | null;
 };
 
 type Props = {
@@ -37,8 +38,25 @@ export default function EditUser({ userRecord, roles, offices }: Props) {
         name: userRecord.name,
         email: userRecord.email,
         role_id: String(userRecord.role_id),
-        office_id: String(userRecord.office_id),
+        office_id: userRecord.office_id ? String(userRecord.office_id) : '',
     });
+
+    const selectedRole = roles.find((role) => String(role.id) === form.data.role_id);
+    const isAdminRole = selectedRole?.code === 'ADMIN';
+
+    useEffect(() => {
+        if (isAdminRole) {
+            if (form.data.office_id !== '') {
+                form.setData('office_id', '');
+            }
+
+            return;
+        }
+
+        if (!form.data.office_id && offices[0]) {
+            form.setData('office_id', String(offices[0].id));
+        }
+    }, [form, form.data.office_id, isAdminRole, offices]);
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
@@ -53,7 +71,7 @@ export default function EditUser({ userRecord, roles, offices }: Props) {
             <section className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
                 <header className="mb-6">
                     <h3 className="text-2xl font-semibold text-slate-800">Edit User Account</h3>
-                    <p className="mt-1 text-sm text-slate-500">Update account details, assigned role, and office access context.</p>
+                    <p className="mt-1 text-sm text-slate-500">Update account details while preserving role-specific governance rules.</p>
                 </header>
 
                 <form onSubmit={submit} className="space-y-5">
@@ -101,24 +119,48 @@ export default function EditUser({ userRecord, roles, offices }: Props) {
                             <InputError message={form.errors.role_id} className="mt-2" />
                         </div>
 
-                        <div>
-                            <InputLabel htmlFor="office_id" value="Office" />
-                            <select
-                                id="office_id"
-                                value={form.data.office_id}
-                                onChange={(event) => form.setData('office_id', event.target.value)}
-                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                                required
-                            >
-                                {offices.map((office) => (
-                                    <option key={office.id} value={office.id}>
-                                        {office.code} - {office.name}
+                        {isAdminRole ? (
+                            <div>
+                                <InputLabel htmlFor="office_na" value="Office" />
+                                <input
+                                    id="office_na"
+                                    value="Technical Administration (Auto-assigned)"
+                                    className="mt-1 block w-full rounded-md border-gray-200 bg-slate-100 text-slate-600"
+                                    disabled
+                                    readOnly
+                                />
+                                <p className="mt-2 text-xs text-slate-500">
+                                    Admin accounts are technical-only and are not assigned to operational office workflows.
+                                </p>
+                                <InputError message={form.errors.office_id} className="mt-2" />
+                            </div>
+                        ) : (
+                            <div>
+                                <InputLabel htmlFor="office_id" value="Office" />
+                                <select
+                                    id="office_id"
+                                    value={form.data.office_id}
+                                    onChange={(event) => form.setData('office_id', event.target.value)}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                    required
+                                >
+                                    <option value="" disabled>
+                                        Select office
                                     </option>
-                                ))}
-                            </select>
-                            <InputError message={form.errors.office_id} className="mt-2" />
-                        </div>
+                                    {offices.map((office) => (
+                                        <option key={office.id} value={office.id}>
+                                            {office.code} - {office.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <InputError message={form.errors.office_id} className="mt-2" />
+                            </div>
+                        )}
                     </div>
+
+                    <p className="text-xs text-slate-500">
+                        Changing a user to Admin automatically uses Technical Administration. Non-admin roles must keep a valid operational office.
+                    </p>
 
                     <div className="flex items-center gap-3 pt-2">
                         <PrimaryButton disabled={form.processing}>Save Changes</PrimaryButton>

@@ -58,10 +58,10 @@ Route::get('/', function () {
 });
 
 Route::get('/dashboard', DashboardController::class)
-    ->middleware(['auth', 'verified', 'twofactor'])
+    ->middleware(['auth', 'verified', 'twofactor', 'must-change-password'])
     ->name('dashboard');
 
-Route::middleware(['auth', 'twofactor'])->group(function () {
+Route::middleware(['auth', 'twofactor', 'must-change-password'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\ConfirmablePasswordController;
+use App\Http\Controllers\Auth\ForcePasswordChangeController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\EmailVerificationPromptController;
 use App\Http\Controllers\Auth\NewPasswordController;
@@ -48,6 +49,14 @@ Route::middleware('auth')->group(function () {
 
     Route::post('two-factor-challenge/cancel', [TwoFactorChallengeController::class, 'cancel'])
         ->name('two-factor.challenge.cancel');
+
+    Route::get('force-password-change', [ForcePasswordChangeController::class, 'edit'])
+        ->middleware('twofactor')
+        ->name('force-password.edit');
+
+    Route::put('force-password-change', [ForcePasswordChangeController::class, 'update'])
+        ->middleware('twofactor')
+        ->name('force-password.update');
 
     Route::get('verify-email', EmailVerificationPromptController::class)
         ->name('verification.notice');
