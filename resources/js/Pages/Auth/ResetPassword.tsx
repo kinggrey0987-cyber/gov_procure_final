@@ -1,6 +1,7 @@
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import TextInput from '@/Components/TextInput';
+import { normalizePasswordValidationMessage } from '@/lib/passwordValidationMessage';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
 
@@ -17,6 +18,7 @@ export default function ResetPassword({
         password: '',
         password_confirmation: '',
     });
+    const passwordError = normalizePasswordValidationMessage(errors.password);
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
@@ -80,7 +82,7 @@ export default function ResetPassword({
                                 onChange={(e) => setData('password', e.target.value)}
                             />
 
-                            <InputError message={errors.password} className="mt-2" />
+                            <InputError message={passwordError} className="mt-2" />
                         </div>
 
                         <div>

@@ -3,6 +3,7 @@ import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import { normalizePasswordValidationMessage } from '@/lib/passwordValidationMessage';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEvent, useEffect } from 'react';
 
@@ -35,6 +36,7 @@ export default function CreateUser({ roles, offices }: Props) {
 
     const selectedRole = roles.find((role) => String(role.id) === form.data.role_id);
     const isAdminRole = selectedRole?.code === 'ADMIN';
+    const passwordError = normalizePasswordValidationMessage(form.errors.password);
 
     useEffect(() => {
         if (isAdminRole) {
@@ -103,7 +105,7 @@ export default function CreateUser({ roles, offices }: Props) {
                                 className="mt-1 block w-full"
                                 required
                             />
-                            <InputError message={form.errors.password} className="mt-2" />
+                            <InputError message={passwordError} className="mt-2" />
                             <p className="mt-2 text-xs text-slate-500">
                                 Use a strong temporary password. The user must change it on first successful login.
                             </p>

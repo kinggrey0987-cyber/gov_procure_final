@@ -1,6 +1,7 @@
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import TextInput from '@/Components/TextInput';
+import { normalizePasswordValidationMessage } from '@/lib/passwordValidationMessage';
 import { Head, useForm } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
 
@@ -14,6 +15,7 @@ export default function ForcePasswordChange({ email }: Props) {
         password: '',
         password_confirmation: '',
     });
+    const passwordError = normalizePasswordValidationMessage(errors.password);
 
     const submit: FormEventHandler = (event) => {
         event.preventDefault();
@@ -63,7 +65,7 @@ export default function ForcePasswordChange({ email }: Props) {
                                 className="mt-2 block h-11 w-full rounded-xl border-slate-300 shadow-sm focus:border-red-500 focus:ring-red-500"
                                 required
                             />
-                            <InputError message={errors.password} className="mt-2" />
+                            <InputError message={passwordError} className="mt-2" />
                         </div>
 
                         <div>

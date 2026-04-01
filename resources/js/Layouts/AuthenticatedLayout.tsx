@@ -1,4 +1,5 @@
 import ApplicationLogo from '@/Components/ApplicationLogo';
+import BellPanel from '@/Components/Notifications/BellPanel';
 import Dropdown from '@/Components/Dropdown';
 import NavLink from '@/Components/NavLink';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink';
@@ -22,6 +23,14 @@ type AuthUser = {
 
 type NotificationState = {
     unread_count: number;
+    recent: Array<{
+        notification_id: number;
+        title: string;
+        message: string;
+        is_read: boolean;
+        created_at?: string | null;
+        open_url: string;
+    }>;
 };
 
 export default function Authenticated({
@@ -36,7 +45,7 @@ export default function Authenticated({
         notifications?: NotificationState;
     };
     const { auth } = pageProps;
-    const notifications: NotificationState = pageProps.notifications ?? { unread_count: 0 };
+    const notifications: NotificationState = pageProps.notifications ?? { unread_count: 0, recent: [] };
 
     const user = auth.user;
     const [showingNavigationDropdown, setShowingNavigationDropdown] = useState(false);
@@ -184,17 +193,7 @@ export default function Authenticated({
                                 <p className="font-bold text-red-700">GovSupply Connect</p>
                             </div>
                             <div className="ms-auto flex items-center gap-5">
-                                <Link href={route('notifications.index')} className="relative text-slate-500 hover:text-slate-700" title="Notifications">
-                                    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
-                                        <path d="M10 21a2 2 0 0 0 4 0" />
-                                    </svg>
-                                    {notifications.unread_count > 0 && (
-                                        <span className="absolute -right-2 -top-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-xs font-bold text-white">
-                                            {notifications.unread_count}
-                                        </span>
-                                    )}
-                                </Link>
+                                <BellPanel unreadCount={notifications.unread_count} recent={notifications.recent} />
 
                                 <div className="flex items-center gap-3">
                                     <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-red-600 text-sm font-bold text-white">
@@ -343,17 +342,7 @@ export default function Authenticated({
                             </div>
 
                             <div className="flex items-center gap-5">
-                                <Link href={route('notifications.index')} className="relative text-slate-500 hover:text-slate-700" title="Notifications">
-                                    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
-                                        <path d="M10 21a2 2 0 0 0 4 0" />
-                                    </svg>
-                                    {notifications.unread_count > 0 && (
-                                        <span className="absolute -right-2 -top-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-xs font-bold text-white">
-                                            {notifications.unread_count}
-                                        </span>
-                                    )}
-                                </Link>
+                                <BellPanel unreadCount={notifications.unread_count} recent={notifications.recent} />
 
                                 <div className="flex items-center gap-3">
                                     <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-red-600 text-sm font-bold text-white">
@@ -505,17 +494,7 @@ export default function Authenticated({
                             </div>
 
                             <div className="flex items-center gap-5">
-                                <Link href={route('notifications.index')} className="relative text-slate-500 hover:text-slate-700" title="Notifications">
-                                    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
-                                        <path d="M10 21a2 2 0 0 0 4 0" />
-                                    </svg>
-                                    {notifications.unread_count > 0 && (
-                                        <span className="absolute -right-2 -top-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-xs font-bold text-white">
-                                            {notifications.unread_count}
-                                        </span>
-                                    )}
-                                </Link>
+                                <BellPanel unreadCount={notifications.unread_count} recent={notifications.recent} />
 
                                 <div className="flex items-center gap-3">
                                     <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-red-600 text-sm font-bold text-white">
@@ -676,17 +655,7 @@ export default function Authenticated({
                             </div>
 
                             <div className="flex items-center gap-5">
-                                <Link href={route('notifications.index')} className="relative text-slate-500 hover:text-slate-700" title="Notifications">
-                                    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
-                                        <path d="M10 21a2 2 0 0 0 4 0" />
-                                    </svg>
-                                    {notifications.unread_count > 0 && (
-                                        <span className="absolute -right-2 -top-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-xs font-bold text-white">
-                                            {notifications.unread_count}
-                                        </span>
-                                    )}
-                                </Link>
+                                <BellPanel unreadCount={notifications.unread_count} recent={notifications.recent} />
 
                                 <div className="flex items-center gap-3">
                                     <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-red-600 text-sm font-bold text-white">
@@ -864,17 +833,7 @@ export default function Authenticated({
                             </div>
 
                             <div className="flex items-center gap-5">
-                                <Link href={route('notifications.index')} className="relative text-slate-500 hover:text-slate-700" title="Notifications">
-                                    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
-                                        <path d="M10 21a2 2 0 0 0 4 0" />
-                                    </svg>
-                                    {notifications.unread_count > 0 && (
-                                        <span className="absolute -right-2 -top-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-xs font-bold text-white">
-                                            {notifications.unread_count}
-                                        </span>
-                                    )}
-                                </Link>
+                                <BellPanel unreadCount={notifications.unread_count} recent={notifications.recent} />
 
                                 <div className="flex items-center gap-3">
                                     <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-red-600 text-sm font-bold text-white">

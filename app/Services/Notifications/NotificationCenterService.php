@@ -14,6 +14,7 @@ use App\Models\PurchaseRequest;
 use App\Models\PublicDisclosure;
 use App\Models\SupplyRequest;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -189,6 +190,15 @@ class NotificationCenterService
             ->forUser((int) $user->id)
             ->unread()
             ->count();
+    }
+
+    public function recentForUser(User $user, int $limit = 5): Collection
+    {
+        return Notification::query()
+            ->forUser((int) $user->id)
+            ->latest('notification_id')
+            ->limit($limit)
+            ->get();
     }
 
     private function assertOwnership(User $user, Notification $notification): void

@@ -2,6 +2,7 @@ import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
+import { normalizePasswordValidationMessage } from '@/lib/passwordValidationMessage';
 import { Transition } from '@headlessui/react';
 import { useForm } from '@inertiajs/react';
 import { FormEventHandler, useRef } from 'react';
@@ -27,6 +28,7 @@ export default function UpdatePasswordForm({
         password: '',
         password_confirmation: '',
     });
+    const passwordError = normalizePasswordValidationMessage(errors.password);
 
     const updatePassword: FormEventHandler = (e) => {
         e.preventDefault();
@@ -99,7 +101,7 @@ export default function UpdatePasswordForm({
                         autoComplete="new-password"
                     />
 
-                    <InputError message={errors.password} className="mt-2" />
+                    <InputError message={passwordError} className="mt-2" />
                 </div>
 
                 <div>
