@@ -2,10 +2,12 @@
 
 namespace App\Http\Middleware;
 
+use App\Enums\UserRole;
 use App\Models\User;
 use App\Services\Notifications\NotificationCenterService;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
+use Throwable;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -32,11 +34,62 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $user = $request->user();
-        $notificationService = app(NotificationCenterService::class);
-        $recentNotifications = [];
+        $roleCode = $user instanceof User ? $user->roleCode() : null;
+        $domainAccess = $this->domainAccessFromRole($roleCode);
+        $notifications = $this->notificationSummary($user, $domainAccess['notifications']);
 
-        if ($user instanceof User && $user->can('notifications.access')) {
-            $recentNotifications = $notificationService
+        return [
+            ...parent::share($request),
+            'auth' => [
+                'user' => $user ? [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'role_code' => $roleCode,
+                    'office_id' => $user->office_id,
+                ] : null,
+                'can' => $domainAccess,
+            ],
+            'notifications' => $notifications,
+            'flash' => [
+                'success' => fn () => $request->session()->get('success'),
+                'error' => fn () => $request->session()->get('error'),
+            ],
+        ];
+    }
+
+    /**
+     * @return array{admin_tech: bool, office: bool, procurement: bool, inventory: bool, executive: bool, notifications: bool}
+     */
+    private function domainAccessFromRole(?string $roleCode): array
+    {
+        return [
+            'admin_tech' => $roleCode === UserRole::ADMIN->value,
+            'office' => $roleCode === UserRole::OFFICE_USER->value,
+            'procurement' => $roleCode === UserRole::PROCUREMENT_OFFICER->value,
+            'inventory' => $roleCode === UserRole::GSO_OFFICER->value,
+            'executive' => $roleCode === UserRole::EXECUTIVE_OFFICER->value,
+            'notifications' => $roleCode !== null && $roleCode !== UserRole::PUBLIC->value,
+        ];
+    }
+
+    /**
+     * @return array{unread_count: int, recent: array<int, array{notification_id: int, title: string, message: string, is_read: bool, created_at: string|null, open_url: string}>}
+     */
+    private function notificationSummary(?User $user, bool $canAccess): array
+    {
+        if (! $user instanceof User || ! $canAccess) {
+            return [
+                'unread_count' => 0,
+                'recent' => [],
+            ];
+        }
+
+        try {
+            /** @var NotificationCenterService $notificationService */
+            $notificationService = app(NotificationCenterService::class);
+
+            $recent = $notificationService
                 ->recentForUser($user, 5)
                 ->map(static fn ($notification): array => [
                     'notification_id' => (int) $notification->notification_id,
@@ -48,37 +101,18 @@ class HandleInertiaRequests extends Middleware
                 ])
                 ->values()
                 ->all();
-        }
 
-        return [
-            ...parent::share($request),
-            'auth' => [
-                'user' => $user ? [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'role_code' => $user->roleCode(),
-                    'office_id' => $user->office_id,
-                ] : null,
-                'can' => [
-                    'admin_tech' => $user?->can('domain.admin-tech.access') ?? false,
-                    'office' => $user?->can('domain.office.access') ?? false,
-                    'procurement' => $user?->can('domain.procurement.access') ?? false,
-                    'inventory' => $user?->can('domain.inventory.access') ?? false,
-                    'executive' => $user?->can('domain.executive.access') ?? false,
-                    'notifications' => $user?->can('notifications.access') ?? false,
-                ],
-            ],
-            'notifications' => [
-                'unread_count' => $user && $user->can('notifications.access')
-                    ? $notificationService->unreadCountForUser($user)
-                    : 0,
-                'recent' => $recentNotifications,
-            ],
-            'flash' => [
-                'success' => fn () => $request->session()->get('success'),
-                'error' => fn () => $request->session()->get('error'),
-            ],
-        ];
+            return [
+                'unread_count' => $notificationService->unreadCountForUser($user),
+                'recent' => $recent,
+            ];
+        } catch (Throwable $throwable) {
+            report($throwable);
+
+            return [
+                'unread_count' => 0,
+                'recent' => [],
+            ];
+        }
     }
 }
