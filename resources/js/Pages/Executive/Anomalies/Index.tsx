@@ -56,7 +56,7 @@ export default function ExecutiveAnomalyIndex({ anomalies, filters }: Props) {
                             <tbody className="divide-y divide-gray-100">
                                 {anomalies.data.map((row) => (
                                     <tr key={row.anomaly_id}>
-                                        <td className="px-4 py-2">{row.anomaly_type}</td>
+                                        <td className="px-4 py-2">{formatAnomalyType(row.anomaly_type)}</td>
                                         <td className="px-4 py-2">{row.severity}</td>
                                         <td className="px-4 py-2">{row.status}</td>
                                         <td className="px-4 py-2">{row.detected_at}</td>
@@ -74,4 +74,12 @@ export default function ExecutiveAnomalyIndex({ anomalies, filters }: Props) {
             </div>
         </AuthenticatedLayout>
     );
+}
+
+function formatAnomalyType(value: string): string {
+    if (value === 'PRICE_Z_SCORE') {
+        return 'Procurement Price Anomaly';
+    }
+
+    return value;
 }

@@ -475,8 +475,6 @@ class InventoryDistributionFoundationTest extends TestCase
             'ppmp_item_id' => $ppmpItem->ppmp_item_id,
             'item_name_snapshot' => 'Item '.$itemId,
             'quantity_requested' => 5,
-            'estimated_unit_cost' => 100,
-            'estimated_total_cost' => 500,
         ]);
 
         $purchaseRequest = PurchaseRequest::query()->create([

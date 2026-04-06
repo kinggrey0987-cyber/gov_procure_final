@@ -10,7 +10,11 @@ use App\Models\ItemCategory;
 use App\Models\Office;
 use App\Models\Ppmp;
 use App\Models\PpmpItem;
+use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderItem;
+use App\Models\PurchaseRequest;
 use App\Models\Role;
+use App\Models\Supplier;
 use App\Models\SupplyRequest;
 use App\Models\SupplyRequestItem;
 use App\Models\User;
@@ -131,6 +135,37 @@ class PpmpAnomalyIntegrationTest extends TestCase
         }
     }
 
+    public function test_price_anomaly_is_generated_only_from_procurement_side_purchase_order_items(): void
+    {
+        $context = $this->createProcurementPriceAnomalyContext(9801, [100, 102, 250]);
+
+        app(AnomalyDetectionService::class)->runExecutiveDetections($this->executive);
+
+        $this->assertDatabaseHas('anomalies', [
+            'anomaly_type' => 'PRICE_Z_SCORE',
+            'reference_type' => PurchaseOrderItem::class,
+            'item_id' => $context['item']->item_id,
+            'office_id' => $this->office->id,
+        ]);
+
+        $this->assertDatabaseMissing('anomalies', [
+            'anomaly_type' => 'PRICE_Z_SCORE',
+            'reference_type' => SupplyRequestItem::class,
+            'item_id' => $context['item']->item_id,
+        ]);
+    }
+
+    public function test_stock_fulfilled_requests_without_procurement_events_do_not_trigger_price_anomaly(): void
+    {
+        $this->createPpmpOverRequestContext(9802, 20, [3, 4, 5]);
+
+        app(AnomalyDetectionService::class)->runExecutiveDetections($this->executive);
+
+        $this->assertDatabaseMissing('anomalies', [
+            'anomaly_type' => 'PRICE_Z_SCORE',
+        ]);
+    }
+
     /**
      * @param  array<int, float|int>  $requestQuantities
      * @return array<string, mixed>
@@ -202,8 +237,6 @@ class PpmpAnomalyIntegrationTest extends TestCase
                 'ppmp_item_id' => $ppmpItem->ppmp_item_id,
                 'item_name_snapshot' => $item->item_name,
                 'quantity_requested' => $quantity,
-                'estimated_unit_cost' => 50,
-                'estimated_total_cost' => ((float) $quantity) * 50,
             ]);
         }
 
@@ -212,6 +245,72 @@ class PpmpAnomalyIntegrationTest extends TestCase
             'ppmp' => $ppmp,
             'ppmpItem' => $ppmpItem,
         ];
+    }
+
+    /**
+     * @param  array<int, float|int>  $unitPrices
+     * @return array<string, mixed>
+     */
+    private function createProcurementPriceAnomalyContext(int $itemId, array $unitPrices): array
+    {
+        $context = $this->createPpmpOverRequestContext($itemId, 100, [2, 2, 2]);
+        $supplier = Supplier::query()->create([
+            'supplier_name' => 'Price Anomaly Supplier '.$itemId,
+            'contact_person' => 'Supplier Contact',
+            'email' => 'price-anomaly-'.$itemId.'@test.local',
+            'phone' => '09123456789',
+            'address' => 'Supplier Address',
+            'status' => 'ACTIVE',
+        ]);
+
+        $supplyItems = SupplyRequestItem::query()
+            ->where('item_id', $context['item']->item_id)
+            ->with('supplyRequest:supply_request_id,office_id')
+            ->orderBy('supply_request_item_id')
+            ->get();
+
+        foreach ($unitPrices as $index => $unitPrice) {
+            $supplyItem = $supplyItems->get($index);
+            if (! $supplyItem instanceof SupplyRequestItem) {
+                continue;
+            }
+
+            $purchaseRequest = PurchaseRequest::query()->create([
+                'supply_request_id' => $supplyItem->supply_request_id,
+                'office_id' => $this->office->id,
+                'requested_by' => $this->procurementUser->id,
+                'status' => 'PROCESSING',
+                'remarks' => 'Procurement price anomaly test PR',
+            ]);
+
+            $purchaseOrder = PurchaseOrder::query()->create([
+                'purchase_request_id' => $purchaseRequest->purchase_request_id,
+                'supply_request_id' => $supplyItem->supply_request_id,
+                'supplier_id' => $supplier->supplier_id,
+                'created_by' => $this->procurementUser->id,
+                'po_number' => 'PO-PPA-'.$itemId.'-'.$index,
+                'procurement_method' => 'SHOPPING',
+                'status' => 'PLACED',
+                'expected_delivery_date' => now()->addDays(7)->toDateString(),
+                'total_amount' => (float) $unitPrice,
+                'terms_notes' => 'Net 30',
+                'remarks' => 'Price anomaly testing PO',
+            ]);
+
+            PurchaseOrderItem::query()->create([
+                'purchase_order_id' => $purchaseOrder->purchase_order_id,
+                'supply_request_item_id' => $supplyItem->supply_request_item_id,
+                'item_id' => $context['item']->item_id,
+                'item_name_snapshot' => $context['item']->item_name,
+                'specification' => 'Procurement price sample',
+                'quantity_ordered' => 1,
+                'unit' => 'PCS',
+                'unit_price' => (float) $unitPrice,
+                'total_price' => (float) $unitPrice,
+            ]);
+        }
+
+        return $context;
     }
 
     private function createOffice(string $name, string $code): Office

@@ -22,7 +22,6 @@ type Props = {
             ppmp_item_id: number;
             item_name_snapshot?: string | null;
             quantity_requested: number;
-            estimated_unit_cost?: number | null;
             planned_quantity?: number | null;
             already_requested_quantity?: number | null;
             remaining_quantity?: number | null;
@@ -155,6 +154,7 @@ export default function SupplyRequestShow({
                 <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="border-b border-slate-200 px-6 py-4">
                         <h4 className="text-xl font-semibold text-slate-800">Requested Items</h4>
+                        <p className="mt-1 text-sm text-slate-600">Pricing here is planning context only via PPMP allocation. Actual procurement prices are recorded on purchase orders.</p>
                     </div>
 
                     {supplyRequest.items.length === 0 ? (
@@ -170,7 +170,6 @@ export default function SupplyRequestShow({
                                         <th className="px-4 py-3 text-left font-semibold text-slate-700">Already Requested</th>
                                         <th className="px-4 py-3 text-left font-semibold text-slate-700">Remaining</th>
                                         <th className="px-4 py-3 text-left font-semibold text-slate-700">Quantity</th>
-                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Estimated Unit Cost</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
@@ -182,7 +181,6 @@ export default function SupplyRequestShow({
                                             <td className="px-4 py-3 text-slate-700">{formatNumber(item.already_requested_quantity)}</td>
                                             <td className="px-4 py-3 text-slate-700">{formatNumber(item.remaining_quantity)}</td>
                                             <td className="px-4 py-3 text-slate-700">{item.quantity_requested}</td>
-                                            <td className="px-4 py-3 text-slate-700">{formatMoney(item.estimated_unit_cost)}</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -349,14 +347,6 @@ function formatDate(value?: string | null): string {
 
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString();
-}
-
-function formatMoney(value?: number | null): string {
-    if (value == null) {
-        return '-';
-    }
-
-    return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(value);
 }
 
 function formatNumber(value?: number | null): string {

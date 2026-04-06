@@ -114,7 +114,6 @@ class SupplyRequestController extends Controller
                     'ppmp_item_id' => (int) $item->ppmp_item_id,
                     'item_name_snapshot' => (string) ($item->item_name_snapshot ?? ''),
                     'quantity_requested' => (float) $item->quantity_requested,
-                    'estimated_unit_cost' => $item->estimated_unit_cost !== null ? (float) $item->estimated_unit_cost : null,
                     'planned_quantity' => isset($context['planned_quantity']) ? (float) $context['planned_quantity'] : null,
                     'already_requested_quantity' => isset($context['requested_quantity']) ? (float) $context['requested_quantity'] : null,
                     'remaining_quantity' => isset($context['remaining_quantity']) ? (float) $context['remaining_quantity'] : null,

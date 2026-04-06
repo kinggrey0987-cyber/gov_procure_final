@@ -118,7 +118,6 @@ class OfficeTransactionalFlowTest extends TestCase
             'ppmp_item_id' => $ppmpItem->ppmp_item_id,
             'item_name_snapshot' => 'Office Item 300',
             'quantity_requested' => 10,
-            'estimated_unit_cost' => 50,
         ]);
         $itemResponse->assertRedirect();
 
@@ -190,7 +189,6 @@ class OfficeTransactionalFlowTest extends TestCase
                 'ppmp_item_id' => $ppmpItem1->ppmp_item_id,
                 'item_name_snapshot' => 'Item 100',
                 'quantity_requested' => 5,
-                'estimated_unit_cost' => 100,
             ]],
         ]);
         $create->assertSessionHasErrors('ppmp_id');
@@ -238,7 +236,6 @@ class OfficeTransactionalFlowTest extends TestCase
                 'ppmp_item_id' => $ppmpItem->ppmp_item_id,
                 'item_name_snapshot' => 'Item 200',
                 'quantity_requested' => 10,
-                'estimated_unit_cost' => 100,
             ]],
         ]);
         $create->assertSessionHasErrors('items.0.quantity_requested');

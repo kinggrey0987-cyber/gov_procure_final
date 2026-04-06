@@ -48,7 +48,6 @@ class StoreSupplyRequestRequest extends FormRequest
             ],
             'items.*.item_name_snapshot' => ['nullable', 'string', 'max:200'],
             'items.*.quantity_requested' => ['required_with:items', 'numeric', 'gt:0'],
-            'items.*.estimated_unit_cost' => ['required_with:items', 'numeric', 'gte:0'],
         ];
     }
 

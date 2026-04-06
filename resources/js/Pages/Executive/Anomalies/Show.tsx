@@ -26,7 +26,7 @@ export default function ExecutiveAnomalyShow({ anomaly }: Props) {
                 <div className="mx-auto max-w-4xl space-y-4 px-4 sm:px-6 lg:px-8">
                     <div className="rounded border bg-white p-6 text-sm space-y-1">
                         <p><strong>ID:</strong> {anomaly.anomaly_id}</p>
-                        <p><strong>Type:</strong> {anomaly.anomaly_type}</p>
+                        <p><strong>Type:</strong> {formatAnomalyType(anomaly.anomaly_type)}</p>
                         <p><strong>Severity:</strong> {anomaly.severity}</p>
                         <p><strong>Status:</strong> {anomaly.status}</p>
                         <p><strong>Detected Value:</strong> {anomaly.detected_value ?? '-'}</p>
@@ -35,6 +35,9 @@ export default function ExecutiveAnomalyShow({ anomaly }: Props) {
                         <p><strong>Z-Score:</strong> {anomaly.z_score ?? '-'}</p>
                         <p><strong>Method:</strong> {anomaly.detection_method ?? '-'}</p>
                         <p><strong>Remarks:</strong> {anomaly.remarks ?? '-'}</p>
+                        {anomaly.anomaly_type === 'PRICE_Z_SCORE' ? (
+                            <p><strong>Source Note:</strong> Price anomalies are derived from purchase order item pricing, with office used only for executive grouping context.</p>
+                        ) : null}
                     </div>
 
                     <form
@@ -52,4 +55,12 @@ export default function ExecutiveAnomalyShow({ anomaly }: Props) {
             </div>
         </AuthenticatedLayout>
     );
+}
+
+function formatAnomalyType(value: string): string {
+    if (value === 'PRICE_Z_SCORE') {
+        return 'Procurement Price Anomaly';
+    }
+
+    return value;
 }

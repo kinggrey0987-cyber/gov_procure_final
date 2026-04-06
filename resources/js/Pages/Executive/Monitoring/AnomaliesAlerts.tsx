@@ -100,8 +100,8 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                 <section className="overflow-hidden rounded-2xl border border-red-200 bg-white shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
                     <div className="border-b border-red-200 bg-gradient-to-r from-red-700 via-red-600 to-red-500 px-6 py-4 text-white">
                         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-100">Executive Alert Center</p>
-                        <p className="text-lg font-semibold">Procurement Alerts and Irregularities</p>
-                        <p className="text-sm text-red-100">System-detected procurement anomalies requiring executive attention.</p>
+                        <p className="text-lg font-semibold">Cross-Office Risk Monitoring</p>
+                        <p className="text-sm text-red-100">Price anomalies are procurement-linked and grouped by requesting office for oversight context.</p>
                     </div>
                     <div className="p-6">
                     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -166,7 +166,7 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                             <option value="">All anomaly types</option>
                             {filter_options.anomaly_types.map((anomalyType) => (
                                 <option key={anomalyType} value={anomalyType}>
-                                    {anomalyType}
+                                    {formatAnomalyType(anomalyType)}
                                 </option>
                             ))}
                         </select>
@@ -202,14 +202,14 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
 
                 <div className="rounded-2xl border border-red-200 bg-red-50/60 px-5 py-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-red-700">Interpretation Guide</p>
-                    <p className="mt-1 text-sm text-slate-700">Prioritize offices where high-severity totals remain elevated while status movements are stalled in OPEN or IN_REVIEW states.</p>
+                    <p className="mt-1 text-sm text-slate-700">For PRICE Z-SCORE, the anomaly source is procurement purchase order pricing. Office names indicate requesting-office grouping only.</p>
                 </div>
 
                 <div className="grid gap-6 xl:grid-cols-12">
                     <div className="xl:col-span-8">
                     <ExecutiveChartCard title="Anomaly Type Distribution" subtitle="Most frequent anomaly categories in the current filter scope" eyebrow="Primary Risk Mix" tone="critical">
                         <HorizontalBarChart
-                            data={anomaly_type_breakdown.map((row) => ({ label: row.label || 'N/A', value: row.total }))}
+                            data={anomaly_type_breakdown.map((row) => ({ label: formatAnomalyType(row.label || 'N/A'), value: row.total }))}
                             emptyText="No anomaly type distribution available for the selected filters."
                         />
                     </ExecutiveChartCard>
@@ -265,7 +265,7 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                         title="Recent Anomalies"
                         headers={['Type', 'Severity', 'Status', 'Office', 'Detected']}
                         rows={recent.anomalies.map((row) => [
-                            row.anomaly_type,
+                            formatAnomalyType(row.anomaly_type),
                             row.severity,
                             row.status,
                             row.office?.name ?? 'N/A',
@@ -292,6 +292,14 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
             </div>
         </AuthenticatedLayout>
     );
+}
+
+function formatAnomalyType(value: string): string {
+    if (value === 'PRICE_Z_SCORE') {
+        return 'Procurement Price Anomaly (Grouped by Requesting Office)';
+    }
+
+    return value;
 }
 
 function mergeStatus(anomalyRows: BreakdownRow[], alertRows: BreakdownRow[]) {

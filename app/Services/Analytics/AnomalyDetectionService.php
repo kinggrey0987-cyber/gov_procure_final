@@ -45,7 +45,13 @@ class AnomalyDetectionService
     {
         $created = collect();
 
-        $items = PurchaseOrderItem::query()->select(['item_id', 'unit_price'])->whereNotNull('item_id')->get()->groupBy('item_id');
+        $items = PurchaseOrderItem::query()
+            ->with(['purchaseOrder.purchaseRequest:purchase_request_id,office_id', 'purchaseOrder.supplyRequest:supply_request_id,office_id'])
+            ->select(['purchase_order_item_id', 'purchase_order_id', 'item_id', 'unit_price'])
+            ->whereNotNull('item_id')
+            ->whereHas('purchaseOrder')
+            ->get()
+            ->groupBy('item_id');
 
         foreach ($items as $itemId => $rows) {
             $prices = $rows->pluck('unit_price')->map(fn ($value) => (float) $value);
@@ -73,20 +79,21 @@ class AnomalyDetectionService
             }
 
             $purchaseOrder = $latest->purchaseOrder;
+            $officeId = (int) ($purchaseOrder?->purchaseRequest?->office_id ?? $purchaseOrder?->supplyRequest?->office_id ?? 0) ?: null;
 
             $created->push($this->anomalyService->create($actor, [
                 'anomaly_type' => 'PRICE_Z_SCORE',
                 'reference_type' => PurchaseOrderItem::class,
                 'reference_id' => (int) $latest->purchase_order_item_id,
                 'item_id' => (int) $itemId,
-                'office_id' => (int) ($purchaseOrder->purchaseRequest->office_id ?? 0) ?: null,
+                'office_id' => $officeId,
                 'detected_value' => $latestPrice,
                 'expected_value' => $mean,
                 'threshold_value' => 2.0,
                 'z_score' => round($zScore, 4),
                 'detection_method' => 'Z_SCORE',
                 'severity' => abs($zScore) >= 3 ? 'HIGH' : 'MEDIUM',
-                'remarks' => 'Detected price outlier using z-score.',
+                'remarks' => 'Detected procurement-side price outlier using purchase order item pricing.',
             ]));
         }
 

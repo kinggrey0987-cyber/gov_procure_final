@@ -79,8 +79,6 @@ class ProcurementFoundationFlowTest extends TestCase
             'ppmp_item_id' => $ppmpItem->ppmp_item_id,
             'item_name_snapshot' => 'Bond Paper A4',
             'quantity_requested' => 5,
-            'estimated_unit_cost' => 100,
-            'estimated_total_cost' => 500,
         ]);
 
         $createPurchaseRequestResponse = $this->actingAs($procurementOfficer)->post(route('procurement.purchase-requests.store'), [

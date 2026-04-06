@@ -10,6 +10,7 @@ use App\Models\Ppmp;
 use App\Models\PpmpItem;
 use App\Models\PublicDisclosure;
 use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderItem;
 use App\Models\PurchaseRequest;
 use App\Models\Role;
 use App\Models\StatusHistory;
@@ -110,8 +111,8 @@ class ExecutiveAnalyticsFoundationTest extends TestCase
         $anomalyService = app(AnomalyService::class);
         $anomaly = $anomalyService->create($this->executive, [
             'anomaly_type' => 'PRICE_Z_SCORE',
-            'reference_type' => SupplyRequestItem::class,
-            'reference_id' => $context['supplyRequestItem']->supply_request_item_id,
+            'reference_type' => PurchaseOrderItem::class,
+            'reference_id' => $context['purchaseOrderItem']->purchase_order_item_id,
             'item_id' => 9302,
             'office_id' => $this->officeA->id,
             'detected_value' => 500,
@@ -137,8 +138,8 @@ class ExecutiveAnalyticsFoundationTest extends TestCase
 
         $this->assertDatabaseHas('anomalies', [
             'anomaly_id' => $anomaly->anomaly_id,
-            'reference_type' => SupplyRequestItem::class,
-            'reference_id' => $context['supplyRequestItem']->supply_request_item_id,
+            'reference_type' => PurchaseOrderItem::class,
+            'reference_id' => $context['purchaseOrderItem']->purchase_order_item_id,
             'item_id' => 9302,
             'office_id' => $this->officeA->id,
         ]);
@@ -270,8 +271,8 @@ class ExecutiveAnalyticsFoundationTest extends TestCase
         $service = app(AnomalyService::class);
         $first = $service->create($this->executive, [
             'anomaly_type' => 'PRICE_Z_SCORE',
-            'reference_type' => SupplyRequestItem::class,
-            'reference_id' => $context['supplyRequestItem']->supply_request_item_id,
+            'reference_type' => PurchaseOrderItem::class,
+            'reference_id' => $context['purchaseOrderItem']->purchase_order_item_id,
             'item_id' => 9304,
             'office_id' => $this->officeA->id,
             'detection_method' => 'Z_SCORE',
@@ -280,8 +281,8 @@ class ExecutiveAnalyticsFoundationTest extends TestCase
 
         $second = $service->create($this->executive, [
             'anomaly_type' => 'PRICE_Z_SCORE',
-            'reference_type' => SupplyRequestItem::class,
-            'reference_id' => $context['supplyRequestItem']->supply_request_item_id,
+            'reference_type' => PurchaseOrderItem::class,
+            'reference_id' => $context['purchaseOrderItem']->purchase_order_item_id,
             'item_id' => 9304,
             'office_id' => $this->officeA->id,
             'detection_method' => 'Z_SCORE',
@@ -298,8 +299,8 @@ class ExecutiveAnalyticsFoundationTest extends TestCase
 
         $anomaly = app(AnomalyService::class)->create($this->executive, [
             'anomaly_type' => 'PRICE_Z_SCORE',
-            'reference_type' => SupplyRequestItem::class,
-            'reference_id' => $context['supplyRequestItem']->supply_request_item_id,
+            'reference_type' => PurchaseOrderItem::class,
+            'reference_id' => $context['purchaseOrderItem']->purchase_order_item_id,
             'item_id' => 9305,
             'office_id' => $this->officeA->id,
             'detection_method' => 'Z_SCORE',
@@ -475,8 +476,6 @@ class ExecutiveAnalyticsFoundationTest extends TestCase
             'ppmp_item_id' => $ppmpItem->ppmp_item_id,
             'item_name_snapshot' => 'Item '.$itemId,
             'quantity_requested' => 5,
-            'estimated_unit_cost' => 100,
-            'estimated_total_cost' => 500,
         ]);
 
         $purchaseRequest = PurchaseRequest::query()->create([
@@ -510,10 +509,23 @@ class ExecutiveAnalyticsFoundationTest extends TestCase
             'remarks' => null,
         ]);
 
+        $purchaseOrderItem = PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $purchaseOrder->purchase_order_id,
+            'supply_request_item_id' => $supplyRequestItem->supply_request_item_id,
+            'item_id' => $itemId,
+            'item_name_snapshot' => 'Item '.$itemId,
+            'specification' => 'Executive analytics test item',
+            'quantity_ordered' => 5,
+            'unit' => 'PCS',
+            'unit_price' => 100,
+            'total_price' => 500,
+        ]);
+
         return [
             'supplyRequest' => $supplyRequest,
             'supplyRequestItem' => $supplyRequestItem,
             'purchaseOrder' => $purchaseOrder,
+            'purchaseOrderItem' => $purchaseOrderItem,
             'supplier' => $supplier,
         ];
     }

@@ -25,8 +25,6 @@ class SupplyRequestItem extends Model
         'ppmp_item_id',
         'item_name_snapshot',
         'quantity_requested',
-        'estimated_unit_cost',
-        'estimated_total_cost',
     ];
 
     protected $casts = [
@@ -34,8 +32,6 @@ class SupplyRequestItem extends Model
         'item_id' => 'integer',
         'ppmp_item_id' => 'integer',
         'quantity_requested' => 'decimal:2',
-        'estimated_unit_cost' => 'decimal:2',
-        'estimated_total_cost' => 'decimal:2',
     ];
 
     public function supplyRequest(): BelongsTo

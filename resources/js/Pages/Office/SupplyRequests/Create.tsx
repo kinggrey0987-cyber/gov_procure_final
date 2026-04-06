@@ -26,7 +26,6 @@ type RequestItemDraft = {
     item_id: string;
     item_name_snapshot: string;
     quantity_requested: string;
-    estimated_unit_cost: string;
 };
 
 type Props = {
@@ -90,7 +89,6 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                 ppmp_item_id: '',
                 item_id: '',
                 item_name_snapshot: '',
-                estimated_unit_cost: '',
             });
             return;
         }
@@ -99,7 +97,6 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
             ppmp_item_id: String(option.ppmp_item_id),
             item_id: String(option.item_id),
             item_name_snapshot: option.item_name,
-            estimated_unit_cost: String(option.suggested_unit_cost),
         });
     };
 
@@ -296,16 +293,6 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                             />
                                         </Field>
 
-                                        <Field label="Estimated Unit Cost">
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                step="0.01"
-                                                value={item.estimated_unit_cost}
-                                                onChange={(event) => updateItem(index, { estimated_unit_cost: event.target.value })}
-                                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                                            />
-                                        </Field>
                                     </div>
 
                                     {option ? (
@@ -313,7 +300,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                             <div>Planned: <strong>{option.planned_quantity}</strong></div>
                                             <div>Already requested: <strong>{option.requested_quantity}</strong></div>
                                             <div>Remaining: <strong>{option.remaining_quantity}</strong></div>
-                                            <div>Suggested unit cost: <strong>{option.suggested_unit_cost}</strong></div>
+                                            <div>PPMP reference unit cost: <strong>{option.suggested_unit_cost}</strong></div>
                                         </div>
                                     ) : null}
 
@@ -368,7 +355,6 @@ function emptyItem(): RequestItemDraft {
         item_id: '',
         item_name_snapshot: '',
         quantity_requested: '1',
-        estimated_unit_cost: '0',
     };
 }
 

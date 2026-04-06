@@ -33,9 +33,11 @@ class OfficeTransactionalSchemaTest extends TestCase
         $this->assertTrue(Schema::hasColumns('supply_request_items', [
             'item_id',
             'ppmp_item_id',
-            'estimated_unit_cost',
-            'estimated_total_cost',
+            'quantity_requested',
         ]));
+
+        $this->assertFalse(Schema::hasColumn('supply_request_items', 'estimated_unit_cost'));
+        $this->assertFalse(Schema::hasColumn('supply_request_items', 'estimated_total_cost'));
 
         $this->assertFalse(Schema::hasColumn('supply_request_items', 'items_id'));
     }

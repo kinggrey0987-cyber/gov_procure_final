@@ -152,7 +152,6 @@ class SupplyRequestService
 
         return DB::transaction(function () use ($supplyRequest, $actor, $payload, $ppmpItem): SupplyRequestItem {
             $quantity = (float) $payload['quantity_requested'];
-            $unitCost = (float) $payload['estimated_unit_cost'];
 
             $consumption = $this->consumptionForPpmpItem(
                 ppmpItemId: (int) $ppmpItem->ppmp_item_id,
@@ -176,8 +175,6 @@ class SupplyRequestService
                 'ppmp_item_id' => (int) $payload['ppmp_item_id'],
                 'item_name_snapshot' => (string) ($payload['item_name_snapshot'] ?? ($ppmpItem->item?->item_name ?? 'Unknown Item')),
                 'quantity_requested' => $quantity,
-                'estimated_unit_cost' => $unitCost,
-                'estimated_total_cost' => round($quantity * $unitCost, 2),
             ]);
 
             $this->recordStatus($supplyRequest, 'DRAFT', 'DRAFT', $actor, 'Supply request item added');
@@ -220,7 +217,6 @@ class SupplyRequestService
 
         return DB::transaction(function () use ($supplyRequest, $item, $actor, $payload, $ppmpItem): SupplyRequestItem {
             $quantity = (float) $payload['quantity_requested'];
-            $unitCost = (float) $payload['estimated_unit_cost'];
 
             $consumption = $this->consumptionForPpmpItem(
                 ppmpItemId: (int) $ppmpItem->ppmp_item_id,
@@ -245,8 +241,6 @@ class SupplyRequestService
                 'ppmp_item_id' => (int) $payload['ppmp_item_id'],
                 'item_name_snapshot' => (string) ($payload['item_name_snapshot'] ?? ($ppmpItem->item?->item_name ?? 'Unknown Item')),
                 'quantity_requested' => $quantity,
-                'estimated_unit_cost' => $unitCost,
-                'estimated_total_cost' => round($quantity * $unitCost, 2),
             ])->save();
 
             $this->recordStatus($supplyRequest, 'DRAFT', 'DRAFT', $actor, 'Supply request item updated');
@@ -396,6 +390,7 @@ class SupplyRequestService
 
     private function resolveOfficePpmp(int $ppmpId, User $actor): Ppmp
     {
+        /** @var Ppmp|null $ppmp */
         $ppmp = Ppmp::query()
             ->where('ppmp_id', $ppmpId)
             ->where('office_id', (int) $actor->office_id)

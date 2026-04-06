@@ -27,7 +27,6 @@ type ExistingItem = {
     item_id: number;
     item_name_snapshot: string;
     quantity_requested: number;
-    estimated_unit_cost: number;
 };
 
 type Props = {
@@ -66,7 +65,6 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
         item_id: '',
         item_name_snapshot: '',
         quantity_requested: '1',
-        estimated_unit_cost: '0',
     });
 
     const [editingRows, setEditingRows] = useState<Record<number, ExistingItem>>(
@@ -104,7 +102,7 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
     const onNewItemOptionChange = (value: string) => {
         const option = itemOptions.find((entry) => String(entry.ppmp_item_id) === value);
         if (!option) {
-            setNewItem({ ...newItem, ppmp_item_id: '', item_id: '', item_name_snapshot: '', estimated_unit_cost: '' });
+            setNewItem({ ...newItem, ppmp_item_id: '', item_id: '', item_name_snapshot: '' });
             return;
         }
 
@@ -113,7 +111,6 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
             ppmp_item_id: String(option.ppmp_item_id),
             item_id: String(option.item_id),
             item_name_snapshot: option.item_name,
-            estimated_unit_cost: String(option.suggested_unit_cost),
         });
     };
 
@@ -215,7 +212,7 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
 
                                 return (
                                     <div key={item.supply_request_item_id} className="rounded-xl border border-slate-200 p-4">
-                                        <div className="grid gap-3 md:grid-cols-6">
+                                        <div className="grid gap-3 md:grid-cols-5">
                                             <input
                                                 className="rounded-lg border border-slate-300 px-3 py-2 text-sm md:col-span-2"
                                                 value={row.item_name_snapshot}
@@ -227,13 +224,6 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                                                 min="1"
                                                 value={row.quantity_requested}
                                                 onChange={(event) => setEditingRows({ ...editingRows, [item.supply_request_item_id]: { ...row, quantity_requested: Number(event.target.value) } })}
-                                            />
-                                            <input
-                                                type="number"
-                                                step="0.01"
-                                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                                                value={row.estimated_unit_cost}
-                                                onChange={(event) => setEditingRows({ ...editingRows, [item.supply_request_item_id]: { ...row, estimated_unit_cost: Number(event.target.value) } })}
                                             />
                                             <button
                                                 type="button"
@@ -256,7 +246,7 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                                                 <div>Planned: <strong>{context.planned_quantity}</strong></div>
                                                 <div>Already requested: <strong>{context.requested_quantity}</strong></div>
                                                 <div>Remaining before this line: <strong>{context.remaining_quantity}</strong></div>
-                                                <div>Suggested unit cost: <strong>{context.suggested_unit_cost}</strong></div>
+                                                <div>PPMP reference unit cost: <strong>{context.suggested_unit_cost}</strong></div>
                                             </div>
                                         ) : null}
 
@@ -271,7 +261,7 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                 <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                     <h4 className="text-xl font-semibold text-slate-800">Add New Item</h4>
                     {!hasPpmp ? <p className="text-sm font-medium text-amber-700">Select a PPMP on the header first.</p> : null}
-                    <div className="grid gap-3 md:grid-cols-5">
+                    <div className="grid gap-3 md:grid-cols-4">
                         <select
                             className="rounded-lg border border-slate-300 px-3 py-2 text-sm md:col-span-2"
                             value={newItem.ppmp_item_id}
@@ -289,14 +279,6 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                             onChange={(event) => setNewItem({ ...newItem, quantity_requested: event.target.value })}
                             type="number"
                             min="1"
-                        />
-                        <input
-                            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                            value={newItem.estimated_unit_cost}
-                            onChange={(event) => setNewItem({ ...newItem, estimated_unit_cost: event.target.value })}
-                            type="number"
-                            step="0.01"
-                            min="0"
                         />
                         <button type="button" onClick={addItem} disabled={!hasPpmp} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60">
                             Add Item
