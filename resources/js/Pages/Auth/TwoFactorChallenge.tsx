@@ -103,6 +103,10 @@ export default function TwoFactorChallenge({ email, expiresInSeconds, status, st
                         <p className="mt-2 text-xs text-slate-500">{expirationText}</p>
                     </div>
 
+                    <p className="mt-3 text-xs text-slate-500">
+                        If you do not see the verification code in your inbox, please check your Spam or Promotions folder.
+                    </p>
+
                     <form onSubmit={submit} className="mt-6 space-y-5">
                         <div>
                             <InputLabel htmlFor="code" value="6-digit verification code" />
