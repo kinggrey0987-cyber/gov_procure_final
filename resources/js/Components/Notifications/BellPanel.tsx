@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 
 type BellNotification = {
@@ -32,6 +32,12 @@ function formatTimestamp(value?: string | null): string {
 export default function BellPanel({ unreadCount, recent }: Props) {
     const [open, setOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement | null>(null);
+    const page = usePage();
+    const onNotificationsPage = route().current('notifications.*');
+
+    useEffect(() => {
+        setOpen(false);
+    }, [page.url]);
 
     useEffect(() => {
         if (!open) {
@@ -122,13 +128,19 @@ export default function BellPanel({ unreadCount, recent }: Props) {
                     </div>
 
                     <div className="border-t border-slate-200 bg-slate-50 px-3 py-2">
-                        <Link
-                            href={route('notifications.index')}
-                            onClick={() => setOpen(false)}
-                            className="inline-flex w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
-                        >
-                            See all notifications
-                        </Link>
+                        {onNotificationsPage ? (
+                            <span className="inline-flex w-full items-center justify-center rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-500">
+                                You are viewing all notifications
+                            </span>
+                        ) : (
+                            <Link
+                                href={route('notifications.index')}
+                                onClick={() => setOpen(false)}
+                                className="inline-flex w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                            >
+                                See all notifications
+                            </Link>
+                        )}
                     </div>
                 </div>
             )}
