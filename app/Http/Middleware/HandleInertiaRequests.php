@@ -50,7 +50,7 @@ class HandleInertiaRequests extends Middleware
                 ] : null,
                 'can' => $domainAccess,
             ],
-            'notifications' => fn (): array => $this->notificationSummary($request->user(), $domainAccess['notifications']),
+            'notificationSummary' => fn (): array => $this->notificationSummary($request->user(), $domainAccess['notifications']),
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),

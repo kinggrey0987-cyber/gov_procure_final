@@ -42,10 +42,10 @@ export default function Authenticated({
             user: AuthUser;
             can: AuthCan;
         };
-        notifications?: NotificationState;
+        notificationSummary?: NotificationState;
     };
     const { auth } = pageProps;
-    const notifications: NotificationState = pageProps.notifications ?? { unread_count: 0, recent: [] };
+    const notifications: NotificationState = pageProps.notificationSummary ?? { unread_count: 0, recent: [] };
 
     const user = auth.user;
     const [showingNavigationDropdown, setShowingNavigationDropdown] = useState(false);

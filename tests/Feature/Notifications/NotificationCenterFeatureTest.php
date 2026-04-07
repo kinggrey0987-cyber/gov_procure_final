@@ -57,6 +57,22 @@ class NotificationCenterFeatureTest extends TestCase
             );
     }
 
+    public function test_notifications_index_keeps_bell_summary_separate_from_page_payload(): void
+    {
+        $service = app(NotificationService::class);
+        $service->notifyUser($this->officeUserA, 'Inbox', 'Inbox message', 'OFFICE_UPDATE');
+
+        $this->actingAs($this->officeUserA)
+            ->get(route('notifications.index'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Notifications/Index')
+                ->has('notifications.data', 1)
+                ->has('notificationSummary.unread_count')
+                ->has('notificationSummary.recent')
+            );
+    }
+
     public function test_viewing_another_users_notification_is_denied(): void
     {
         $notification = Notification::query()->create([
