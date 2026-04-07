@@ -115,6 +115,11 @@ class DashboardPostLoginStabilityTest extends TestCase
         $this->actingAs($user)
             ->get(route('profile.edit'))
             ->assertOk();
+
+        $this->actingAs($user)
+            ->followingRedirects()
+            ->get(route('dashboard'))
+            ->assertOk();
     }
 
     private function assertDashboardRedirect(UserRole $role, string $expectedRoute, Office $office): void

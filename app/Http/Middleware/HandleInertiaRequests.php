@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Models\User;
 use App\Services\Notifications\NotificationCenterService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Inertia\Middleware;
 use Throwable;
 
@@ -36,7 +37,6 @@ class HandleInertiaRequests extends Middleware
         $user = $request->user();
         $roleCode = $user instanceof User ? $user->roleCode() : null;
         $domainAccess = $this->domainAccessFromRole($roleCode);
-        $notifications = $this->notificationSummary($user, $domainAccess['notifications']);
 
         return [
             ...parent::share($request),
@@ -50,7 +50,7 @@ class HandleInertiaRequests extends Middleware
                 ] : null,
                 'can' => $domainAccess,
             ],
-            'notifications' => $notifications,
+            'notifications' => fn (): array => $this->notificationSummary($request->user(), $domainAccess['notifications']),
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
@@ -85,6 +85,8 @@ class HandleInertiaRequests extends Middleware
             ];
         }
 
+        $startedAt = microtime(true);
+
         try {
             /** @var NotificationCenterService $notificationService */
             $notificationService = app(NotificationCenterService::class);
@@ -109,10 +111,24 @@ class HandleInertiaRequests extends Middleware
         } catch (Throwable $throwable) {
             report($throwable);
 
+            Log::warning('inertia.notifications.load_failed', [
+                'user_id' => (int) $user->id,
+                'error' => $throwable->getMessage(),
+            ]);
+
             return [
                 'unread_count' => 0,
                 'recent' => [],
             ];
+        } finally {
+            $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
+
+            if ($durationMs >= 400) {
+                Log::warning('inertia.notifications.load_slow', [
+                    'user_id' => (int) $user->id,
+                    'duration_ms' => $durationMs,
+                ]);
+            }
         }
     }
 }

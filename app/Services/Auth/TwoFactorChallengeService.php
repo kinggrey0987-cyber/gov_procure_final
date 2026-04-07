@@ -9,7 +9,9 @@ use App\Models\User;
 use App\Services\AuditLogService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Throwable;
 
 class TwoFactorChallengeService
 {
@@ -48,7 +50,36 @@ class TwoFactorChallengeService
             'user_agent' => mb_substr((string) $userAgent, 0, 512),
         ]);
 
-        Mail::to($user->email)->send(new TwoFactorCodeMail($user, $code, $expiresInMinutes));
+        $deliveryFailed = false;
+        $deliveryError = null;
+        $mailStartedAt = microtime(true);
+
+        try {
+            Mail::to($user->email)->send(new TwoFactorCodeMail($user, $code, $expiresInMinutes));
+        } catch (Throwable $throwable) {
+            $deliveryFailed = true;
+            $deliveryError = mb_substr($throwable->getMessage(), 0, 500);
+
+            report($throwable);
+
+            Log::warning('auth.two_factor.delivery_failed', [
+                'user_id' => (int) $user->id,
+                'challenge_id' => (int) $challenge->id,
+                'is_resend' => $isResend,
+                'error' => $deliveryError,
+            ]);
+        }
+
+        $deliveryDurationMs = (int) round((microtime(true) - $mailStartedAt) * 1000);
+
+        if ($deliveryDurationMs >= 1500) {
+            Log::warning('auth.two_factor.delivery_slow', [
+                'user_id' => (int) $user->id,
+                'challenge_id' => (int) $challenge->id,
+                'is_resend' => $isResend,
+                'duration_ms' => $deliveryDurationMs,
+            ]);
+        }
 
         $this->auditLogService->log(
             actor: $user,
@@ -59,10 +90,28 @@ class TwoFactorChallengeService
             details: [
                 'challenge_id' => (int) $challenge->id,
                 'expires_at' => $challenge->expires_at?->toIso8601String(),
+                'delivery_failed' => $deliveryFailed,
+                'delivery_duration_ms' => $deliveryDurationMs,
             ],
             logDomain: 'TECHNICAL',
             officeId: $user->office_id,
         );
+
+        if ($deliveryFailed) {
+            $this->auditLogService->log(
+                actor: $user,
+                moduleName: 'Auth.TwoFactor',
+                actionType: '2FA_CODE_DELIVERY_FAILED',
+                referenceType: User::class,
+                referenceId: (int) $user->id,
+                details: [
+                    'challenge_id' => (int) $challenge->id,
+                    'error' => $deliveryError,
+                ],
+                logDomain: 'TECHNICAL',
+                officeId: $user->office_id,
+            );
+        }
 
         return $challenge;
     }

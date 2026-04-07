@@ -362,6 +362,31 @@ class TwoFactorAuthenticationTest extends TestCase
         ]);
     }
 
+    public function test_login_does_not_crash_when_two_factor_mail_delivery_fails(): void
+    {
+        $user = $this->createUser(UserRole::OFFICE_USER, 'mail.fail@gsc.local');
+
+        Mail::shouldReceive('to')->once()->andReturnSelf();
+        Mail::shouldReceive('send')->once()->andThrow(new \RuntimeException('smtp timeout'));
+
+        $response = $this->post('/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $response->assertRedirect(route('two-factor.challenge.show', absolute: false));
+        $this->assertAuthenticatedAs($user);
+
+        $this->assertDatabaseCount('two_factor_challenges', 1);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'module_name' => 'Auth.TwoFactor',
+            'action_type' => '2FA_CODE_DELIVERY_FAILED',
+            'reference_type' => User::class,
+            'reference_id' => $user->id,
+        ]);
+    }
+
     private function createUser(UserRole $role, string $email): User
     {
         $office = Office::query()->firstOrCreate([

@@ -13,6 +13,8 @@ use App\Models\PurchaseRequest;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class ExecutiveMonitoringService
 {
@@ -42,42 +44,99 @@ class ExecutiveMonitoringService
      */
     public function dashboard(): array
     {
-        $summary = $this->summary();
+        $startedAt = microtime(true);
 
+        try {
+            $summary = $this->summary();
+
+            return [
+                'summary' => $summary,
+                'procurement' => [
+                    'purchase_request_count' => PurchaseRequest::query()->count(),
+                    'purchase_order_count' => PurchaseOrder::query()->count(),
+                    'total_purchase_order_amount' => (float) PurchaseOrder::query()->sum('total_amount'),
+                ],
+                'transparency' => [
+                    'published_disclosure_count' => PublicDisclosure::query()->published()->count(),
+                    'draft_disclosure_count' => PublicDisclosure::query()->byStatus('DRAFT')->count(),
+                ],
+                'approvals' => [
+                    'pending_ppmp_approvals' => Ppmp::query()->where('status', 'SUBMITTED')->count(),
+                    'pending_consolidated_plan_approvals' => Ppmp::query()->where('status', 'SUBMITTED')->count(),
+                    'returned_for_revision' => Ppmp::query()->where('status', 'RETURNED_FOR_REVISION')->count(),
+                    'recently_approved' => Ppmp::query()->where('status', 'APPROVED')->whereDate('updated_at', '>=', now()->subDays(30)->toDateString())->count(),
+                ],
+                'recent_anomalies' => Anomaly::query()
+                    ->select(['anomaly_id', 'anomaly_type', 'severity', 'status', 'office_id', 'detected_at', 'created_at'])
+                    ->with('office:id,name')
+                    ->latest('detected_at')
+                    ->limit(5)
+                    ->get(),
+                'recent_alerts' => Alert::query()
+                    ->select(['alerts_id', 'alert_type', 'severity', 'status', 'office_id', 'detected_at', 'created_at'])
+                    ->with('office:id,name')
+                    ->latest('detected_at')
+                    ->limit(5)
+                    ->get(),
+                'recent_disclosures' => PublicDisclosure::query()
+                    ->select(['disclosure_id', 'title', 'type', 'status', 'published_at', 'created_at'])
+                    ->latest('published_at')
+                    ->limit(5)
+                    ->get(),
+            ];
+        } catch (Throwable $throwable) {
+            report($throwable);
+
+            Log::warning('executive.dashboard.payload_failed', [
+                'error' => $throwable->getMessage(),
+            ]);
+
+            return $this->emptyDashboardPayload();
+        } finally {
+            $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
+
+            if ($durationMs >= 1200) {
+                Log::warning('executive.dashboard.payload_slow', [
+                    'duration_ms' => $durationMs,
+                ]);
+            }
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function emptyDashboardPayload(): array
+    {
         return [
-            'summary' => $summary,
+            'summary' => [
+                'open_anomaly_count' => 0,
+                'in_review_anomaly_count' => 0,
+                'high_severity_anomaly_count' => 0,
+                'open_alert_count' => 0,
+                'in_review_alert_count' => 0,
+                'high_severity_alert_count' => 0,
+                'cross_office_anomaly_count' => 0,
+                'office_breakdown' => [],
+            ],
             'procurement' => [
-                'purchase_request_count' => PurchaseRequest::query()->count(),
-                'purchase_order_count' => PurchaseOrder::query()->count(),
-                'total_purchase_order_amount' => (float) PurchaseOrder::query()->sum('total_amount'),
+                'purchase_request_count' => 0,
+                'purchase_order_count' => 0,
+                'total_purchase_order_amount' => 0.0,
             ],
             'transparency' => [
-                'published_disclosure_count' => PublicDisclosure::query()->published()->count(),
-                'draft_disclosure_count' => PublicDisclosure::query()->byStatus('DRAFT')->count(),
+                'published_disclosure_count' => 0,
+                'draft_disclosure_count' => 0,
             ],
             'approvals' => [
-                'pending_ppmp_approvals' => Ppmp::query()->where('status', 'SUBMITTED')->count(),
-                'pending_consolidated_plan_approvals' => Ppmp::query()->where('status', 'SUBMITTED')->count(),
-                'returned_for_revision' => Ppmp::query()->where('status', 'RETURNED_FOR_REVISION')->count(),
-                'recently_approved' => Ppmp::query()->where('status', 'APPROVED')->whereDate('updated_at', '>=', now()->subDays(30)->toDateString())->count(),
+                'pending_ppmp_approvals' => 0,
+                'pending_consolidated_plan_approvals' => 0,
+                'returned_for_revision' => 0,
+                'recently_approved' => 0,
             ],
-            'recent_anomalies' => Anomaly::query()
-                ->select(['anomaly_id', 'anomaly_type', 'severity', 'status', 'office_id', 'detected_at', 'created_at'])
-                ->with('office:id,name')
-                ->latest('detected_at')
-                ->limit(5)
-                ->get(),
-            'recent_alerts' => Alert::query()
-                ->select(['alerts_id', 'alert_type', 'severity', 'status', 'office_id', 'detected_at', 'created_at'])
-                ->with('office:id,name')
-                ->latest('detected_at')
-                ->limit(5)
-                ->get(),
-            'recent_disclosures' => PublicDisclosure::query()
-                ->select(['disclosure_id', 'title', 'type', 'status', 'published_at', 'created_at'])
-                ->latest('published_at')
-                ->limit(5)
-                ->get(),
+            'recent_anomalies' => collect(),
+            'recent_alerts' => collect(),
+            'recent_disclosures' => collect(),
         ];
     }
 

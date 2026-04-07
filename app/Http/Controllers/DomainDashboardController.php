@@ -16,6 +16,7 @@ use App\Models\Role;
 use App\Models\SupplyRequest;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -23,6 +24,7 @@ class DomainDashboardController extends Controller
 {
     public function adminTech(Request $request): Response
     {
+        $startedAt = microtime(true);
         $user = $request->user();
 
         $activities = AuditLog::query()
@@ -38,7 +40,7 @@ class DomainDashboardController extends Controller
                 'occurred_at' => optional($log->created_at)?->toIso8601String(),
             ])->values();
 
-        return Inertia::render('Dashboard/AdminDashboard', [
+        $response = Inertia::render('Dashboard/AdminDashboard', [
             'summary' => [
                 'total_users' => User::query()->count(),
                 'office_count' => Office::query()->count(),
@@ -49,10 +51,15 @@ class DomainDashboardController extends Controller
             ],
             'activities' => $activities,
         ]);
+
+        $this->logIfSlow('admin-tech', $startedAt, (int) ($user?->id ?? 0));
+
+        return $response;
     }
 
     public function office(Request $request): Response
     {
+        $startedAt = microtime(true);
         $user = $request->user();
         $officeId = (int) $user?->office_id;
 
@@ -97,7 +104,7 @@ class DomainDashboardController extends Controller
             ->whereIn('status', ['COMPLETED', 'RELEASED'])
             ->count();
 
-        return Inertia::render('Office/Tracking', [
+        $response = Inertia::render('Office/Tracking', [
             'summary' => [
                 'total_requests' => SupplyRequest::query()->forOffice($officeId)->count(),
                 'pending_requests' => SupplyRequest::query()->forOffice($officeId)->whereIn('status', ['DRAFT', 'SUBMITTED', 'IN_REVIEW', 'PENDING'])->count(),
@@ -108,10 +115,15 @@ class DomainDashboardController extends Controller
             'recentRequests' => $recentRequests,
             'notificationPreview' => $notificationPreview,
         ]);
+
+        $this->logIfSlow('office', $startedAt, (int) ($user?->id ?? 0));
+
+        return $response;
     }
 
     public function procurement(): Response
     {
+        $startedAt = microtime(true);
         $recentPurchaseRequests = PurchaseRequest::query()
             ->with(['office'])
             ->latest('purchase_request_id')
@@ -124,7 +136,7 @@ class DomainDashboardController extends Controller
             ->limit(5)
             ->get();
 
-        return Inertia::render('Procurement/Tracking', [
+        $response = Inertia::render('Procurement/Tracking', [
             'summary' => [
                 'pending_requests' => PurchaseRequest::query()->open()->count(),
                 'approved_requests' => PurchaseRequest::query()->processing()->count(),
@@ -146,11 +158,17 @@ class DomainDashboardController extends Controller
                 'created_at' => optional($order->created_at)?->toIso8601String(),
             ])->values(),
         ]);
+
+        $this->logIfSlow('procurement', $startedAt, (int) (auth()->id() ?? 0));
+
+        return $response;
     }
 
     public function inventory(): Response
     {
-        return Inertia::render('Inventory/Tracking', [
+        $startedAt = microtime(true);
+
+        $response = Inertia::render('Inventory/Tracking', [
             'summary' => [
                 'inventory_count' => Inventory::query()->count(),
                 'low_stock_count' => Inventory::query()->lowStock()->count(),
@@ -160,6 +178,10 @@ class DomainDashboardController extends Controller
                 'open_claim_count' => Claim::query()->open()->count(),
             ],
         ]);
+
+        $this->logIfSlow('inventory', $startedAt, (int) (auth()->id() ?? 0));
+
+        return $response;
     }
 
     public function executive(): Response
@@ -175,6 +197,21 @@ class DomainDashboardController extends Controller
         return Inertia::render('Domain/Placeholder', [
             'title' => 'Public Transparency Portal',
             'description' => 'Approved and published disclosures only.',
+        ]);
+    }
+
+    private function logIfSlow(string $dashboard, float $startedAt, int $userId): void
+    {
+        $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
+
+        if ($durationMs < 800) {
+            return;
+        }
+
+        Log::warning('dashboard.load_slow', [
+            'dashboard' => $dashboard,
+            'user_id' => $userId,
+            'duration_ms' => $durationMs,
         ]);
     }
 }
