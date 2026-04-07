@@ -38,7 +38,7 @@ class EnsureTwoFactorVerified
         }
 
         if (! $pending || $sessionUserId !== (int) $user->id) {
-            $this->twoFactorService->issueChallenge(
+            $challengeResult = $this->twoFactorService->issueChallenge(
                 user: $user,
                 ipAddress: $request->ip(),
                 userAgent: (string) $request->userAgent(),
@@ -50,6 +50,12 @@ class EnsureTwoFactorVerified
                 'two_factor.verified' => false,
                 'two_factor.user_id' => (int) $user->id,
             ]);
+
+            if (! $challengeResult['delivery_ok']) {
+                $request->session()->flash('error', 'We could not send the verification email. Please try again.');
+            } else {
+                $request->session()->flash('status', 'A verification code was sent to your email address.');
+            }
         }
 
         return redirect()->route('two-factor.challenge.show');

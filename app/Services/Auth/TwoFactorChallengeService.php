@@ -30,7 +30,10 @@ class TwoFactorChallengeService
         ], true);
     }
 
-    public function issueChallenge(User $user, ?string $ipAddress, ?string $userAgent, bool $isResend = false): TwoFactorChallenge
+    /**
+     * @return array{challenge: TwoFactorChallenge, delivery_ok: bool, delivery_error: string|null, delivery_duration_ms: int}
+     */
+    public function issueChallenge(User $user, ?string $ipAddress, ?string $userAgent, bool $isResend = false): array
     {
         TwoFactorChallenge::query()
             ->where('user_id', $user->id)
@@ -50,12 +53,31 @@ class TwoFactorChallengeService
             'user_agent' => mb_substr((string) $userAgent, 0, 512),
         ]);
 
+        Log::info('auth.two_factor.challenge_created', [
+            'user_id' => (int) $user->id,
+            'challenge_id' => (int) $challenge->id,
+            'is_resend' => $isResend,
+            'expires_at' => $challenge->expires_at?->toIso8601String(),
+        ]);
+
         $deliveryFailed = false;
         $deliveryError = null;
         $mailStartedAt = microtime(true);
 
+        Log::info('auth.two_factor.delivery_attempt', [
+            'user_id' => (int) $user->id,
+            'challenge_id' => (int) $challenge->id,
+            'is_resend' => $isResend,
+        ]);
+
         try {
             Mail::to($user->email)->send(new TwoFactorCodeMail($user, $code, $expiresInMinutes));
+
+            Log::info('auth.two_factor.delivery_success', [
+                'user_id' => (int) $user->id,
+                'challenge_id' => (int) $challenge->id,
+                'is_resend' => $isResend,
+            ]);
         } catch (Throwable $throwable) {
             $deliveryFailed = true;
             $deliveryError = mb_substr($throwable->getMessage(), 0, 500);
@@ -113,7 +135,12 @@ class TwoFactorChallengeService
             );
         }
 
-        return $challenge;
+        return [
+            'challenge' => $challenge,
+            'delivery_ok' => ! $deliveryFailed,
+            'delivery_error' => $deliveryError,
+            'delivery_duration_ms' => $deliveryDurationMs,
+        ];
     }
 
     public function currentActiveChallenge(User $user): ?TwoFactorChallenge

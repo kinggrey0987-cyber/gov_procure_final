@@ -45,7 +45,7 @@ class AuthenticatedSessionController extends Controller
         $request->session()->regenerate();
 
         if ($this->twoFactorService->requiresTwoFactor($user)) {
-            $this->twoFactorService->issueChallenge(
+            $challengeResult = $this->twoFactorService->issueChallenge(
                 user: $user,
                 ipAddress: $request->ip(),
                 userAgent: (string) $request->userAgent(),
@@ -58,6 +58,11 @@ class AuthenticatedSessionController extends Controller
                 'two_factor.user_id' => (int) $user->id,
                 'two_factor.remember' => $request->boolean('remember'),
             ]);
+
+            if (! $challengeResult['delivery_ok']) {
+                return redirect()->route('two-factor.challenge.show')
+                    ->with('error', 'We could not send the verification email. Please try again.');
+            }
 
             return redirect()->route('two-factor.challenge.show')
                 ->with('status', 'A verification code was sent to your email address.');

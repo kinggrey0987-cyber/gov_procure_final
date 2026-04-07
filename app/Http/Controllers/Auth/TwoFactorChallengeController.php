@@ -40,7 +40,7 @@ class TwoFactorChallengeController extends Controller
         }
 
         if (! $pending || $pendingUserId !== (int) $user->id) {
-            $this->twoFactorService->issueChallenge(
+            $challengeResult = $this->twoFactorService->issueChallenge(
                 user: $user,
                 ipAddress: $request->ip(),
                 userAgent: (string) $request->userAgent(),
@@ -52,6 +52,12 @@ class TwoFactorChallengeController extends Controller
                 'two_factor.verified' => false,
                 'two_factor.user_id' => (int) $user->id,
             ]);
+
+            if (! $challengeResult['delivery_ok']) {
+                $request->session()->flash('error', 'We could not send the verification email. Please try again.');
+            } else {
+                $request->session()->flash('status', 'A verification code was sent to your email address.');
+            }
         }
 
         $activeChallenge = $this->twoFactorService->currentActiveChallenge($user);
@@ -61,7 +67,8 @@ class TwoFactorChallengeController extends Controller
             'expiresInSeconds' => $activeChallenge
                 ? max(0, now()->diffInSeconds($activeChallenge->expires_at, false))
                 : 0,
-            'status' => session('status'),
+            'status' => session('error') ?: session('status'),
+            'statusType' => session()->has('error') ? 'error' : 'success',
         ]);
     }
 
@@ -127,7 +134,7 @@ class TwoFactorChallengeController extends Controller
             return redirect()->route('login');
         }
 
-        $this->twoFactorService->issueChallenge(
+        $challengeResult = $this->twoFactorService->issueChallenge(
             user: $user,
             ipAddress: $request->ip(),
             userAgent: (string) $request->userAgent(),
@@ -139,6 +146,10 @@ class TwoFactorChallengeController extends Controller
             'two_factor.verified' => false,
             'two_factor.user_id' => (int) $user->id,
         ]);
+
+        if (! $challengeResult['delivery_ok']) {
+            return back()->with('error', 'We could not send the verification email. Please try again.');
+        }
 
         return back()->with('status', 'A new verification code has been sent to your email address.');
     }

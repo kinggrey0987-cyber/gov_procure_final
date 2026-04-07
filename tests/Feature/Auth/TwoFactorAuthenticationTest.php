@@ -36,6 +36,8 @@ class TwoFactorAuthenticationTest extends TestCase
         ]);
 
         $response->assertRedirect(route('two-factor.challenge.show', absolute: false));
+        $response->assertSessionHas('status', 'A verification code was sent to your email address.');
+        $response->assertSessionMissing('error');
 
         $this->assertDatabaseCount('two_factor_challenges', 1);
         $this->assertAuthenticatedAs($user);
@@ -239,7 +241,8 @@ class TwoFactorAuthenticationTest extends TestCase
         ]);
 
         $this->post(route('two-factor.challenge.resend'))
-            ->assertSessionHas('status');
+            ->assertSessionHas('status', 'A new verification code has been sent to your email address.')
+            ->assertSessionMissing('error');
 
         Mail::assertSent(TwoFactorCodeMail::class, 2);
 
@@ -375,9 +378,18 @@ class TwoFactorAuthenticationTest extends TestCase
         ]);
 
         $response->assertRedirect(route('two-factor.challenge.show', absolute: false));
+        $response->assertSessionHas('error', 'We could not send the verification email. Please try again.');
+        $response->assertSessionMissing('status');
         $this->assertAuthenticatedAs($user);
 
         $this->assertDatabaseCount('two_factor_challenges', 1);
+
+        $activeChallenges = TwoFactorChallenge::query()
+            ->where('user_id', $user->id)
+            ->whereNull('consumed_at')
+            ->count();
+
+        $this->assertSame(1, $activeChallenges);
 
         $this->assertDatabaseHas('audit_logs', [
             'module_name' => 'Auth.TwoFactor',
@@ -385,6 +397,33 @@ class TwoFactorAuthenticationTest extends TestCase
             'reference_type' => User::class,
             'reference_id' => $user->id,
         ]);
+    }
+
+    public function test_resend_delivery_failure_does_not_show_false_success_message(): void
+    {
+        $user = $this->createUser(UserRole::ADMIN, 'resend.fail@gsc.local');
+
+        Mail::shouldReceive('to')->andReturnSelf();
+        Mail::shouldReceive('send')->once()->andThrow(new \RuntimeException('smtp unavailable'));
+
+        $this->actingAs($user)->withSession([
+            'two_factor.pending' => true,
+            'two_factor.verified' => false,
+            'two_factor.user_id' => $user->id,
+        ]);
+
+        $response = $this->post(route('two-factor.challenge.resend'));
+
+        $response->assertRedirect();
+        $response->assertSessionHas('error', 'We could not send the verification email. Please try again.');
+        $response->assertSessionMissing('status');
+
+        $activeChallenges = TwoFactorChallenge::query()
+            ->where('user_id', $user->id)
+            ->whereNull('consumed_at')
+            ->count();
+
+        $this->assertSame(1, $activeChallenges);
     }
 
     private function createUser(UserRole $role, string $email): User

@@ -8,9 +8,10 @@ type Props = {
     email: string;
     expiresInSeconds: number;
     status?: string;
+    statusType?: 'success' | 'error';
 };
 
-export default function TwoFactorChallenge({ email, expiresInSeconds, status }: Props) {
+export default function TwoFactorChallenge({ email, expiresInSeconds, status, statusType = 'success' }: Props) {
     const { data, setData, post, processing, errors, clearErrors } = useForm({
         code: '',
     });
@@ -91,13 +92,13 @@ export default function TwoFactorChallenge({ email, expiresInSeconds, status }: 
                     </div>
 
                     {status && (
-                        <div className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+                        <div className={`mt-5 rounded-lg px-4 py-3 text-sm font-medium ${statusType === 'error' ? 'border border-rose-200 bg-rose-50 text-rose-700' : 'border border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
                             {status}
                         </div>
                     )}
 
                     <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                        <p className="font-semibold">Verification code sent to:</p>
+                        <p className="font-semibold">Verification email address:</p>
                         <p>{email}</p>
                         <p className="mt-2 text-xs text-slate-500">{expirationText}</p>
                     </div>
