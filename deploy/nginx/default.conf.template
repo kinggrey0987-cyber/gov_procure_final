@@ -1,0 +1,47 @@
+server {
+    listen ${PORT};
+    server_name _;
+
+    root /app/public;
+    index index.php index.html;
+
+    access_log /dev/stdout;
+    error_log /dev/stderr warn;
+
+    charset utf-8;
+    client_max_body_size 25m;
+
+    location = /favicon.ico {
+        log_not_found off;
+        access_log off;
+    }
+
+    location = /robots.txt {
+        log_not_found off;
+        access_log off;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~* \.(?:css|js|mjs|jpg|jpeg|gif|png|svg|ico|webp|map|woff|woff2|ttf)$ {
+        expires 1h;
+        add_header Cache-Control "public";
+        access_log off;
+        try_files $uri =404;
+    }
+
+    location ~ \.php$ {
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param DOCUMENT_ROOT $document_root;
+        fastcgi_index index.php;
+        fastcgi_read_timeout 120;
+        fastcgi_pass 127.0.0.1:9000;
+    }
+
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+}
