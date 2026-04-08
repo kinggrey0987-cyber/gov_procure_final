@@ -53,50 +53,12 @@ class TwoFactorChallengeService
             'user_agent' => mb_substr((string) $userAgent, 0, 512),
         ]);
 
-        Log::info('auth.two_factor.challenge_created', [
-            'user_id' => (int) $user->id,
-            'challenge_id' => (int) $challenge->id,
-            'is_resend' => $isResend,
-            'expires_at' => $challenge->expires_at?->toIso8601String(),
-        ]);
-
-        $mailRuntime = [
-            'mail_default' => config('mail.default'),
-            'smtp_host' => config('mail.mailers.smtp.host'),
-            'smtp_port' => config('mail.mailers.smtp.port'),
-            'smtp_encryption' => config('mail.mailers.smtp.encryption'),
-            'smtp_username' => config('mail.mailers.smtp.username'),
-            'mail_from_address' => config('mail.from.address'),
-            'mail_from_name' => config('mail.from.name'),
-        ];
-
-        Log::info('auth.two_factor.mail_runtime', array_merge($mailRuntime, [
-            'user_id' => (int) $user->id,
-            'challenge_id' => (int) $challenge->id,
-            'is_resend' => $isResend,
-        ]));
-
         $deliveryFailed = false;
         $deliveryError = null;
         $mailStartedAt = microtime(true);
 
-        Log::info('auth.two_factor.delivery_attempt', array_merge($mailRuntime, [
-            'user_id' => (int) $user->id,
-            'challenge_id' => (int) $challenge->id,
-            'is_resend' => $isResend,
-        ]));
-
         try {
             Mail::to($user->email)->send(new TwoFactorCodeMail($user, $code, $expiresInMinutes));
-
-            $deliveryDurationMs = (int) round((microtime(true) - $mailStartedAt) * 1000);
-
-            Log::info('auth.two_factor.delivery_success', array_merge($mailRuntime, [
-                'user_id' => (int) $user->id,
-                'challenge_id' => (int) $challenge->id,
-                'is_resend' => $isResend,
-                'duration_ms' => $deliveryDurationMs,
-            ]));
         } catch (Throwable $throwable) {
             $deliveryFailed = true;
             $deliveryError = mb_substr($throwable->getMessage(), 0, 500);
@@ -105,14 +67,14 @@ class TwoFactorChallengeService
 
             report($throwable);
 
-            Log::warning('auth.two_factor.delivery_failed', array_merge($mailRuntime, [
+            Log::warning('auth.two_factor.delivery_failed', [
                 'user_id' => (int) $user->id,
                 'challenge_id' => (int) $challenge->id,
                 'is_resend' => $isResend,
                 'duration_ms' => $deliveryDurationMs,
                 'exception_class' => $throwable::class,
                 'exception_message' => $deliveryError,
-            ]));
+            ]);
         }
 
         $deliveryDurationMs = (int) round((microtime(true) - $mailStartedAt) * 1000);

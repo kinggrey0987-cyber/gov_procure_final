@@ -204,7 +204,7 @@ class DomainDashboardController extends Controller
     {
         $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
 
-        if ($durationMs < 800) {
+        if ($durationMs < 1500) {
             return;
         }
 

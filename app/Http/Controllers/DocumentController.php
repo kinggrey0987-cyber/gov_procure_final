@@ -74,11 +74,16 @@ class DocumentController extends Controller
     {
         abort_unless($document->isRelatedTo('public_disclosures', (int) $public_disclosure->disclosure_id), 404);
 
-        try {
-            $this->service->authorizeViewDocument($document, auth()->user());
-        } catch (ValidationException) {
-            abort(404);
-        }
+        $actor = auth()->user();
+        $isPublished = (string) ($public_disclosure->status ?? '') === 'PUBLISHED'
+            && (bool) $public_disclosure->published_at;
+
+        $canViewNonPublished = $actor && (
+            $actor->can('public-disclosure.manage')
+            || $actor->can('public-disclosure.view')
+        );
+
+        abort_unless($isPublished || $canViewNonPublished, 404);
 
         abort_unless(Storage::disk('public')->exists((string) $document->file_path), 404);
 

@@ -137,7 +137,7 @@ class PpmpAnomalyIntegrationTest extends TestCase
 
     public function test_price_anomaly_is_generated_only_from_procurement_side_purchase_order_items(): void
     {
-        $context = $this->createProcurementPriceAnomalyContext(9801, [100, 102, 250]);
+        $context = $this->createProcurementPriceAnomalyContext(9801, [100, 101, 102, 103, 104, 260]);
 
         app(AnomalyDetectionService::class)->runExecutiveDetections($this->executive);
 
@@ -253,7 +253,11 @@ class PpmpAnomalyIntegrationTest extends TestCase
      */
     private function createProcurementPriceAnomalyContext(int $itemId, array $unitPrices): array
     {
-        $context = $this->createPpmpOverRequestContext($itemId, 100, [2, 2, 2]);
+        $context = $this->createPpmpOverRequestContext(
+            $itemId,
+            100,
+            array_fill(0, max(3, count($unitPrices)), 2)
+        );
         $supplier = Supplier::query()->create([
             'supplier_name' => 'Price Anomaly Supplier '.$itemId,
             'contact_person' => 'Supplier Contact',

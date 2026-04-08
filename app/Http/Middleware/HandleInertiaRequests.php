@@ -123,7 +123,7 @@ class HandleInertiaRequests extends Middleware
         } finally {
             $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
 
-            if ($durationMs >= 400) {
+            if ($durationMs >= 1200) {
                 Log::warning('inertia.notifications.load_slow', [
                     'user_id' => (int) $user->id,
                     'duration_ms' => $durationMs,
