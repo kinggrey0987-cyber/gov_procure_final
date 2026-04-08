@@ -87,8 +87,8 @@ class DashboardPostLoginStabilityTest extends TestCase
             ->get(route('office.dashboard'))
             ->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page
-                ->where('notifications.unread_count', 0)
-                ->where('notifications.recent', [])
+                ->where('notificationSummary.unread_count', 0)
+                ->where('notificationSummary.recent', [])
             );
     }
 

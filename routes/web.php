@@ -3,6 +3,7 @@
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Governance\AuditLogController;
 use App\Http\Controllers\AdminTech\OfficeManagementController;
+use App\Http\Controllers\AdminTech\MailDebugController;
 use App\Http\Controllers\AdminTech\RoleManagementController;
 use App\Http\Controllers\AdminTech\UserManagementController;
 use App\Http\Controllers\DomainDashboardController;
@@ -157,6 +158,15 @@ Route::middleware(['auth', 'twofactor', 'must-change-password'])->group(function
             Route::get('/audit/technical', [AuditLogController::class, 'technical'])
                 ->middleware('can:audit.technical.view')
                 ->name('audit.technical');
+
+            // TEMPORARY: production mail debug routes (remove after Render mail diagnostics)
+            Route::get('/debug/mail/runtime-config', [MailDebugController::class, 'logRuntimeConfig'])
+                ->middleware('throttle:6,1')
+                ->name('debug.mail.runtime-config');
+
+            Route::get('/debug/mail/test-send', [MailDebugController::class, 'sendTest'])
+                ->middleware('throttle:6,1')
+                ->name('debug.mail.test-send');
         });
 
     Route::prefix('office')
