@@ -98,9 +98,13 @@ export default function OfficeSupplyRequestsIndex({ requests }: Props) {
                                             >
                                                 Process Distribution
                                             </Link>
+                                        ) : request.has_purchase_request ? (
+                                            <span className="text-sm font-semibold text-slate-500">Queued</span>
                                         ) : (
                                             <Link
-                                                href={route('inventory.procurement-requests.index')}
+                                                href={route('inventory.office-supply-requests.queue', request.supply_request_id)}
+                                                method="post"
+                                                as="button"
                                                 className="text-sm font-semibold text-rose-700 hover:text-rose-900"
                                             >
                                                 Queue Procurement

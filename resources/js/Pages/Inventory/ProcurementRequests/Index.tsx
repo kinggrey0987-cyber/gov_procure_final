@@ -48,7 +48,7 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
         <AuthenticatedLayout
             header={
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                    <h2 className="text-xl font-semibold leading-tight text-gray-800">Procurement Requests</h2>
+                    <h2 className="text-xl font-semibold leading-tight text-gray-800">Purchase Requests</h2>
                     <Link href={route('inventory.office-supply-requests.index')} className="rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
                         Back to Office Request Review
                     </Link>
@@ -62,7 +62,7 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                     <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Shortage-Based Initiation Queue</h3>
                         <p className="mt-2 text-sm text-slate-600">
-                            This queue identifies office requests that cannot be fulfilled from current stock. It prepares procurement initiation inputs and does not perform
+                            This queue identifies office requests that cannot be fulfilled from current stock. It prepares purchase request initiation inputs and does not perform
                             BAC approval or adjudication.
                         </p>
                         <div className="mt-4 space-y-3">
@@ -73,8 +73,8 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                                     <p className="mt-1 text-xs font-semibold text-rose-700">Shortage: {candidate.shortage_total.toFixed(2)}</p>
                                 </div>
                             ))}
-                            {shortageCandidates.length === 0 ? <p className="text-sm text-slate-500">No active shortages requiring procurement initiation.</p> : null}
-                        </div>
+                            {shortageCandidates.length === 0 ? <p className="text-sm text-slate-500">No active shortages requiring purchase request initiation.</p> : null}
+                        </div>x``
                     </div>
 
                     <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -96,7 +96,7 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
 
                 <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                     <div className="border-b border-slate-200 px-4 py-3">
-                        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Existing Procurement Request Records</h3>
+                        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Existing Purchase Request Records</h3>
                     </div>
                     <table className="min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-slate-50">

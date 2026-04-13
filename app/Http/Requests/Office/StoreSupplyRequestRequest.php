@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Office;
 
+use App\Models\Ppmp;
 use App\Models\PpmpItem;
 use App\Models\SupplyRequestItem;
 use Illuminate\Foundation\Http\FormRequest;
@@ -25,12 +26,10 @@ class StoreSupplyRequestRequest extends FormRequest
                 'required',
                 'integer',
                 Rule::exists('ppmp', 'ppmp_id')->where(function ($query) use ($officeId): void {
-                    $query->where('office_id', $officeId)
-                        ->whereIn('status', ['DRAFT', 'SUBMITTED', 'APPROVED', 'RETURNED_FOR_REVISION']);
+                    $query->where('office_id', $officeId);
                 }),
             ],
-            'request_date' => ['required', 'date'],
-            'needed_by_date' => ['required', 'date', 'after_or_equal:request_date'],
+            'needed_by_date' => ['required', 'date', 'after_or_equal:today'],
             'request_category' => ['required', 'string', 'max:50'],
             'purpose' => ['required', 'string'],
             'priority_level' => ['required', 'string', 'max:30'],
@@ -57,6 +56,19 @@ class StoreSupplyRequestRequest extends FormRequest
             $ppmpId = (int) $this->input('ppmp_id');
             $officeId = (int) $this->user()?->office_id;
             $items = collect($this->input('items', []));
+
+            if ($ppmpId > 0) {
+                $ppmpIsApproved = Ppmp::query()
+                    ->where('ppmp_id', $ppmpId)
+                    ->where('office_id', $officeId)
+                    ->where('status', 'APPROVED')
+                    ->exists();
+
+                if (! $ppmpIsApproved) {
+                    $validator->errors()->add('ppmp_id', 'Selected PPMP is not approved and cannot be used for a supply request.');
+                    return;
+                }
+            }
 
             if ($ppmpId <= 0 || $items->isEmpty()) {
                 return;

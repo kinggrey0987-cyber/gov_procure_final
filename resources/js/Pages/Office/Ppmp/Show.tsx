@@ -1,4 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import ApprovalHistoryTimeline from '@/Components/ApprovalHistoryTimeline';
+import StatusHistoryTimeline from '@/Components/StatusHistoryTimeline';
 import { Head, Link, useForm } from '@inertiajs/react';
 
 type PpmpItem = {
@@ -22,9 +24,24 @@ type Props = {
     };
     canEdit: boolean;
     canSubmit: boolean;
+    statusHistory: Array<{
+        id: number;
+        old_status?: string | null;
+        new_status: string;
+        remarks?: string | null;
+        changed_at?: string | null;
+        changed_by?: { id: number; name: string } | null;
+    }>;
+    approvalHistory: Array<{
+        id: number;
+        status: string;
+        remarks?: string | null;
+        approved_at?: string | null;
+        approver?: { id: number; name: string } | null;
+    }>;
 };
 
-export default function PpmpShow({ ppmp, canEdit, canSubmit }: Props) {
+export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, approvalHistory }: Props) {
     const submitForm = useForm({ remarks: ppmp.remarks ?? '' });
 
     const totalBudget = ppmp.items.reduce((total, item) => total + item.quantity * item.unit_cost, 0);
@@ -106,6 +123,9 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit }: Props) {
                         ) : null}
                     </div>
                 </section>
+
+                <StatusHistoryTimeline entries={statusHistory} />
+                <ApprovalHistoryTimeline entries={approvalHistory} />
             </div>
         </AuthenticatedLayout>
     );

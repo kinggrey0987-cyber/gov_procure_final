@@ -5,14 +5,22 @@ namespace App\Http\Controllers\Inventory;
 use App\Models\Inventory;
 use App\Models\PurchaseRequest;
 use App\Models\SupplyRequest;
+use App\Services\Procurement\PurchaseRequestService;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class RequestWorkflowController
 {
+    public function __construct(private readonly PurchaseRequestService $purchaseRequestService)
+    {
+    }
+
     public function officeSupplyRequests(): Response
     {
-        abort_unless(auth()->user()->can('inventory.view-any'), 403);
+        abort_unless(Auth::user()?->can('inventory.view-any'), 403);
 
         $requests = SupplyRequest::query()
             ->with(['office', 'requester', 'items.item.inventory', 'purchaseRequests'])
@@ -62,7 +70,7 @@ class RequestWorkflowController
 
     public function procurementRequests(): Response
     {
-        abort_unless(auth()->user()->can('inventory.view-any'), 403);
+        abort_unless(Auth::user()?->can('inventory.view-any'), 403);
 
         $purchaseRequests = PurchaseRequest::query()
             ->with(['office', 'requester', 'supplyRequest'])
@@ -122,5 +130,19 @@ class RequestWorkflowController
             'shortageCandidates' => $shortageCandidates,
             'lowStockItems' => $lowStockItems,
         ]);
+    }
+
+    public function queueProcurement(Request $request, SupplyRequest $supplyRequest): RedirectResponse
+    {
+        abort_unless($request->user()?->can('inventory.view-any'), 403);
+
+        $this->purchaseRequestService->queueFromSupplyRequest($request->user(), [
+            'supply_request_id' => (int) $supplyRequest->supply_request_id,
+            'remarks' => 'Queued by GSO due to stock shortage.',
+        ]);
+
+        return redirect()
+            ->route('inventory.procurement-requests.index')
+            ->with('success', 'Supply request queued for procurement processing.');
     }
 }

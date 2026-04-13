@@ -85,8 +85,30 @@ class PpmpApprovalController extends Controller
             'rejected' => Ppmp::query()->where('status', 'REJECTED')->count(),
         ];
 
+        $records = $query->latest('ppmp_id')->paginate(15)->withQueryString();
+        $records->through(function (Ppmp $record) use ($request): array {
+            return [
+                'ppmp_id' => (int) $record->ppmp_id,
+                'office' => $record->office ? [
+                    'id' => (int) $record->office->id,
+                    'name' => (string) $record->office->name,
+                ] : null,
+                'preparer' => $record->preparer ? [
+                    'id' => (int) $record->preparer->id,
+                    'name' => (string) $record->preparer->name,
+                ] : null,
+                'fiscal_year' => (int) $record->fiscal_year,
+                'total_estimated_budget' => (float) $record->total_estimated_budget,
+                'status' => (string) $record->status,
+                'date_prepared' => optional($record->date_prepared)?->toDateString(),
+                'submitted_at' => $record->submitted_at,
+                'items_count' => (int) $record->items_count,
+                'can_signoff' => $request->user()?->can('executive.ppmp-approval.signoff', $record) ?? false,
+            ];
+        });
+
         return Inertia::render('Executive/Approvals/Index', [
-            'records' => $query->latest('ppmp_id')->paginate(15)->withQueryString(),
+            'records' => $records,
             'summary' => $summary,
             'filters' => [
                 'office_id' => $filters['office_id'] ?? null,
@@ -142,6 +164,38 @@ class PpmpApprovalController extends Controller
             ->where('new_status', 'SUBMITTED')
             ->max('changed_at');
 
+        $workflowTimeline = $history['status']
+            ->filter(function ($entry): bool {
+                $newStatus = strtoupper((string) ($entry->new_status ?? ''));
+                $oldStatus = strtoupper((string) ($entry->old_status ?? ''));
+
+                if ($newStatus === '') {
+                    return false;
+                }
+
+                if ($newStatus === 'DRAFT') {
+                    return $oldStatus === '';
+                }
+
+                if ($oldStatus === $newStatus) {
+                    return false;
+                }
+
+                return in_array($newStatus, ['SUBMITTED', 'APPROVED', 'REJECTED', 'RETURNED_FOR_REVISION'], true);
+            })
+            ->map(fn ($entry): array => [
+                'id' => (int) $entry->id,
+                'old_status' => $entry->old_status,
+                'new_status' => (string) $entry->new_status,
+                'remarks' => $entry->remarks,
+                'changed_at' => optional($entry->changed_at)?->toIso8601String(),
+                'changed_by' => $entry->changedBy ? [
+                    'id' => (int) $entry->changedBy->id,
+                    'name' => (string) $entry->changedBy->name,
+                ] : null,
+            ])
+            ->values();
+
         return Inertia::render('Executive/Approvals/Show', [
             'ppmp' => [
                 'ppmp_id' => (int) $ppmp->ppmp_id,
@@ -173,27 +227,7 @@ class PpmpApprovalController extends Controller
                 'upload' => false,
                 'delete' => false,
             ],
-            'statusHistory' => $history['status']->map(fn ($entry): array => [
-                'id' => (int) $entry->id,
-                'old_status' => $entry->old_status,
-                'new_status' => (string) $entry->new_status,
-                'remarks' => $entry->remarks,
-                'changed_at' => optional($entry->changed_at)?->toIso8601String(),
-                'changed_by' => $entry->changedBy ? [
-                    'id' => (int) $entry->changedBy->id,
-                    'name' => (string) $entry->changedBy->name,
-                ] : null,
-            ])->values(),
-            'approvalHistory' => $history['approval']->map(fn ($entry): array => [
-                'id' => (int) $entry->id,
-                'status' => (string) $entry->status,
-                'remarks' => $entry->remarks,
-                'approved_at' => optional($entry->approved_at)?->toIso8601String(),
-                'approver' => $entry->approver ? [
-                    'id' => (int) $entry->approver->id,
-                    'name' => (string) $entry->approver->name,
-                ] : null,
-            ])->values(),
+            'workflowTimeline' => $workflowTimeline,
             'canSignoff' => $request->user()?->can('executive.ppmp-approval.signoff', $ppmp) ?? false,
         ]);
     }

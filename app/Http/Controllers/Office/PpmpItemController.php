@@ -33,7 +33,7 @@ class PpmpItemController extends Controller
     {
         $this->service->addItem($ppmp, $request->user(), $request->validated());
 
-        return redirect()->route('office.ppmp.items.index', $ppmp->ppmp_id)
+        return redirect()->route('office.ppmp.edit', $ppmp->ppmp_id)
             ->with('success', 'PPMP item added.');
     }
 
@@ -41,7 +41,7 @@ class PpmpItemController extends Controller
     {
         $this->service->updateItem($ppmp, $ppmpItem, $request->user(), $request->validated());
 
-        return redirect()->route('office.ppmp.items.index', $ppmp->ppmp_id)
+        return redirect()->route('office.ppmp.edit', $ppmp->ppmp_id)
             ->with('success', 'PPMP item updated.');
     }
 
@@ -51,7 +51,7 @@ class PpmpItemController extends Controller
 
         $this->service->removeItem($ppmp, $ppmpItem, $request->user());
 
-        return redirect()->route('office.ppmp.show', $ppmp->ppmp_id)
+        return redirect()->route('office.ppmp.edit', $ppmp->ppmp_id)
             ->with('success', 'PPMP item removed.');
     }
 }

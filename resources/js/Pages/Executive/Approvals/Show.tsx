@@ -1,17 +1,16 @@
 import AttachmentsPanel from '@/Components/AttachmentsPanel';
+import PpmpDecisionModal from '@/Components/PpmpDecisionModal';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
+import { useState } from 'react';
 
 type HistoryEntry = {
     id: number;
     old_status?: string | null;
     new_status?: string;
-    status?: string;
     remarks?: string | null;
     changed_at?: string | null;
-    approved_at?: string | null;
     changed_by?: { id: number; name: string } | null;
-    approver?: { id: number; name: string } | null;
 };
 
 type Attachment = {
@@ -48,8 +47,7 @@ type Props = {
         upload: boolean;
         delete: boolean;
     };
-    statusHistory: HistoryEntry[];
-    approvalHistory: HistoryEntry[];
+    workflowTimeline: HistoryEntry[];
     canSignoff: boolean;
 };
 
@@ -58,21 +56,78 @@ export default function ExecutiveApprovalShow({
     categorySummary,
     attachments,
     attachmentPermissions,
-    statusHistory,
-    approvalHistory,
+    workflowTimeline,
     canSignoff,
 }: Props) {
-    const form = useForm({ status: '', remarks: ppmp.remarks ?? '' });
+    const [decisionTarget, setDecisionTarget] = useState<{ status: 'APPROVED' | 'REJECTED' | 'RETURNED_FOR_REVISION' } | null>(null);
+    const decisionForm = useForm({ status: '', remarks: '' });
 
-    const submitDecision = (status: 'APPROVED' | 'REJECTED' | 'RETURNED_FOR_REVISION') => {
-        form.setData('status', status);
-        form.put(route('executive.ppmp-approvals.update-status', ppmp.ppmp_id), {
+    const openDecisionModal = (status: 'APPROVED' | 'REJECTED' | 'RETURNED_FOR_REVISION') => {
+        setDecisionTarget({ status });
+        decisionForm.clearErrors();
+        decisionForm.setData('status', status);
+        decisionForm.setData('remarks', '');
+    };
+
+    const closeDecisionModal = () => {
+        setDecisionTarget(null);
+        decisionForm.clearErrors();
+        decisionForm.reset('status', 'remarks');
+    };
+
+    const confirmDecision = () => {
+        if (!decisionTarget) {
+            return;
+        }
+
+        decisionForm.setData('status', decisionTarget.status);
+
+        decisionForm.put(route('executive.ppmp-approvals.update-status', ppmp.ppmp_id), {
             preserveScroll: true,
             onSuccess: () => {
-                form.reset('status');
+                setDecisionTarget(null);
+                decisionForm.reset('status', 'remarks');
             },
         });
     };
+
+    const decisionMeta: Record<'APPROVED' | 'REJECTED' | 'RETURNED_FOR_REVISION', {
+        title: string;
+        message: string;
+        confirmLabel: string;
+        confirmClass: string;
+        requiresRemarks: boolean;
+        remarksLabel?: string;
+        remarksPlaceholder?: string;
+    }> = {
+        APPROVED: {
+            title: 'Approve PPMP',
+            message: 'Are you sure you want to approve this PPMP?',
+            confirmLabel: 'Approve PPMP',
+            confirmClass: 'bg-emerald-700 hover:bg-emerald-800 text-white',
+            requiresRemarks: false,
+        },
+        RETURNED_FOR_REVISION: {
+            title: 'Return PPMP for Revision',
+            message: 'Are you sure you want to return this PPMP for revision?',
+            confirmLabel: 'Return for Revision',
+            confirmClass: 'bg-amber-600 hover:bg-amber-700 text-white',
+            requiresRemarks: true,
+            remarksLabel: 'Revision Remarks',
+            remarksPlaceholder: 'Please explain what the office needs to revise.',
+        },
+        REJECTED: {
+            title: 'Reject PPMP',
+            message: 'Are you sure you want to reject this PPMP?',
+            confirmLabel: 'Reject PPMP',
+            confirmClass: 'bg-rose-700 hover:bg-rose-800 text-white',
+            requiresRemarks: true,
+            remarksLabel: 'Rejection Remarks',
+            remarksPlaceholder: 'Please provide the reason for rejection.',
+        },
+    };
+
+    const activeDecision = decisionTarget ? decisionMeta[decisionTarget.status] : null;
 
     return (
         <AuthenticatedLayout header="Executive Approval Review">
@@ -150,40 +205,26 @@ export default function ExecutiveApprovalShow({
                 {canSignoff && ppmp.status === 'SUBMITTED' && (
                     <section className="rounded-2xl border border-red-200 bg-white p-6 shadow-sm">
                         <h3 className="text-lg font-semibold text-slate-900">Executive Decision</h3>
-                        <p className="mt-1 text-sm text-slate-600">Record the final signoff action with optional executive remarks.</p>
-
-                        <div className="mt-4">
-                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Decision Remarks</label>
-                            <textarea
-                                value={form.data.remarks}
-                                onChange={(event) => form.setData('remarks', event.target.value)}
-                                className="h-24 w-full rounded-lg border-slate-300 text-sm"
-                                placeholder="Add executive notes for approval, rejection, or return decision"
-                            />
-                            {form.errors.remarks && <p className="mt-1 text-xs text-rose-700">{form.errors.remarks}</p>}
-                        </div>
+                        <p className="mt-1 text-sm text-slate-600">Record the final signoff action with optional approval notes or required revision/rejection remarks.</p>
 
                         <div className="mt-4 flex flex-wrap gap-2">
                             <button
                                 type="button"
-                                onClick={() => submitDecision('APPROVED')}
-                                disabled={form.processing}
+                                onClick={() => openDecisionModal('APPROVED')}
                                 className="rounded-lg bg-emerald-700 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-60"
                             >
                                 Approve
                             </button>
                             <button
                                 type="button"
-                                onClick={() => submitDecision('RETURNED_FOR_REVISION')}
-                                disabled={form.processing}
+                                onClick={() => openDecisionModal('RETURNED_FOR_REVISION')}
                                 className="rounded-lg bg-amber-600 px-4 py-2 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-60"
                             >
                                 Return for Revision
                             </button>
                             <button
                                 type="button"
-                                onClick={() => submitDecision('REJECTED')}
-                                disabled={form.processing}
+                                onClick={() => openDecisionModal('REJECTED')}
                                 className="rounded-lg bg-rose-700 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-800 disabled:opacity-60"
                             >
                                 Reject
@@ -202,36 +243,40 @@ export default function ExecutiveApprovalShow({
                     deleteRouteFor={(documentId: number) => route('documents.destroy', documentId)}
                 />
 
-                <section id="history" className="grid gap-6 xl:grid-cols-2">
-                    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                        <h3 className="text-lg font-semibold text-slate-900">Status Timeline</h3>
-                        <div className="mt-4 space-y-3 text-sm">
-                            {statusHistory.length === 0 && <p className="text-slate-500">No status timeline entries found.</p>}
-                            {statusHistory.map((row) => (
-                                <div key={row.id} className="rounded-lg border border-slate-200 p-3">
-                                    <p className="font-semibold text-slate-900">{row.old_status ?? 'N/A'} to {row.new_status ?? 'N/A'}</p>
-                                    <p className="text-slate-600">{row.remarks ?? '-'}</p>
-                                    <p className="mt-1 text-xs text-slate-500">{formatDateTime(row.changed_at)} by {row.changed_by?.name ?? 'System'}</p>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                <section id="history" className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <h3 className="text-lg font-semibold text-slate-900">Workflow Timeline</h3>
+                    <p className="mt-1 text-sm text-slate-600">Executive-facing milestones only. Draft line-edit activity is intentionally omitted to reduce review noise.</p>
 
-                    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                        <h3 className="text-lg font-semibold text-slate-900">Approval Timeline</h3>
-                        <div className="mt-4 space-y-3 text-sm">
-                            {approvalHistory.length === 0 && <p className="text-slate-500">No approval timeline entries found.</p>}
-                            {approvalHistory.map((row) => (
-                                <div key={row.id} className="rounded-lg border border-slate-200 p-3">
-                                    <p className="font-semibold text-slate-900">{row.status ?? 'N/A'}</p>
-                                    <p className="text-slate-600">{row.remarks ?? '-'}</p>
-                                    <p className="mt-1 text-xs text-slate-500">{formatDateTime(row.approved_at)} by {row.approver?.name ?? 'Pending'}</p>
-                                </div>
-                            ))}
-                        </div>
+                    <div className="mt-4 space-y-3 text-sm">
+                        {workflowTimeline.length === 0 && <p className="text-slate-500">No significant workflow events found.</p>}
+                        {workflowTimeline.map((row) => (
+                            <div key={row.id} className="rounded-lg border border-slate-200 p-3">
+                                <p className="font-semibold text-slate-900">{timelineLabel(row.old_status, row.new_status)}</p>
+                                <p className="text-slate-600">{row.remarks ?? '-'}</p>
+                                <p className="mt-1 text-xs text-slate-500">{formatDateTime(row.changed_at)} by {row.changed_by?.name ?? 'System'}</p>
+                            </div>
+                        ))}
                     </div>
                 </section>
             </div>
+
+            <PpmpDecisionModal
+                show={decisionTarget !== null}
+                title={activeDecision?.title ?? 'Confirm Executive Action'}
+                message={activeDecision?.message ?? 'Are you sure you want to continue with this executive action?'}
+                confirmLabel={activeDecision?.confirmLabel ?? 'Confirm'}
+                confirmToneClass={activeDecision?.confirmClass ?? 'bg-slate-700 hover:bg-slate-800 text-white'}
+                targetLabel={decisionTarget ? `Target Record: ${ppmp.reference_code}` : undefined}
+                remarks={decisionForm.data.remarks}
+                remarksRequired={activeDecision?.requiresRemarks ?? false}
+                remarksLabel={activeDecision?.remarksLabel}
+                remarksPlaceholder={activeDecision?.remarksPlaceholder}
+                remarksError={decisionForm.errors.remarks}
+                processing={decisionForm.processing}
+                onRemarksChange={(value) => decisionForm.setData('remarks', value)}
+                onCancel={closeDecisionModal}
+                onConfirm={confirmDecision}
+            />
         </AuthenticatedLayout>
     );
 }
@@ -265,4 +310,15 @@ function formatDateTime(value?: string | null): string {
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) return '-';
     return parsed.toLocaleString();
+}
+
+function timelineLabel(oldStatus?: string | null, newStatus?: string): string {
+    const from = oldStatus ? oldStatus.replace(/_/g, ' ') : 'N/A';
+    const to = newStatus ? newStatus.replace(/_/g, ' ') : 'N/A';
+
+    if ((oldStatus ?? '') === '') {
+        return `Created as ${to}`;
+    }
+
+    return `${from} to ${to}`;
 }

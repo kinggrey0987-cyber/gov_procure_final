@@ -63,6 +63,7 @@ class SupplyRequestController extends Controller
         return Inertia::render('Office/SupplyRequests/Create', [
             'ppmpOptions' => $ppmpOptions,
             'selectedPpmpId' => $selectedPpmpId > 0 ? $selectedPpmpId : null,
+            'requestDate' => now()->toDateString(),
             'ppmpItemOptions' => $selectedPpmpId > 0
                 ? $this->service->ppmpItemOptionsForRequestContext($officeId, $selectedPpmpId)
                 : [],
@@ -190,7 +191,7 @@ class SupplyRequestController extends Controller
         abort_unless($request->user()?->can('office.supply-request.create'), 403);
 
         $officeId = (int) $request->user()?->office_id;
-        if ((int) $ppmp->office_id !== $officeId) {
+        if ((int) $ppmp->office_id !== $officeId || (string) $ppmp->status !== 'APPROVED') {
             abort(403);
         }
 

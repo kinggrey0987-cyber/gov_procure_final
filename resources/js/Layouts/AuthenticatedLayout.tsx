@@ -746,7 +746,7 @@ export default function Authenticated({
                 active: route().current('inventory.office-supply-requests.*'),
             },
             {
-                label: 'Procurement Requests',
+                label: 'Purchase Request',
                 href: route('inventory.procurement-requests.index'),
                 active: route().current('inventory.procurement-requests.*'),
             },

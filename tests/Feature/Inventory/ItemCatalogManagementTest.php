@@ -70,6 +70,43 @@ class ItemCatalogManagementTest extends TestCase
         ]);
     }
 
+    public function test_item_category_index_loads_for_gso(): void
+    {
+        ItemCategory::query()->create([
+            'category_name' => 'Index Load Category',
+            'standard_delivery_days' => 5,
+            'description' => null,
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($this->gsoOfficer)
+            ->get(route('inventory.item-categories.index'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Inventory/ItemCategories/Index')
+                ->has('categories.data', 1)
+            );
+    }
+
+    public function test_item_category_edit_page_loads_for_gso(): void
+    {
+        $category = ItemCategory::query()->create([
+            'category_name' => 'Edit Load Category',
+            'standard_delivery_days' => 6,
+            'description' => 'Editable description',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($this->gsoOfficer)
+            ->get(route('inventory.item-categories.edit', $category->item_category_id))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Inventory/ItemCategories/Edit')
+                ->where('category.item_category_id', $category->item_category_id)
+                ->where('category.description', 'Editable description')
+            );
+    }
+
     public function test_non_gso_roles_cannot_mutate_catalog(): void
     {
         $category = ItemCategory::query()->create([
@@ -144,6 +181,133 @@ class ItemCatalogManagementTest extends TestCase
         $this->assertDatabaseHas('items', [
             'item_id' => $item->item_id,
             'status' => 'inactive',
+        ]);
+    }
+
+    public function test_gso_can_update_item_category_fields(): void
+    {
+        $category = ItemCategory::query()->create([
+            'category_name' => 'Consumables',
+            'standard_delivery_days' => 5,
+            'description' => 'Original category description',
+            'status' => 'active',
+        ]);
+
+        $response = $this->actingAs($this->gsoOfficer)
+            ->put(route('inventory.item-categories.update', $category->item_category_id), [
+                'category_name' => 'Office Consumables',
+                'standard_delivery_days' => 9,
+                'description' => 'Updated category description',
+                'status' => 'inactive',
+            ]);
+
+        $response->assertRedirect(route('inventory.item-categories.show', $category->item_category_id));
+        $response->assertSessionHas('success', 'Item category updated successfully.');
+
+        $this->assertDatabaseHas('item_categories', [
+            'item_category_id' => $category->item_category_id,
+            'category_name' => 'Office Consumables',
+            'standard_delivery_days' => 9,
+            'description' => 'Updated category description',
+            'status' => 'inactive',
+        ]);
+    }
+
+    public function test_wrong_http_method_for_item_category_update_is_rejected(): void
+    {
+        $category = ItemCategory::query()->create([
+            'category_name' => 'Method Guard Category',
+            'standard_delivery_days' => 2,
+            'description' => null,
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($this->gsoOfficer)
+            ->patch(route('inventory.item-categories.update', $category->item_category_id), [
+                'category_name' => 'Patched Category',
+                'standard_delivery_days' => 3,
+                'description' => 'Should not persist',
+                'status' => 'active',
+            ])
+            ->assertStatus(405);
+
+        $this->assertDatabaseHas('item_categories', [
+            'item_category_id' => $category->item_category_id,
+            'category_name' => 'Method Guard Category',
+            'standard_delivery_days' => 2,
+        ]);
+    }
+
+    public function test_non_gso_roles_cannot_update_item_categories(): void
+    {
+        $category = ItemCategory::query()->create([
+            'category_name' => 'Role Guard Category',
+            'standard_delivery_days' => 4,
+            'description' => 'Original',
+            'status' => 'active',
+        ]);
+
+        $payload = [
+            'category_name' => 'Unauthorized Update',
+            'standard_delivery_days' => 8,
+            'description' => 'Blocked update',
+            'status' => 'inactive',
+        ];
+
+        foreach ([$this->adminUser, $this->procurementOfficer, $this->officeUser, $this->executiveUser] as $user) {
+            $this->actingAs($user)
+                ->put(route('inventory.item-categories.update', $category->item_category_id), $payload)
+                ->assertForbidden();
+        }
+
+        $this->assertDatabaseHas('item_categories', [
+            'item_category_id' => $category->item_category_id,
+            'category_name' => 'Role Guard Category',
+            'standard_delivery_days' => 4,
+            'description' => 'Original',
+            'status' => 'active',
+        ]);
+    }
+
+    public function test_item_category_update_route_binds_custom_primary_key(): void
+    {
+        $target = ItemCategory::query()->create([
+            'category_name' => 'Binding Target',
+            'standard_delivery_days' => 6,
+            'description' => 'Target row',
+            'status' => 'active',
+        ]);
+
+        $other = ItemCategory::query()->create([
+            'category_name' => 'Binding Other',
+            'standard_delivery_days' => 6,
+            'description' => 'Other row',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($this->gsoOfficer)
+            ->put(route('inventory.item-categories.update', $target->item_category_id), [
+                'category_name' => 'Binding Target Updated',
+                'standard_delivery_days' => 11,
+                'description' => 'Updated via bound key',
+                'status' => 'inactive',
+            ])
+            ->assertRedirect(route('inventory.item-categories.show', $target->item_category_id));
+
+        $this->assertDatabaseHas('item_categories', [
+            'item_category_id' => $target->item_category_id,
+            'category_name' => 'Binding Target Updated',
+            'standard_delivery_days' => 11,
+            'description' => 'Updated via bound key',
+            'status' => 'inactive',
+        ]);
+
+        $this->assertDatabaseHas('item_categories', [
+            'item_category_id' => $other->item_category_id,
+            'category_name' => 'Binding Other',
+            'standard_delivery_days' => 6,
+            'description' => 'Other row',
+            'status' => 'active',
         ]);
     }
 

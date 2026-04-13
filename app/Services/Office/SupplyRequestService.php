@@ -35,7 +35,7 @@ class SupplyRequestService
                 'office_id' => $actor->office_id,
                 'requested_by' => $actor->id,
                 'ppmp_id' => (int) $payload['ppmp_id'],
-                'request_date' => $payload['request_date'],
+                'request_date' => now()->toDateString(),
                 'needed_by_date' => $payload['needed_by_date'],
                 'request_category' => $payload['request_category'],
                 'purpose' => $payload['purpose'],
@@ -80,7 +80,6 @@ class SupplyRequestService
 
             $supplyRequest->fill([
                 'ppmp_id' => (int) $payload['ppmp_id'],
-                'request_date' => $payload['request_date'],
                 'needed_by_date' => $payload['needed_by_date'],
                 'request_category' => $payload['request_category'],
                 'purpose' => $payload['purpose'],
@@ -173,7 +172,7 @@ class SupplyRequestService
             $item = $supplyRequest->items()->create([
                 'item_id' => (int) $ppmpItem->item_id,
                 'ppmp_item_id' => (int) $payload['ppmp_item_id'],
-                'item_name_snapshot' => (string) ($payload['item_name_snapshot'] ?? ($ppmpItem->item?->item_name ?? 'Unknown Item')),
+                'item_name_snapshot' => $this->itemNameSnapshotForPpmpItem($ppmpItem),
                 'quantity_requested' => $quantity,
             ]);
 
@@ -239,7 +238,7 @@ class SupplyRequestService
             $item->fill([
                 'item_id' => (int) $ppmpItem->item_id,
                 'ppmp_item_id' => (int) $payload['ppmp_item_id'],
-                'item_name_snapshot' => (string) ($payload['item_name_snapshot'] ?? ($ppmpItem->item?->item_name ?? 'Unknown Item')),
+                'item_name_snapshot' => $this->itemNameSnapshotForPpmpItem($ppmpItem),
                 'quantity_requested' => $quantity,
             ])->save();
 
@@ -289,7 +288,7 @@ class SupplyRequestService
     {
         return Ppmp::query()
             ->where('office_id', $officeId)
-            ->whereIn('status', ['DRAFT', 'SUBMITTED', 'APPROVED', 'RETURNED_FOR_REVISION'])
+            ->where('status', 'APPROVED')
             ->latest('ppmp_id')
             ->get(['ppmp_id', 'fiscal_year', 'status', 'date_prepared'])
             ->map(fn (Ppmp $ppmp): array => [
@@ -394,12 +393,12 @@ class SupplyRequestService
         $ppmp = Ppmp::query()
             ->where('ppmp_id', $ppmpId)
             ->where('office_id', (int) $actor->office_id)
-            ->whereIn('status', ['DRAFT', 'SUBMITTED', 'APPROVED', 'RETURNED_FOR_REVISION'])
+            ->where('status', 'APPROVED')
             ->first();
 
         if (! $ppmp) {
             throw ValidationException::withMessages([
-                'ppmp_id' => 'Selected PPMP is invalid for your office context.',
+                'ppmp_id' => 'Selected PPMP is not approved and cannot be used for a supply request.',
             ]);
         }
 
@@ -420,6 +419,11 @@ class SupplyRequestService
         }
 
         return $ppmpItem;
+    }
+
+    private function itemNameSnapshotForPpmpItem(PpmpItem $ppmpItem): string
+    {
+        return (string) ($ppmpItem->item?->item_name ?? 'Unknown Item');
     }
 
     private function recordStatus(

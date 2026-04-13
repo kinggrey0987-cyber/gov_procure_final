@@ -5,6 +5,7 @@ namespace Tests\Feature\Office;
 use App\Enums\UserRole;
 use App\Models\Office;
 use App\Models\Ppmp;
+use App\Models\PpmpItem;
 use App\Models\Role;
 use App\Models\SupplyRequest;
 use App\Models\User;
@@ -85,6 +86,59 @@ class OfficeTransactionalAccessTest extends TestCase
         $this->actingAs($admin)->get(route('office.dashboard'))->assertForbidden();
         $this->actingAs($admin)->get(route('office.ppmp.index'))->assertForbidden();
         $this->actingAs($admin)->get(route('office.supply-requests.index'))->assertForbidden();
+    }
+
+    public function test_non_office_user_role_cannot_mutate_ppmp_item_lines(): void
+    {
+        $office = Office::query()->create([
+            'name' => 'Office Line Access',
+            'code' => 'OFF_LINE',
+            'description' => 'Office line access test office',
+            'is_active' => true,
+        ]);
+
+        $officeUser = $this->createUser(UserRole::OFFICE_USER, $office);
+        $admin = $this->createUser(UserRole::ADMIN, $office);
+
+        $ppmp = Ppmp::query()->create([
+            'office_id' => $office->id,
+            'prepared_by' => $officeUser->id,
+            'approved_by' => null,
+            'fiscal_year' => 2026,
+            'status' => 'DRAFT',
+            'total_estimated_budget' => 200,
+            'date_prepared' => now()->toDateString(),
+            'date_approved' => null,
+            'remarks' => null,
+        ]);
+
+        $item = PpmpItem::query()->create([
+            'ppmp_id' => $ppmp->ppmp_id,
+            'item_id' => 501,
+            'item_category_id' => 50,
+            'quantity' => 2,
+            'unit_cost' => 100,
+            'estimated_budget' => 200,
+            'procurement_schedule' => 'Q1',
+            'fund_source' => 'General Fund',
+            'remarks' => null,
+        ]);
+
+        $this->actingAs($admin)
+            ->put(route('office.ppmp.items.update', [$ppmp->ppmp_id, $item->ppmp_item_id]), [
+                'item_id' => 501,
+                'item_category_id' => 50,
+                'quantity' => 4,
+                'unit_cost' => 100,
+                'procurement_schedule' => 'Q2',
+                'fund_source' => 'MOOE',
+                'remarks' => 'Unauthorized update attempt',
+            ])
+            ->assertForbidden();
+
+        $this->actingAs($admin)
+            ->delete(route('office.ppmp.items.destroy', [$ppmp->ppmp_id, $item->ppmp_item_id]))
+            ->assertForbidden();
     }
 
     private function createUser(UserRole $role, Office $office): User

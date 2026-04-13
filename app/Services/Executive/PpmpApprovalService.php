@@ -26,6 +26,12 @@ class PpmpApprovalService
         $currentStatus = (string) $ppmp->status;
         $newStatus = strtoupper($newStatus);
 
+        if (in_array($newStatus, ['RETURNED_FOR_REVISION', 'REJECTED'], true) && trim((string) $remarks) === '') {
+            throw ValidationException::withMessages([
+                'remarks' => 'Remarks are required when returning or rejecting a PPMP.',
+            ]);
+        }
+
         $validTransitions = [
             'SUBMITTED' => ['APPROVED', 'REJECTED', 'RETURNED_FOR_REVISION'],
             'APPROVED' => [],
@@ -48,7 +54,6 @@ class PpmpApprovalService
                 'status' => $newStatus,
                 'approved_by' => $approverId,
                 'date_approved' => $approvalDate,
-                'remarks' => $remarks ?? $ppmp->remarks,
             ])->save();
 
             $this->recordStatus($ppmp, $currentStatus, $newStatus, $actor, $remarks);

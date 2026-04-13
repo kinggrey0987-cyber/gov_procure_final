@@ -29,6 +29,9 @@ class User extends Authenticatable
         'must_change_password',
         'role_id',
         'office_id',
+        'google_id',
+        'google_avatar',
+        'google_linked_at',
     ];
 
     /**
@@ -53,6 +56,7 @@ class User extends Authenticatable
             'office_id' => 'integer',
             'must_change_password' => 'boolean',
             'email_verified_at' => 'datetime',
+            'google_linked_at' => 'datetime',
             'password' => 'hashed',
         ];
     }

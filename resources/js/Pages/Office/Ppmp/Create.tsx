@@ -23,6 +23,8 @@ type Props = {
     itemOptions: ItemOption[];
 };
 
+const QUARTER_OPTIONS = ['Q1', 'Q2', 'Q3', 'Q4'] as const;
+
 export default function PpmpCreate({ itemOptions }: Props) {
     const form = useForm({
         fiscal_year: new Date().getFullYear(),
@@ -110,7 +112,12 @@ export default function PpmpCreate({ itemOptions }: Props) {
                                     </label>
                                     <label className="block">
                                         <span className="mb-1 block text-sm font-medium text-slate-700">Procurement Schedule</span>
-                                        <input value={item.procurement_schedule} onChange={(event) => patchItem(index, { procurement_schedule: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Q1/Q2/Q3/Q4" />
+                                        <select value={item.procurement_schedule} onChange={(event) => patchItem(index, { procurement_schedule: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                                            <option value="">Select Quarter</option>
+                                            {QUARTER_OPTIONS.map((quarter) => (
+                                                <option key={quarter} value={quarter}>{quarter}</option>
+                                            ))}
+                                        </select>
                                     </label>
                                     <label className="block">
                                         <span className="mb-1 block text-sm font-medium text-slate-700">Fund Source</span>

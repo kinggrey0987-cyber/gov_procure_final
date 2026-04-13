@@ -11,6 +11,8 @@ use App\Models\DistributionItem;
 use App\Models\DistributionRecord;
 use App\Models\Inventory;
 use App\Models\InventoryMovement;
+use App\Models\Item;
+use App\Models\ItemCategory;
 use App\Models\Office;
 use App\Models\Ppmp;
 use App\Models\PpmpItem;
@@ -381,6 +383,58 @@ class InventoryDistributionFoundationTest extends TestCase
             ->assertSessionHasErrors('office_id');
     }
 
+    public function test_gso_queue_procurement_creates_purchase_request_and_items_for_shortage(): void
+    {
+        $context = $this->createSubmittedSupplyRequestForQueue($this->officeA, $this->officeUserA, 9012, 10, 2);
+
+        $this->actingAs($this->gsoOfficer)
+            ->post(route('inventory.office-supply-requests.queue', $context['supplyRequest']->supply_request_id))
+            ->assertRedirect(route('inventory.procurement-requests.index'));
+
+        $purchaseRequest = PurchaseRequest::query()
+            ->where('supply_request_id', $context['supplyRequest']->supply_request_id)
+            ->firstOrFail();
+
+        $this->assertSame('OPEN', $purchaseRequest->status);
+
+        $this->assertDatabaseHas('purchase_request_items', [
+            'purchase_request_id' => $purchaseRequest->purchase_request_id,
+            'item_id' => $context['item']->item_id,
+            'quantity_requested' => 10,
+        ]);
+    }
+
+    public function test_gso_queue_procurement_rejects_duplicate_queueing(): void
+    {
+        $context = $this->createSubmittedSupplyRequestForQueue($this->officeA, $this->officeUserA, 9013, 8, 1);
+
+        $this->actingAs($this->gsoOfficer)
+            ->post(route('inventory.office-supply-requests.queue', $context['supplyRequest']->supply_request_id))
+            ->assertRedirect(route('inventory.procurement-requests.index'));
+
+        $this->actingAs($this->gsoOfficer)
+            ->post(route('inventory.office-supply-requests.queue', $context['supplyRequest']->supply_request_id))
+            ->assertSessionHasErrors('supply_request_id');
+
+        $this->assertSame(
+            1,
+            PurchaseRequest::query()->where('supply_request_id', $context['supplyRequest']->supply_request_id)->count()
+        );
+    }
+
+    public function test_gso_queue_procurement_rejects_stock_ready_requests(): void
+    {
+        $context = $this->createSubmittedSupplyRequestForQueue($this->officeA, $this->officeUserA, 9014, 5, 10);
+
+        $this->actingAs($this->gsoOfficer)
+            ->post(route('inventory.office-supply-requests.queue', $context['supplyRequest']->supply_request_id))
+            ->assertSessionHasErrors('supply_request_id');
+
+        $this->assertDatabaseMissing('purchase_requests', [
+            'supply_request_id' => $context['supplyRequest']->supply_request_id,
+        ]);
+    }
+
     private function createReleasedDistributionRecordForOffice(Office $office, int $itemId): DistributionRecord
     {
         $officeUser = ((int) $office->id === (int) $this->officeA->id) ? $this->officeUserA : $this->officeUserB;
@@ -418,6 +472,94 @@ class InventoryDistributionFoundationTest extends TestCase
         ]);
 
         return $record;
+    }
+
+    /**
+     * @return array{item: Item, supplyRequest: SupplyRequest}
+     */
+    private function createSubmittedSupplyRequestForQueue(
+        Office $office,
+        User $officeUser,
+        int $itemNumber,
+        float $quantityRequested,
+        float $availableStock,
+    ): array {
+        $category = ItemCategory::query()->create([
+            'category_name' => 'Queue Category '.uniqid(),
+            'standard_delivery_days' => 7,
+            'description' => 'Queue test category',
+            'status' => 'ACTIVE',
+        ]);
+
+        $item = Item::query()->create([
+            'item_category_id' => $category->item_category_id,
+            'item_name' => 'Queue Item '.$itemNumber,
+            'description' => 'Queue test item',
+            'default_unit' => 'PCS',
+            'status' => 'ACTIVE',
+        ]);
+
+        Inventory::query()->create([
+            'item_id' => $item->item_id,
+            'available_stock' => $availableStock,
+            'stock_on_hand' => $availableStock,
+            'reserved_quantity' => 0,
+            'released_quantity' => 0,
+            'low_stock_threshold' => 2,
+            'last_updated' => now(),
+        ]);
+
+        $ppmp = Ppmp::query()->create([
+            'office_id' => $office->id,
+            'prepared_by' => $officeUser->id,
+            'approved_by' => null,
+            'fiscal_year' => 2026,
+            'status' => 'SUBMITTED',
+            'total_estimated_budget' => 1000,
+            'date_prepared' => now()->toDateString(),
+            'date_approved' => null,
+            'remarks' => null,
+        ]);
+
+        $ppmpItem = PpmpItem::query()->create([
+            'ppmp_id' => $ppmp->ppmp_id,
+            'item_id' => $item->item_id,
+            'item_category_id' => $category->item_category_id,
+            'quantity' => $quantityRequested,
+            'unit_cost' => 10,
+            'estimated_budget' => $quantityRequested * 10,
+            'procurement_schedule' => 'Q1',
+            'fund_source' => 'General Fund',
+            'remarks' => null,
+        ]);
+
+        $supplyRequest = SupplyRequest::query()->create([
+            'request_code' => 'SR-QUEUE-'.uniqid(),
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(5)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Queue procurement flow test',
+            'priority_level' => 'HIGH',
+            'status' => 'SUBMITTED',
+            'review_notes' => null,
+            'approved_by' => null,
+            'approved_at' => null,
+        ]);
+
+        SupplyRequestItem::query()->create([
+            'supply_request_id' => $supplyRequest->supply_request_id,
+            'item_id' => $item->item_id,
+            'ppmp_item_id' => $ppmpItem->ppmp_item_id,
+            'item_name_snapshot' => $item->item_name,
+            'quantity_requested' => $quantityRequested,
+        ]);
+
+        return [
+            'item' => $item,
+            'supplyRequest' => $supplyRequest,
+        ];
     }
 
     /**

@@ -1,6 +1,9 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, router } from '@inertiajs/react';
+import PpmpDecisionModal from '@/Components/PpmpDecisionModal';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { FormEvent, useState } from 'react';
+
+type DecisionStatus = 'APPROVED' | 'REJECTED' | 'RETURNED_FOR_REVISION';
 
 type OfficeOption = { id: number; name: string };
 
@@ -14,6 +17,7 @@ type ApprovalRow = {
     date_prepared?: string | null;
     submitted_at?: string | null;
     items_count: number;
+    can_signoff: boolean;
 };
 
 type Props = {
@@ -45,34 +49,73 @@ export default function ExecutiveApprovalsIndex({ records, summary, filters, fil
         to_date: filters.to_date ?? '',
         search: filters.search ?? '',
     });
+    const [decisionTarget, setDecisionTarget] = useState<{ ppmpId: number; status: DecisionStatus } | null>(null);
+    const decisionForm = useForm({ status: '', remarks: '' });
 
     const onSubmit = (event: FormEvent) => {
         event.preventDefault();
         router.get(route('executive.ppmp-approvals.index'), form, { preserveState: true, replace: true });
     };
 
-    const quickDecision = (ppmpId: number, status: 'APPROVED' | 'REJECTED' | 'RETURNED_FOR_REVISION') => {
-        const confirmText: Record<typeof status, string> = {
-            APPROVED: 'Approve this PPMP now?',
-            REJECTED: 'Reject this PPMP now?',
-            RETURNED_FOR_REVISION: 'Return this PPMP for revision now?',
-        };
+    const requestDecisionConfirmation = (ppmpId: number, status: DecisionStatus) => {
+        setDecisionTarget({ ppmpId, status });
+        decisionForm.clearErrors();
+        decisionForm.setData('status', status);
+        decisionForm.setData('remarks', '');
+    };
 
-        if (!window.confirm(confirmText[status])) {
+    const closeDecisionModal = () => {
+        setDecisionTarget(null);
+        decisionForm.clearErrors();
+        decisionForm.reset('status', 'remarks');
+    };
+
+    const confirmDecision = () => {
+        if (!decisionTarget) {
             return;
         }
 
-        router.put(
-            route('executive.ppmp-approvals.update-status', ppmpId),
-            { status },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    router.reload({ only: ['records', 'summary'] });
-                },
+        const { ppmpId, status } = decisionTarget;
+        decisionForm.setData('status', status);
+
+        decisionForm.put(route('executive.ppmp-approvals.update-status', ppmpId), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setDecisionTarget(null);
+                decisionForm.reset('status', 'remarks');
             },
-        );
+        });
     };
+
+    const decisionMeta: Record<DecisionStatus, { title: string; message: string; confirmLabel: string; confirmClass: string; requiresRemarks: boolean; remarksLabel?: string; remarksPlaceholder?: string }> = {
+        APPROVED: {
+            title: 'Approve PPMP',
+            message: 'Are you sure you want to approve this PPMP?',
+            confirmLabel: 'Approve PPMP',
+            confirmClass: 'bg-emerald-700 hover:bg-emerald-800 text-white',
+            requiresRemarks: false,
+        },
+        RETURNED_FOR_REVISION: {
+            title: 'Return PPMP for Revision',
+            message: 'Are you sure you want to return this PPMP for revision?',
+            confirmLabel: 'Return for Revision',
+            confirmClass: 'bg-amber-600 hover:bg-amber-700 text-white',
+            requiresRemarks: true,
+            remarksLabel: 'Revision Remarks',
+            remarksPlaceholder: 'Please explain what the office needs to revise.',
+        },
+        REJECTED: {
+            title: 'Reject PPMP',
+            message: 'Are you sure you want to reject this PPMP?',
+            confirmLabel: 'Reject PPMP',
+            confirmClass: 'bg-rose-700 hover:bg-rose-800 text-white',
+            requiresRemarks: true,
+            remarksLabel: 'Rejection Remarks',
+            remarksPlaceholder: 'Please provide the reason for rejection.',
+        },
+    };
+
+    const activeDecision = decisionTarget ? decisionMeta[decisionTarget.status] : null;
 
     return (
         <AuthenticatedLayout header="Executive Approvals">
@@ -203,25 +246,25 @@ export default function ExecutiveApprovalsIndex({ records, summary, filters, fil
                                     View Summary
                                 </Link>
 
-                                {row.status === 'SUBMITTED' && (
+                                {row.can_signoff && (
                                     <>
                                         <button
                                             type="button"
-                                            onClick={() => quickDecision(row.ppmp_id, 'APPROVED')}
+                                            onClick={() => requestDecisionConfirmation(row.ppmp_id, 'APPROVED')}
                                             className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
                                         >
                                             Approve
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={() => quickDecision(row.ppmp_id, 'RETURNED_FOR_REVISION')}
+                                            onClick={() => requestDecisionConfirmation(row.ppmp_id, 'RETURNED_FOR_REVISION')}
                                             className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100"
                                         >
                                             Return for Revision
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={() => quickDecision(row.ppmp_id, 'REJECTED')}
+                                            onClick={() => requestDecisionConfirmation(row.ppmp_id, 'REJECTED')}
                                             className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100"
                                         >
                                             Reject
@@ -240,6 +283,24 @@ export default function ExecutiveApprovalsIndex({ records, summary, filters, fil
                     ))}
                 </section>
             </div>
+
+            <PpmpDecisionModal
+                show={decisionTarget !== null}
+                title={activeDecision?.title ?? 'Confirm Executive Action'}
+                message={activeDecision?.message ?? 'Are you sure you want to continue with this executive action?'}
+                confirmLabel={activeDecision?.confirmLabel ?? 'Confirm'}
+                confirmToneClass={activeDecision?.confirmClass ?? 'bg-slate-700 hover:bg-slate-800 text-white'}
+                targetLabel={decisionTarget ? `Target Record: PPMP-${decisionTarget.ppmpId}` : undefined}
+                remarks={decisionForm.data.remarks}
+                remarksRequired={activeDecision?.requiresRemarks ?? false}
+                remarksLabel={activeDecision?.remarksLabel}
+                remarksPlaceholder={activeDecision?.remarksPlaceholder}
+                remarksError={decisionForm.errors.remarks}
+                processing={decisionForm.processing}
+                onRemarksChange={(value) => decisionForm.setData('remarks', value)}
+                onCancel={closeDecisionModal}
+                onConfirm={confirmDecision}
+            />
         </AuthenticatedLayout>
     );
 }

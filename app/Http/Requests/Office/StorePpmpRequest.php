@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Office;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StorePpmpRequest extends FormRequest
 {
@@ -22,9 +23,33 @@ class StorePpmpRequest extends FormRequest
             'items.*.item_category_id' => ['required_with:items', 'integer', 'exists:item_categories,item_category_id'],
             'items.*.quantity' => ['required_with:items', 'numeric', 'gt:0'],
             'items.*.unit_cost' => ['required_with:items', 'numeric', 'gte:0'],
-            'items.*.procurement_schedule' => ['required_with:items', 'string', 'max:100'],
+            'items.*.procurement_schedule' => ['required_with:items', 'string', Rule::in(['Q1', 'Q2', 'Q3', 'Q4'])],
             'items.*.fund_source' => ['required_with:items', 'string', 'max:100'],
             'items.*.remarks' => ['nullable', 'string', 'max:1000'],
+        ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $items = collect($this->input('items', []))
+            ->map(function ($item): array {
+                if (! is_array($item)) {
+                    return [];
+                }
+
+                $item['procurement_schedule'] = strtoupper(trim((string) ($item['procurement_schedule'] ?? '')));
+
+                return $item;
+            })
+            ->all();
+
+        $this->merge(['items' => $items]);
+    }
+
+    public function messages(): array
+    {
+        return [
+            'items.*.procurement_schedule.in' => 'Procurement Schedule must be one of: Q1, Q2, Q3, or Q4.',
         ];
     }
 }

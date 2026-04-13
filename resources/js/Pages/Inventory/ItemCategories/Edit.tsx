@@ -16,7 +16,7 @@ type Props = {
 };
 
 export default function EditItemCategory({ category }: Props) {
-    const { data, setData, patch, processing, errors } = useForm({
+    const { data, setData, put, processing, errors } = useForm({
         category_name: category.category_name,
         standard_delivery_days: category.standard_delivery_days,
         description: category.description ?? '',
@@ -25,7 +25,7 @@ export default function EditItemCategory({ category }: Props) {
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
-        patch(route('inventory.item-categories.update', category.item_category_id));
+        put(route('inventory.item-categories.update', category.item_category_id));
     };
 
     return (

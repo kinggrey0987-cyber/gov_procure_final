@@ -165,11 +165,12 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                                 </option>
                             ))}
                         </select>
+                        <p className="mt-1 text-xs text-slate-500">Only approved PPMPs can be used as the basis for a supply request.</p>
                     </Field>
 
                     <div className="grid gap-4 md:grid-cols-2">
-                        <Field label="Request Date">
-                            <input type="date" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={form.data.request_date} onChange={(event) => form.setData('request_date', event.target.value)} />
+                        <Field label="Request Date" hint="Request date is automatically recorded by the system.">
+                            <input type="text" className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700" value={supplyRequest.request_date} readOnly aria-readonly="true" />
                         </Field>
                         <Field label="Needed By Date">
                             <input type="date" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={form.data.needed_by_date} onChange={(event) => form.setData('needed_by_date', event.target.value)} />
@@ -213,11 +214,16 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                                 return (
                                     <div key={item.supply_request_item_id} className="rounded-xl border border-slate-200 p-4">
                                         <div className="grid gap-3 md:grid-cols-5">
-                                            <input
-                                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm md:col-span-2"
-                                                value={row.item_name_snapshot}
-                                                onChange={(event) => setEditingRows({ ...editingRows, [item.supply_request_item_id]: { ...row, item_name_snapshot: event.target.value } })}
-                                            />
+                                            <label className="md:col-span-2">
+                                                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Item Snapshot</span>
+                                                <input
+                                                    className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700"
+                                                    value={row.item_name_snapshot}
+                                                    readOnly
+                                                    aria-readonly="true"
+                                                />
+                                                <span className="mt-1 block text-xs text-slate-500">Auto-filled from the selected PPMP item.</span>
+                                            </label>
                                             <input
                                                 type="number"
                                                 className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
@@ -296,11 +302,12 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
     );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
     return (
         <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>
             {children}
+            {hint ? <span className="mt-1 block text-xs text-slate-500">{hint}</span> : null}
         </label>
     );
 }

@@ -32,15 +32,15 @@ type Props = {
     ppmpOptions: PpmpOption[];
     selectedPpmpId: number | null;
     ppmpItemOptions: Option[];
+    requestDate: string;
 };
 
-export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpItemOptions: initialOptions }: Props) {
+export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpItemOptions: initialOptions, requestDate }: Props) {
     const [itemOptions, setItemOptions] = useState<Option[]>(initialOptions);
     const [loadingOptions, setLoadingOptions] = useState(false);
 
     const form = useForm({
         ppmp_id: selectedPpmpId ? String(selectedPpmpId) : '',
-        request_date: new Date().toISOString().slice(0, 10),
         needed_by_date: new Date().toISOString().slice(0, 10),
         request_category: 'GENERAL',
         purpose: '',
@@ -166,18 +166,14 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                     </option>
                                 ))}
                             </select>
+                            <p className="mt-1 text-xs text-slate-500">Only approved PPMPs can be used as the basis for a supply request.</p>
                         </Field>
-                        {!hasPpmp ? <p className="mt-2 text-xs font-medium text-amber-700">Choose a PPMP to unlock valid item rows.</p> : null}
+                        {!hasPpmp ? <p className="mt-2 text-xs font-medium text-amber-700">No approved PPMP is available yet. Your office must have an approved PPMP before creating a supply request.</p> : null}
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-2">
-                        <Field label="Request Date">
-                            <input
-                                type="date"
-                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                                value={form.data.request_date}
-                                onChange={(event) => form.setData('request_date', event.target.value)}
-                            />
+                        <Field label="Request Date" hint="Request date is automatically recorded by the system.">
+                            <input type="text" className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700" value={requestDate} readOnly aria-readonly="true" />
                         </Field>
 
                         <Field label="Needed By Date">
@@ -247,7 +243,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                         </button>
                     </div>
 
-                    {loadingOptions ? <p className="mb-3 text-sm text-slate-500">Loading PPMP items...</p> : null}
+                    {loadingOptions ? <p className="mb-3 text-sm text-slate-500">Loading approved PPMP items...</p> : null}
 
                     <div className="space-y-4">
                         {form.data.items.map((item, index) => {
@@ -258,7 +254,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
 
                             return (
                                 <div key={index} className="rounded-xl border border-slate-200 p-4">
-                                    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                                    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
                                         <Field label="PPMP Item">
                                             <select
                                                 value={item.ppmp_item_id}
@@ -275,11 +271,12 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                             </select>
                                         </Field>
 
-                                        <Field label="Item Name Snapshot">
+                                        <Field label="Item Snapshot" hint="Auto-filled from the selected PPMP item.">
                                             <input
                                                 value={item.item_name_snapshot}
-                                                onChange={(event) => updateItem(index, { item_name_snapshot: event.target.value })}
-                                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                                readOnly
+                                                aria-readonly="true"
+                                                className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700"
                                             />
                                         </Field>
 
@@ -358,11 +355,12 @@ function emptyItem(): RequestItemDraft {
     };
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
     return (
         <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>
             {children}
+            {hint ? <span className="mt-1 block text-xs text-slate-500">{hint}</span> : null}
         </label>
     );
 }

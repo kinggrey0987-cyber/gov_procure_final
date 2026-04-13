@@ -2,9 +2,12 @@
 
 namespace App\Http\Requests\Office;
 
+use App\Models\Ppmp;
 use App\Models\SupplyRequest;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class UpdateSupplyRequestRequest extends FormRequest
 {
@@ -27,16 +30,47 @@ class UpdateSupplyRequestRequest extends FormRequest
                 'required',
                 'integer',
                 Rule::exists('ppmp', 'ppmp_id')->where(function ($query) use ($officeId): void {
-                    $query->where('office_id', $officeId)
-                        ->whereIn('status', ['DRAFT', 'SUBMITTED', 'APPROVED', 'RETURNED_FOR_REVISION']);
+                    $query->where('office_id', $officeId);
                 }),
             ],
-            'request_date' => ['required', 'date'],
-            'needed_by_date' => ['required', 'date', 'after_or_equal:request_date'],
+            'needed_by_date' => ['required', 'date'],
             'request_category' => ['required', 'string', 'max:50'],
             'purpose' => ['required', 'string'],
             'priority_level' => ['required', 'string', 'max:30'],
             'review_notes' => ['nullable', 'string', 'max:2000'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            /** @var SupplyRequest|null $supplyRequest */
+            $supplyRequest = $this->route('supply_request');
+
+            if (! $supplyRequest || ! $this->filled('needed_by_date') || ! $supplyRequest->request_date) {
+                return;
+            }
+
+            $ppmpId = (int) $this->input('ppmp_id');
+            if ($ppmpId > 0) {
+                $ppmpIsApproved = Ppmp::query()
+                    ->where('ppmp_id', $ppmpId)
+                    ->where('office_id', (int) $this->user()?->office_id)
+                    ->where('status', 'APPROVED')
+                    ->exists();
+
+                if (! $ppmpIsApproved) {
+                    $validator->errors()->add('ppmp_id', 'Selected PPMP is not approved and cannot be used for a supply request.');
+                    return;
+                }
+            }
+
+            $neededByDate = Carbon::parse($this->input('needed_by_date'))->startOfDay();
+            $requestDate = $supplyRequest->request_date->copy()->startOfDay();
+
+            if ($neededByDate->lt($requestDate)) {
+                $validator->errors()->add('needed_by_date', 'Needed By Date must be on or after the recorded request date.');
+            }
+        });
     }
 }

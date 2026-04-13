@@ -98,6 +98,93 @@ class PurchaseRequestService
     /**
      * @param  array<string, mixed>  $payload
      */
+    public function queueFromSupplyRequest(User $actor, array $payload): PurchaseRequest
+    {
+        $this->assertGsoActor($actor);
+
+        $supplyRequest = SupplyRequest::query()
+            ->with(['items.item.inventory'])
+            ->where('supply_request_id', (int) $payload['supply_request_id'])
+            ->firstOrFail();
+
+        if ((string) $supplyRequest->status !== 'SUBMITTED') {
+            throw ValidationException::withMessages([
+                'supply_request_id' => 'Only SUBMITTED supply requests can be queued for procurement.',
+            ]);
+        }
+
+        if (! $supplyRequest->items->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'supply_request_id' => 'Supply request must contain at least one item before queueing.',
+            ]);
+        }
+
+        if (PurchaseRequest::query()->where('supply_request_id', $supplyRequest->supply_request_id)->exists()) {
+            throw ValidationException::withMessages([
+                'supply_request_id' => 'A purchase request already exists for this supply request.',
+            ]);
+        }
+
+        $shortageTotal = 0.0;
+        foreach ($supplyRequest->items as $supplyRequestItem) {
+            $requested = (float) $supplyRequestItem->quantity_requested;
+            $available = (float) ($supplyRequestItem->item?->inventory?->available_stock ?? 0);
+            $shortageTotal += max($requested - $available, 0);
+        }
+
+        if ($shortageTotal <= 0) {
+            throw ValidationException::withMessages([
+                'supply_request_id' => 'Only shortage requests can be queued for procurement.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($actor, $payload, $supplyRequest): PurchaseRequest {
+            $purchaseRequest = PurchaseRequest::query()->create([
+                'supply_request_id' => (int) $supplyRequest->supply_request_id,
+                'office_id' => (int) $supplyRequest->office_id,
+                'requested_by' => (int) $supplyRequest->requested_by,
+                'status' => 'OPEN',
+                'remarks' => $payload['remarks'] ?? 'Queued by GSO due to stock shortage.',
+            ]);
+
+            $itemRows = [];
+            foreach ($supplyRequest->items as $supplyRequestItem) {
+                $itemRows[] = [
+                    'purchase_request_id' => (int) $purchaseRequest->purchase_request_id,
+                    'item_id' => (int) $supplyRequestItem->item_id,
+                    'quantity_requested' => (float) $supplyRequestItem->quantity_requested,
+                    'remarks' => null,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }
+
+            if ($itemRows !== []) {
+                PurchaseRequestItem::query()->insert($itemRows);
+            }
+
+            $this->recordStatus($purchaseRequest, null, 'OPEN', $actor, 'Purchase request queued by GSO due to stock shortage.');
+            $this->recordAudit($actor, 'QUEUE', $purchaseRequest);
+
+            $requester = User::query()->find($purchaseRequest->requested_by);
+            if ($requester instanceof User) {
+                $this->notificationService->notifyUser(
+                    user: $requester,
+                    title: 'Purchase Request Queued',
+                    message: 'GSO has queued your supply request for procurement due to stock shortage.',
+                    notificationType: 'PROCUREMENT_PURCHASE_REQUEST_CREATED',
+                    referenceType: PurchaseRequest::class,
+                    referenceId: (int) $purchaseRequest->purchase_request_id,
+                );
+            }
+
+            return $purchaseRequest->fresh(['items', 'office', 'requester', 'supplyRequest']) ?? $purchaseRequest;
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
     public function update(PurchaseRequest $purchaseRequest, User $actor, array $payload): PurchaseRequest
     {
         $this->assertProcurementActor($actor);
@@ -205,6 +292,15 @@ class PurchaseRequestService
         if (! $actor->isProcurement()) {
             throw ValidationException::withMessages([
                 'role' => 'Only procurement officers can perform this action.',
+            ]);
+        }
+    }
+
+    private function assertGsoActor(User $actor): void
+    {
+        if (! $actor->isGsoOfficer()) {
+            throw ValidationException::withMessages([
+                'role' => 'Only GSO officers can queue procurement requests from inventory.',
             ]);
         }
     }
