@@ -4,8 +4,9 @@ import InputLabel from '@/Components/InputLabel';
 import TextInput from '@/Components/TextInput';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
+import { PageProps as AppPageProps } from '@/types';
 
-type PageProps = {
+type PageProps = AppPageProps & {
     flash?: {
         success?: string | null;
         error?: string | null;
