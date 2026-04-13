@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import useSmartRefresh from '@/hooks/useSmartRefresh';
 import { Head, Link } from '@inertiajs/react';
 
 type PaginationLink = {
@@ -44,6 +45,13 @@ type Props = {
 };
 
 export default function ProcurementRequestsIndex({ purchaseRequests, shortageCandidates, lowStockItems }: Props) {
+    const { isRefreshing, lastRefreshedAt } = useSmartRefresh({
+        only: ['purchaseRequests', 'shortageCandidates', 'lowStockItems'],
+        refreshOnFocus: true,
+        refreshOnMount: true,
+        pollIntervalMs: 30000,
+    });
+
     return (
         <AuthenticatedLayout
             header={
@@ -58,6 +66,14 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
             <Head title="Procurement Requests" />
 
             <div className="space-y-6 py-8">
+                <p className="text-xs text-slate-500">
+                    {isRefreshing
+                        ? 'Refreshing procurement queue...'
+                        : lastRefreshedAt
+                        ? `Updated ${lastRefreshedAt.toLocaleTimeString()}`
+                        : 'Auto-refresh every 30 seconds while this page is open'}
+                </p>
+
                 <section className="grid gap-4 lg:grid-cols-2">
                     <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Shortage-Based Initiation Queue</h3>
@@ -74,7 +90,7 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                                 </div>
                             ))}
                             {shortageCandidates.length === 0 ? <p className="text-sm text-slate-500">No active shortages requiring purchase request initiation.</p> : null}
-                        </div>x``
+                        </div>
                     </div>
 
                     <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">

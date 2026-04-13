@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PpmpDecisionModal from '@/Components/PpmpDecisionModal';
+import useSmartRefresh from '@/hooks/useSmartRefresh';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { FormEvent, useState } from 'react';
 
@@ -42,6 +43,12 @@ type Props = {
 };
 
 export default function ExecutiveApprovalsIndex({ records, summary, filters, filter_options }: Props) {
+    const { isRefreshing, lastRefreshedAt } = useSmartRefresh({
+        only: ['records', 'summary', 'filters', 'filter_options'],
+        refreshOnFocus: true,
+        refreshOnMount: true,
+    });
+
     const [form, setForm] = useState({
         office_id: filters.office_id ? String(filters.office_id) : '',
         status: filters.status ?? '',
@@ -126,6 +133,13 @@ export default function ExecutiveApprovalsIndex({ records, summary, filters, fil
                     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-700">Executive Approval Desk</p>
                     <h3 className="mt-1 text-2xl font-semibold text-slate-900">PPMP Final Signoff</h3>
                     <p className="mt-1 text-sm text-slate-600">Review submitted PPMP records, validate summaries, and record executive decisions with full traceability.</p>
+                    <p className="mt-2 text-xs text-slate-500">
+                        {isRefreshing
+                            ? 'Refreshing approvals queue...'
+                            : lastRefreshedAt
+                            ? `Updated ${lastRefreshedAt.toLocaleTimeString()}`
+                            : 'Auto-refresh when this tab regains focus'}
+                    </p>
                 </section>
 
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import useSmartRefresh from '@/hooks/useSmartRefresh';
 import { Head, Link } from '@inertiajs/react';
 
 type PaginationLink = {
@@ -31,6 +32,13 @@ type Props = {
 };
 
 export default function OfficeSupplyRequestsIndex({ requests }: Props) {
+    const { isRefreshing, lastRefreshedAt } = useSmartRefresh({
+        only: ['requests'],
+        refreshOnFocus: true,
+        refreshOnMount: true,
+        pollIntervalMs: 30000,
+    });
+
     return (
         <AuthenticatedLayout
             header={
@@ -49,6 +57,13 @@ export default function OfficeSupplyRequestsIndex({ requests }: Props) {
                     <p className="text-sm text-slate-600">
                         Review submitted office requests against current stock. Requests with shortages are forwarded to the procurement initiation queue; stock-ready
                         requests proceed to distribution.
+                    </p>
+                    <p className="mt-2 text-xs text-slate-500">
+                        {isRefreshing
+                            ? 'Refreshing queue...'
+                            : lastRefreshedAt
+                            ? `Updated ${lastRefreshedAt.toLocaleTimeString()}`
+                            : 'Auto-refresh every 30 seconds while this page is open'}
                     </p>
                 </div>
 

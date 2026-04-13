@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import useSmartRefresh from '@/hooks/useSmartRefresh';
 import { Head, Link } from '@inertiajs/react';
 
 type PurchaseRequestRow = {
@@ -32,6 +33,13 @@ type Props = {
 };
 
 export default function PurchaseRequestsIndex({ purchaseRequests }: Props) {
+    const { isRefreshing, lastRefreshedAt } = useSmartRefresh({
+        only: ['purchaseRequests'],
+        refreshOnFocus: true,
+        refreshOnMount: true,
+        pollIntervalMs: 30000,
+    });
+
     return (
         <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Request Review</h2>}>
             <Head title="Request Review" />
@@ -39,6 +47,13 @@ export default function PurchaseRequestsIndex({ purchaseRequests }: Props) {
             <div className="space-y-4 py-8">
                 <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                     <p className="text-sm text-slate-600">Review procurement requests forwarded from office supply demand and move eligible ones to processing.</p>
+                    <p className="mt-2 text-xs text-slate-500">
+                        {isRefreshing
+                            ? 'Refreshing request queue...'
+                            : lastRefreshedAt
+                            ? `Updated ${lastRefreshedAt.toLocaleTimeString()}`
+                            : 'Auto-refresh every 30 seconds while this page is open'}
+                    </p>
                 </section>
 
                 <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">

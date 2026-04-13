@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import useSmartRefresh from '@/hooks/useSmartRefresh';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEvent } from 'react';
 
@@ -26,6 +27,12 @@ type Props = {
 const QUARTER_OPTIONS = ['Q1', 'Q2', 'Q3', 'Q4'] as const;
 
 export default function PpmpCreate({ itemOptions }: Props) {
+    const { isRefreshing } = useSmartRefresh({
+        only: ['itemOptions'],
+        refreshOnFocus: true,
+        refreshOnMount: true,
+    });
+
     const form = useForm({
         fiscal_year: new Date().getFullYear(),
         date_prepared: new Date().toISOString().slice(0, 10),
@@ -65,7 +72,10 @@ export default function PpmpCreate({ itemOptions }: Props) {
                 <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                     <div className="mb-4 flex items-center justify-between">
                         <h3 className="text-2xl font-semibold text-slate-800">PPMP Details</h3>
-                        <Link href={route('office.ppmp.index')} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">Back to PPMP</Link>
+                        <div className="flex items-center gap-2">
+                            {isRefreshing ? <span className="text-xs text-slate-500">Refreshing item options...</span> : null}
+                            <Link href={route('office.ppmp.index')} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">Back to PPMP</Link>
+                        </div>
                     </div>
                     <div className="grid gap-4 md:grid-cols-2">
                         <label className="block">

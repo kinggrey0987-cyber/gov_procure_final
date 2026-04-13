@@ -1,6 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, useForm } from '@inertiajs/react';
-import { FormEvent, ReactNode, useMemo, useState } from 'react';
+import useSmartRefresh from '@/hooks/useSmartRefresh';
+import { Head, Link, router, useForm } from '@inertiajs/react';
+import { FormEvent, ReactNode, useCallback, useMemo, useState } from 'react';
 
 type PpmpOption = {
     ppmp_id: number;
@@ -100,10 +101,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
         });
     };
 
-    const handlePpmpChange = async (value: string) => {
-        form.setData('ppmp_id', value);
-        form.setData('items', [emptyItem()]);
-
+    const fetchPpmpItems = useCallback(async (value: string) => {
         if (!value) {
             setItemOptions([]);
             return;
@@ -126,7 +124,31 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
         } finally {
             setLoadingOptions(false);
         }
+    }, []);
+
+    const handlePpmpChange = async (value: string) => {
+        form.setData('ppmp_id', value);
+        form.setData('items', [emptyItem()]);
+        await fetchPpmpItems(value);
     };
+
+    const { isRefreshing, lastRefreshedAt, refreshNow } = useSmartRefresh({
+        only: ['ppmpOptions', 'requestDate'],
+        onRefresh: async () => {
+            await new Promise<void>((resolve) => {
+                router.reload({
+                    only: ['ppmpOptions', 'requestDate'],
+                    onFinish: () => resolve(),
+                });
+            });
+
+            if (form.data.ppmp_id) {
+                await fetchPpmpItems(form.data.ppmp_id);
+            }
+        },
+        refreshOnFocus: true,
+        refreshOnMount: true,
+    });
 
     const optionById = useMemo(() => {
         return new Map(itemOptions.map((option) => [String(option.ppmp_item_id), option]));
@@ -142,13 +164,30 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                         <div>
                             <h3 className="text-2xl font-semibold text-slate-800">New Supply Request</h3>
                             <p className="text-sm text-slate-600">Select a PPMP first, then add request lines from that plan only.</p>
+                            <p className="mt-1 text-xs text-slate-500">
+                                {isRefreshing
+                                    ? 'Refreshing PPMP references...'
+                                    : lastRefreshedAt
+                                    ? `Updated ${lastRefreshedAt.toLocaleTimeString()}`
+                                    : 'Auto-refreshes on tab focus'}
+                            </p>
                         </div>
-                        <Link
-                            href={route('office.supply-requests.index')}
-                            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                        >
-                            Back to Tracking
-                        </Link>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => void refreshNow()}
+                                disabled={isRefreshing}
+                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                            >
+                                {isRefreshing ? 'Refreshing...' : 'Refresh Options'}
+                            </button>
+                            <Link
+                                href={route('office.supply-requests.index')}
+                                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                            >
+                                Back to Tracking
+                            </Link>
+                        </div>
                     </div>
 
                     <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-4">

@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import InputError from '@/Components/InputError';
+import useSmartRefresh from '@/hooks/useSmartRefresh';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { FormEvent, useState } from 'react';
 
@@ -37,6 +38,12 @@ type Props = {
 const QUARTER_OPTIONS = ['Q1', 'Q2', 'Q3', 'Q4'] as const;
 
 export default function PpmpEdit({ ppmp, itemOptions }: Props) {
+    const { isRefreshing } = useSmartRefresh({
+        only: ['itemOptions'],
+        refreshOnFocus: true,
+        refreshOnMount: true,
+    });
+
     const form = useForm({
         fiscal_year: ppmp.fiscal_year,
         date_prepared: ppmp.date_prepared,
@@ -105,7 +112,10 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                 <form onSubmit={submitHeader} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                     <div className="flex items-center justify-between">
                         <h3 className="text-2xl font-semibold text-slate-800">PPMP #{ppmp.ppmp_id}</h3>
-                        <Link href={route('office.ppmp.show', ppmp.ppmp_id)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">Back to Details</Link>
+                        <div className="flex items-center gap-2">
+                            {isRefreshing ? <span className="text-xs text-slate-500">Refreshing item options...</span> : null}
+                            <Link href={route('office.ppmp.show', ppmp.ppmp_id)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">Back to Details</Link>
+                        </div>
                     </div>
                     <div className="grid gap-4 md:grid-cols-2">
                         <label className="block">

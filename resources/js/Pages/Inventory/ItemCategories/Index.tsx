@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import useSmartRefresh from '@/hooks/useSmartRefresh';
 import { Head, Link, router } from '@inertiajs/react';
 import { FormEvent, useState } from 'react';
 
@@ -30,6 +31,12 @@ type Props = {
 };
 
 export default function ItemCategoryIndex({ categories, filters, canManage }: Props) {
+    const { isRefreshing, refreshNow } = useSmartRefresh({
+        only: ['categories', 'filters', 'canManage'],
+        refreshOnFocus: true,
+        refreshOnMount: true,
+    });
+
     const [q, setQ] = useState(filters.q ?? '');
     const [status, setStatus] = useState(filters.status ?? '');
 
@@ -77,6 +84,16 @@ export default function ItemCategoryIndex({ categories, filters, canManage }: Pr
                         Reset
                     </Link>
                 </form>
+                <div className="flex justify-end">
+                    <button
+                        type="button"
+                        onClick={() => void refreshNow()}
+                        disabled={isRefreshing}
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                    >
+                        {isRefreshing ? 'Refreshing...' : 'Refresh List'}
+                    </button>
+                </div>
 
                 <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                     <table className="min-w-full divide-y divide-slate-200 text-sm">
