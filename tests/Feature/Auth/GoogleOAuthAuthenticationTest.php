@@ -7,6 +7,9 @@ use App\Models\Office;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia;
+use Laravel\Socialite\Contracts\User as SocialiteUser;
+use Laravel\Socialite\Facades\Socialite;
 use Tests\TestCase;
 
 class GoogleOAuthAuthenticationTest extends TestCase
@@ -30,7 +33,12 @@ class GoogleOAuthAuthenticationTest extends TestCase
         $response = $this->get(route('login'));
 
         $response->assertOk();
-        $response->assertSee('google.redirect', false);
+        $response->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('Auth/Login')
+            ->where('error', null)
+            ->where('status', null)
+            ->where('canResetPassword', true)
+        );
     }
 
     public function test_google_redirect_route_exists(): void
@@ -41,6 +49,84 @@ class GoogleOAuthAuthenticationTest extends TestCase
     public function test_google_callback_route_exists(): void
     {
         $this->assertTrue(route('google.callback') !== null);
+    }
+
+    public function test_google_callback_logs_in_existing_internal_user_and_redirects_to_two_factor(): void
+    {
+        $office = $this->createOffice();
+        $user = $this->createUser(UserRole::ADMIN, $office, 'Admin.User@Gov.local');
+
+        $googleUser = \Mockery::mock(SocialiteUser::class);
+        $googleUser->shouldReceive('getEmail')->andReturn(' admin.user@gov.local ');
+        $googleUser->shouldReceive('getId')->andReturn('google-admin-1');
+        $googleUser->shouldReceive('getAvatar')->andReturn('https://example.test/avatar.png');
+
+        Socialite::shouldReceive('driver->user')->once()->andReturn($googleUser);
+
+        $response = $this->get(route('google.callback'));
+
+        $response->assertRedirect(route('two-factor.challenge.show'));
+        $this->assertAuthenticatedAs($user->fresh());
+        $this->assertTrue((bool) session('two_factor.pending'));
+        $this->assertSame((int) $user->id, (int) session('two_factor.user_id'));
+    }
+
+    public function test_google_callback_denies_unknown_email_with_visible_error(): void
+    {
+        $googleUser = \Mockery::mock(SocialiteUser::class);
+        $googleUser->shouldReceive('getEmail')->andReturn('unknown@gov.local');
+        $googleUser->shouldReceive('getId')->andReturn('google-unknown');
+        $googleUser->shouldReceive('getAvatar')->andReturn(null);
+
+        Socialite::shouldReceive('driver->user')->once()->andReturn($googleUser);
+
+        $response = $this->get(route('google.callback'));
+
+        $response->assertRedirect(route('login'));
+        $response->assertSessionHas('error', 'This Google account is not authorized for this system. Please contact your administrator.');
+
+        $this->get(route('login'))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->component('Auth/Login')
+                ->where('error', 'This Google account is not authorized for this system. Please contact your administrator.')
+            );
+    }
+
+    public function test_google_callback_denies_public_user_with_visible_error(): void
+    {
+        $office = $this->createOffice();
+        $user = $this->createUser(UserRole::PUBLIC, $office, 'public@gov.local');
+
+        $googleUser = \Mockery::mock(SocialiteUser::class);
+        $googleUser->shouldReceive('getEmail')->andReturn($user->email);
+        $googleUser->shouldReceive('getId')->andReturn('google-public');
+        $googleUser->shouldReceive('getAvatar')->andReturn(null);
+
+        Socialite::shouldReceive('driver->user')->once()->andReturn($googleUser);
+
+        $response = $this->get(route('google.callback'));
+
+        $response->assertRedirect(route('login'));
+        $response->assertSessionHas('error', 'Your account does not have access to this system.');
+        $this->assertGuest();
+    }
+
+    public function test_google_callback_handles_cancelled_login_with_visible_error(): void
+    {
+        $response = $this->get(route('google.callback', ['error' => 'access_denied']));
+
+        $response->assertRedirect(route('login'));
+        $response->assertSessionHas('error', 'Google login was cancelled. Please try again.');
+    }
+
+    public function test_google_callback_handles_provider_exception_with_visible_error(): void
+    {
+        Socialite::shouldReceive('driver->user')->once()->andThrow(new \RuntimeException('provider failed'));
+
+        $response = $this->get(route('google.callback'));
+
+        $response->assertRedirect(route('login'));
+        $response->assertSessionHas('error', 'Google authentication failed. Please try again or use email and password.');
     }
 
     public function test_google_auth_disabled_redirects_with_message(): void
@@ -127,7 +213,7 @@ class GoogleOAuthAuthenticationTest extends TestCase
         ]);
     }
 
-    private function createUser(UserRole $role, Office $office): User
+    private function createUser(UserRole $role, Office $office, ?string $email = null): User
     {
         $roleModel = Role::query()->firstOrCreate(
             ['code' => $role->value],
@@ -138,10 +224,16 @@ class GoogleOAuthAuthenticationTest extends TestCase
             ],
         );
 
-        return User::factory()->withRole($role)->forOffice($office)->create([
+        $attributes = [
             'role_id' => $roleModel->id,
             'office_id' => $office->id,
             'password' => bcrypt('password'),
-        ]);
+        ];
+
+        if ($email !== null) {
+            $attributes['email'] = $email;
+        }
+
+        return User::factory()->withRole($role)->forOffice($office)->create($attributes);
     }
 }

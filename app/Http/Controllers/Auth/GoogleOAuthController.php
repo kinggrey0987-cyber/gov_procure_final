@@ -9,6 +9,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class GoogleOAuthController extends Controller
 {
@@ -28,7 +29,6 @@ class GoogleOAuthController extends Controller
 
         try {
             return \Laravel\Socialite\Facades\Socialite::driver('google')
-                ->scopes(['email', 'profile'])
                 ->redirect();
         } catch (\Exception $e) {
             Log::error('Google OAuth redirect failed', ['error' => $e->getMessage()]);
@@ -49,6 +49,11 @@ class GoogleOAuthController extends Controller
                 ->with('error', 'Google Sign-In is not configured. Please use email and password to log in.');
         }
 
+        if ((string) $request->query('error') === 'access_denied') {
+            return redirect()->route('login')
+                ->with('error', 'Google login was cancelled. Please try again.');
+        }
+
         try {
             $googleUser = \Laravel\Socialite\Facades\Socialite::driver('google')->user();
         } catch (\Exception $e) {
@@ -63,9 +68,11 @@ class GoogleOAuthController extends Controller
                 ->with('error', 'Could not retrieve your email from Google. Please try again.');
         }
 
+        $normalizedEmail = Str::lower(trim((string) $googleUser->getEmail()));
+
         $user = User::query()
             ->with('role')
-            ->where('email', $googleUser->getEmail())
+            ->whereRaw('LOWER(email) = ?', [$normalizedEmail])
             ->first();
 
         if (! $user) {
@@ -85,6 +92,9 @@ class GoogleOAuthController extends Controller
         }
 
         $this->updateGoogleLinkage($user, $googleUser);
+
+        // Mirror the existing password login flow: authenticate first, then continue to 2FA.
+        Auth::login($user, false);
 
         $request->session()->regenerate();
 
