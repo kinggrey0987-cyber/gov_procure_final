@@ -2,8 +2,15 @@ import Checkbox from '@/Components/Checkbox';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import TextInput from '@/Components/TextInput';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
+
+type PageProps = {
+    flash?: {
+        success?: string | null;
+        error?: string | null;
+    };
+};
 
 export default function Login({
     status,
@@ -19,6 +26,9 @@ export default function Login({
         password: '',
         remember: false as boolean,
     });
+    const { flash } = usePage<PageProps>().props;
+    const visibleStatus = status ?? flash?.success ?? null;
+    const visibleError = error ?? flash?.error ?? null;
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
@@ -61,15 +71,15 @@ export default function Login({
                         <p className="mt-2 text-lg text-slate-500">Enter your credentials to access the system</p>
                     </div>
 
-                    {status && (
+                    {visibleStatus && (
                         <div className="mt-5 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-700">
-                            {status}
+                            {visibleStatus}
                         </div>
                     )}
 
-                    {error && (
+                    {visibleError && (
                         <div className="mt-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
-                            {error}
+                            {visibleError}
                         </div>
                     )}
 

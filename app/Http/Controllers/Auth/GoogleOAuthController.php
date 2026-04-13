@@ -28,6 +28,11 @@ class GoogleOAuthController extends Controller
         }
 
         try {
+            Log::info('auth.google.redirect.entered', [
+                'configured' => true,
+                'redirect_url' => config('services.google.redirect'),
+            ]);
+
             return \Laravel\Socialite\Facades\Socialite::driver('google')
                 ->redirect();
         } catch (\Exception $e) {
@@ -45,17 +50,35 @@ class GoogleOAuthController extends Controller
     public function callback(Request $request): RedirectResponse
     {
         if (! $this->isConfigured()) {
+            Log::warning('auth.google.callback.misconfigured', [
+                'query_error' => $request->query('error'),
+            ]);
+
             return redirect()->route('login')
                 ->with('error', 'Google Sign-In is not configured. Please use email and password to log in.');
         }
 
+        Log::info('auth.google.callback.entered', [
+            'query_error' => $request->query('error'),
+            'has_code' => $request->filled('code'),
+            'has_state' => $request->filled('state'),
+        ]);
+
         if ((string) $request->query('error') === 'access_denied') {
+            Log::info('auth.google.callback.cancelled', [
+                'query_error' => $request->query('error'),
+            ]);
+
             return redirect()->route('login')
                 ->with('error', 'Google login was cancelled. Please try again.');
         }
 
         try {
             $googleUser = \Laravel\Socialite\Facades\Socialite::driver('google')->user();
+            Log::info('auth.google.callback.user_retrieved', [
+                'email' => $googleUser->getEmail(),
+                'google_id' => $googleUser->getId(),
+            ]);
         } catch (\Exception $e) {
             Log::error('Google OAuth callback failed', ['error' => $e->getMessage()]);
 
@@ -69,24 +92,44 @@ class GoogleOAuthController extends Controller
         }
 
         $normalizedEmail = Str::lower(trim((string) $googleUser->getEmail()));
+        Log::info('auth.google.callback.email_normalized', ['email' => $normalizedEmail]);
 
         $user = User::query()
             ->with('role')
             ->whereRaw('LOWER(email) = ?', [$normalizedEmail])
             ->first();
 
+        Log::info('auth.google.callback.user_lookup_result', [
+            'found' => (bool) $user,
+            'user_id' => $user?->id,
+            'role_code' => $user?->roleCode(),
+        ]);
+
         if (! $user) {
+            Log::warning('auth.google.callback.unauthorized_email', [
+                'email' => $normalizedEmail,
+            ]);
+
             return redirect()->route('login')
                 ->with('error', 'This Google account is not authorized for this system. Please contact your administrator.');
         }
 
         if (! $this->isAllowedRole($user)) {
+            Log::warning('auth.google.callback.role_denied', [
+                'user_id' => (int) $user->id,
+                'role_code' => $user->roleCode(),
+            ]);
+
             return redirect()->route('login')
                 ->with('error', 'Your account does not have access to this system.');
         }
 
         $userRole = optional($user->role)->code;
         if ($userRole === 'PUBLIC') {
+            Log::warning('auth.google.callback.public_denied', [
+                'user_id' => (int) $user->id,
+            ]);
+
             return redirect()->route('login')
                 ->with('error', 'Public accounts cannot access this system. Please log in with your internal email.');
         }
@@ -113,6 +156,12 @@ class GoogleOAuthController extends Controller
                 'two_factor.remember' => false,
             ]);
 
+            Log::info('auth.google.callback.redirect_two_factor', [
+                'user_id' => (int) $user->id,
+                'delivery_ok' => (bool) $challengeResult['delivery_ok'],
+                'redirect' => route('two-factor.challenge.show'),
+            ]);
+
             if (! $challengeResult['delivery_ok']) {
                 return redirect()->route('two-factor.challenge.show')
                     ->with('error', 'We could not send the verification email. Please try again.');
@@ -128,6 +177,11 @@ class GoogleOAuthController extends Controller
             'two_factor.pending' => false,
             'two_factor.verified' => true,
             'two_factor.user_id' => (int) $user->id,
+        ]);
+
+        Log::info('auth.google.callback.redirect_dashboard', [
+            'user_id' => (int) $user->id,
+            'redirect' => route('dashboard', absolute: false),
         ]);
 
         return redirect()->intended(route('dashboard', absolute: false));
