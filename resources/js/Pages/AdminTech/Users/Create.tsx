@@ -28,6 +28,7 @@ export default function CreateUser({ roles, offices }: Props) {
     const form = useForm({
         name: '',
         email: '',
+        emp_id: '',
         password: '',
         password_confirmation: '',
         role_id: roles[0] ? String(roles[0].id) : '',
@@ -92,6 +93,22 @@ export default function CreateUser({ roles, offices }: Props) {
                             required
                         />
                         <InputError message={form.errors.email} className="mt-2" />
+                    </div>
+
+                    <div>
+                        <InputLabel htmlFor="emp_id" value="Employee ID" />
+                        <TextInput
+                            id="emp_id"
+                            type="text"
+                            value={form.data.emp_id}
+                            onChange={(event) => form.setData('emp_id', event.target.value)}
+                            className="mt-1 block w-full"
+                            placeholder="e.g., EMP2026001"
+                        />
+                        <InputError message={form.errors.emp_id} className="mt-2" />
+                        <p className="mt-2 text-xs text-slate-500">
+                            Optional in Phase 1. If provided, it must be unique.
+                        </p>
                     </div>
 
                     <div className="grid gap-5 sm:grid-cols-2">

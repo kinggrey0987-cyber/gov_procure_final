@@ -8,6 +8,7 @@ use App\Models\Ppmp;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class AdminManagementCrudTest extends TestCase
@@ -397,4 +398,192 @@ class AdminManagementCrudTest extends TestCase
     {
         return Role::query()->where('code', $code)->firstOrFail();
     }
+
+        public function test_admin_can_create_user_with_emp_id(): void
+        {
+            $roleOfficeUser = $this->roleByCode(UserRole::OFFICE_USER->value);
+
+            $this->actingAs($this->admin)
+                ->post(route('admin-tech.users.store'), [
+                    'name' => 'Employee ID User',
+                    'email' => 'emp.id.user@gsc.local',
+                    'emp_id' => 'EMP2026001',
+                    'password' => 'TempPass#12345',
+                    'password_confirmation' => 'TempPass#12345',
+                    'role_id' => $roleOfficeUser->id,
+                    'office_id' => $this->office->id,
+                ])
+                ->assertRedirect(route('admin-tech.users.index'));
+
+            $user = User::query()->where('email', 'emp.id.user@gsc.local')->firstOrFail();
+            $this->assertSame('EMP2026001', $user->emp_id);
+        }
+
+        public function test_admin_can_edit_user_emp_id(): void
+        {
+            $user = $this->createUser(UserRole::OFFICE_USER, $this->office, 'edit.emp@gsc.local');
+
+            $this->actingAs($this->admin)
+                ->put(route('admin-tech.users.update', $user->id), [
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'emp_id' => 'EMP2026002',
+                    'role_id' => $user->role_id,
+                    'office_id' => $user->office_id,
+                ])
+                ->assertRedirect(route('admin-tech.users.index'));
+
+            $user->refresh();
+            $this->assertSame('EMP2026002', $user->emp_id);
+        }
+
+        public function test_duplicate_emp_id_is_rejected(): void
+        {
+            $roleOfficeUser = $this->roleByCode(UserRole::OFFICE_USER->value);
+
+            // Create first user with emp_id
+            User::factory()
+                ->withRole(UserRole::OFFICE_USER)
+                ->forOffice($this->office)
+                ->create([
+                    'email' => 'first.emp@gsc.local',
+                    'emp_id' => 'EMP2026003',
+                    'role_id' => $roleOfficeUser->id,
+                    'office_id' => $this->office->id,
+                ]);
+
+            // Try to create second user with same emp_id
+            $this->actingAs($this->admin)
+                ->post(route('admin-tech.users.store'), [
+                    'name' => 'Duplicate Emp ID',
+                    'email' => 'second.emp@gsc.local',
+                    'emp_id' => 'EMP2026003',
+                    'password' => 'TempPass#12345',
+                    'password_confirmation' => 'TempPass#12345',
+                    'role_id' => $roleOfficeUser->id,
+                    'office_id' => $this->office->id,
+                ])
+                ->assertSessionHasErrors('emp_id');
+        }
+
+        public function test_emp_id_update_rejects_duplicate_for_different_user(): void
+        {
+            $roleOfficeUser = $this->roleByCode(UserRole::OFFICE_USER->value);
+
+            $user1 = $this->createUser(UserRole::OFFICE_USER, $this->office, 'user.one@gsc.local');
+            $user2 = $this->createUser(UserRole::OFFICE_USER, $this->office, 'user.two@gsc.local');
+
+            // Assign emp_id to user1
+            $user1->update(['emp_id' => 'EMP2026004']);
+
+            // Try to assign same emp_id to user2 (should fail)
+            $this->actingAs($this->admin)
+                ->put(route('admin-tech.users.update', $user2->id), [
+                    'name' => $user2->name,
+                    'email' => $user2->email,
+                    'emp_id' => 'EMP2026004',
+                    'role_id' => $user2->role_id,
+                    'office_id' => $user2->office_id,
+                ])
+                ->assertSessionHasErrors('emp_id');
+        }
+
+        public function test_existing_user_without_emp_id_still_works(): void
+        {
+            // Create user without emp_id
+            $user = $this->createUser(UserRole::OFFICE_USER, $this->office, 'no.emp.id@gsc.local');
+            $this->assertNull($user->emp_id);
+
+            // Can update the user (other fields) without specifying emp_id
+            $this->actingAs($this->admin)
+                ->put(route('admin-tech.users.update', $user->id), [
+                    'name' => 'Updated Without Emp ID',
+                    'email' => 'no.emp.id@gsc.local',
+                    'role_id' => $user->role_id,
+                    'office_id' => $user->office_id,
+                ])
+                ->assertRedirect(route('admin-tech.users.index'));
+
+            $user->refresh();
+            $this->assertSame('Updated Without Emp ID', $user->name);
+            $this->assertNull($user->emp_id);
+        }
+
+        public function test_multiple_null_emp_id_values_are_allowed(): void
+        {
+            $roleOfficeUser = $this->roleByCode(UserRole::OFFICE_USER->value);
+
+            // Create two users without emp_id (both will have null)
+            $user1 = User::factory()
+                ->withRole(UserRole::OFFICE_USER)
+                ->forOffice($this->office)
+                ->create([
+                    'email' => 'null.emp.one@gsc.local',
+                    'emp_id' => null,
+                    'role_id' => $roleOfficeUser->id,
+                    'office_id' => $this->office->id,
+                ]);
+
+            $user2 = User::factory()
+                ->withRole(UserRole::OFFICE_USER)
+                ->forOffice($this->office)
+                ->create([
+                    'email' => 'null.emp.two@gsc.local',
+                    'emp_id' => null,
+                    'role_id' => $roleOfficeUser->id,
+                    'office_id' => $this->office->id,
+                ]);
+
+            // Both should exist and be queryable
+            $this->assertDatabaseHas('users', ['id' => $user1->id, 'emp_id' => null]);
+            $this->assertDatabaseHas('users', ['id' => $user2->id, 'emp_id' => null]);
+        }
+
+        public function test_emp_id_can_be_cleared_after_being_set(): void
+        {
+            $user = $this->createUser(UserRole::OFFICE_USER, $this->office, 'clear.emp@gsc.local');
+
+            // Assign emp_id
+            $user->update(['emp_id' => 'EMP2026005']);
+            $this->assertSame('EMP2026005', $user->emp_id);
+
+            // Clear emp_id via update
+            $this->actingAs($this->admin)
+                ->put(route('admin-tech.users.update', $user->id), [
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'emp_id' => '',
+                    'role_id' => $user->role_id,
+                    'office_id' => $user->office_id,
+                ])
+                ->assertRedirect(route('admin-tech.users.index'));
+
+            $user->refresh();
+            $this->assertNull($user->emp_id);
+        }
+
+        public function test_emp_id_migration_is_safe_for_populated_users_table(): void
+        {
+            /** @var object{up: callable, down: callable} $migration */
+            $migration = require database_path('migrations/2026_04_16_000100_add_emp_id_to_users_table.php');
+
+            // Simulate pre-phase-1 state.
+            $migration->down();
+
+            $userA = $this->createUser(UserRole::OFFICE_USER, $this->office, 'migration.a@gsc.local');
+            $userB = $this->createUser(UserRole::PROCUREMENT_OFFICER, $this->office, 'migration.b@gsc.local');
+            $beforeCount = User::query()->count();
+
+            // Apply phase-1 migration on a populated users table.
+            $migration->up();
+
+            $this->assertTrue(Schema::hasColumn('users', 'emp_id'));
+            $this->assertSame($beforeCount, User::query()->count());
+
+            $userA->refresh();
+            $userB->refresh();
+
+            $this->assertNull($userA->emp_id);
+            $this->assertNull($userB->emp_id);
+        }
 }

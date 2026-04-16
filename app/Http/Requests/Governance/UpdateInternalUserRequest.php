@@ -27,6 +27,7 @@ class UpdateInternalUserRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'emp_id' => ['nullable', 'string', 'max:255', Rule::unique('users', 'emp_id')->ignore($user->id)],
             'role_id' => [
                 'required',
                 'integer',

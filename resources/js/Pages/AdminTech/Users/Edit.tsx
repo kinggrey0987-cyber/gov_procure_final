@@ -22,6 +22,7 @@ type UserRecord = {
     id: number;
     name: string;
     email: string;
+    emp_id: string | null;
     role_id: number;
     role_code: string;
     office_id: number | null;
@@ -37,6 +38,7 @@ export default function EditUser({ userRecord, roles, offices }: Props) {
     const form = useForm({
         name: userRecord.name,
         email: userRecord.email,
+        emp_id: userRecord.emp_id ?? '',
         role_id: String(userRecord.role_id),
         office_id: userRecord.office_id ? String(userRecord.office_id) : '',
     });
@@ -98,6 +100,22 @@ export default function EditUser({ userRecord, roles, offices }: Props) {
                             required
                         />
                         <InputError message={form.errors.email} className="mt-2" />
+                    </div>
+
+                    <div>
+                        <InputLabel htmlFor="emp_id" value="Employee ID" />
+                        <TextInput
+                            id="emp_id"
+                            type="text"
+                            value={form.data.emp_id}
+                            onChange={(event) => form.setData('emp_id', event.target.value)}
+                            className="mt-1 block w-full"
+                            placeholder="e.g., EMP2026001"
+                        />
+                        <InputError message={form.errors.emp_id} className="mt-2" />
+                        <p className="mt-2 text-xs text-slate-500">
+                            Optional in Phase 1. If provided, it must be unique.
+                        </p>
                     </div>
 
                     <div className="grid gap-5 sm:grid-cols-2">
