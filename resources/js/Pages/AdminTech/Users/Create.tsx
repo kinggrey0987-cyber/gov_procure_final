@@ -104,10 +104,11 @@ export default function CreateUser({ roles, offices }: Props) {
                             onChange={(event) => form.setData('emp_id', event.target.value)}
                             className="mt-1 block w-full"
                             placeholder="e.g., EMP2026001"
+                            required
                         />
                         <InputError message={form.errors.emp_id} className="mt-2" />
                         <p className="mt-2 text-xs text-slate-500">
-                            Optional in Phase 1. If provided, it must be unique.
+                            The unique government/employee ID. Required and must be unique.
                         </p>
                     </div>
 

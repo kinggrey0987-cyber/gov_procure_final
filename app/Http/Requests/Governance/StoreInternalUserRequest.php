@@ -24,7 +24,7 @@ class StoreInternalUserRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')],
-            'emp_id' => ['nullable', 'string', 'max:255', Rule::unique('users', 'emp_id')],
+            'emp_id' => ['required', 'string', 'max:255', Rule::unique('users', 'emp_id')],
             'password' => [
                 'required',
                 'string',

@@ -84,7 +84,7 @@ class UserManagementController extends Controller
         User::query()->create([
             'name' => $validated['name'],
             'email' => $validated['email'],
-            'emp_id' => isset($validated['emp_id']) && $validated['emp_id'] !== '' ? $validated['emp_id'] : null,
+            'emp_id' => $validated['emp_id'],
             'password' => Hash::make($validated['password']),
             'must_change_password' => true,
             'role_id' => $roleId,
@@ -127,7 +127,7 @@ class UserManagementController extends Controller
         $user->update([
             'name' => $validated['name'],
             'email' => $validated['email'],
-            'emp_id' => isset($validated['emp_id']) && $validated['emp_id'] !== '' ? $validated['emp_id'] : null,
+            'emp_id' => $validated['emp_id'],
             'role_id' => $roleId,
             'office_id' => $this->resolveOfficeIdForRole(
                 roleId: $roleId,

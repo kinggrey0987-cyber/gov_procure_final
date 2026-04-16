@@ -586,4 +586,82 @@ class AdminManagementCrudTest extends TestCase
             $this->assertNull($userA->emp_id);
             $this->assertNull($userB->emp_id);
         }
+
+        public function test_phase_2_emp_id_is_required_on_create(): void
+        {
+            $roleOfficeUser = $this->roleByCode(UserRole::OFFICE_USER->value);
+
+            // Try to create user without emp_id
+            $this->actingAs($this->admin)
+                ->post(route('admin-tech.users.store'), [
+                    'name' => 'Missing Emp ID',
+                    'email' => 'missing.emp.id@gsc.local',
+                    'password' => 'TempPass#12345',
+                    'password_confirmation' => 'TempPass#12345',
+                    'role_id' => $roleOfficeUser->id,
+                    'office_id' => $this->office->id,
+                ])
+                ->assertSessionHasErrors('emp_id');
+        }
+
+        public function test_phase_2_emp_id_is_required_on_update(): void
+        {
+            $user = $this->createUser(UserRole::OFFICE_USER, $this->office, 'update.emp@gsc.local');
+            $user->update(['emp_id' => 'EMP2026099']);
+
+            // Try to update user by clearing emp_id
+            $this->actingAs($this->admin)
+                ->put(route('admin-tech.users.update', $user->id), [
+                    'name' => 'Updated Name',
+                    'email' => $user->email,
+                    'emp_id' => '',
+                    'role_id' => $user->role_id,
+                    'office_id' => $user->office_id,
+                ])
+                ->assertSessionHasErrors('emp_id');
+
+            $user->refresh();
+            $this->assertSame('EMP2026099', $user->emp_id);
+        }
+
+        public function test_phase_2_migration_enforces_not_null_and_unique(): void
+        {
+            /** @var object{up: callable, down: callable} $phase1Migration */
+            $phase1Migration = require database_path('migrations/2026_04_16_000100_add_emp_id_to_users_table.php');
+
+            /** @var object{up: callable, down: callable} $phase2Migration */
+            $phase2Migration = require database_path('migrations/2026_04_16_000200_finalize_emp_id_not_null_and_unique.php');
+
+            // Start from Phase 1 state
+            $phase1Migration->down();
+            $phase1Migration->up();
+
+            // Populate with real emp_ids (simulating production state after backfill)
+            $userA = $this->createUser(UserRole::OFFICE_USER, $this->office, 'phase2.a@gsc.local');
+            $userB = $this->createUser(UserRole::PROCUREMENT_OFFICER, $this->office, 'phase2.b@gsc.local');
+            $userA->update(['emp_id' => 'EMP2026100']);
+            $userB->update(['emp_id' => 'EMP2026101']);
+
+            // Apply Phase 2 migration
+            $phase2Migration->up();
+
+            $this->assertTrue(Schema::hasColumn('users', 'emp_id'));
+            $userA->refresh();
+            $userB->refresh();
+            $this->assertSame('EMP2026100', $userA->emp_id);
+            $this->assertSame('EMP2026101', $userB->emp_id);
+
+            // Verify we cannot add duplicate emp_id
+            $this->expectException(\Exception::class);
+            User::factory()
+                ->withRole(UserRole::OFFICE_USER)
+                ->forOffice($this->office)
+                ->create([
+                    'email' => 'duplicate.emp@gsc.local',
+                    'emp_id' => 'EMP2026100',
+                    'role_id' => $this->roleByCode(UserRole::OFFICE_USER->value)->id,
+                    'office_id' => $this->office->id,
+                ]);
+        }
 }
+
