@@ -9,6 +9,7 @@ use App\Models\SupplyRequest;
 use App\Models\SupplyRequestItem;
 use App\Models\StatusHistory;
 use App\Models\User;
+use App\Services\Analytics\AnomalyService;
 use App\Services\AuditLogService;
 use App\Services\NotificationService;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +20,7 @@ class SupplyRequestService
     public function __construct(
         private readonly AuditLogService $auditLogService,
         private readonly NotificationService $notificationService,
+        private readonly AnomalyService $anomalyService,
     ) {
     }
 
@@ -112,6 +114,8 @@ class SupplyRequestService
                 'review_notes' => $reviewNotes ?? $supplyRequest->review_notes,
             ])->save();
 
+            $overRequestCount = $this->createOrUpdatePpmpOverRequestAnomalies($supplyRequest);
+
             $this->recordStatus($supplyRequest, $oldStatus, 'SUBMITTED', $actor, 'Supply request submitted');
             $this->recordAudit($actor, 'SUBMIT', $supplyRequest);
 
@@ -124,7 +128,10 @@ class SupplyRequestService
                 referenceId: (int) $supplyRequest->supply_request_id,
             );
 
-            return $supplyRequest->fresh(['items', 'office', 'requester', 'approver']) ?? $supplyRequest;
+            $freshSupplyRequest = $supplyRequest->fresh(['items', 'office', 'requester', 'approver']) ?? $supplyRequest;
+            $freshSupplyRequest->setAttribute('ppmp_over_request_count', $overRequestCount);
+
+            return $freshSupplyRequest;
         });
     }
 
@@ -151,23 +158,6 @@ class SupplyRequestService
 
         return DB::transaction(function () use ($supplyRequest, $actor, $payload, $ppmpItem): SupplyRequestItem {
             $quantity = (float) $payload['quantity_requested'];
-
-            $consumption = $this->consumptionForPpmpItem(
-                ppmpItemId: (int) $ppmpItem->ppmp_item_id,
-                officeId: (int) $supplyRequest->office_id,
-                ppmpId: (int) $supplyRequest->ppmp_id,
-            );
-
-            if ($quantity > $consumption['remaining_quantity']) {
-                throw ValidationException::withMessages([
-                    'quantity_requested' => sprintf(
-                        'Requested quantity exceeds PPMP remaining quantity (planned %.2f, already requested %.2f, remaining %.2f).',
-                        $consumption['planned_quantity'],
-                        $consumption['requested_quantity'],
-                        max($consumption['remaining_quantity'], 0)
-                    ),
-                ]);
-            }
 
             $item = $supplyRequest->items()->create([
                 'item_id' => (int) $ppmpItem->item_id,
@@ -216,24 +206,6 @@ class SupplyRequestService
 
         return DB::transaction(function () use ($supplyRequest, $item, $actor, $payload, $ppmpItem): SupplyRequestItem {
             $quantity = (float) $payload['quantity_requested'];
-
-            $consumption = $this->consumptionForPpmpItem(
-                ppmpItemId: (int) $ppmpItem->ppmp_item_id,
-                officeId: (int) $supplyRequest->office_id,
-                ppmpId: (int) $supplyRequest->ppmp_id,
-                excludeSupplyRequestItemId: (int) $item->supply_request_item_id,
-            );
-
-            if ($quantity > $consumption['remaining_quantity']) {
-                throw ValidationException::withMessages([
-                    'quantity_requested' => sprintf(
-                        'Requested quantity exceeds PPMP remaining quantity (planned %.2f, already requested %.2f, remaining %.2f).',
-                        $consumption['planned_quantity'],
-                        $consumption['requested_quantity'],
-                        max($consumption['remaining_quantity'], 0)
-                    ),
-                ]);
-            }
 
             $item->fill([
                 'item_id' => (int) $ppmpItem->item_id,
@@ -476,5 +448,105 @@ class SupplyRequestService
     private function buildRequestCode(int $officeId): string
     {
         return sprintf('SR-%d-%s', $officeId, now()->format('YmdHisv'));
+    }
+
+    private function createOrUpdatePpmpOverRequestAnomalies(SupplyRequest $supplyRequest): int
+    {
+        $requestItems = $supplyRequest->items()
+            ->with('ppmpItem:ppmp_item_id,item_id,quantity')
+            ->get(['supply_request_item_id', 'supply_request_id', 'ppmp_item_id', 'item_id', 'item_name_snapshot', 'quantity_requested']);
+
+        if ($requestItems->isEmpty() || ! $supplyRequest->ppmp_id) {
+            return 0;
+        }
+
+        $ppmpItemIds = $requestItems
+            ->pluck('ppmp_item_id')
+            ->map(fn ($value): int => (int) $value)
+            ->unique()
+            ->values()
+            ->all();
+
+        $consumptionTotals = SupplyRequestItem::query()
+            ->selectRaw('ppmp_item_id, COALESCE(SUM(quantity_requested), 0) as total_requested')
+            ->whereIn('ppmp_item_id', $ppmpItemIds)
+            ->whereHas('supplyRequest', function ($query) use ($supplyRequest): void {
+                $query->where('office_id', (int) $supplyRequest->office_id)
+                    ->where('ppmp_id', (int) $supplyRequest->ppmp_id);
+            })
+            ->groupBy('ppmp_item_id')
+            ->get()
+            ->mapWithKeys(fn ($row): array => [(int) $row->ppmp_item_id => (float) $row->total_requested]);
+
+        $anomalyCount = 0;
+
+        foreach ($requestItems->unique('ppmp_item_id') as $requestItem) {
+            $ppmpItemId = (int) $requestItem->ppmp_item_id;
+            $plannedQuantity = (float) ($requestItem->ppmpItem?->quantity ?? 0);
+            $totalRequestedQuantity = (float) ($consumptionTotals[$ppmpItemId] ?? 0);
+            $overRequestedQuantity = max(0, round($totalRequestedQuantity - $plannedQuantity, 2));
+
+            if ($overRequestedQuantity <= 0) {
+                continue;
+            }
+
+            $latestItem = SupplyRequestItem::query()
+                ->where('ppmp_item_id', $ppmpItemId)
+                ->whereHas('supplyRequest', function ($query) use ($supplyRequest): void {
+                    $query->where('office_id', (int) $supplyRequest->office_id)
+                        ->where('ppmp_id', (int) $supplyRequest->ppmp_id);
+                })
+                ->latest('supply_request_item_id')
+                ->first(['supply_request_item_id', 'item_id']);
+
+            if (! $latestItem instanceof SupplyRequestItem) {
+                continue;
+            }
+
+            $this->anomalyService->createOrUpdateSystemDetected([
+                'anomaly_type' => 'PPMP_OVER_REQUEST',
+                'reference_type' => SupplyRequestItem::class,
+                'reference_id' => (int) $latestItem->supply_request_item_id,
+                'item_id' => (int) ($requestItem->ppmpItem?->item_id ?: $latestItem->item_id),
+                'office_id' => (int) $supplyRequest->office_id,
+                'detected_value' => $totalRequestedQuantity,
+                'expected_value' => $plannedQuantity,
+                'threshold_value' => $plannedQuantity,
+                'detection_method' => 'PPMP_PLAN_CONSUMPTION',
+                'severity' => $this->severityForPpmpOverRequest($plannedQuantity, $overRequestedQuantity),
+                'detected_at' => now(),
+                'remarks' => sprintf(
+                    'Supply request %s exceeded PPMP item #%d by %.2f units (requested %.2f vs planned %.2f).',
+                    (string) $supplyRequest->request_code,
+                    $ppmpItemId,
+                    $overRequestedQuantity,
+                    $totalRequestedQuantity,
+                    $plannedQuantity
+                ),
+            ]);
+
+            $anomalyCount++;
+        }
+
+        return $anomalyCount;
+    }
+
+    private function severityForPpmpOverRequest(float $plannedQuantity, float $overRequestedQuantity): string
+    {
+        if ($plannedQuantity <= 0) {
+            return 'HIGH';
+        }
+
+        $overagePercent = ($overRequestedQuantity / $plannedQuantity) * 100;
+
+        if ($overagePercent <= 10.0) {
+            return 'LOW';
+        }
+
+        if ($overagePercent <= 25.0) {
+            return 'MEDIUM';
+        }
+
+        return 'HIGH';
     }
 }

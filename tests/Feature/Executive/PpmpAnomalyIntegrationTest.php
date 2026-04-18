@@ -119,6 +119,52 @@ class PpmpAnomalyIntegrationTest extends TestCase
             ->assertOk();
     }
 
+    public function test_soft_limit_over_request_submission_is_visible_in_exec_anomaly_monitoring_without_manual_detection_run(): void
+    {
+        $context = $this->createApprovedPpmpRequestContext(9705, 8);
+
+        $createResponse = $this->actingAs($this->officeUser)
+            ->post(route('office.supply-requests.store'), [
+                'ppmp_id' => $context['ppmp']->ppmp_id,
+                'needed_by_date' => now()->addDays(3)->toDateString(),
+                'request_category' => 'GENERAL',
+                'purpose' => 'Urgent office need beyond PPMP allocation',
+                'priority_level' => 'URGENT',
+                'review_notes' => 'Soft-limit submission',
+                'items' => [[
+                    'item_id' => $context['item']->item_id,
+                    'ppmp_item_id' => $context['ppmpItem']->ppmp_item_id,
+                    'item_name_snapshot' => $context['item']->item_name,
+                    'quantity_requested' => 11,
+                ]],
+            ]);
+
+        $createResponse->assertRedirect();
+
+        $supplyRequest = SupplyRequest::query()->latest('supply_request_id')->firstOrFail();
+
+        $this->actingAs($this->officeUser)
+            ->post(route('office.supply-requests.submit', $supplyRequest->supply_request_id), [
+                'review_notes' => 'Submit urgent request',
+            ])
+            ->assertRedirect(route('office.supply-requests.show', $supplyRequest->supply_request_id));
+
+        $this->assertDatabaseHas('anomalies', [
+            'anomaly_type' => 'PPMP_OVER_REQUEST',
+            'office_id' => $this->office->id,
+            'detection_method' => 'PPMP_PLAN_CONSUMPTION',
+            'status' => 'OPEN',
+        ]);
+
+        $this->actingAs($this->executive)
+            ->get(route('executive.anomalies-monitoring'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Executive/Monitoring/AnomaliesAlerts')
+                ->has('recent.anomalies')
+            );
+    }
+
     public function test_non_exec_roles_are_denied_from_exec_ppmp_anomaly_pages(): void
     {
         $this->createPpmpOverRequestContext(9704, 10, [7, 6]);
@@ -327,6 +373,57 @@ class PpmpAnomalyIntegrationTest extends TestCase
         ]);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    private function createApprovedPpmpRequestContext(int $itemId, float $plannedQuantity): array
+    {
+        $category = ItemCategory::query()->create([
+            'category_name' => 'Approved PPMP Category '.$itemId,
+            'standard_delivery_days' => 5,
+            'description' => null,
+            'status' => 'active',
+        ]);
+
+        $item = Item::query()->create([
+            'item_category_id' => $category->item_category_id,
+            'item_name' => 'Approved PPMP Item '.$itemId,
+            'description' => null,
+            'default_unit' => 'PCS',
+            'status' => 'active',
+        ]);
+
+        $ppmp = Ppmp::query()->create([
+            'office_id' => $this->office->id,
+            'prepared_by' => $this->officeUser->id,
+            'approved_by' => $this->executive->id,
+            'fiscal_year' => 2026,
+            'status' => 'APPROVED',
+            'total_estimated_budget' => 10000,
+            'date_prepared' => now()->startOfYear()->toDateString(),
+            'date_approved' => now()->toDateString(),
+            'remarks' => null,
+        ]);
+
+        $ppmpItem = PpmpItem::query()->create([
+            'ppmp_id' => $ppmp->ppmp_id,
+            'item_id' => $item->item_id,
+            'item_category_id' => $category->item_category_id,
+            'quantity' => $plannedQuantity,
+            'unit_cost' => 50,
+            'estimated_budget' => $plannedQuantity * 50,
+            'procurement_schedule' => 'Q1',
+            'fund_source' => 'General Fund',
+            'remarks' => null,
+        ]);
+
+        return [
+            'item' => $item,
+            'ppmp' => $ppmp,
+            'ppmpItem' => $ppmpItem,
+        ];
+    }
+
     private function createUser(UserRole $role, Office $office): User
     {
         $roleModel = Role::query()->firstOrCreate(
@@ -341,6 +438,7 @@ class PpmpAnomalyIntegrationTest extends TestCase
         return User::factory()->withRole($role)->forOffice($office)->create([
             'role_id' => $roleModel->id,
             'office_id' => $office->id,
+            'emp_id' => sprintf('PPA-%d-%s', $office->id, strtoupper(substr((string) str()->uuid(), 0, 8))),
         ]);
     }
 }

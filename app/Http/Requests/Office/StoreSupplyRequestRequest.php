@@ -91,21 +91,8 @@ class StoreSupplyRequestRequest extends FormRequest
                 ->get(['ppmp_item_id', 'ppmp_id', 'item_id', 'quantity'])
                 ->keyBy('ppmp_item_id');
 
-            $consumed = SupplyRequestItem::query()
-                ->selectRaw('ppmp_item_id, COALESCE(SUM(quantity_requested), 0) as consumed_quantity')
-                ->whereIn('ppmp_item_id', $ppmpItemIds->all())
-                ->whereHas('supplyRequest', function ($query) use ($officeId, $ppmpId): void {
-                    $query->where('office_id', $officeId)->where('ppmp_id', $ppmpId);
-                })
-                ->groupBy('ppmp_item_id')
-                ->get()
-                ->mapWithKeys(fn ($row): array => [(int) $row->ppmp_item_id => (float) $row->consumed_quantity]);
-
-            $runningRequested = [];
-
             foreach ($items as $index => $row) {
                 $ppmpItemId = (int) ($row['ppmp_item_id'] ?? 0);
-                $quantity = (float) ($row['quantity_requested'] ?? 0);
                 $payloadItemId = isset($row['item_id']) && is_numeric($row['item_id']) ? (int) $row['item_id'] : null;
 
                 /** @var PpmpItem|null $ppmpItem */
@@ -117,26 +104,6 @@ class StoreSupplyRequestRequest extends FormRequest
 
                 if ($payloadItemId !== null && $payloadItemId !== (int) $ppmpItem->item_id) {
                     $validator->errors()->add("items.$index.item_id", 'Selected item must match the chosen PPMP item.');
-                }
-
-                $runningRequested[$ppmpItemId] = ($runningRequested[$ppmpItemId] ?? 0.0) + $quantity;
-
-                $planned = (float) $ppmpItem->quantity;
-                $alreadyRequested = (float) ($consumed[$ppmpItemId] ?? 0.0);
-                $remainingBeforeThisRequest = $planned - $alreadyRequested;
-
-                if ($runningRequested[$ppmpItemId] > $remainingBeforeThisRequest) {
-                    $itemName = (string) ($ppmpItem->item?->item_name ?? 'Selected item');
-                    $validator->errors()->add(
-                        "items.$index.quantity_requested",
-                        sprintf(
-                            '%s exceeds remaining PPMP quantity (planned %.2f, already requested %.2f, remaining %.2f).',
-                            $itemName,
-                            $planned,
-                            $alreadyRequested,
-                            max($remainingBeforeThisRequest, 0)
-                        )
-                    );
                 }
             }
         });

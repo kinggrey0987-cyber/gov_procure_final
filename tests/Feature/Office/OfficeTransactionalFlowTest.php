@@ -3,6 +3,7 @@
 namespace Tests\Feature\Office;
 
 use App\Enums\UserRole;
+use App\Models\Anomaly;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Office;
@@ -878,7 +879,66 @@ class OfficeTransactionalFlowTest extends TestCase
         $create->assertSessionHasErrors('ppmp_id');
     }
 
-    public function test_supply_request_blocks_over_request_against_ppmp_planned_quantity(): void
+    public function test_supply_request_rejects_mismatched_ppmp_item_reference_for_selected_ppmp(): void
+    {
+        $office = $this->createOffice();
+        $officeUser = $this->createUser(UserRole::OFFICE_USER, $office);
+
+        $ppmpA = Ppmp::query()->create([
+            'office_id' => $office->id,
+            'prepared_by' => $officeUser->id,
+            'approved_by' => $officeUser->id,
+            'fiscal_year' => 2026,
+            'status' => 'APPROVED',
+            'total_estimated_budget' => 0,
+            'date_prepared' => now()->toDateString(),
+            'date_approved' => now()->toDateString(),
+            'remarks' => null,
+        ]);
+
+        $ppmpB = Ppmp::query()->create([
+            'office_id' => $office->id,
+            'prepared_by' => $officeUser->id,
+            'approved_by' => $officeUser->id,
+            'fiscal_year' => 2026,
+            'status' => 'APPROVED',
+            'total_estimated_budget' => 0,
+            'date_prepared' => now()->toDateString(),
+            'date_approved' => now()->toDateString(),
+            'remarks' => null,
+        ]);
+
+        $foreignPpmpItem = PpmpItem::query()->create([
+            'ppmp_id' => $ppmpB->ppmp_id,
+            'item_id' => 201,
+            'item_category_id' => 20,
+            'quantity' => 5,
+            'unit_cost' => 100,
+            'estimated_budget' => 500,
+            'procurement_schedule' => 'Q2',
+            'fund_source' => 'General Fund',
+            'remarks' => null,
+        ]);
+
+        $response = $this->actingAs($officeUser)->post(route('office.supply-requests.store'), [
+            'ppmp_id' => $ppmpA->ppmp_id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(3)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Mismatched PPMP item test',
+            'priority_level' => 'HIGH',
+            'items' => [[
+                'item_id' => 201,
+                'ppmp_item_id' => $foreignPpmpItem->ppmp_item_id,
+                'item_name_snapshot' => 'Item 201',
+                'quantity_requested' => 3,
+            ]],
+        ]);
+
+        $response->assertSessionHasErrors('items.0.ppmp_item_id');
+    }
+
+    public function test_supply_request_allows_over_request_and_flags_submission_for_executive_review(): void
     {
         $office = $this->createOffice();
         $officeUser = $this->createUser(UserRole::OFFICE_USER, $office);
@@ -907,7 +967,6 @@ class OfficeTransactionalFlowTest extends TestCase
             'remarks' => null,
         ]);
 
-        // Request exceeds planned quantity. Should fail.
         $create = $this->actingAs($officeUser)->post(route('office.supply-requests.store'), [
             'ppmp_id' => $ppmp->ppmp_id,
             'request_date' => now()->toDateString(),
@@ -922,7 +981,38 @@ class OfficeTransactionalFlowTest extends TestCase
                 'quantity_requested' => 10,
             ]],
         ]);
-        $create->assertSessionHasErrors('items.0.quantity_requested');
+        $create->assertRedirect();
+
+        $supplyRequest = SupplyRequest::query()->firstOrFail();
+
+        $this->assertDatabaseHas('supply_request_items', [
+            'supply_request_id' => $supplyRequest->supply_request_id,
+            'ppmp_item_id' => $ppmpItem->ppmp_item_id,
+            'quantity_requested' => 10,
+        ]);
+
+        $submitResponse = $this->actingAs($officeUser)->post(route('office.supply-requests.submit', $supplyRequest->supply_request_id), [
+            'review_notes' => 'Urgent request',
+        ]);
+
+        $submitResponse->assertRedirect(route('office.supply-requests.show', $supplyRequest->supply_request_id));
+        $submitResponse->assertSessionHas('success');
+
+        $this->assertDatabaseHas('anomalies', [
+            'anomaly_type' => 'PPMP_OVER_REQUEST',
+            'reference_type' => SupplyRequestItem::class,
+            'office_id' => $office->id,
+            'detection_method' => 'PPMP_PLAN_CONSUMPTION',
+            'status' => 'OPEN',
+        ]);
+
+        $anomaly = Anomaly::query()
+            ->where('anomaly_type', 'PPMP_OVER_REQUEST')
+            ->where('office_id', $office->id)
+            ->firstOrFail();
+
+        $this->assertSame('HIGH', $anomaly->severity);
+        $this->assertGreaterThan((float) $anomaly->expected_value, (float) $anomaly->detected_value);
     }
 
     private function createOffice(): Office
@@ -949,6 +1039,7 @@ class OfficeTransactionalFlowTest extends TestCase
         return User::factory()->withRole($role)->forOffice($office)->create([
             'role_id' => $roleModel->id,
             'office_id' => $office->id,
+            'emp_id' => sprintf('OFF-%d-%s', $office->id, strtoupper(substr((string) str()->uuid(), 0, 8))),
         ]);
     }
 }

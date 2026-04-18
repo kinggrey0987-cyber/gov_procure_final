@@ -77,6 +77,30 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
         return new Map(itemOptions.map((option) => [String(option.ppmp_item_id), option]));
     }, [itemOptions]);
 
+    const overPlanExistingLineCount = useMemo(() => {
+        return supplyRequest.items.reduce((count, item) => {
+            const row = editingRows[item.supply_request_item_id];
+            const context = optionById.get(String(row.ppmp_item_id));
+
+            if (!context) {
+                return count;
+            }
+
+            const exceeds = Number(row.quantity_requested) > (context.remaining_quantity + Number(item.quantity_requested));
+
+            return exceeds ? count + 1 : count;
+        }, 0);
+    }, [editingRows, optionById, supplyRequest.items]);
+
+    const newItemOption = useMemo(() => optionById.get(newItem.ppmp_item_id), [newItem.ppmp_item_id, optionById]);
+    const newItemExceedsRemaining = useMemo(() => {
+        if (!newItemOption) {
+            return false;
+        }
+
+        return Number(newItem.quantity_requested || '0') > newItemOption.remaining_quantity;
+    }, [newItem.quantity_requested, newItemOption]);
+
     const submitHeader = (event: FormEvent) => {
         event.preventDefault();
         form.put(route('office.supply-requests.update', supplyRequest.supply_request_id));
@@ -202,6 +226,12 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
 
                 <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                     <h4 className="text-xl font-semibold text-slate-800">Edit Existing Items</h4>
+                    {overPlanExistingLineCount > 0 ? (
+                        <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                            <p className="font-semibold">{overPlanExistingLineCount} existing line item(s) exceed remaining PPMP allocation.</p>
+                            <p>You may still submit for urgent or unplanned needs, but this request will be flagged for executive review.</p>
+                        </div>
+                    ) : null}
                     {supplyRequest.items.length === 0 ? (
                         <p className="text-sm text-slate-600">No items attached yet.</p>
                     ) : (
@@ -256,7 +286,12 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                                             </div>
                                         ) : null}
 
-                                        {exceeds ? <p className="mt-2 text-xs font-semibold text-rose-700">Requested quantity is above remaining PPMP allowance.</p> : null}
+                                        {exceeds ? (
+                                            <div className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                                                <p className="font-semibold">This request exceeds the remaining PPMP allocation for this item.</p>
+                                                <p>You may still submit for urgent or unplanned needs, but it will be flagged for executive review.</p>
+                                            </div>
+                                        ) : null}
                                     </div>
                                 );
                             })}
@@ -294,6 +329,13 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                     {newItem.ppmp_item_id ? (
                         <div className="text-xs text-slate-600">
                             Remaining quantity: <strong>{optionById.get(newItem.ppmp_item_id)?.remaining_quantity ?? 0}</strong>
+                        </div>
+                    ) : null}
+
+                    {newItemExceedsRemaining ? (
+                        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                            <p className="font-semibold">This request exceeds the remaining PPMP allocation for this item.</p>
+                            <p>You may still submit for urgent or unplanned needs, but it will be flagged for executive review.</p>
                         </div>
                     ) : null}
                 </section>

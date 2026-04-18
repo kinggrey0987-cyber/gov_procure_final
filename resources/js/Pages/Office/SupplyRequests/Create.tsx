@@ -154,6 +154,19 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
         return new Map(itemOptions.map((option) => [String(option.ppmp_item_id), option]));
     }, [itemOptions]);
 
+    const overPlanLineCount = useMemo(() => {
+        return form.data.items.reduce((count, item) => {
+            const option = optionById.get(item.ppmp_item_id);
+            if (!option) {
+                return count;
+            }
+
+            const rowQuantity = Number(item.quantity_requested || '0');
+
+            return rowQuantity > option.remaining_quantity ? count + 1 : count;
+        }, 0);
+    }, [form.data.items, optionById]);
+
     return (
         <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Create Supply Request</h2>}>
             <Head title="Create Supply Request" />
@@ -284,6 +297,13 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
 
                     {loadingOptions ? <p className="mb-3 text-sm text-slate-500">Loading approved PPMP items...</p> : null}
 
+                    {overPlanLineCount > 0 ? (
+                        <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                            <p className="font-semibold">{overPlanLineCount} line item(s) exceed remaining PPMP allocation.</p>
+                            <p>You may still submit for urgent or unplanned needs, but this request will be flagged for executive review.</p>
+                        </div>
+                    ) : null}
+
                     <div className="space-y-4">
                         {form.data.items.map((item, index) => {
                             const option = optionById.get(item.ppmp_item_id);
@@ -341,9 +361,10 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                     ) : null}
 
                                     {exceedsRemaining ? (
-                                        <p className="mt-2 text-xs font-semibold text-rose-700">
-                                            Requested quantity exceeds remaining PPMP quantity for this line.
-                                        </p>
+                                        <div className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                                            <p className="font-semibold">This request exceeds the remaining PPMP allocation for this item.</p>
+                                            <p>You may still submit for urgent or unplanned needs, but it will be flagged for executive review.</p>
+                                        </div>
                                     ) : null}
 
                                     <input type="hidden" value={item.item_id} readOnly />

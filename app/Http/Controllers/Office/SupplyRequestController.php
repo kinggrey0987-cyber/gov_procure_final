@@ -118,6 +118,10 @@ class SupplyRequestController extends Controller
                     'planned_quantity' => isset($context['planned_quantity']) ? (float) $context['planned_quantity'] : null,
                     'already_requested_quantity' => isset($context['requested_quantity']) ? (float) $context['requested_quantity'] : null,
                     'remaining_quantity' => isset($context['remaining_quantity']) ? (float) $context['remaining_quantity'] : null,
+                    'over_requested_quantity' => isset($context['over_requested_quantity']) ? (float) $context['over_requested_quantity'] : null,
+                    'exceeds_ppmp_allocation' => isset($context['over_requested_quantity'])
+                        ? (float) $context['over_requested_quantity'] > 0
+                        : false,
                 ];
             })->values()->all(),
         ];
@@ -210,10 +214,20 @@ class SupplyRequestController extends Controller
 
     public function submit(SubmitSupplyRequestRequest $request, SupplyRequest $supplyRequest): RedirectResponse
     {
-        $this->service->submit($supplyRequest, $request->user(), $request->input('review_notes'));
+        $submittedRequest = $this->service->submit($supplyRequest, $request->user(), $request->input('review_notes'));
+        $overRequestCount = (int) ($submittedRequest->getAttribute('ppmp_over_request_count') ?? 0);
+
+        $successMessage = 'Supply request submitted successfully.';
+
+        if ($overRequestCount > 0) {
+            $successMessage = sprintf(
+                'Supply request submitted successfully. %d PPMP over-allocation line(s) were flagged for executive review.',
+                $overRequestCount,
+            );
+        }
 
         return redirect()->route('office.supply-requests.show', $supplyRequest->supply_request_id)
-            ->with('success', 'Supply request submitted successfully.');
+            ->with('success', $successMessage);
     }
 
     public function suppliesReadyForClaim(Request $request): Response

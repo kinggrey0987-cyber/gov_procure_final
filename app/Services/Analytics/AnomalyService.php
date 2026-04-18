@@ -119,6 +119,74 @@ class AnomalyService
         });
     }
 
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    public function createOrUpdateSystemDetected(array $payload): Anomaly
+    {
+        $referenceType = (string) $payload['reference_type'];
+        $referenceId = (int) $payload['reference_id'];
+        $this->assertReferenceExists($referenceType, $referenceId);
+
+        return DB::transaction(function () use ($payload): Anomaly {
+            $anomalyType = strtoupper((string) $payload['anomaly_type']);
+            $detectionMethod = $payload['detection_method'] ?? null;
+
+            $existing = Anomaly::query()
+                ->where('anomaly_type', $anomalyType)
+                ->where('reference_type', (string) $payload['reference_type'])
+                ->where('reference_id', (int) $payload['reference_id'])
+                ->where('item_id', $payload['item_id'] ?? null)
+                ->where('office_id', $payload['office_id'] ?? null)
+                ->where('detection_method', $detectionMethod)
+                ->whereIn('status', ['OPEN', 'IN_REVIEW'])
+                ->first();
+
+            if ($existing instanceof Anomaly) {
+                $existing->forceFill([
+                    'detected_value' => $payload['detected_value'] ?? $existing->detected_value,
+                    'expected_value' => $payload['expected_value'] ?? $existing->expected_value,
+                    'threshold_value' => $payload['threshold_value'] ?? $existing->threshold_value,
+                    'z_score' => $payload['z_score'] ?? $existing->z_score,
+                    'severity' => strtoupper((string) ($payload['severity'] ?? $existing->severity ?? 'MEDIUM')),
+                    'detected_at' => $payload['detected_at'] ?? now(),
+                    'remarks' => $payload['remarks'] ?? $existing->remarks,
+                ])->save();
+
+                return $existing->fresh() ?? $existing;
+            }
+
+            $anomaly = Anomaly::query()->create([
+                'anomaly_type' => $anomalyType,
+                'reference_type' => (string) $payload['reference_type'],
+                'reference_id' => (int) $payload['reference_id'],
+                'item_id' => $payload['item_id'] ?? null,
+                'office_id' => $payload['office_id'] ?? null,
+                'detected_value' => $payload['detected_value'] ?? null,
+                'expected_value' => $payload['expected_value'] ?? null,
+                'threshold_value' => $payload['threshold_value'] ?? null,
+                'z_score' => $payload['z_score'] ?? null,
+                'detection_method' => $detectionMethod,
+                'severity' => strtoupper((string) ($payload['severity'] ?? 'MEDIUM')),
+                'status' => 'OPEN',
+                'detected_at' => $payload['detected_at'] ?? now(),
+                'remarks' => $payload['remarks'] ?? null,
+            ]);
+
+            StatusHistory::query()->create([
+                'reference_type' => Anomaly::class,
+                'reference_id' => (int) $anomaly->anomaly_id,
+                'old_status' => null,
+                'new_status' => 'OPEN',
+                'changed_by' => null,
+                'remarks' => 'System-detected anomaly created.',
+                'changed_at' => now(),
+            ]);
+
+            return $anomaly;
+        });
+    }
+
     private function assertExecutive(User $actor): void
     {
         if (!$actor->isExecutive()) {

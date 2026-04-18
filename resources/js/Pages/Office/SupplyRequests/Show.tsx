@@ -25,6 +25,8 @@ type Props = {
             planned_quantity?: number | null;
             already_requested_quantity?: number | null;
             remaining_quantity?: number | null;
+            over_requested_quantity?: number | null;
+            exceeds_ppmp_allocation: boolean;
         }>;
     };
     distributionRecords: Array<{
@@ -71,6 +73,10 @@ export default function SupplyRequestShow({
     approvalHistory,
 }: Props) {
     const [reportIssueOpen, setReportIssueOpen] = useState(false);
+
+    const overAllocationCount = useMemo(() => {
+        return supplyRequest.items.filter((item) => item.exceeds_ppmp_allocation).length;
+    }, [supplyRequest.items]);
 
     const submitForm = useForm({ review_notes: supplyRequest.review_notes ?? '' });
     const issueForm = useForm({
@@ -155,6 +161,12 @@ export default function SupplyRequestShow({
                     <div className="border-b border-slate-200 px-6 py-4">
                         <h4 className="text-xl font-semibold text-slate-800">Requested Items</h4>
                         <p className="mt-1 text-sm text-slate-600">Pricing here is planning context only via PPMP allocation. Actual procurement prices are recorded on purchase orders.</p>
+                        {overAllocationCount > 0 ? (
+                            <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                                <p className="font-semibold">{overAllocationCount} line item(s) exceed PPMP allocation.</p>
+                                <p>This request was flagged for executive monitoring and review.</p>
+                            </div>
+                        ) : null}
                     </div>
 
                     {supplyRequest.items.length === 0 ? (
@@ -169,7 +181,9 @@ export default function SupplyRequestShow({
                                         <th className="px-4 py-3 text-left font-semibold text-slate-700">Planned</th>
                                         <th className="px-4 py-3 text-left font-semibold text-slate-700">Already Requested</th>
                                         <th className="px-4 py-3 text-left font-semibold text-slate-700">Remaining</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Over Plan</th>
                                         <th className="px-4 py-3 text-left font-semibold text-slate-700">Quantity</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Flag</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
@@ -180,7 +194,15 @@ export default function SupplyRequestShow({
                                             <td className="px-4 py-3 text-slate-700">{formatNumber(item.planned_quantity)}</td>
                                             <td className="px-4 py-3 text-slate-700">{formatNumber(item.already_requested_quantity)}</td>
                                             <td className="px-4 py-3 text-slate-700">{formatNumber(item.remaining_quantity)}</td>
+                                            <td className="px-4 py-3 text-slate-700">{formatNumber(item.over_requested_quantity)}</td>
                                             <td className="px-4 py-3 text-slate-700">{item.quantity_requested}</td>
+                                            <td className="px-4 py-3">
+                                                {item.exceeds_ppmp_allocation ? (
+                                                    <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">Flagged</span>
+                                                ) : (
+                                                    <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">Within Plan</span>
+                                                )}
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
