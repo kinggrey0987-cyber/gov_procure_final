@@ -33,6 +33,7 @@ class AdminUserSeeder extends Seeder
                 'must_change_password' => true,
                 'role_id' => $adminRole->id,
                 'office_id' => $technicalOffice->id,
+                    'emp_id' => 'TECH-ADMIN-0001',
                 'email_verified_at' => now(),
             ]);
 
@@ -43,6 +44,7 @@ class AdminUserSeeder extends Seeder
             'name' => 'GovSupply Administrator',
             'role_id' => $adminRole->id,
             'office_id' => $technicalOffice->id,
+                'emp_id' => 'TECH-ADMIN-0001',
         ]);
     }
 }

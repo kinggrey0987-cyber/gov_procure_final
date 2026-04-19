@@ -16,6 +16,8 @@ return new class extends Migration
      */
     public function up(): void
     {
+        DB::statement("UPDATE users SET emp_id = CONCAT('LEGACY-', id) WHERE emp_id IS NULL OR BTRIM(emp_id) = ''");
+
         // Drop the Phase 1 partial unique index (no longer needed post-NOT NULL)
         DB::statement('DROP INDEX IF EXISTS idx_users_emp_id_not_null');
 

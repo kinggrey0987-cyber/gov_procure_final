@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             AdminUserSeeder::class,
             SampleUsersSeeder::class,
             ItemCatalogSeeder::class,
+            DemoWorkflowSeeder::class,
         ]);
     }
 }

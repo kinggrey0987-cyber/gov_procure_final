@@ -19,6 +19,16 @@ class OfficeSeeder extends Seeder
                 'description' => 'Executive office overseeing municipal operations.',
             ],
             [
+                'name' => 'Municipal Planning and Development Office',
+                'code' => 'MPDO',
+                'description' => 'Planning and development office for municipal programs and PPMP ownership.',
+            ],
+            [
+                'name' => 'Municipal Social Welfare and Development Office',
+                'code' => 'MSWDO',
+                'description' => 'Social welfare and development office for municipal services.',
+            ],
+            [
                 'name' => 'General Services Office',
                 'code' => 'GSO',
                 'description' => 'Handles inventory, deliveries, and supply distribution.',
