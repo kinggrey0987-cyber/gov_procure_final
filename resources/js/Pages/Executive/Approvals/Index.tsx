@@ -141,7 +141,6 @@ export default function ExecutiveApprovalsIndex({ records, summary, filters, fil
                 <section className="rounded-2xl border border-red-200 bg-white p-6 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
                     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-700">Executive Approval Desk</p>
                     <h3 className="mt-1 text-2xl font-semibold text-slate-900">PPMP Final Signoff</h3>
-                    <p className="mt-1 text-sm text-slate-600">Review submitted PPMP records, validate summaries, and record executive decisions with full traceability.</p>
                     <p className="mt-2 text-xs text-slate-500">
                         {isRefreshing
                             ? 'Refreshing approvals queue...'
@@ -159,16 +158,10 @@ export default function ExecutiveApprovalsIndex({ records, summary, filters, fil
                 </div>
 
                 <section className="rounded-2xl border border-red-200 bg-white p-6 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
-                    <div className="mb-4">
-                        <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-700">Executive Filters</p>
-                            <h3 className="text-lg font-semibold text-slate-900">Approval Queue Filters</h3>
-                        </div>
-                    </div>
-
-                    <form onSubmit={onSubmit} className="grid gap-3 md:grid-cols-6">
+                    <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3">
+                        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
                         <select
-                            className="rounded-lg border-slate-300 text-sm"
+                            className="h-10 rounded-lg border-slate-300 text-sm"
                             value={form.office_id}
                             onChange={(event) => setForm((current) => ({ ...current, office_id: event.target.value }))}
                         >
@@ -181,7 +174,7 @@ export default function ExecutiveApprovalsIndex({ records, summary, filters, fil
                         </select>
 
                         <select
-                            className="rounded-lg border-slate-300 text-sm"
+                            className="h-10 rounded-lg border-slate-300 text-sm"
                             value={form.status}
                             onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}
                         >
@@ -195,35 +188,36 @@ export default function ExecutiveApprovalsIndex({ records, summary, filters, fil
 
                         <input
                             type="date"
-                            className="rounded-lg border-slate-300 text-sm"
+                            className="h-10 rounded-lg border-slate-300 text-sm"
                             value={form.from_date}
                             onChange={(event) => setForm((current) => ({ ...current, from_date: event.target.value }))}
                         />
 
                         <input
                             type="date"
-                            className="rounded-lg border-slate-300 text-sm"
+                            className="h-10 rounded-lg border-slate-300 text-sm"
                             value={form.to_date}
                             onChange={(event) => setForm((current) => ({ ...current, to_date: event.target.value }))}
                         />
 
                         <input
                             type="text"
-                            className="rounded-lg border-slate-300 text-sm"
+                            className="h-10 rounded-lg border-slate-300 text-sm"
                             placeholder="Search PPMP code, office, preparer"
                             value={form.search}
                             onChange={(event) => setForm((current) => ({ ...current, search: event.target.value }))}
                         />
+                        </div>
 
-                        <div className="md:col-span-6 flex flex-wrap justify-end gap-2 pt-1">
+                        <div className="ml-auto flex items-center gap-2">
                             <button
                                 type="button"
                                 onClick={() => router.get(route('executive.ppmp-approvals.index'))}
-                                className="rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 transition hover:border-red-500 hover:bg-red-50"
+                                className="h-10 rounded-lg border border-red-300 px-4 text-sm font-semibold text-red-700 transition hover:border-red-500 hover:bg-red-50"
                             >
                                 Reset
                             </button>
-                            <button type="submit" className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
+                            <button type="submit" className="h-10 rounded-lg bg-red-700 px-4 text-sm font-semibold text-white hover:bg-red-800">
                                 Apply
                             </button>
                         </div>

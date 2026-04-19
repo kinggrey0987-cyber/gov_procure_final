@@ -1,4 +1,4 @@
-import { ExecutiveChartCard, GroupedComparisonChart, HorizontalBarChart, TrendLineChart } from '@/Components/Executive/Charts';
+import { DonutChart, ExecutiveChartCard, GroupedComparisonChart, HorizontalBarChart, TrendLineChart } from '@/Components/Executive/Charts';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, router } from '@inertiajs/react';
 import { FormEvent, useState } from 'react';
@@ -50,6 +50,7 @@ type Props = {
         alerts: BreakdownRow[];
     };
     anomaly_type_breakdown: Array<{ label: string; total: number }>;
+    anomaly_severity_breakdown: Array<{ label: string; total: number }>;
     alert_severity_breakdown: Array<{ label: string; total: number }>;
     office_comparison: Array<{
         office_id: number;
@@ -73,6 +74,7 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
     totals,
     status_breakdown,
     anomaly_type_breakdown,
+    anomaly_severity_breakdown,
     alert_severity_breakdown,
     office_comparison,
     monthly_trends,
@@ -92,113 +94,131 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
         router.get(route('executive.anomalies-monitoring'), form, { preserveState: true, replace: true });
     };
 
-    const anomalySeveritySignals = [
-        { label: 'High Severity Anomalies', value: totals.high_severity_anomaly_count },
-        { label: 'High Severity Alerts', value: totals.high_severity_alert_count },
-    ];
-
     const mergedTrend = mergeMonthlyTrends(monthly_trends.anomalies, monthly_trends.alerts);
+    const severityComparison = mergeSeverity(anomaly_severity_breakdown, alert_severity_breakdown);
+    const officeRisk = office_comparison
+        .map((row) => ({
+            label: row.office_name,
+            value: row.anomaly_count + row.alert_count,
+        }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 10);
+
+    const exportCsv = () => {
+        const rows = [
+            ['metric', 'value'],
+            ['anomalies', String(totals.anomaly_count)],
+            ['alerts', String(totals.alert_count)],
+            ['high_severity_anomalies', String(totals.high_severity_anomaly_count)],
+            ['high_severity_alerts', String(totals.high_severity_alert_count)],
+        ];
+
+        downloadCsv(rows, 'risk-and-alerts.csv');
+    };
 
     return (
-        <AuthenticatedLayout header="Anomalies and Alerts Monitoring">
-            <Head title="Anomalies and Alerts Monitoring" />
+        <AuthenticatedLayout header="Risk & Alerts">
+            <Head title="Risk & Alerts" />
 
             <div className="space-y-6 py-8">
-                <section className="overflow-hidden rounded-2xl border border-red-200 bg-white shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
-                    <div className="border-b border-red-200 bg-gradient-to-r from-red-700 via-red-600 to-red-500 px-6 py-4 text-white">
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-100">Executive Alert Center</p>
-                        <p className="text-lg font-semibold">Cross-Office Risk Monitoring</p>
-                        <p className="text-sm text-red-100">Price anomalies are procurement-linked and grouped by requesting office for oversight context.</p>
+                <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-200 bg-white px-5 py-4 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
+                    <div>
+                        <h2 className="text-2xl font-semibold text-slate-900">Risk & Alerts</h2>
+                        <p className="text-sm text-slate-600">Executive risk cockpit</p>
                     </div>
-                    <div className="p-6">
-                    <div className="mb-4">
-                        <h3 className="text-xl font-semibold text-slate-900">Monitoring Filter Bar</h3>
-                        <p className="mt-1 text-sm text-slate-600">Focus risk intelligence by office, severity, status, anomaly type, and detection window.</p>
+                    <div className="flex items-center gap-2">
+                        <button type="button" onClick={() => window.print()} className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
+                            Export PDF
+                        </button>
+                        <button type="button" onClick={exportCsv} className="rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white hover:bg-red-800">
+                            Export CSV
+                        </button>
                     </div>
+                </section>
 
-                    <form onSubmit={onSubmit} className="grid gap-3 md:grid-cols-6">
-                        <select
-                            className="rounded-lg border-slate-300 text-sm"
-                            value={form.office_id}
-                            onChange={(event) => setForm((current) => ({ ...current, office_id: event.target.value }))}
-                        >
-                            <option value="">All offices</option>
-                            {filter_options.offices.map((office) => (
-                                <option key={office.id} value={office.id}>
-                                    {office.name}
-                                </option>
-                            ))}
-                        </select>
+                <section className="rounded-2xl border border-red-200 bg-white p-5 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
+                    <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3">
+                        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
+                            <select
+                                className="h-10 rounded-lg border-slate-300 text-sm"
+                                value={form.office_id}
+                                onChange={(event) => setForm((current) => ({ ...current, office_id: event.target.value }))}
+                            >
+                                <option value="">All offices</option>
+                                {filter_options.offices.map((office) => (
+                                    <option key={office.id} value={office.id}>
+                                        {office.name}
+                                    </option>
+                                ))}
+                            </select>
 
-                        <select
-                            className="rounded-lg border-slate-300 text-sm"
-                            value={form.severity}
-                            onChange={(event) => setForm((current) => ({ ...current, severity: event.target.value }))}
-                        >
-                            <option value="">All severities</option>
-                            {filter_options.severities.map((severity) => (
-                                <option key={severity} value={severity}>
-                                    {severity}
-                                </option>
-                            ))}
-                        </select>
+                            <select
+                                className="h-10 rounded-lg border-slate-300 text-sm"
+                                value={form.severity}
+                                onChange={(event) => setForm((current) => ({ ...current, severity: event.target.value }))}
+                            >
+                                <option value="">All severities</option>
+                                {filter_options.severities.map((severity) => (
+                                    <option key={severity} value={severity}>
+                                        {severity}
+                                    </option>
+                                ))}
+                            </select>
 
-                        <select
-                            className="rounded-lg border-slate-300 text-sm"
-                            value={form.status}
-                            onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}
-                        >
-                            <option value="">All statuses</option>
-                            {filter_options.statuses.map((status) => (
-                                <option key={status} value={status}>
-                                    {status}
-                                </option>
-                            ))}
-                        </select>
+                            <select
+                                className="h-10 rounded-lg border-slate-300 text-sm"
+                                value={form.status}
+                                onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}
+                            >
+                                <option value="">All statuses</option>
+                                {filter_options.statuses.map((status) => (
+                                    <option key={status} value={status}>
+                                        {status}
+                                    </option>
+                                ))}
+                            </select>
 
-                        <select
-                            className="rounded-lg border-slate-300 text-sm"
-                            value={form.anomaly_type}
-                            onChange={(event) => setForm((current) => ({ ...current, anomaly_type: event.target.value }))}
-                        >
-                            <option value="">All anomaly types</option>
-                            {filter_options.anomaly_types.map((anomalyType) => (
-                                <option key={anomalyType} value={anomalyType}>
-                                    {formatAnomalyType(anomalyType)}
-                                </option>
-                            ))}
-                        </select>
+                            <select
+                                className="h-10 rounded-lg border-slate-300 text-sm"
+                                value={form.anomaly_type}
+                                onChange={(event) => setForm((current) => ({ ...current, anomaly_type: event.target.value }))}
+                            >
+                                <option value="">All anomaly types</option>
+                                {filter_options.anomaly_types.map((anomalyType) => (
+                                    <option key={anomalyType} value={anomalyType}>
+                                        {formatAnomalyType(anomalyType)}
+                                    </option>
+                                ))}
+                            </select>
 
-                        <input
-                            type="date"
-                            className="rounded-lg border-slate-300 text-sm"
-                            value={form.from_date}
-                            onChange={(event) => setForm((current) => ({ ...current, from_date: event.target.value }))}
-                        />
-
-                        <div className="flex gap-2">
                             <input
                                 type="date"
-                                className="w-full rounded-lg border-slate-300 text-sm"
+                                className="h-10 rounded-lg border-slate-300 text-sm"
+                                value={form.from_date}
+                                onChange={(event) => setForm((current) => ({ ...current, from_date: event.target.value }))}
+                            />
+
+                            <input
+                                type="date"
+                                className="h-10 rounded-lg border-slate-300 text-sm"
                                 value={form.to_date}
                                 onChange={(event) => setForm((current) => ({ ...current, to_date: event.target.value }))}
                             />
                         </div>
 
-                        <div className="md:col-span-6 flex flex-wrap justify-end gap-2 pt-1">
+                        <div className="ml-auto flex items-center gap-2">
                             <button
                                 type="button"
                                 onClick={() => router.get(route('executive.anomalies-monitoring'))}
-                                className="rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 transition hover:border-red-500 hover:bg-red-50"
+                                className="h-10 rounded-lg border border-red-300 px-4 text-sm font-semibold text-red-700 transition hover:border-red-500 hover:bg-red-50"
                             >
                                 Reset
                             </button>
-                            <button type="submit" className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
+                            <button type="submit" className="h-10 rounded-lg bg-red-700 px-4 text-sm font-semibold text-white hover:bg-red-800">
                                 Apply
                             </button>
                         </div>
                     </form>
-                    </div>
                 </section>
 
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -208,70 +228,53 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                     <StatCard label="High Severity Alerts" value={totals.high_severity_alert_count} tone="orange" />
                 </div>
 
-                <div className="rounded-2xl border border-red-200 bg-red-50/60 px-5 py-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-red-700">Interpretation Guide</p>
-                    <p className="mt-1 text-sm text-slate-700">For PRICE Z-SCORE, the anomaly source is procurement purchase order pricing. Office names indicate requesting-office grouping only.</p>
-                </div>
-
                 <div className="grid gap-6 xl:grid-cols-12">
                     <div className="xl:col-span-12">
-                    <ExecutiveChartCard title="Incident Trend Over Time" subtitle="Monthly anomalies and alerts in the selected scope" eyebrow="Trend" tone="critical">
+                    <ExecutiveChartCard title="Incident Trend Over Time" subtitle="Monthly risk movement" eyebrow="Trend" tone="critical">
                         <TrendLineChart
                             data={mergedTrend}
-                            emptyText="No incident trend data available for the selected filters."
-                        />
-                    </ExecutiveChartCard>
-                    </div>
-
-                    <div className="xl:col-span-8">
-                    <ExecutiveChartCard title="Anomaly Type Distribution" subtitle="Most frequent anomaly categories in the current filter scope" eyebrow="Primary Risk Mix" tone="critical">
-                        <HorizontalBarChart
-                            data={anomaly_type_breakdown.map((row) => ({ label: formatAnomalyType(row.label || 'N/A'), value: row.total }))}
-                            emptyText="No anomaly type distribution available for the selected filters."
+                            emptyText="No data in current filter scope"
                         />
                     </ExecutiveChartCard>
                     </div>
 
                     <div className="xl:col-span-4">
-                    <ExecutiveChartCard title="Critical Severity Snapshot" subtitle="Concentrated severe incidents requiring executive action" eyebrow="Immediate Attention" tone="critical">
-                        <HorizontalBarChart
-                            data={anomalySeveritySignals.map((row) => ({ label: row.label, value: row.value }))}
-                            emptyText="No high-severity anomaly or alert records for the selected filters."
+                    <ExecutiveChartCard title="Anomaly Type Distribution" subtitle="Anomaly categories" eyebrow="Distribution" tone="critical">
+                        <DonutChart
+                            data={anomaly_type_breakdown.map((row) => ({ label: formatAnomalyType(row.label || 'N/A'), value: row.total }))}
+                            centerLabel="Anomalies"
+                            emptyText="No data in current filter scope"
                         />
                     </ExecutiveChartCard>
                     </div>
 
-                    <div className="xl:col-span-5">
-                    <ExecutiveChartCard title="Alert Severity Distribution" subtitle="Current spread of alert severity levels" eyebrow="Alert Pressure" tone="warning">
-                        <HorizontalBarChart
-                            data={alert_severity_breakdown.map((row) => ({ label: row.label || 'N/A', value: row.total }))}
-                            emptyText="No alert severity data available for the selected filters."
+                    <div className="xl:col-span-8">
+                    <ExecutiveChartCard title="Severity Distribution" subtitle="Anomalies vs alerts by severity" eyebrow="Severity" tone="default">
+                        <GroupedComparisonChart
+                            data={severityComparison}
+                            firstLabel="Anomalies"
+                            secondLabel="Alerts"
+                            emptyText="No data in current filter scope"
                         />
                     </ExecutiveChartCard>
                     </div>
 
-                    <div className="xl:col-span-7">
+                    <div className="xl:col-span-6">
+                    <ExecutiveChartCard title="Office Risk Comparison" subtitle="Total incidents by office" eyebrow="Cross-Office" tone="neutral">
+                        <HorizontalBarChart
+                            data={officeRisk}
+                            emptyText="No data in current filter scope"
+                        />
+                    </ExecutiveChartCard>
+                    </div>
+
+                    <div className="xl:col-span-6">
                     <ExecutiveChartCard title="Status Breakdown" subtitle="Anomaly and alert statuses side-by-side" eyebrow="Resolution Flow" tone="default">
                         <GroupedComparisonChart
                             data={mergeStatus(status_breakdown.anomalies, status_breakdown.alerts)}
                             firstLabel="Anomalies"
                             secondLabel="Alerts"
-                            emptyText="No status breakdown data available for the selected filters."
-                        />
-                    </ExecutiveChartCard>
-                    </div>
-
-                    <div className="xl:col-span-12">
-                    <ExecutiveChartCard title="Office-Based Anomaly and Alert Comparison" subtitle="Office-level anomaly and alert monitoring intensity" eyebrow="Cross-Office Risk" tone="default">
-                        <GroupedComparisonChart
-                            data={office_comparison.map((row) => ({
-                                label: row.office_name,
-                                first: row.anomaly_count,
-                                second: row.alert_count,
-                            }))}
-                            firstLabel="Anomalies"
-                            secondLabel="Alerts"
-                            emptyText="No office-level monitoring data available for the selected filters."
+                            emptyText="No data in current filter scope"
                         />
                     </ExecutiveChartCard>
                     </div>
@@ -289,7 +292,7 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                             row.detected_at ? new Date(row.detected_at).toLocaleDateString() : 'N/A',
                         ])}
                         emptyText="No anomalies found for the selected filters."
-                        subtitle="Secondary detail list after summary visuals."
+                        subtitle="Latest records"
                     />
 
                     <TableSection
@@ -303,7 +306,7 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                             row.detected_at ? new Date(row.detected_at).toLocaleDateString() : 'N/A',
                         ])}
                         emptyText="No alerts found for the selected filters."
-                        subtitle="Secondary detail list after summary visuals."
+                        subtitle="Latest records"
                     />
                 </div>
             </div>
@@ -367,6 +370,33 @@ function mergeStatus(anomalyRows: BreakdownRow[], alertRows: BreakdownRow[]) {
     });
 
     return [...statusMap.entries()]
+        .map(([label, values]) => ({
+            label,
+            first: values.anomaly,
+            second: values.alert,
+        }))
+        .sort((a, b) => (b.first + b.second) - (a.first + a.second));
+}
+
+function mergeSeverity(
+    anomalyRows: Array<{ label: string; total: number }>,
+    alertRows: Array<{ label: string; total: number }>,
+) {
+    const severityMap = new Map<string, { anomaly: number; alert: number }>();
+
+    anomalyRows.forEach((row) => {
+        const key = row.label || 'N/A';
+        const existing = severityMap.get(key) ?? { anomaly: 0, alert: 0 };
+        severityMap.set(key, { ...existing, anomaly: row.total });
+    });
+
+    alertRows.forEach((row) => {
+        const key = row.label || 'N/A';
+        const existing = severityMap.get(key) ?? { anomaly: 0, alert: 0 };
+        severityMap.set(key, { ...existing, alert: row.total });
+    });
+
+    return [...severityMap.entries()]
         .map(([label, values]) => ({
             label,
             first: values.anomaly,
@@ -448,4 +478,17 @@ function TableSection({
             )}
         </section>
     );
+}
+
+function downloadCsv(rows: string[][], fileName: string): void {
+    const csv = rows.map((row) => row.map((column) => `"${String(column).replaceAll('"', '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
 }

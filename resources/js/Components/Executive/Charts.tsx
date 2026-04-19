@@ -246,7 +246,7 @@ export function DonutChart({
     let runningOffset = 0;
 
     return (
-        <div className="grid gap-6 lg:grid-cols-[220px_1fr] lg:items-center">
+        <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,220px)_minmax(0,1fr)] lg:items-center">
             <div className="mx-auto h-[220px] w-[220px]">
                 <svg viewBox="0 0 220 220" className="h-full w-full">
                     <circle
@@ -289,17 +289,17 @@ export function DonutChart({
                 </svg>
             </div>
 
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
                 {filteredData.map((segment, index) => {
                     const percent = total > 0 ? Math.round((segment.value / total) * 100) : 0;
 
                     return (
-                        <div key={segment.label} className="flex items-center justify-between rounded-lg border border-red-100 bg-white px-3 py-2 text-sm">
-                            <div className="flex items-center gap-2">
+                        <div key={segment.label} className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-red-100 bg-white px-3 py-2 text-sm">
+                            <div className="flex min-w-0 items-center gap-2">
                                 <span className="h-3 w-3 rounded-full" style={{ backgroundColor: palette[index % palette.length] }} />
-                                <span className="font-medium text-slate-700">{segment.label}</span>
+                                <span className="truncate font-medium text-slate-700" title={segment.label}>{segment.label}</span>
                             </div>
-                            <span className="font-semibold text-slate-900">{segment.value} ({percent}%)</span>
+                            <span className="shrink-0 font-semibold text-slate-900">{segment.value} ({percent}%)</span>
                         </div>
                     );
                 })}

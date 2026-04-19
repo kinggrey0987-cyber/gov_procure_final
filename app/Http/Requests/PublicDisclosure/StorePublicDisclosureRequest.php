@@ -8,7 +8,7 @@ class StorePublicDisclosureRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return auth()->user()?->can('public-disclosure.manage') ?? false;
+        return $this->user()?->can('public-disclosure.manage') ?? false;
     }
 
     /**
@@ -23,6 +23,8 @@ class StorePublicDisclosureRequest extends FormRequest
             'reference_id' => ['nullable', 'integer'],
             'description' => ['nullable', 'string'],
             'file_path' => ['nullable', 'string', 'max:255'],
+            'status' => ['nullable', 'string', 'in:DRAFT,PUBLISHED'],
+            'remarks' => ['nullable', 'string'],
         ];
     }
 }

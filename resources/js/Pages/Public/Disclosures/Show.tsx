@@ -30,6 +30,17 @@ export default function PublicDisclosureShow({ disclosure, attachments }: Props)
                         <p><strong>Published:</strong> {disclosure.published_at ?? '-'}</p>
                         <p><strong>Description:</strong> {disclosure.description ?? '-'}</p>
                         <p><strong>File:</strong> {disclosure.file_path ?? '-'}</p>
+
+                        {disclosure.file_path ? (
+                            <a
+                                href={route('public.disclosures.download', disclosure.disclosure_id)}
+                                className="mt-3 inline-flex rounded border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700"
+                            >
+                                Download Disclosure File
+                            </a>
+                        ) : (
+                            <p className="mt-3 text-xs text-slate-500">No direct disclosure file is available for this record.</p>
+                        )}
                     </div>
 
                     <div className="mt-4 rounded border bg-white p-6 text-sm">

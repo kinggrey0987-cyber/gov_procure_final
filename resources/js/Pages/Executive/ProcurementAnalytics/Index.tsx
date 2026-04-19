@@ -1,4 +1,4 @@
-import { ExecutiveChartCard, GroupedComparisonChart, HorizontalBarChart } from '@/Components/Executive/Charts';
+import { DonutChart, ExecutiveChartCard, GroupedComparisonChart, HorizontalBarChart } from '@/Components/Executive/Charts';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, router } from '@inertiajs/react';
 import { FormEvent, useState } from 'react';
@@ -94,220 +94,221 @@ export default function ProcurementAnalyticsIndex({
         }))
         .sort((a, b) => b.value - a.value);
 
+    const statusMixPr = status_breakdown.purchase_requests.map((row) => ({
+        label: row.status || 'N/A',
+        value: row.total,
+    }));
+
+    const statusMixPo = status_breakdown.purchase_orders.map((row) => ({
+        label: row.status || 'N/A',
+        value: row.total,
+    }));
+
+    const spendingDonut = officeValueBreakdown.slice(0, 8);
+    const crossOfficeActivity = office_comparison.filter((row) => row.purchase_request_count > 0 || row.purchase_order_count > 0).length;
+
+    const exportCsv = () => {
+        const lines = [
+            ['metric', 'value'],
+            ['purchase_requests', String(totals.purchase_request_count)],
+            ['purchase_orders', String(totals.purchase_order_count)],
+            ['purchase_order_total_amount', String(totals.purchase_order_total_amount)],
+            ['active_offices', String(crossOfficeActivity)],
+            [''],
+            ['office', 'po_amount'],
+            ...officeValueBreakdown.map((row) => [row.label, String(row.value)]),
+        ];
+
+        downloadCsv(lines, 'procurement-insights.csv');
+    };
+
     return (
-        <AuthenticatedLayout header="Procurement Analytics">
-            <Head title="Procurement Analytics" />
+        <AuthenticatedLayout header="Procurement Insights">
+            <Head title="Procurement Insights" />
 
             <div className="space-y-6 py-8">
-                <section className="rounded-2xl border border-red-200 bg-white p-6 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
-                    <div className="mb-4">
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-700">Executive Controls</p>
-                        <h3 className="text-xl font-semibold text-slate-900">Analytics Filter Bar</h3>
-                        <p className="mt-1 text-sm text-slate-600">Adjust office, workflow states, and date scope before reading chart outputs.</p>
+                <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-200 bg-white px-5 py-4 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
+                    <div>
+                        <h2 className="text-2xl font-semibold text-slate-900">Procurement Insights</h2>
+                        <p className="text-sm text-slate-600">Graph-first procurement decisions</p>
                     </div>
+                    <div className="flex items-center gap-2">
+                        <button type="button" onClick={() => window.print()} className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
+                            Export PDF
+                        </button>
+                        <button type="button" onClick={exportCsv} className="rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white hover:bg-red-800">
+                            Export CSV
+                        </button>
+                    </div>
+                </section>
 
-                    <form onSubmit={onSubmit} className="grid gap-3 md:grid-cols-6">
-                        <select
-                            className="rounded-lg border-slate-300 text-sm"
-                            value={form.office_id}
-                            onChange={(event) => setForm((current) => ({ ...current, office_id: event.target.value }))}
-                        >
-                            <option value="">All offices</option>
-                            {filter_options.offices.map((office) => (
-                                <option key={office.id} value={office.id}>
-                                    {office.name}
-                                </option>
-                            ))}
-                        </select>
+                <section className="rounded-2xl border border-red-200 bg-white p-5 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
+                    <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3">
+                        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                            <select
+                                className="h-10 rounded-lg border-slate-300 text-sm"
+                                value={form.office_id}
+                                onChange={(event) => setForm((current) => ({ ...current, office_id: event.target.value }))}
+                            >
+                                <option value="">All offices</option>
+                                {filter_options.offices.map((office) => (
+                                    <option key={office.id} value={office.id}>
+                                        {office.name}
+                                    </option>
+                                ))}
+                            </select>
 
-                        <select
-                            className="rounded-lg border-slate-300 text-sm"
-                            value={form.pr_status}
-                            onChange={(event) => setForm((current) => ({ ...current, pr_status: event.target.value }))}
-                        >
-                            <option value="">All PR statuses</option>
-                            {filter_options.pr_statuses.map((status) => (
-                                <option key={status} value={status}>
-                                    {status}
-                                </option>
-                            ))}
-                        </select>
+                            <select
+                                className="h-10 rounded-lg border-slate-300 text-sm"
+                                value={form.pr_status}
+                                onChange={(event) => setForm((current) => ({ ...current, pr_status: event.target.value }))}
+                            >
+                                <option value="">All PR statuses</option>
+                                {filter_options.pr_statuses.map((status) => (
+                                    <option key={status} value={status}>
+                                        {status}
+                                    </option>
+                                ))}
+                            </select>
 
-                        <select
-                            className="rounded-lg border-slate-300 text-sm"
-                            value={form.po_status}
-                            onChange={(event) => setForm((current) => ({ ...current, po_status: event.target.value }))}
-                        >
-                            <option value="">All PO statuses</option>
-                            {filter_options.po_statuses.map((status) => (
-                                <option key={status} value={status}>
-                                    {status}
-                                </option>
-                            ))}
-                        </select>
+                            <select
+                                className="h-10 rounded-lg border-slate-300 text-sm"
+                                value={form.po_status}
+                                onChange={(event) => setForm((current) => ({ ...current, po_status: event.target.value }))}
+                            >
+                                <option value="">All PO statuses</option>
+                                {filter_options.po_statuses.map((status) => (
+                                    <option key={status} value={status}>
+                                        {status}
+                                    </option>
+                                ))}
+                            </select>
 
-                        <input
-                            type="date"
-                            className="rounded-lg border-slate-300 text-sm"
-                            value={form.from_date}
-                            onChange={(event) => setForm((current) => ({ ...current, from_date: event.target.value }))}
-                        />
-                        <input
-                            type="date"
-                            className="rounded-lg border-slate-300 text-sm"
-                            value={form.to_date}
-                            onChange={(event) => setForm((current) => ({ ...current, to_date: event.target.value }))}
-                        />
+                            <input
+                                type="date"
+                                className="h-10 rounded-lg border-slate-300 text-sm"
+                                value={form.from_date}
+                                onChange={(event) => setForm((current) => ({ ...current, from_date: event.target.value }))}
+                            />
+                            <input
+                                type="date"
+                                className="h-10 rounded-lg border-slate-300 text-sm"
+                                value={form.to_date}
+                                onChange={(event) => setForm((current) => ({ ...current, to_date: event.target.value }))}
+                            />
+                        </div>
 
-                        <div className="md:col-span-6 flex flex-wrap justify-end gap-2 pt-1">
+                        <div className="ml-auto flex items-center gap-2">
                             <button
                                 type="button"
                                 onClick={() => router.get(route('executive.procurement-analytics'))}
-                                className="rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 transition hover:border-red-500 hover:bg-red-50"
+                                className="h-10 rounded-lg border border-red-300 px-4 text-sm font-semibold text-red-700 transition hover:border-red-500 hover:bg-red-50"
                             >
                                 Reset
                             </button>
-                            <button type="submit" className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white shadow-[0_8px_18px_rgba(185,28,28,0.2)] hover:bg-red-800">
+                            <button type="submit" className="h-10 rounded-lg bg-red-700 px-4 text-sm font-semibold text-white shadow-[0_8px_18px_rgba(185,28,28,0.2)] hover:bg-red-800">
                                 Apply
                             </button>
                         </div>
                     </form>
                 </section>
 
-                <div className="grid gap-4 sm:grid-cols-3">
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <Card label="Purchase Requests" value={totals.purchase_request_count} tone="sky" />
                     <Card label="Purchase Orders" value={totals.purchase_order_count} tone="emerald" />
                     <Card label="PO Total Amount" value={formatCurrency(totals.purchase_order_total_amount)} tone="amber" />
+                    <Card label="Active Offices" value={crossOfficeActivity} tone="sky" />
                 </div>
 
                 <div className="grid gap-6 xl:grid-cols-12">
-                    <div className="xl:col-span-12">
+                    <div className="xl:col-span-8">
                         <ExecutiveChartCard
-                            title="Monthly Procurement Trend"
-                            subtitle="Primary momentum view for requests and orders over time"
-                            eyebrow="Primary Trend"
+                            title="PR vs PO Trend"
+                            subtitle="Monthly movement"
+                            eyebrow="Trend"
                             tone="critical"
                         >
                             <GroupedComparisonChart
                                 data={monthlyMerged}
                                 firstLabel="Purchase Requests"
                                 secondLabel="Purchase Orders"
-                                emptyText="No monthly trend data for the selected filters."
+                                emptyText="No data in current filter scope"
                             />
                         </ExecutiveChartCard>
                     </div>
 
-                    <div className="xl:col-span-6">
-                    <ExecutiveChartCard title="Purchase Request Status" subtitle="Real-time request lifecycle distribution" eyebrow="Status Mix" tone="default">
-                        <HorizontalBarChart
-                            data={status_breakdown.purchase_requests.map((row) => ({ label: row.status || 'N/A', value: row.total }))}
-                            emptyText="No purchase request status data for the selected filters."
-                        />
-                    </ExecutiveChartCard>
-                    </div>
-
-                    <div className="xl:col-span-6">
-                    <ExecutiveChartCard title="Purchase Order Status" subtitle="Order progression across filtered records" eyebrow="Status Mix" tone="default">
-                        <HorizontalBarChart
-                            data={status_breakdown.purchase_orders.map((row) => ({ label: row.status || 'N/A', value: row.total }))}
-                            emptyText="No purchase order status data for the selected filters."
-                        />
-                    </ExecutiveChartCard>
-                    </div>
-
-                    <div className="xl:col-span-8">
-                    <ExecutiveChartCard title="Office Workflow Comparison" subtitle="Office-level request and order throughput" eyebrow="Cross-Office" tone="default">
-                        <GroupedComparisonChart
-                            data={office_comparison.map((row) => ({
-                                label: row.office_name,
-                                first: row.purchase_request_count,
-                                second: row.purchase_order_count,
-                            }))}
-                            firstLabel="Requests"
-                            secondLabel="Orders"
-                            emptyText="No office-level procurement data for the selected filters."
-                        />
-                    </ExecutiveChartCard>
-                    </div>
-
                     <div className="xl:col-span-4">
-                    <ExecutiveChartCard title="Office Value Concentration" subtitle="Purchase order amount concentration by office" eyebrow="Financial Focus" tone="warning">
+                    <ExecutiveChartCard title="Spending by Office" subtitle="PO concentration" eyebrow="Distribution" tone="warning">
+                        <DonutChart
+                            data={spendingDonut}
+                            centerLabel="Spending"
+                            emptyText="No data in current filter scope"
+                        />
+                    </ExecutiveChartCard>
+                    </div>
+
+                    <div className="xl:col-span-6">
+                    <ExecutiveChartCard title="PR Status Mix" subtitle="Request lifecycle" eyebrow="Status" tone="default">
+                        <DonutChart
+                            data={statusMixPr}
+                            centerLabel="PR"
+                            emptyText="No data in current filter scope"
+                        />
+                    </ExecutiveChartCard>
+                    </div>
+
+                    <div className="xl:col-span-6">
+                    <ExecutiveChartCard title="PO Status Mix" subtitle="Order progression" eyebrow="Status" tone="default">
+                        <DonutChart
+                            data={statusMixPo}
+                            centerLabel="PO"
+                            emptyText="No data in current filter scope"
+                        />
+                    </ExecutiveChartCard>
+                    </div>
+
+                    <div className="xl:col-span-12">
+                    <ExecutiveChartCard title="Top Procurement Concentration" subtitle="Office spending ranking" eyebrow="Comparison" tone="neutral">
                         <HorizontalBarChart
                             data={officeValueBreakdown}
                             valueFormatter={formatCurrency}
-                            emptyText="No office amount concentration data for the selected filters."
+                            emptyText="No data in current filter scope"
                         />
                     </ExecutiveChartCard>
                     </div>
                 </div>
 
-                <div className="grid gap-6 xl:grid-cols-2">
-                    <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-                        <div className="border-b border-slate-200 px-6 py-5">
-                            <h3 className="text-xl font-semibold text-slate-800">Recent Purchase Requests</h3>
-                            <p className="mt-1 text-sm text-slate-500">Secondary evidence list after executive visual summaries.</p>
-                        </div>
-                        {recent.purchase_requests.length === 0 ? (
-                            <p className="px-6 py-8 text-sm text-slate-500">No purchase requests found for the selected filters.</p>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-slate-200 text-sm">
-                                    <thead className="bg-slate-50">
-                                        <tr>
-                                            <th className="px-4 py-2 text-left">ID</th>
-                                            <th className="px-4 py-2 text-left">Office</th>
-                                            <th className="px-4 py-2 text-left">Status</th>
-                                            <th className="px-4 py-2 text-left">Created</th>
+                <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+                    <div className="border-b border-slate-200 px-6 py-5">
+                        <h3 className="text-xl font-semibold text-slate-800">Latest Procurement Records</h3>
+                    </div>
+                    {recent.purchase_orders.length === 0 ? (
+                        <p className="px-6 py-8 text-sm text-slate-500">No data in current filter scope</p>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-slate-200 text-sm">
+                                <thead className="bg-slate-50">
+                                    <tr>
+                                        <th className="px-4 py-2 text-left">PO</th>
+                                        <th className="px-4 py-2 text-left">Office</th>
+                                        <th className="px-4 py-2 text-left">Status</th>
+                                        <th className="px-4 py-2 text-left">Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {recent.purchase_orders.map((row) => (
+                                        <tr key={row.purchase_order_id}>
+                                            <td className="px-4 py-2">PO-{row.purchase_order_id}</td>
+                                            <td className="px-4 py-2">{row.purchase_request?.office?.name ?? 'N/A'}</td>
+                                            <td className="px-4 py-2">{row.status}</td>
+                                            <td className="px-4 py-2">{formatCurrency(row.total_amount)}</td>
                                         </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {recent.purchase_requests.map((row) => (
-                                            <tr key={row.purchase_request_id}>
-                                                <td className="px-4 py-2">{row.purchase_request_id}</td>
-                                                <td className="px-4 py-2">{row.office?.name ?? 'N/A'}</td>
-                                                <td className="px-4 py-2">{row.status}</td>
-                                                <td className="px-4 py-2">{new Date(row.created_at).toLocaleDateString()}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </section>
-
-                    <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-                        <div className="border-b border-slate-200 px-6 py-5">
-                            <h3 className="text-xl font-semibold text-slate-800">Recent Purchase Orders</h3>
-                            <p className="mt-1 text-sm text-slate-500">Secondary evidence list after executive visual summaries.</p>
+                                    ))}
+                                </tbody>
+                            </table>
                         </div>
-                        {recent.purchase_orders.length === 0 ? (
-                            <p className="px-6 py-8 text-sm text-slate-500">No purchase orders found for the selected filters.</p>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-slate-200 text-sm">
-                                    <thead className="bg-slate-50">
-                                        <tr>
-                                            <th className="px-4 py-2 text-left">ID</th>
-                                            <th className="px-4 py-2 text-left">Office</th>
-                                            <th className="px-4 py-2 text-left">Status</th>
-                                            <th className="px-4 py-2 text-left">Amount</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {recent.purchase_orders.map((row) => (
-                                            <tr key={row.purchase_order_id}>
-                                                <td className="px-4 py-2">{row.purchase_order_id}</td>
-                                                <td className="px-4 py-2">{row.purchase_request?.office?.name ?? 'N/A'}</td>
-                                                <td className="px-4 py-2">{row.status}</td>
-                                                <td className="px-4 py-2">{formatCurrency(row.total_amount)}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </section>
-                </div>
+                    )}
+                </section>
             </div>
         </AuthenticatedLayout>
     );
@@ -366,4 +367,17 @@ function formatCurrency(value: number): string {
         currency: 'PHP',
         maximumFractionDigits: 2,
     }).format(value ?? 0);
+}
+
+function downloadCsv(rows: string[][], fileName: string): void {
+    const csv = rows.map((row) => row.map((column) => `"${String(column).replaceAll('"', '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
 }

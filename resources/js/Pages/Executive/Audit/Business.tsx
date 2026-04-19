@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { ExecutiveChartCard, HorizontalBarChart, TrendLineChart } from '@/Components/Executive/Charts';
+import { DonutChart, ExecutiveChartCard, HorizontalBarChart, TrendLineChart } from '@/Components/Executive/Charts';
 import { Head, router } from '@inertiajs/react';
 import { FormEvent, useState } from 'react';
 
@@ -29,20 +29,40 @@ type Props = {
         action_summary: Array<{ label: string; total: number }>;
         daily_trend: Array<{ label: string; total: number }>;
     };
+    filter_options: {
+        modules: string[];
+        actions: string[];
+        users: Array<{ id: number; name: string }>;
+    };
 };
 
-export default function BusinessAudit({ auditLogs, filters, analytics }: Props) {
+export default function BusinessAudit({ auditLogs, filters, analytics, filter_options }: Props) {
+    const selectedUser = filter_options.users.find((user) => String(user.id) === String(filters.user_id ?? ''));
+
     const [form, setForm] = useState({
         module_name: filters.module_name ?? '',
         action_type: filters.action_type ?? '',
-        user_id: filters.user_id ? String(filters.user_id) : '',
+        user_query: selectedUser ? `${selectedUser.name} (#${selectedUser.id})` : '',
         from_date: filters.from_date ?? '',
         to_date: filters.to_date ?? '',
     });
 
     const onSubmit = (event: FormEvent) => {
         event.preventDefault();
-        router.get(route('executive.audit.business'), form, { preserveState: true, replace: true });
+
+        const matchedUser = filter_options.users.find((user) => `${user.name} (#${user.id})` === form.user_query);
+
+        router.get(
+            route('executive.audit.business'),
+            {
+                module_name: form.module_name,
+                action_type: form.action_type,
+                user_id: matchedUser ? matchedUser.id : '',
+                from_date: form.from_date,
+                to_date: form.to_date,
+            },
+            { preserveState: true, replace: true },
+        );
     };
 
     const moduleSummary = analytics.module_summary.map((row) => ({
@@ -60,79 +80,139 @@ export default function BusinessAudit({ auditLogs, filters, analytics }: Props) 
         value: row.total,
     }));
 
-    return (
-        <AuthenticatedLayout header="Audit Trail">
-            <Head title="Business Audit Logs" />
-            <div className="space-y-6 py-8">
-                <section className="overflow-hidden rounded-2xl border border-red-200 bg-white shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
-                    <div className="border-b border-red-200 bg-gradient-to-r from-red-700 via-red-600 to-red-500 px-6 py-4 text-white">
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-100">Business Governance Logs</p>
-                        <p className="text-lg font-semibold">Executive Audit Controls</p>
-                        <p className="text-sm text-red-100">Complete activity trail across oversight-relevant system actions.</p>
-                    </div>
-                    <div className="p-6">
-                        <form onSubmit={onSubmit} className="grid gap-3 md:grid-cols-6">
-                            <input className="rounded-lg border-red-200 text-sm" placeholder="Module" value={form.module_name} onChange={(e) => setForm((v) => ({ ...v, module_name: e.target.value }))} />
-                            <input className="rounded-lg border-red-200 text-sm" placeholder="Action" value={form.action_type} onChange={(e) => setForm((v) => ({ ...v, action_type: e.target.value }))} />
-                            <input className="rounded-lg border-red-200 text-sm" placeholder="User ID" value={form.user_id} onChange={(e) => setForm((v) => ({ ...v, user_id: e.target.value }))} />
-                            <input type="date" className="rounded-lg border-red-200 text-sm" value={form.from_date} onChange={(e) => setForm((v) => ({ ...v, from_date: e.target.value }))} />
-                            <input type="date" className="rounded-lg border-red-200 text-sm" value={form.to_date} onChange={(e) => setForm((v) => ({ ...v, to_date: e.target.value }))} />
+    const exportCsv = () => {
+        const rows = [
+            ['timestamp', 'user', 'module', 'action', 'reference', 'office'],
+            ...auditLogs.data.map((log) => [
+                new Date(log.created_at).toISOString(),
+                log.user?.name ?? 'System',
+                log.module_name,
+                log.action_type,
+                `${log.reference_type}#${log.reference_id}`,
+                log.office?.name ?? 'N/A',
+            ]),
+        ];
 
-                            <div className="md:col-span-6 flex flex-wrap justify-end gap-2 pt-1">
-                                <button
-                                    type="button"
-                                    onClick={() => router.get(route('executive.audit.business'))}
-                                    className="rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
-                                >
-                                    Reset
-                                </button>
-                                <button className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800" type="submit">
-                                    Apply
-                                </button>
-                            </div>
-                        </form>
+        const csv = rows.map((row) => row.map((column) => `"${String(column).replaceAll('"', '""')}"`).join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = window.URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = 'governance-logs.csv';
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        window.URL.revokeObjectURL(url);
+    };
+
+    return (
+        <AuthenticatedLayout header="Governance Logs">
+            <Head title="Governance Logs" />
+            <div className="space-y-6 py-8">
+                <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-200 bg-white px-5 py-4 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
+                    <div>
+                        <h2 className="text-2xl font-semibold text-slate-900">Governance Logs</h2>
+                        <p className="text-sm text-slate-600">Business activity evidence</p>
                     </div>
+                    <div className="flex items-center gap-2">
+                        <button type="button" onClick={() => window.print()} className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
+                            Export PDF
+                        </button>
+                        <button type="button" onClick={exportCsv} className="rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white hover:bg-red-800">
+                            Export CSV
+                        </button>
+                    </div>
+                </section>
+
+                <section className="rounded-2xl border border-red-200 bg-white p-5 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
+                    <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3">
+                        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                            <select className="h-10 rounded-lg border-red-200 text-sm" value={form.module_name} onChange={(e) => setForm((v) => ({ ...v, module_name: e.target.value }))}>
+                                <option value="">All modules</option>
+                                {filter_options.modules.map((moduleName) => (
+                                    <option key={moduleName} value={moduleName}>{moduleName}</option>
+                                ))}
+                            </select>
+
+                            <select className="h-10 rounded-lg border-red-200 text-sm" value={form.action_type} onChange={(e) => setForm((v) => ({ ...v, action_type: e.target.value }))}>
+                                <option value="">All actions</option>
+                                {filter_options.actions.map((actionName) => (
+                                    <option key={actionName} value={actionName}>{actionName}</option>
+                                ))}
+                            </select>
+
+                            <input
+                                list="governance-users"
+                                className="h-10 rounded-lg border-red-200 text-sm"
+                                placeholder="Search user"
+                                value={form.user_query}
+                                onChange={(e) => setForm((v) => ({ ...v, user_query: e.target.value }))}
+                            />
+                            <datalist id="governance-users">
+                                {filter_options.users.map((user) => (
+                                    <option key={user.id} value={`${user.name} (#${user.id})`} />
+                                ))}
+                            </datalist>
+
+                            <input type="date" className="h-10 rounded-lg border-red-200 text-sm" value={form.from_date} onChange={(e) => setForm((v) => ({ ...v, from_date: e.target.value }))} />
+                            <input type="date" className="h-10 rounded-lg border-red-200 text-sm" value={form.to_date} onChange={(e) => setForm((v) => ({ ...v, to_date: e.target.value }))} />
+                        </div>
+
+                        <div className="ml-auto flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => router.get(route('executive.audit.business'))}
+                                className="h-10 rounded-lg border border-red-300 px-4 text-sm font-semibold text-red-700 hover:bg-red-50"
+                            >
+                                Reset
+                            </button>
+                            <button className="h-10 rounded-lg bg-red-700 px-4 text-sm font-semibold text-white hover:bg-red-800" type="submit">
+                                Apply
+                            </button>
+                        </div>
+                    </form>
                 </section>
 
                 <div className="grid gap-6 xl:grid-cols-12">
                     <div className="xl:col-span-12">
                     <ExecutiveChartCard
-                        title="Business Audit Activity Trend"
-                        subtitle="Daily event volume from the active filter scope"
+                        title="Activity Trend"
+                        subtitle="Daily event volume"
                         eyebrow="Trend"
                         tone="critical"
                     >
                         <TrendLineChart
                             data={auditTrend}
-                            emptyText="No business audit trend data in the current filter scope."
+                            emptyText="No data in current filter scope"
                         />
                     </ExecutiveChartCard>
                     </div>
 
                     <div className="xl:col-span-6">
                     <ExecutiveChartCard
-                        title="Actions by Module"
-                        subtitle="Module concentration in the current audit slice"
+                        title="Module Mix"
+                        subtitle="Activity by module"
                         eyebrow="Module Mix"
                         tone="neutral"
                     >
                         <HorizontalBarChart
                             data={moduleSummary}
-                            emptyText="No audit activity in the current filter scope."
+                            emptyText="No data in current filter scope"
                         />
                     </ExecutiveChartCard>
                     </div>
 
                     <div className="xl:col-span-6">
                     <ExecutiveChartCard
-                        title="Actions by Type"
-                        subtitle="Most common action types in current filters"
+                        title="Action Mix"
+                        subtitle="Event type distribution"
                         eyebrow="Action Mix"
                         tone="default"
                     >
-                        <HorizontalBarChart
+                        <DonutChart
                             data={actionSummary}
-                            emptyText="No action summary is available in the current filter scope."
+                            centerLabel="Actions"
+                            emptyText="No data in current filter scope"
                         />
                     </ExecutiveChartCard>
                     </div>
@@ -140,12 +220,11 @@ export default function BusinessAudit({ auditLogs, filters, analytics }: Props) 
 
                 <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
                     <div className="border-b border-slate-200 px-6 py-5">
-                        <h3 className="text-xl font-semibold text-slate-900">System Audit Trail</h3>
-                        <p className="mt-1 text-sm text-slate-600">Complete activity log of executive-facing business transactions.</p>
+                        <h3 className="text-xl font-semibold text-slate-900">Latest Business Logs</h3>
                     </div>
 
                     {auditLogs.data.length === 0 ? (
-                        <p className="px-6 py-10 text-sm text-slate-500">No audit logs found for the selected filters.</p>
+                        <p className="px-6 py-10 text-sm text-slate-500">No data in current filter scope</p>
                     ) : (
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-slate-200 text-sm">

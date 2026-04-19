@@ -1,7 +1,8 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import AttachmentsPanel from '@/Components/AttachmentsPanel';
 import ApprovalHistoryTimeline from '@/Components/ApprovalHistoryTimeline';
 import StatusHistoryTimeline from '@/Components/StatusHistoryTimeline';
-import { Head } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 
 type Props = {
     disclosure: {
@@ -11,6 +12,17 @@ type Props = {
         status: string;
         description?: string | null;
         file_path?: string | null;
+    };
+    attachments: Array<{
+        document_id: number;
+        title: string;
+        file_name: string;
+        uploaded_at?: string | null;
+        uploader_name?: string | null;
+    }>;
+    attachmentPermissions: {
+        upload: boolean;
+        delete: boolean;
     };
     statusHistory: Array<{
         id: number;
@@ -29,7 +41,15 @@ type Props = {
     }>;
 };
 
-export default function DisclosureShow({ disclosure, statusHistory, approvalHistory }: Props) {
+export default function DisclosureShow({ disclosure, attachments, attachmentPermissions, statusHistory, approvalHistory }: Props) {
+    const publishForm = useForm({ remarks: '' });
+
+    const onPublish = () => {
+        publishForm.put(route('executive.disclosures.publish', disclosure.disclosure_id), {
+            preserveScroll: true,
+        });
+    };
+
     return (
         <AuthenticatedLayout header="Disclosure Detail">
             <Head title="Disclosure Detail" />
@@ -50,9 +70,51 @@ export default function DisclosureShow({ disclosure, statusHistory, approvalHist
                         <p><strong>File:</strong> {disclosure.file_path ?? '-'}</p>
                     </div>
 
+                    <div className="flex flex-wrap gap-2">
+                        {disclosure.status === 'DRAFT' && (
+                            <Link href={route('executive.disclosures.edit', disclosure.disclosure_id)} className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                                Edit Draft
+                            </Link>
+                        )}
+                        <Link href={route('executive.disclosures.index')} className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                            Back to Disclosure Review
+                        </Link>
+                    </div>
+
                     <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
                         This view is read-only for executive monitoring.
                     </div>
+
+                    {disclosure.status === 'DRAFT' && (
+                        <section className="rounded-2xl border border-red-200 bg-white p-6 shadow-sm">
+                            <h3 className="text-lg font-semibold text-slate-900">Publish Disclosure</h3>
+                            <p className="mt-1 text-sm text-slate-600">Publishing makes this disclosure visible to public pages and public downloads.</p>
+                            <textarea
+                                className="mt-4 w-full rounded border px-3 py-2 text-sm"
+                                placeholder="Publication remarks (optional)"
+                                value={publishForm.data.remarks}
+                                onChange={(event) => publishForm.setData('remarks', event.target.value)}
+                            />
+                            <button
+                                type="button"
+                                onClick={onPublish}
+                                disabled={publishForm.processing}
+                                className="mt-3 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-60"
+                            >
+                                Publish Disclosure
+                            </button>
+                        </section>
+                    )}
+
+                    <AttachmentsPanel
+                        title="Disclosure Attachments"
+                        attachments={attachments}
+                        uploadRoute={route('documents.store', { related_module: 'public_disclosures', related_reference_id: disclosure.disclosure_id })}
+                        canUpload={attachmentPermissions.upload}
+                        canDelete={attachmentPermissions.delete}
+                        downloadRouteFor={(documentId: number) => route('documents.show', documentId)}
+                        deleteRouteFor={(documentId: number) => route('documents.destroy', documentId)}
+                    />
 
                     <StatusHistoryTimeline entries={statusHistory} />
                     <ApprovalHistoryTimeline entries={approvalHistory} />

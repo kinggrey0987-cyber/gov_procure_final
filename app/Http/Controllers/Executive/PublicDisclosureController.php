@@ -4,10 +4,14 @@ namespace App\Http\Controllers\Executive;
 
 use App\Http\Requests\PublicDisclosure\PublishPublicDisclosureRequest;
 use App\Http\Requests\PublicDisclosure\StorePublicDisclosureRequest;
+use App\Http\Requests\PublicDisclosure\UpdatePublicDisclosureRequest;
 use App\Models\PublicDisclosure;
 use App\Services\Analytics\PublicDisclosureService;
+use App\Services\Documents\DocumentService;
+use App\Services\Executive\DisclosureEligibilityService;
 use App\Services\History\HistoryTimelineService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -17,12 +21,15 @@ class PublicDisclosureController
     public function __construct(
         private readonly PublicDisclosureService $disclosureService,
         private readonly HistoryTimelineService $historyTimelineService,
+        private readonly DisclosureEligibilityService $eligibilityService,
+        private readonly DocumentService $documentService,
     ) {
     }
 
     public function index(): Response
     {
-        abort_unless(auth()->user()->can('public-disclosure.view'), 403);
+        $user = Auth::user();
+        abort_unless($user && $user->can('public-disclosure.view'), 403);
 
         $disclosures = PublicDisclosure::query()
             ->with('publisher')
@@ -36,31 +43,85 @@ class PublicDisclosureController
 
     public function create(): Response
     {
-        abort_unless(auth()->user()->can('public-disclosure.manage'), 403);
+        $user = Auth::user();
+        abort_unless($user && $user->can('public-disclosure.manage'), 403);
 
-        return Inertia::render('Executive/Disclosures/Create');
+        return Inertia::render('Executive/Disclosures/Create', [
+            'eligibleSources' => $this->eligibilityService->listEligibleRecords(),
+        ]);
+    }
+
+    public function edit(PublicDisclosure $public_disclosure): Response
+    {
+        $user = Auth::user();
+        abort_unless($user && $user->can('public-disclosure.manage'), 403);
+
+        abort_unless((string) $public_disclosure->status === 'DRAFT', 403);
+
+        return Inertia::render('Executive/Disclosures/Edit', [
+            'disclosure' => $public_disclosure,
+            'eligibleSources' => $this->eligibilityService->listEligibleRecords(),
+        ]);
     }
 
     public function store(StorePublicDisclosureRequest $request): RedirectResponse
     {
-        abort_unless(auth()->user()->can('public-disclosure.manage'), 403);
+        $user = Auth::user();
+        abort_unless($user && $user->can('public-disclosure.manage'), 403);
 
-        $disclosure = $this->disclosureService->createDraft(auth()->user(), $request->validated());
+        $disclosure = $this->disclosureService->createFromPayload($user, $request->validated());
 
         return Redirect::route('executive.disclosures.show', $disclosure->disclosure_id)
-            ->with('success', 'Disclosure draft created successfully.');
+            ->with('success', (string) $disclosure->status === 'PUBLISHED' ? 'Disclosure published successfully.' : 'Disclosure draft created successfully.');
+    }
+
+    public function update(UpdatePublicDisclosureRequest $request, PublicDisclosure $public_disclosure): RedirectResponse
+    {
+        $user = Auth::user();
+        abort_unless($user && $user->can('public-disclosure.manage'), 403);
+
+        $payload = $request->validated();
+
+        $updated = $this->disclosureService->updateDraft($public_disclosure, $user, $payload);
+
+        if (strtoupper((string) ($payload['status'] ?? 'DRAFT')) === 'PUBLISHED') {
+            $updated = $this->disclosureService->publish(
+                disclosure: $updated,
+                actor: $user,
+                remarks: $payload['remarks'] ?? null,
+            );
+        }
+
+        return Redirect::route('executive.disclosures.show', $public_disclosure->disclosure_id)
+            ->with('success', (string) $updated->status === 'PUBLISHED' ? 'Disclosure published successfully.' : 'Disclosure draft updated successfully.');
     }
 
     public function show(PublicDisclosure $public_disclosure): Response
     {
-        abort_unless(auth()->user()->can('public-disclosure.view'), 403);
+        $user = Auth::user();
+        abort_unless($user && $user->can('public-disclosure.view'), 403);
 
-        $history = $this->historyTimelineService->forRecord(auth()->user(), $public_disclosure);
+        $history = $this->historyTimelineService->forRecord($user, $public_disclosure);
+
+        $attachments = $this->documentService
+            ->listForRelated($user, 'public_disclosures', (int) $public_disclosure->disclosure_id)
+            ->map(fn ($document): array => [
+                'document_id' => (int) $document->document_id,
+                'title' => (string) $document->title,
+                'file_name' => (string) $document->file_name,
+                'uploaded_at' => optional($document->uploaded_at)?->toIso8601String(),
+                'uploader_name' => $document->uploader?->name,
+            ])->values();
 
         $public_disclosure->load(['publisher', 'statusHistory.changedBy']);
 
         return Inertia::render('Executive/Disclosures/Show', [
             'disclosure' => $public_disclosure,
+            'attachments' => $attachments,
+            'attachmentPermissions' => [
+                'upload' => (string) $public_disclosure->status === 'DRAFT',
+                'delete' => (string) $public_disclosure->status === 'DRAFT',
+            ],
             'statusHistory' => $history['status']->map(fn ($entry): array => [
                 'id' => (int) $entry->id,
                 'old_status' => $entry->old_status,
@@ -87,11 +148,12 @@ class PublicDisclosureController
 
     public function publish(PublishPublicDisclosureRequest $request, PublicDisclosure $public_disclosure): RedirectResponse
     {
-        abort_unless(auth()->user()->can('public-disclosure.publish', $public_disclosure), 403);
+        $user = Auth::user();
+        abort_unless($user && $user->can('public-disclosure.publish', $public_disclosure), 403);
 
         $this->disclosureService->publish(
             disclosure: $public_disclosure,
-            actor: auth()->user(),
+            actor: $user,
             remarks: $request->validated('remarks'),
         );
 

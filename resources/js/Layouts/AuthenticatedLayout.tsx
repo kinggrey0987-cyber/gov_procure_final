@@ -558,12 +558,12 @@ export default function Authenticated({
                 active: route().current('executive.dashboard'),
             },
             {
-                label: 'Procurement Analytics',
+                label: 'Procurement Insights',
                 href: route('executive.procurement-analytics'),
                 active: route().current('executive.procurement-analytics'),
             },
             {
-                label: 'Anomalies and Alerts',
+                label: 'Risk & Alerts',
                 href: route('executive.anomalies-monitoring'),
                 active:
                     route().current('executive.anomalies-monitoring') ||
@@ -577,24 +577,14 @@ export default function Authenticated({
                 active: route().current('executive.ppmp-approvals.*'),
             },
             {
-                label: 'Audit Trail',
+                label: 'Governance Logs',
                 href: route('executive.audit.business'),
                 active: route().current('executive.audit.*'),
             },
             {
-                label: 'Reports',
-                href: route('executive.reports'),
-                active: route().current('executive.reports'),
-            },
-            {
-                label: 'Transparency Monitoring',
+                label: 'Transparency & Disclosures',
                 href: route('executive.transparency-monitoring'),
-                active: route().current('executive.transparency-monitoring'),
-            },
-            {
-                label: 'Disclosure Review',
-                href: route('executive.disclosures.index'),
-                active: route().current('executive.disclosures.*'),
+                active: route().current('executive.transparency-monitoring') || route().current('executive.disclosures.*'),
             },
             {
                 label: 'Profile',

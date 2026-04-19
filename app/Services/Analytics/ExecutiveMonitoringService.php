@@ -340,6 +340,12 @@ class ExecutiveMonitoringService
                 ->orderByDesc('total')
                 ->limit(10)
                 ->get(),
+            'anomaly_severity_breakdown' => (clone $anomalyBase)
+                ->selectRaw('severity as label, COUNT(*) as total')
+                ->whereNotNull('severity')
+                ->groupBy('severity')
+                ->orderByDesc('total')
+                ->get(),
             'alert_severity_breakdown' => (clone $alertBase)
                 ->selectRaw('severity as label, COUNT(*) as total')
                 ->whereNotNull('severity')
@@ -427,6 +433,7 @@ class ExecutiveMonitoringService
                 'type' => $filters['type'] ?? null,
                 'from_date' => $filters['from_date'] ?? null,
                 'to_date' => $filters['to_date'] ?? null,
+                'tab' => $filters['tab'] ?? 'overview',
             ],
             'filter_options' => [
                 'statuses' => PublicDisclosure::query()->select('status')->whereNotNull('status')->distinct()->orderBy('status')->pluck('status')->values(),
@@ -447,11 +454,32 @@ class ExecutiveMonitoringService
                 ->groupBy('type')
                 ->orderBy('type')
                 ->get(),
+            'office_publication_mix' => PublicDisclosure::query()
+                ->published()
+                ->leftJoin('users', 'users.id', '=', 'public_disclosures.published_by')
+                ->leftJoin('offices', 'offices.id', '=', 'users.office_id')
+                ->selectRaw('COALESCE(offices.name, ?) as label, COUNT(*) as total', ['Unassigned'])
+                ->groupBy('offices.name')
+                ->orderByDesc('total')
+                ->limit(10)
+                ->get(),
             'monthly_publication_trend' => $this->buildMonthlyTrendByColumn((clone $base)->get(['published_at', 'created_at']), 'published_at'),
             'recent_disclosures' => (clone $base)
                 ->latest('published_at')
                 ->limit(10)
                 ->get(['disclosure_id', 'title', 'type', 'status', 'published_at', 'published_by', 'created_at']),
+            'published_disclosures' => PublicDisclosure::query()
+                ->with('publisher:id,name')
+                ->published()
+                ->latest('published_at')
+                ->limit(25)
+                ->get(['disclosure_id', 'title', 'type', 'status', 'published_at', 'published_by', 'created_at', 'file_path']),
+            'draft_disclosures' => PublicDisclosure::query()
+                ->with('publisher:id,name')
+                ->where('status', 'DRAFT')
+                ->latest('updated_at')
+                ->limit(25)
+                ->get(['disclosure_id', 'title', 'type', 'status', 'published_at', 'published_by', 'created_at', 'updated_at', 'file_path']),
         ];
     }
 

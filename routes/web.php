@@ -665,6 +665,12 @@ Route::middleware(['auth', 'twofactor', 'must-change-password'])->group(function
                 Route::post('/', [PublicDisclosureController::class, 'store'])
                     ->middleware('can:public-disclosure.manage')
                     ->name('store');
+                Route::get('/{public_disclosure}/edit', [PublicDisclosureController::class, 'edit'])
+                    ->middleware('can:public-disclosure.manage')
+                    ->name('edit');
+                Route::put('/{public_disclosure}', [PublicDisclosureController::class, 'update'])
+                    ->middleware('can:public-disclosure.manage')
+                    ->name('update');
                 Route::get('/{public_disclosure}', [PublicDisclosureController::class, 'show'])
                     ->middleware('can:public-disclosure.view')
                     ->name('show');
@@ -687,6 +693,9 @@ Route::prefix('public')
         Route::get('/disclosures/{public_disclosure}', [PublicDisclosurePortalController::class, 'show'])
             ->middleware('can:public.disclosures.view')
             ->name('disclosures.show');
+        Route::get('/disclosures/{public_disclosure}/download', [PublicDisclosurePortalController::class, 'download'])
+            ->middleware('can:public.disclosures.view')
+            ->name('disclosures.download');
         Route::get('/disclosures/{public_disclosure}/documents/{document}', [DocumentController::class, 'downloadPublicDisclosureDocument'])
             ->middleware('can:public.disclosures.view')
             ->name('disclosures.documents.download');

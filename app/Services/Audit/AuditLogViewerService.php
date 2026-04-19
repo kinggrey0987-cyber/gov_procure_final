@@ -95,6 +95,48 @@ class AuditLogViewerService
     }
 
     /**
+     * @return array<string, Collection>
+     */
+    public function businessFilterOptions(User $actor): array
+    {
+        if (! $actor->can('audit.business.view')) {
+            throw ValidationException::withMessages([
+                'authorization' => 'Not authorized for business audit analytics.',
+            ]);
+        }
+
+        $businessBase = AuditLog::query()->business();
+
+        $moduleOptions = (clone $businessBase)
+            ->select('module_name')
+            ->whereNotNull('module_name')
+            ->distinct()
+            ->orderBy('module_name')
+            ->pluck('module_name')
+            ->values();
+
+        $actionOptions = (clone $businessBase)
+            ->select('action_type')
+            ->whereNotNull('action_type')
+            ->distinct()
+            ->orderBy('action_type')
+            ->pluck('action_type')
+            ->values();
+
+        $userOptions = User::query()
+            ->whereIn('id', (clone $businessBase)->whereNotNull('user_id')->select('user_id')->distinct())
+            ->select(['id', 'name'])
+            ->orderBy('name')
+            ->get();
+
+        return [
+            'modules' => $moduleOptions,
+            'actions' => $actionOptions,
+            'users' => $userOptions,
+        ];
+    }
+
+    /**
      * @param  array<string, mixed>  $filters
      */
     private function buildBaseQuery(array $filters): Builder

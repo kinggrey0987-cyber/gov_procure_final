@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { DonutChart, ExecutiveChartCard, GroupedComparisonChart, HorizontalBarChart, TrendLineChart } from '@/Components/Executive/Charts';
-import { Head, Link } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 
 type OfficeBreakdown = {
     id: number;
@@ -41,7 +41,6 @@ type Props = {
         recently_approved: number;
         status_mix: Array<{ status: string; total: number }>;
     };
-    anomaly_type_breakdown: Array<{ label: string; total: number }>;
     alert_severity_breakdown: Array<{ label: string; total: number }>;
     recent_business_logs: Array<{
         id: number;
@@ -58,38 +57,21 @@ export default function ExecutiveDashboardIndex({
     procurement,
     transparency,
     approvals,
-    anomaly_type_breakdown,
     alert_severity_breakdown,
     recent_business_logs,
 }: Props) {
-    const officePulse = summary.office_breakdown
+    const officeOversight = summary.office_breakdown
         .map((office) => ({
             label: office.name,
-            first: office.anomaly_count,
-            second: office.alert_count,
-            total: office.anomaly_count + office.alert_count,
+            value: office.anomaly_count + office.alert_count,
         }))
-        .sort((a, b) => b.total - a.total)
-        .slice(0, 6)
-        .map(({ label, first, second }) => ({ label, first, second }));
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 8);
 
-    const riskMix = [
-        { label: 'Open Anomalies', value: summary.open_anomaly_count },
-        { label: 'In Review Anomalies', value: summary.in_review_anomaly_count },
-        { label: 'High Severity Anomalies', value: summary.high_severity_anomaly_count },
-        { label: 'Open Alerts', value: summary.open_alert_count },
-        { label: 'In Review Alerts', value: summary.in_review_alert_count },
-        { label: 'High Severity Alerts', value: summary.high_severity_alert_count },
-    ];
-
-    const procurementSnapshot = [
-        { label: 'Purchase Requests', value: procurement.purchase_request_count },
-        { label: 'Purchase Orders', value: procurement.purchase_order_count },
-    ];
-
-    const disclosureSnapshot = [
-        { label: 'Published', value: transparency.published_disclosure_count },
-        { label: 'Draft', value: transparency.draft_disclosure_count },
+    const riskSnapshot = [
+        { label: 'Open', first: summary.open_anomaly_count, second: summary.open_alert_count },
+        { label: 'In Review', first: summary.in_review_anomaly_count, second: summary.in_review_alert_count },
+        { label: 'High Severity', first: summary.high_severity_anomaly_count, second: summary.high_severity_alert_count },
     ];
 
     const procurementTrend = mergeTrend(
@@ -102,27 +84,52 @@ export default function ExecutiveDashboardIndex({
         value: row.total,
     }));
 
-    const disclosureStatusMix = transparency.status_breakdown.map((row) => ({
-        label: row.status || 'N/A',
+    const alertSeverityMix = alert_severity_breakdown.map((row) => ({
+        label: row.label || 'N/A',
         value: row.total,
     }));
 
-    const executiveSignals = [
-        { label: 'Cross Office Anomalies', value: String(summary.cross_office_anomaly_count) },
-        { label: 'Purchase Orders', value: String(procurement.purchase_order_count) },
-        { label: 'Draft Disclosures', value: String(transparency.draft_disclosure_count) },
-        { label: 'Total PO Amount', value: formatCurrency(procurement.total_purchase_order_amount) },
-    ];
+    const exportCsv = () => {
+        const lines = [
+            ['metric', 'value'],
+            ['open_anomalies', String(summary.open_anomaly_count)],
+            ['open_alerts', String(summary.open_alert_count)],
+            ['purchase_requests', String(procurement.purchase_request_count)],
+            ['published_disclosures', String(transparency.published_disclosure_count)],
+            ['purchase_orders', String(procurement.purchase_order_count)],
+            ['total_po_amount', String(procurement.total_purchase_order_amount)],
+        ];
+
+        const csv = lines.map((row) => row.map(csvValue).join(',')).join('\n');
+        downloadFile(csv, 'executive-dashboard.csv', 'text/csv;charset=utf-8;');
+    };
 
     return (
         <AuthenticatedLayout header="Executive Dashboard">
             <Head title="Executive Dashboard" />
 
             <div className="space-y-6 py-8">
-                <section className="overflow-hidden rounded-2xl border border-red-200 bg-gradient-to-r from-red-700 via-red-600 to-red-500 px-6 py-5 text-white shadow-[0_10px_28px_rgba(185,28,28,0.25)]">
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-100">Executive Risk Brief</p>
-                    <h3 className="mt-1 text-2xl font-semibold">Procurement Oversight and Irregularity Signals</h3>
-                    <p className="mt-1 text-sm text-red-100">Live indicators from anomalies, alerts, purchasing activity, and disclosure governance.</p>
+                <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-200 bg-white px-5 py-4 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
+                    <div>
+                        <h2 className="text-2xl font-semibold text-slate-900">Executive DSS Home</h2>
+                        <p className="text-sm text-slate-600">Live oversight view</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => window.print()}
+                            className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
+                        >
+                            Export PDF
+                        </button>
+                        <button
+                            type="button"
+                            onClick={exportCsv}
+                            className="rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white hover:bg-red-800"
+                        >
+                            Export CSV
+                        </button>
+                    </div>
                 </section>
 
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -132,64 +139,17 @@ export default function ExecutiveDashboardIndex({
                     <MetricCard label="Published Disclosures" value={transparency.published_disclosure_count} tone="emerald" />
                 </div>
 
-                <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-                    <div className="border-b border-slate-200 px-6 py-5">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div>
-                                <h3 className="text-xl font-semibold text-slate-900">Executive Approval Queue</h3>
-                                <p className="mt-1 text-sm text-slate-600">Final PPMP signoff pipeline for executive authority decisions.</p>
-                            </div>
-                            <Link href={route('executive.ppmp-approvals.index')} className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
-                                Open Executive Approvals
-                            </Link>
-                        </div>
-                    </div>
-                    <div className="grid gap-3 p-6 md:grid-cols-2 lg:grid-cols-4">
-                        <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-4">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">Pending PPMP Approvals</p>
-                            <p className="mt-2 text-2xl font-semibold text-slate-900">{approvals.pending_ppmp_approvals}</p>
-                        </div>
-                        <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-4">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">PPMP Records in Workflow</p>
-                            <p className="mt-2 text-2xl font-semibold text-slate-900">{approvals.ppmp_workflow_total}</p>
-                        </div>
-                        <div className="rounded-xl border border-blue-200 bg-blue-50/70 px-4 py-4">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-blue-800">Returned for Revision</p>
-                            <p className="mt-2 text-2xl font-semibold text-slate-900">{approvals.returned_for_revision}</p>
-                        </div>
-                        <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-4">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">Recently Approved</p>
-                            <p className="mt-2 text-2xl font-semibold text-slate-900">{approvals.recently_approved}</p>
-                        </div>
-                    </div>
-                </section>
-
-                <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-                    <div className="border-b border-slate-200 px-6 py-5">
-                        <h3 className="text-xl font-semibold text-slate-900">Executive Summary</h3>
-                        <p className="mt-1 text-sm text-slate-600">High-level governance signals across procurement, risk, and transparency.</p>
-                    </div>
-                    <div className="grid gap-3 p-6 md:grid-cols-2 lg:grid-cols-4">
-                        {executiveSignals.map((signal) => (
-                            <div key={signal.label} className="rounded-xl border border-red-100 bg-gradient-to-b from-red-50/60 to-white px-4 py-4">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">{signal.label}</p>
-                                <p className="mt-2 text-2xl font-semibold text-slate-900">{signal.value}</p>
-                            </div>
-                        ))}
-                    </div>
-                </section>
-
                 <div className="grid gap-6 xl:grid-cols-12">
                     <div className="xl:col-span-8">
                     <ExecutiveChartCard
-                        title="Procurement Activity Trend"
-                        subtitle="Requests and orders over time for executive capacity monitoring"
-                        eyebrow="Trend"
+                        title="Procurement Trend"
+                        subtitle="PR and PO movement"
+                        eyebrow="Main Insight"
                         tone="critical"
                     >
                         <TrendLineChart
                             data={procurementTrend}
-                            emptyText="No procurement trend activity found yet."
+                            emptyText="No data in current filter scope"
                         />
                     </ExecutiveChartCard>
                     </div>
@@ -197,118 +157,67 @@ export default function ExecutiveDashboardIndex({
                     <div className="xl:col-span-4">
                     <ExecutiveChartCard
                         title="PPMP Workflow Mix"
-                        subtitle="Current approval-status distribution"
-                        eyebrow="Approvals"
+                        subtitle="Approval state"
+                        eyebrow="Main Insight"
                         tone="default"
                     >
                         <DonutChart
                             data={approvalStatusMix}
                             centerLabel="PPMP"
-                            emptyText="No PPMP workflow records in the current scope."
+                            emptyText="No data in current filter scope"
                         />
                     </ExecutiveChartCard>
                     </div>
 
-                    <div className="xl:col-span-7">
+                    <div className="xl:col-span-8">
                     <ExecutiveChartCard
-                        title="Anomaly and Alert Overview"
-                        subtitle="Live anomaly and alert pressure by review state"
-                        eyebrow="Risk Snapshot"
+                        title="Risk Snapshot"
+                        subtitle="Anomalies vs alerts"
+                        eyebrow="Secondary Insight"
                         tone="critical"
-                    >
-                        <HorizontalBarChart data={riskMix} emptyText="No anomaly or alert records available yet." />
-                    </ExecutiveChartCard>
-                    </div>
-
-                    <div className="xl:col-span-5">
-                    <ExecutiveChartCard
-                        title="Office Oversight Comparison"
-                        subtitle="Top offices by combined anomaly and alert volume"
-                        eyebrow="Cross-Office"
-                        tone="default"
                     >
                         <GroupedComparisonChart
-                            data={officePulse}
+                            data={riskSnapshot}
                             firstLabel="Anomalies"
                             secondLabel="Alerts"
-                            emptyText="No office-level anomaly or alert data available."
+                            emptyText="No data in current filter scope"
                         />
                     </ExecutiveChartCard>
                     </div>
 
-                    <div className="xl:col-span-6">
-                    <ExecutiveChartCard
-                        title="Procurement Activity Snapshot"
-                        subtitle="Current filtered purchasing volume summary"
-                        eyebrow="Procurement"
-                        tone="neutral"
-                    >
-                        <HorizontalBarChart data={procurementSnapshot} emptyText="No procurement activity found in the current scope." />
-                    </ExecutiveChartCard>
-                    </div>
-
-                    <div className="xl:col-span-6">
-                    <ExecutiveChartCard
-                        title="Transparency Disclosure Snapshot"
-                        subtitle="Published versus draft disclosure count"
-                        eyebrow="Transparency"
-                        tone="warning"
-                    >
-                        <HorizontalBarChart data={disclosureSnapshot} emptyText="No disclosure records found in the current scope." />
-                    </ExecutiveChartCard>
-                    </div>
-
-                    <div className="xl:col-span-6">
-                    <ExecutiveChartCard
-                        title="Anomaly Type Mix"
-                        subtitle="Top anomaly categories requiring executive attention"
-                        eyebrow="Risk Signals"
-                        tone="critical"
-                    >
-                        <HorizontalBarChart
-                            data={anomaly_type_breakdown.map((row) => ({ label: row.label || 'N/A', value: row.total }))}
-                            emptyText="No anomaly type records found in the current scope."
-                        />
-                    </ExecutiveChartCard>
-                    </div>
-
-                    <div className="xl:col-span-6">
+                    <div className="xl:col-span-4">
                     <ExecutiveChartCard
                         title="Alert Severity Mix"
-                        subtitle="Severity distribution from current alert inventory"
-                        eyebrow="Alert Pressure"
+                        subtitle="Current alert pressure"
+                        eyebrow="Secondary Insight"
                         tone="warning"
                     >
-                        <HorizontalBarChart
-                            data={alert_severity_breakdown.map((row) => ({ label: row.label || 'N/A', value: row.total }))}
-                            emptyText="No alert severity data found in the current scope."
+                        <DonutChart
+                            data={alertSeverityMix}
+                            centerLabel="Alerts"
+                            emptyText="No data in current filter scope"
                         />
                     </ExecutiveChartCard>
                     </div>
 
                     <div className="xl:col-span-12">
                     <ExecutiveChartCard
-                        title="Disclosure Governance Mix"
-                        subtitle="Status composition of disclosure records"
-                        eyebrow="Transparency"
+                        title="Office Oversight Comparison"
+                        subtitle="Risk volume by office"
+                        eyebrow="Comparative Insight"
                         tone="neutral"
                     >
-                        <DonutChart
-                            data={disclosureStatusMix}
-                            centerLabel="Disclosures"
-                            emptyText="No disclosure status records found in the current scope."
-                        />
+                        <HorizontalBarChart data={officeOversight} emptyText="No data in current filter scope" />
                     </ExecutiveChartCard>
                     </div>
                 </div>
 
                 <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
                     <div className="border-b border-slate-200 px-6 py-5">
-                        <h3 className="text-xl font-semibold text-slate-900">Latest Executive Audit Evidence</h3>
-                        <p className="mt-1 text-sm text-slate-600">Recent business-log activities linked to executive oversight decisions.</p>
+                        <h3 className="text-xl font-semibold text-slate-900">Latest Executive Logs</h3>
                     </div>
                     {recent_business_logs.length === 0 ? (
-                        <p className="px-6 py-8 text-sm text-slate-500">No recent business logs are available.</p>
+                        <p className="px-6 py-8 text-sm text-slate-500">No data in current filter scope</p>
                     ) : (
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-slate-200 text-sm">
@@ -335,30 +244,6 @@ export default function ExecutiveDashboardIndex({
                             </table>
                         </div>
                     )}
-                </section>
-
-                <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-                    <div className="border-b border-slate-200 px-6 py-5">
-                        <h3 className="text-xl font-semibold text-slate-900">Executive Navigation</h3>
-                        <p className="mt-1 text-sm text-slate-600">Jump to detailed analytics, risk monitoring, and governance evidence trails.</p>
-                    </div>
-                    <div className="grid gap-3 p-6 sm:grid-cols-2 lg:grid-cols-4">
-                        <Link href={route('executive.procurement-analytics')} className="rounded-xl border border-red-200 bg-red-50/40 px-4 py-5 text-center text-sm font-semibold text-red-800 transition hover:border-red-500 hover:bg-red-100/50">
-                            Procurement Analytics
-                        </Link>
-                        <Link href={route('executive.anomalies-monitoring')} className="rounded-xl border border-red-200 bg-red-50/40 px-4 py-5 text-center text-sm font-semibold text-red-800 transition hover:border-red-500 hover:bg-red-100/50">
-                            Anomalies and Alerts
-                        </Link>
-                        <Link href={route('executive.ppmp-approvals.index')} className="rounded-xl border border-red-200 bg-red-50/40 px-4 py-5 text-center text-sm font-semibold text-red-800 transition hover:border-red-500 hover:bg-red-100/50">
-                            Executive Approvals
-                        </Link>
-                        <Link href={route('executive.audit.business')} className="rounded-xl border border-red-200 bg-red-50/40 px-4 py-5 text-center text-sm font-semibold text-red-800 transition hover:border-red-500 hover:bg-red-100/50">
-                            Audit Trail
-                        </Link>
-                        <Link href={route('executive.transparency-monitoring')} className="rounded-xl border border-red-200 bg-red-50/40 px-4 py-5 text-center text-sm font-semibold text-red-800 transition hover:border-red-500 hover:bg-red-100/50">
-                            Transparency Monitoring
-                        </Link>
-                    </div>
                 </section>
             </div>
         </AuthenticatedLayout>
@@ -419,4 +304,20 @@ function formatCurrency(value: number): string {
         currency: 'PHP',
         maximumFractionDigits: 2,
     }).format(value ?? 0);
+}
+
+function csvValue(value: string): string {
+    return `"${value.replaceAll('"', '""')}"`;
+}
+
+function downloadFile(content: string, fileName: string, mimeType: string): void {
+    const blob = new Blob([content], { type: mimeType });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
 }

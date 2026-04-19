@@ -195,8 +195,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('alert.review', fn (User $user, Alert $alert): bool => $user->isExecutive());
 
         Gate::define('public-disclosure.view', fn (User $user): bool => $user->isExecutive());
-        Gate::define('public-disclosure.manage', fn (User $user): bool => false);
-        Gate::define('public-disclosure.publish', fn (User $user, PublicDisclosure $disclosure): bool => false);
+        Gate::define('public-disclosure.manage', fn (User $user): bool => $user->isExecutive());
+        Gate::define('public-disclosure.publish', fn (User $user, PublicDisclosure $disclosure): bool => $user->isExecutive() && (string) $disclosure->status === 'DRAFT');
 
         Gate::define('notifications.access', fn (User $user): bool => ! $user->isPublicUser());
         Gate::define('notification.view', fn (User $user, Notification $notification): bool => ! $user->isPublicUser() && (int) $notification->user_id === (int) $user->id);

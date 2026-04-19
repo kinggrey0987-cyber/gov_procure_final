@@ -46,6 +46,51 @@ class PublicDisclosureService
         });
     }
 
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    public function createFromPayload(User $actor, array $payload): PublicDisclosure
+    {
+        $status = strtoupper((string) ($payload['status'] ?? 'DRAFT'));
+
+        $draft = $this->createDraft($actor, $payload);
+
+        if ($status === 'PUBLISHED') {
+            return $this->publish($draft, $actor, $payload['remarks'] ?? null);
+        }
+
+        return $draft;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    public function updateDraft(PublicDisclosure $disclosure, User $actor, array $payload): PublicDisclosure
+    {
+        $this->assertExecutive($actor);
+
+        if ((string) $disclosure->status !== 'DRAFT') {
+            throw ValidationException::withMessages([
+                'status' => 'Only DRAFT disclosures can be edited.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($disclosure, $actor, $payload): PublicDisclosure {
+            $disclosure->forceFill([
+                'title' => (string) ($payload['title'] ?? $disclosure->title),
+                'type' => strtoupper((string) ($payload['type'] ?? $disclosure->type)),
+                'reference_type' => $payload['reference_type'] ?? $disclosure->reference_type,
+                'reference_id' => $payload['reference_id'] ?? $disclosure->reference_id,
+                'description' => $payload['description'] ?? $disclosure->description,
+                'file_path' => $payload['file_path'] ?? $disclosure->file_path,
+            ])->save();
+
+            $this->recordAudit($actor, 'UPDATE_DRAFT', $disclosure, []);
+
+            return $disclosure->fresh(['publisher']) ?? $disclosure;
+        });
+    }
+
     public function publish(PublicDisclosure $disclosure, User $actor, ?string $remarks = null): PublicDisclosure
     {
         $this->assertExecutive($actor);

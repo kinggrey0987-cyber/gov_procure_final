@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Executive;
 
 use App\Services\Analytics\ExecutiveMonitoringService;
 use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -56,11 +58,11 @@ class ExecutiveMonitoringController
         return Inertia::render('Executive/Monitoring/AnomaliesAlerts', $this->monitoringService->anomaliesMonitoring($filters));
     }
 
-    public function reports(): Response
+    public function reports(): RedirectResponse
     {
         $this->authorizeView();
 
-        return Inertia::render('Executive/Reports/Index', $this->monitoringService->reports());
+        return redirect()->route('executive.dashboard');
     }
 
     public function transparencyMonitoring(Request $request): Response
@@ -72,6 +74,7 @@ class ExecutiveMonitoringController
             'type' => ['nullable', 'string', 'max:80'],
             'from_date' => ['nullable', 'date'],
             'to_date' => ['nullable', 'date', 'after_or_equal:from_date'],
+            'tab' => ['nullable', 'in:overview,published,drafts'],
         ]);
 
         return Inertia::render('Executive/Transparency/Index', $this->monitoringService->transparencyMonitoring($filters));
@@ -79,6 +82,6 @@ class ExecutiveMonitoringController
 
     private function authorizeView(): void
     {
-        abort_unless(auth()->user()?->can('executive.monitoring.view'), 403);
+        abort_unless(Auth::user()?->can('executive.monitoring.view'), 403);
     }
 }
