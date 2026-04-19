@@ -301,8 +301,8 @@ export function DonutChart({
     let runningOffset = 0;
 
     return (
-        <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,210px)_minmax(0,1fr)] lg:items-center">
-            <div className="mx-auto h-[210px] w-[210px]">
+        <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,196px)_minmax(0,1fr)] lg:items-center">
+            <div className="mx-auto h-[196px] w-[196px]">
                 <svg viewBox="0 0 220 220" className="h-full w-full">
                     <circle
                         cx="110"
@@ -349,10 +349,10 @@ export function DonutChart({
                     const percent = total > 0 ? Math.round((segment.value / total) * 100) : 0;
 
                     return (
-                        <div key={segment.label} className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm">
+                        <div key={segment.label} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm">
                             <div className="flex min-w-0 items-center gap-2">
-                                <span className="h-3 w-3 rounded-full" style={{ backgroundColor: palette[index % palette.length] }} />
-                                <span className="truncate font-medium text-slate-700" title={segment.label}>{segment.label}</span>
+                                <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: palette[index % palette.length] }} />
+                                <span className="font-medium leading-5 text-slate-700" title={segment.label}>{segment.label}</span>
                             </div>
                             <span className="shrink-0 font-semibold text-slate-900">{segment.value} ({percent}%)</span>
                         </div>
