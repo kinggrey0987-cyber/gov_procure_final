@@ -304,35 +304,30 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                     {recent.anomalies.length === 0 ? (
                         <p className="px-5 py-6 text-sm text-slate-500">No anomalies found for the selected filters.</p>
                     ) : (
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-slate-200 text-sm">
-                                <thead className="bg-slate-50">
-                                    <tr>
-                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Anomaly</th>
-                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Severity</th>
-                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Office</th>
-                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Source</th>
-                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Detected vs Expected</th>
-                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Impact Summary</th>
-                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Detected</th>
-                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {recent.anomalies.slice(0, 5).map((row) => (
-                                        <tr key={row.anomaly_id}>
-                                            <td className="px-4 py-2 font-medium text-slate-800">{formatAnomalyType(row.anomaly_type)}</td>
-                                            <td className="px-4 py-2">{SeverityBadge(row.severity)}</td>
-                                            <td className="px-4 py-2 text-slate-700">{row.office?.name ?? 'N/A'}</td>
-                                            <td className="px-4 py-2 text-slate-700">{formatAnomalySource(row)}</td>
-                                            <td className="px-4 py-2 text-slate-700">{formatDetectionVsExpected(row)}</td>
-                                            <td className="px-4 py-2 text-slate-700">{buildAnomalyImpact(row)}</td>
-                                            <td className="px-4 py-2 text-slate-700">{formatDate(row.detected_at)}</td>
-                                            <td className="px-4 py-2">{StatusPill(row.status)}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                        <div className="space-y-3 px-4 py-4">
+                            {recent.anomalies.slice(0, 5).map((row) => (
+                                <article key={row.anomaly_id} className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                                    <div className="flex flex-wrap items-start justify-between gap-3">
+                                        <p className="text-sm font-semibold text-slate-900">{formatAnomalyType(row.anomaly_type)}</p>
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                            {SeverityBadge(row.severity)}
+                                            {StatusPill(row.status)}
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-3 grid gap-3 text-sm md:grid-cols-2">
+                                        <InfoCell label="Office" value={row.office?.name ?? 'N/A'} />
+                                        <InfoCell label="Source Context" value={formatAnomalySource(row)} />
+                                        <InfoCell label="Detected vs Expected / Threshold" value={formatDetectionVsExpected(row)} />
+                                        <InfoCell label="Detected Date" value={formatDate(row.detected_at)} />
+                                    </div>
+
+                                    <div className="mt-3 rounded-lg border border-red-100 bg-white px-3 py-2">
+                                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">Impact Summary</p>
+                                        <p className="mt-1 text-sm text-slate-700">{buildAnomalyImpact(row)}</p>
+                                    </div>
+                                </article>
+                            ))}
                         </div>
                     )}
                 </section>
@@ -596,23 +591,32 @@ function toCompactNumber(value: number | string | null | undefined): string | nu
 function StatusPill(value: string) {
     const normalized = value.toUpperCase();
     const tone = normalized.includes('OPEN')
-        ? 'border-rose-200 bg-rose-50 text-rose-700'
+        ? 'bg-rose-100 text-rose-700'
         : normalized.includes('REVIEW')
-            ? 'border-amber-200 bg-amber-50 text-amber-700'
-            : 'border-emerald-200 bg-emerald-50 text-emerald-700';
+            ? 'bg-amber-100 text-amber-700'
+            : 'bg-emerald-100 text-emerald-700';
 
-    return <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${tone}`}>{formatStatus(value)}</span>;
+    return <span className={`inline-flex cursor-default select-none rounded-full px-2 py-0.5 text-xs font-semibold ${tone}`}>{formatStatus(value)}</span>;
 }
 
 function SeverityBadge(value: string) {
     const normalized = value.toUpperCase();
     const tone = normalized === 'HIGH'
-        ? 'border-rose-200 bg-rose-50 text-rose-700'
+        ? 'bg-rose-100 text-rose-700'
         : normalized === 'MEDIUM'
-            ? 'border-amber-200 bg-amber-50 text-amber-700'
-            : 'border-slate-200 bg-slate-50 text-slate-700';
+            ? 'bg-amber-100 text-amber-700'
+            : 'bg-slate-200 text-slate-700';
 
-    return <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${tone}`}>{formatStatus(value)}</span>;
+    return <span className={`inline-flex cursor-default select-none rounded-full px-2 py-0.5 text-xs font-semibold ${tone}`}>{formatStatus(value)}</span>;
+}
+
+function InfoCell({ label, value }: { label: string; value: string }) {
+    return (
+        <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">{label}</p>
+            <p className="mt-1 break-words text-sm text-slate-700">{value}</p>
+        </div>
+    );
 }
 
 function CompactEmpty({ text }: { text: string }) {

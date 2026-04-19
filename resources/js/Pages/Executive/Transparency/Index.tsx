@@ -212,21 +212,21 @@ export default function TransparencyMonitoringIndex({
                         <button
                             type="button"
                             onClick={() => switchTab('overview')}
-                            className={`rounded-lg px-3 py-2 text-sm font-semibold ${activeTab === 'overview' ? 'bg-red-700 text-white' : 'bg-red-50 text-red-700'}`}
+                            className={`rounded-lg px-3 py-2.5 text-sm font-semibold ${activeTab === 'overview' ? 'bg-red-700 text-white' : 'bg-red-50 text-red-700'}`}
                         >
                             Overview
                         </button>
                         <button
                             type="button"
                             onClick={() => switchTab('published')}
-                            className={`rounded-lg px-3 py-2 text-sm font-semibold ${activeTab === 'published' ? 'bg-red-700 text-white' : 'bg-red-50 text-red-700'}`}
+                            className={`rounded-lg px-3 py-2.5 text-sm font-semibold ${activeTab === 'published' ? 'bg-red-700 text-white' : 'bg-red-50 text-red-700'}`}
                         >
                             Published
                         </button>
                         <button
                             type="button"
                             onClick={() => switchTab('drafts')}
-                            className={`rounded-lg px-3 py-2 text-sm font-semibold ${activeTab === 'drafts' ? 'bg-red-700 text-white' : 'bg-red-50 text-red-700'}`}
+                            className={`rounded-lg px-3 py-2.5 text-sm font-semibold ${activeTab === 'drafts' ? 'bg-red-700 text-white' : 'bg-red-50 text-red-700'}`}
                         >
                             Drafts / Review
                         </button>
@@ -267,21 +267,23 @@ export default function TransparencyMonitoringIndex({
                                     <table className="min-w-full divide-y divide-slate-200 text-sm">
                                         <thead className="bg-slate-50">
                                             <tr>
-                                                <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Title</th>
-                                                <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Type</th>
-                                                <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Status</th>
-                                                <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Published</th>
-                                                <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Action</th>
+                                                <th className="px-4 py-2.5 text-left text-xs uppercase tracking-wide text-slate-600">Title</th>
+                                                <th className="px-4 py-2.5 text-left text-xs uppercase tracking-wide text-slate-600">Type</th>
+                                                <th className="px-4 py-2.5 text-left text-xs uppercase tracking-wide text-slate-600">Status</th>
+                                                <th className="px-4 py-2.5 text-left text-xs uppercase tracking-wide text-slate-600">Published</th>
+                                                <th className="px-4 py-2.5 text-left text-xs uppercase tracking-wide text-slate-600">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
                                             {recent_disclosures.slice(0, 8).map((row) => (
                                                 <tr key={row.disclosure_id}>
-                                                    <td className="px-4 py-2 text-slate-800">{row.title}</td>
-                                                    <td className="px-4 py-2 text-slate-700">{row.type}</td>
-                                                    <td className="px-4 py-2">{StatusBadge(row.status)}</td>
-                                                    <td className="px-4 py-2 text-slate-700">{formatDate(row.published_at)}</td>
-                                                    <td className="px-4 py-2">
+                                                    <td className="px-4 py-3 text-slate-800">
+                                                        <p className="font-medium text-slate-900">{row.title}</p>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-slate-700">{row.type}</td>
+                                                    <td className="px-4 py-3">{StatusBadge(row.status)}</td>
+                                                    <td className="px-4 py-3 text-slate-700">{formatDate(row.published_at)}</td>
+                                                    <td className="px-4 py-3">
                                                         <Link href={route('executive.disclosures.show', row.disclosure_id)} className="rounded-lg border border-red-300 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-50">
                                                             Open
                                                         </Link>
@@ -331,9 +333,10 @@ export default function TransparencyMonitoringIndex({
                                     <div className="flex flex-wrap items-start justify-between gap-3">
                                         <div>
                                             <p className="text-lg font-semibold text-slate-900">{row.title}</p>
-                                            <p className="text-sm text-slate-600">{row.type} | {row.publisher?.name ?? 'N/A'} | {formatDate(row.published_at)}</p>
+                                            <p className="mt-1 text-sm text-slate-600">{row.type}</p>
+                                            <p className="text-xs text-slate-500">Publisher: {row.publisher?.name ?? 'N/A'} • Published: {formatDate(row.published_at)}</p>
                                         </div>
-                                        <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">{row.status}</span>
+                                        {StatusBadge(row.status)}
                                     </div>
                                     <div className="mt-3 flex flex-wrap items-center gap-2">
                                         <Link href={route('executive.disclosures.show', row.disclosure_id)} className="rounded-lg bg-red-700 px-3 py-2 text-xs font-semibold text-white hover:bg-red-800">
@@ -370,9 +373,10 @@ export default function TransparencyMonitoringIndex({
                                     <div className="flex flex-wrap items-start justify-between gap-3">
                                         <div>
                                             <p className="text-lg font-semibold text-slate-900">{row.title}</p>
-                                            <p className="text-sm text-slate-600">{row.type}</p>
+                                            <p className="mt-1 text-sm text-slate-600">{row.type}</p>
+                                            <p className="text-xs text-slate-500">Last updated: {formatDate(row.updated_at ?? null)}</p>
                                         </div>
-                                        <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">{row.status}</span>
+                                        {StatusBadge(row.status)}
                                     </div>
                                     <div className="mt-3 flex flex-wrap items-center gap-2">
                                         <Link href={route('executive.disclosures.show', row.disclosure_id)} className="rounded-lg border border-red-300 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50">
@@ -394,9 +398,9 @@ export default function TransparencyMonitoringIndex({
 
 function Card({ label, value }: { label: string; value: number }) {
     return (
-        <div className="rounded-2xl border border-red-200 bg-gradient-to-r from-red-50 to-white p-6 shadow-[0_8px_18px_rgba(15,23,42,0.06)]">
+        <div className="rounded-2xl border border-red-200 bg-gradient-to-r from-red-50 to-white p-5 shadow-[0_8px_18px_rgba(15,23,42,0.06)]">
             <p className="text-sm font-semibold uppercase tracking-wide text-slate-600">{label}</p>
-            <p className="mt-2 text-4xl font-bold text-red-700">{value}</p>
+            <p className="mt-2 text-3xl font-bold text-red-700">{value}</p>
         </div>
     );
 }
@@ -412,9 +416,9 @@ function EmptyDisclosureState({ title, subtitle }: { title: string; subtitle: st
 
 function StatusBadge(value: string) {
     const normalized = value.toUpperCase();
-    const tone = normalized === 'PUBLISHED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800';
+    const tone = normalized === 'PUBLISHED' ? 'bg-emerald-100 text-emerald-800' : normalized === 'DRAFT' ? 'bg-slate-200 text-slate-700' : 'bg-amber-100 text-amber-800';
 
-    return <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${tone}`}>{formatStatus(value)}</span>;
+    return <span className={`inline-flex cursor-default select-none rounded-full px-2 py-0.5 text-xs font-semibold ${tone}`}>{formatStatus(value)}</span>;
 }
 
 function formatStatus(value: string): string {
