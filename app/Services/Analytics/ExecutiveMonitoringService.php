@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use App\Support\DashboardStatusGroups;
 use Throwable;
 
 class ExecutiveMonitoringService
@@ -24,11 +25,11 @@ class ExecutiveMonitoringService
     public function summary(): array
     {
         return [
-            'open_anomaly_count' => Anomaly::query()->byStatus('OPEN')->count(),
-            'in_review_anomaly_count' => Anomaly::query()->byStatus('IN_REVIEW')->count(),
+            'open_anomaly_count' => Anomaly::query()->whereIn('status', DashboardStatusGroups::executiveOpenIncidentStatuses())->count(),
+            'in_review_anomaly_count' => Anomaly::query()->whereIn('status', DashboardStatusGroups::executiveInReviewIncidentStatuses())->count(),
             'high_severity_anomaly_count' => Anomaly::query()->bySeverity('HIGH')->count(),
-            'open_alert_count' => Alert::query()->byStatus('OPEN')->count(),
-            'in_review_alert_count' => Alert::query()->byStatus('IN_REVIEW')->count(),
+            'open_alert_count' => Alert::query()->whereIn('status', DashboardStatusGroups::executiveOpenIncidentStatuses())->count(),
+            'in_review_alert_count' => Alert::query()->whereIn('status', DashboardStatusGroups::executiveInReviewIncidentStatuses())->count(),
             'high_severity_alert_count' => Alert::query()->bySeverity('HIGH')->count(),
             'cross_office_anomaly_count' => Anomaly::query()->whereNotNull('office_id')->distinct('office_id')->count('office_id'),
             'office_breakdown' => Office::query()
@@ -55,17 +56,50 @@ class ExecutiveMonitoringService
                     'purchase_request_count' => PurchaseRequest::query()->count(),
                     'purchase_order_count' => PurchaseOrder::query()->count(),
                     'total_purchase_order_amount' => (float) PurchaseOrder::query()->sum('total_amount'),
+                    'monthly_trends' => [
+                        'purchase_requests' => $this->buildMonthlyTrend(PurchaseRequest::query()->get(['created_at'])),
+                        'purchase_orders' => $this->buildMonthlyTrend(PurchaseOrder::query()->get(['created_at'])),
+                    ],
                 ],
                 'transparency' => [
                     'published_disclosure_count' => PublicDisclosure::query()->published()->count(),
                     'draft_disclosure_count' => PublicDisclosure::query()->byStatus('DRAFT')->count(),
+                    'status_breakdown' => PublicDisclosure::query()
+                        ->selectRaw('status, COUNT(*) as total')
+                        ->whereNotNull('status')
+                        ->groupBy('status')
+                        ->orderBy('status')
+                        ->get(),
                 ],
                 'approvals' => [
-                    'pending_ppmp_approvals' => Ppmp::query()->where('status', 'SUBMITTED')->count(),
-                    'pending_consolidated_plan_approvals' => Ppmp::query()->where('status', 'SUBMITTED')->count(),
+                    'pending_ppmp_approvals' => Ppmp::query()
+                        ->whereIn('status', DashboardStatusGroups::executivePendingPpmpStatuses())
+                        ->count(),
+                    'ppmp_workflow_total' => Ppmp::query()
+                        ->whereIn('status', DashboardStatusGroups::executivePpmpWorkflowStatuses())
+                        ->count(),
                     'returned_for_revision' => Ppmp::query()->where('status', 'RETURNED_FOR_REVISION')->count(),
                     'recently_approved' => Ppmp::query()->where('status', 'APPROVED')->whereDate('updated_at', '>=', now()->subDays(30)->toDateString())->count(),
+                    'status_mix' => Ppmp::query()
+                        ->whereIn('status', DashboardStatusGroups::executivePpmpWorkflowStatuses())
+                        ->selectRaw('status, COUNT(*) as total')
+                        ->groupBy('status')
+                        ->orderBy('status')
+                        ->get(),
                 ],
+                'anomaly_type_breakdown' => Anomaly::query()
+                    ->selectRaw('anomaly_type as label, COUNT(*) as total')
+                    ->whereNotNull('anomaly_type')
+                    ->groupBy('anomaly_type')
+                    ->orderByDesc('total')
+                    ->limit(8)
+                    ->get(),
+                'alert_severity_breakdown' => Alert::query()
+                    ->selectRaw('severity as label, COUNT(*) as total')
+                    ->whereNotNull('severity')
+                    ->groupBy('severity')
+                    ->orderByDesc('total')
+                    ->get(),
                 'recent_anomalies' => Anomaly::query()
                     ->select(['anomaly_id', 'anomaly_type', 'severity', 'status', 'office_id', 'detected_at', 'created_at'])
                     ->with('office:id,name')
@@ -83,6 +117,12 @@ class ExecutiveMonitoringService
                     ->latest('published_at')
                     ->limit(5)
                     ->get(),
+                'recent_business_logs' => AuditLog::query()
+                    ->business()
+                    ->with(['user:id,name', 'office:id,name'])
+                    ->latest('created_at')
+                    ->limit(6)
+                    ->get(['id', 'user_id', 'office_id', 'module_name', 'action_type', 'created_at']),
             ];
         } catch (Throwable $throwable) {
             report($throwable);
@@ -123,20 +163,29 @@ class ExecutiveMonitoringService
                 'purchase_request_count' => 0,
                 'purchase_order_count' => 0,
                 'total_purchase_order_amount' => 0.0,
+                'monthly_trends' => [
+                    'purchase_requests' => collect(),
+                    'purchase_orders' => collect(),
+                ],
             ],
             'transparency' => [
                 'published_disclosure_count' => 0,
                 'draft_disclosure_count' => 0,
+                'status_breakdown' => collect(),
             ],
             'approvals' => [
                 'pending_ppmp_approvals' => 0,
-                'pending_consolidated_plan_approvals' => 0,
+                'ppmp_workflow_total' => 0,
                 'returned_for_revision' => 0,
                 'recently_approved' => 0,
+                'status_mix' => collect(),
             ],
+            'anomaly_type_breakdown' => collect(),
+            'alert_severity_breakdown' => collect(),
             'recent_anomalies' => collect(),
             'recent_alerts' => collect(),
             'recent_disclosures' => collect(),
+            'recent_business_logs' => collect(),
         ];
     }
 
@@ -298,6 +347,10 @@ class ExecutiveMonitoringService
                 ->orderByDesc('total')
                 ->get(),
             'office_comparison' => $this->buildIncidentOfficeComparison($anomalyBase, $alertBase),
+            'monthly_trends' => [
+                'anomalies' => $this->buildMonthlyTrendByColumn((clone $anomalyBase)->get(['detected_at']), 'detected_at'),
+                'alerts' => $this->buildMonthlyTrendByColumn((clone $alertBase)->get(['detected_at']), 'detected_at'),
+            ],
             'recent' => [
                 'anomalies' => (clone $anomalyBase)
                     ->latest('detected_at')
@@ -330,6 +383,15 @@ class ExecutiveMonitoringService
                 ->orderByDesc('total')
                 ->limit(10)
                 ->get(),
+            'audit_actions' => AuditLog::query()
+                ->business()
+                ->selectRaw('action_type, COUNT(*) as total')
+                ->whereNotNull('action_type')
+                ->groupBy('action_type')
+                ->orderByDesc('total')
+                ->limit(10)
+                ->get(),
+            'monthly_business_trend' => $this->buildMonthlyTrend(AuditLog::query()->business()->get(['created_at'])),
             'latest_business_logs' => AuditLog::query()
                 ->business()
                 ->with(['user:id,name', 'office:id,name'])
@@ -385,6 +447,7 @@ class ExecutiveMonitoringService
                 ->groupBy('type')
                 ->orderBy('type')
                 ->get(),
+            'monthly_publication_trend' => $this->buildMonthlyTrendByColumn((clone $base)->get(['published_at', 'created_at']), 'published_at'),
             'recent_disclosures' => (clone $base)
                 ->latest('published_at')
                 ->limit(10)
@@ -443,6 +506,26 @@ class ExecutiveMonitoringService
             ->values();
 
         return $trend;
+    }
+
+    /**
+     * @param  Collection<int, mixed>  $rows
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function buildMonthlyTrendByColumn(Collection $rows, string $column): Collection
+    {
+        return $rows
+            ->groupBy(static function ($row) use ($column): string {
+                $date = $row->{$column} ?? $row->created_at ?? null;
+
+                return Carbon::parse($date ?? now())->format('Y-m');
+            })
+            ->map(static fn (Collection $group, string $month) => [
+                'month' => $month,
+                'total' => $group->count(),
+            ])
+            ->sortBy('month')
+            ->values();
     }
 
     /**

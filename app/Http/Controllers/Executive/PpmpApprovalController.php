@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Executive\UpdatePpmpApprovalStatusRequest;
 use App\Models\Office;
 use App\Models\Ppmp;
+use App\Support\DashboardStatusGroups;
 use App\Services\Documents\DocumentService;
 use App\Services\Executive\PpmpApprovalService;
 use App\Services\History\HistoryTimelineService;
@@ -79,11 +80,22 @@ class PpmpApprovalController extends Controller
         }
 
         $summary = [
-            'pending_ppmp_approvals' => Ppmp::query()->where('status', 'SUBMITTED')->count(),
+            'pending_ppmp_approvals' => Ppmp::query()
+                ->whereIn('status', DashboardStatusGroups::executivePendingPpmpStatuses())
+                ->count(),
             'returned_for_revision' => Ppmp::query()->where('status', 'RETURNED_FOR_REVISION')->count(),
             'recently_approved' => Ppmp::query()->where('status', 'APPROVED')->whereDate('updated_at', '>=', now()->subDays(30)->toDateString())->count(),
             'rejected' => Ppmp::query()->where('status', 'REJECTED')->count(),
         ];
+
+        $officeBreakdown = Ppmp::query()
+            ->join('offices', 'offices.id', '=', 'ppmp.office_id')
+            ->whereIn('ppmp.status', ['SUBMITTED', 'APPROVED', 'REJECTED', 'RETURNED_FOR_REVISION'])
+            ->selectRaw('offices.id as office_id, offices.name as office_name, COUNT(*) as total')
+            ->groupBy('offices.id', 'offices.name')
+            ->orderByDesc('total')
+            ->limit(10)
+            ->get();
 
         $records = $query->latest('ppmp_id')->paginate(15)->withQueryString();
         $records->through(function (Ppmp $record) use ($request): array {
@@ -121,6 +133,7 @@ class PpmpApprovalController extends Controller
                 'offices' => Office::query()->select(['id', 'name'])->orderBy('name')->get(),
                 'statuses' => ['SUBMITTED', 'APPROVED', 'REJECTED', 'RETURNED_FOR_REVISION'],
             ],
+            'office_breakdown' => $officeBreakdown,
         ]);
     }
 

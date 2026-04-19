@@ -1,4 +1,4 @@
-import { ExecutiveChartCard, HorizontalBarChart } from '@/Components/Executive/Charts';
+import { DonutChart, ExecutiveChartCard, HorizontalBarChart, TrendLineChart } from '@/Components/Executive/Charts';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router } from '@inertiajs/react';
 import { FormEvent, useState } from 'react';
@@ -30,6 +30,7 @@ type Props = {
     };
     status_breakdown: Array<{ status: string; total: number }>;
     type_breakdown: Array<{ type: string; total: number }>;
+    monthly_publication_trend: Array<{ month: string; total: number }>;
     recent_disclosures: DisclosureRow[];
 };
 
@@ -39,6 +40,7 @@ export default function TransparencyMonitoringIndex({
     totals,
     status_breakdown,
     type_breakdown,
+    monthly_publication_trend,
     recent_disclosures,
 }: Props) {
     const [form, setForm] = useState({
@@ -113,9 +115,18 @@ export default function TransparencyMonitoringIndex({
                             onChange={(event) => setForm((current) => ({ ...current, to_date: event.target.value }))}
                         />
 
-                        <button type="submit" className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
-                            Apply
-                        </button>
+                        <div className="md:col-span-5 flex flex-wrap justify-end gap-2 pt-1">
+                            <button
+                                type="button"
+                                onClick={() => router.get(route('executive.transparency-monitoring'))}
+                                className="rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
+                            >
+                                Reset
+                            </button>
+                            <button type="submit" className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
+                                Apply
+                            </button>
+                        </div>
                     </form>
 
                     <div className="mt-4">
@@ -132,6 +143,20 @@ export default function TransparencyMonitoringIndex({
                 </div>
 
                 <div className="grid gap-6 xl:grid-cols-12">
+                    <div className="xl:col-span-12">
+                    <ExecutiveChartCard
+                        title="Disclosure Publication Trend"
+                        subtitle="Monthly disclosure publication activity in the selected scope"
+                        eyebrow="Trend"
+                        tone="critical"
+                    >
+                        <TrendLineChart
+                            data={monthly_publication_trend.map((row) => ({ label: formatMonth(row.month), value: row.total }))}
+                            emptyText="No publication trend data available for the selected filters."
+                        />
+                    </ExecutiveChartCard>
+                    </div>
+
                     <div className="xl:col-span-7">
                     <ExecutiveChartCard
                         title="Published vs Draft or Pending"
@@ -148,8 +173,9 @@ export default function TransparencyMonitoringIndex({
 
                     <div className="xl:col-span-5">
                     <ExecutiveChartCard title="Status Breakdown" subtitle="Distribution by disclosure status" eyebrow="Governance State" tone="default">
-                        <HorizontalBarChart
+                        <DonutChart
                             data={status_breakdown.map((row) => ({ label: row.status || 'N/A', value: row.total }))}
+                            centerLabel="Status"
                             emptyText="No status breakdown available for the selected filters."
                         />
                     </ExecutiveChartCard>
@@ -201,6 +227,16 @@ export default function TransparencyMonitoringIndex({
             </div>
         </AuthenticatedLayout>
     );
+}
+
+function formatMonth(value: string): string {
+    const date = new Date(`${value}-01T00:00:00`);
+
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
+
+    return date.toLocaleDateString('en-PH', { month: 'short', year: 'numeric' });
 }
 
 function Card({ label, value }: { label: string; value: number }) {

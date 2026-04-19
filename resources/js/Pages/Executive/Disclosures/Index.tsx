@@ -14,14 +14,25 @@ type Props = {
 
 export default function DisclosureIndex({ disclosures }: Props) {
     return (
-        <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Disclosure Review</h2>}>
+        <AuthenticatedLayout header="Disclosure Review">
             <Head title="Disclosure Review" />
-            <div className="py-10">
-                <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-                    <div className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-                        Executive access is restricted to disclosure monitoring and review.
+            <div className="space-y-6 py-8">
+                <section className="rounded-2xl border border-red-200 bg-white px-6 py-5 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-700">Disclosure Governance</p>
+                    <h3 className="mt-1 text-2xl font-semibold text-slate-900">Executive Disclosure Review Queue</h3>
+                    <p className="mt-1 text-sm text-slate-600">Read-only monitoring access for published and draft disclosure records.</p>
+                </section>
+
+                <section className="rounded-2xl border border-red-200 bg-red-50/60 px-5 py-4 text-sm text-red-800">
+                    Executive access is restricted to disclosure monitoring and review.
+                </section>
+
+                <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+                    <div className="border-b border-slate-200 px-6 py-5">
+                        <h3 className="text-xl font-semibold text-slate-900">Disclosure Records</h3>
+                        <p className="mt-1 text-sm text-slate-600">Low-visual list view prioritized for traceable record reading.</p>
                     </div>
-                    <div className="overflow-hidden rounded border bg-white">
+                    <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200 text-sm">
                             <thead className="bg-gray-50">
                                 <tr>
@@ -38,7 +49,7 @@ export default function DisclosureIndex({ disclosures }: Props) {
                                         <td className="px-4 py-2">{row.type}</td>
                                         <td className="px-4 py-2">{row.status}</td>
                                         <td className="px-4 py-2">
-                                            <Link href={route('executive.disclosures.show', row.disclosure_id)} className="rounded bg-indigo-600 px-3 py-1 text-xs text-white">
+                                            <Link href={route('executive.disclosures.show', row.disclosure_id)} className="rounded bg-red-700 px-3 py-1 text-xs font-semibold text-white hover:bg-red-800">
                                                 View
                                             </Link>
                                         </td>
@@ -47,7 +58,7 @@ export default function DisclosureIndex({ disclosures }: Props) {
                             </tbody>
                         </table>
                     </div>
-                </div>
+                </section>
             </div>
         </AuthenticatedLayout>
     );

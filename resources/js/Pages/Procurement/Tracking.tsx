@@ -4,7 +4,7 @@ import { Head, Link } from '@inertiajs/react';
 type Props = {
     summary: {
         pending_requests: number;
-        approved_requests: number;
+        processing_requests: number;
         ongoing_procurement: number;
         completed_procurements: number;
     };
@@ -34,7 +34,7 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
             <div className="space-y-6 py-8">
                 <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <SummaryCard label="Pending Requests" value={summary.pending_requests} tone="amber" />
-                    <SummaryCard label="Approved Requests" value={summary.approved_requests} tone="blue" />
+                    <SummaryCard label="Processing Requests" value={summary.processing_requests} tone="blue" />
                     <SummaryCard label="Ongoing Procurement" value={summary.ongoing_procurement} tone="green" />
                     <SummaryCard label="Completed Procurements" value={summary.completed_procurements} tone="red" />
                 </section>

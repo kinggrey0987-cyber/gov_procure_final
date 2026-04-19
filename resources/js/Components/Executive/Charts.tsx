@@ -5,6 +5,12 @@ export type ChartPoint = {
     value: number;
 };
 
+export type GroupedChartPoint = {
+    label: string;
+    first: number;
+    second: number;
+};
+
 export function ExecutiveChartCard({
     title,
     subtitle,
@@ -124,6 +130,180 @@ export function GroupedComparisonChart({
                     />
                 </div>
             ))}
+        </div>
+    );
+}
+
+export function TrendLineChart({
+    data,
+    emptyText,
+    valueFormatter,
+}: {
+    data: ChartPoint[];
+    emptyText: string;
+    valueFormatter?: (value: number) => string;
+}) {
+    if (data.length === 0) {
+        return <EmptyState text={emptyText} />;
+    }
+
+    const width = 680;
+    const height = 260;
+    const paddingX = 28;
+    const paddingY = 24;
+    const plotWidth = width - paddingX * 2;
+    const plotHeight = height - paddingY * 2;
+    const max = Math.max(...data.map((point) => point.value), 1);
+
+    const points = data.map((point, index) => {
+        const x = data.length === 1
+            ? width / 2
+            : paddingX + (index / (data.length - 1)) * plotWidth;
+        const y = paddingY + (1 - point.value / max) * plotHeight;
+
+        return { ...point, x, y };
+    });
+
+    const polylinePoints = points.map((point) => `${point.x},${point.y}`).join(' ');
+
+    return (
+        <div className="space-y-4">
+            <div className="overflow-x-auto">
+                <svg viewBox={`0 0 ${width} ${height}`} className="h-60 w-full min-w-[560px]">
+                    <defs>
+                        <linearGradient id="execTrendFill" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="rgba(220, 38, 38, 0.24)" />
+                            <stop offset="100%" stopColor="rgba(220, 38, 38, 0.02)" />
+                        </linearGradient>
+                    </defs>
+
+                    <line x1={paddingX} y1={height - paddingY} x2={width - paddingX} y2={height - paddingY} stroke="rgb(254 202 202)" strokeWidth="2" />
+                    <line x1={paddingX} y1={paddingY} x2={paddingX} y2={height - paddingY} stroke="rgb(254 202 202)" strokeWidth="2" />
+
+                    <polygon
+                        points={`${paddingX},${height - paddingY} ${polylinePoints} ${width - paddingX},${height - paddingY}`}
+                        fill="url(#execTrendFill)"
+                    />
+
+                    <polyline
+                        points={polylinePoints}
+                        fill="none"
+                        stroke="rgb(185 28 28)"
+                        strokeWidth="3"
+                        strokeLinejoin="round"
+                        strokeLinecap="round"
+                    />
+
+                    {points.map((point) => (
+                        <g key={point.label}>
+                            <circle cx={point.x} cy={point.y} r="4.5" fill="rgb(220 38 38)" />
+                            <title>{`${point.label}: ${valueFormatter ? valueFormatter(point.value) : point.value}`}</title>
+                        </g>
+                    ))}
+                </svg>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {data.map((point) => (
+                    <div key={point.label} className="rounded-lg border border-red-100 bg-red-50/50 px-3 py-2 text-xs">
+                        <p className="font-semibold text-slate-700">{point.label}</p>
+                        <p className="mt-1 text-sm font-bold text-red-700">{valueFormatter ? valueFormatter(point.value) : point.value}</p>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+export function DonutChart({
+    data,
+    emptyText,
+    centerLabel,
+}: {
+    data: ChartPoint[];
+    emptyText: string;
+    centerLabel?: string;
+}) {
+    const filteredData = data.filter((row) => row.value > 0);
+
+    if (filteredData.length === 0) {
+        return <EmptyState text={emptyText} />;
+    }
+
+    const total = filteredData.reduce((sum, row) => sum + row.value, 0);
+    const radius = 72;
+    const strokeWidth = 24;
+    const circumference = 2 * Math.PI * radius;
+    const palette = [
+        'rgb(185 28 28)',
+        'rgb(239 68 68)',
+        'rgb(251 113 133)',
+        'rgb(14 116 144)',
+        'rgb(245 158 11)',
+        'rgb(71 85 105)',
+    ];
+
+    let runningOffset = 0;
+
+    return (
+        <div className="grid gap-6 lg:grid-cols-[220px_1fr] lg:items-center">
+            <div className="mx-auto h-[220px] w-[220px]">
+                <svg viewBox="0 0 220 220" className="h-full w-full">
+                    <circle
+                        cx="110"
+                        cy="110"
+                        r={radius}
+                        fill="none"
+                        stroke="rgb(254 226 226)"
+                        strokeWidth={strokeWidth}
+                    />
+
+                    {filteredData.map((segment, index) => {
+                        const segmentLength = (segment.value / total) * circumference;
+                        const segmentOffset = runningOffset;
+                        runningOffset += segmentLength;
+
+                        return (
+                            <circle
+                                key={segment.label}
+                                cx="110"
+                                cy="110"
+                                r={radius}
+                                fill="none"
+                                stroke={palette[index % palette.length]}
+                                strokeWidth={strokeWidth}
+                                strokeDasharray={`${segmentLength} ${circumference - segmentLength}`}
+                                strokeDashoffset={-segmentOffset}
+                                transform="rotate(-90 110 110)"
+                                strokeLinecap="butt"
+                            />
+                        );
+                    })}
+
+                    <text x="110" y="105" textAnchor="middle" className="fill-slate-500 text-[10px] uppercase tracking-[0.14em]">
+                        {centerLabel ?? 'Total'}
+                    </text>
+                    <text x="110" y="128" textAnchor="middle" className="fill-slate-900 text-[22px] font-bold">
+                        {total}
+                    </text>
+                </svg>
+            </div>
+
+            <div className="space-y-2">
+                {filteredData.map((segment, index) => {
+                    const percent = total > 0 ? Math.round((segment.value / total) * 100) : 0;
+
+                    return (
+                        <div key={segment.label} className="flex items-center justify-between rounded-lg border border-red-100 bg-white px-3 py-2 text-sm">
+                            <div className="flex items-center gap-2">
+                                <span className="h-3 w-3 rounded-full" style={{ backgroundColor: palette[index % palette.length] }} />
+                                <span className="font-medium text-slate-700">{segment.label}</span>
+                            </div>
+                            <span className="font-semibold text-slate-900">{segment.value} ({percent}%)</span>
+                        </div>
+                    );
+                })}
+            </div>
         </div>
     );
 }

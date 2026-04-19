@@ -68,6 +68,20 @@ export default function Edit({
                         </div>
                     </section>
 
+                    {roleCode === 'EXEC_OFFICER' && (
+                        <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+                            <div className="border-b border-slate-200 px-6 py-4">
+                                <h3 className="text-lg font-semibold text-slate-900">Executive Workspace Access</h3>
+                                <p className="text-sm text-slate-600">Your profile is scoped for monitoring dashboards, approvals, and governance evidence access.</p>
+                            </div>
+                            <div className="p-6 sm:p-8">
+                                <div className="max-w-2xl rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                                    Account role: Executive Officer. Access policies are enforced by role-based authorization and workflow permissions.
+                                </div>
+                            </div>
+                        </section>
+                    )}
+
                     {canDeleteAccount && (
                         <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
                             <div className="border-b border-slate-200 px-6 py-4">

@@ -5,7 +5,9 @@ namespace App\Services\Audit;
 use App\Models\AuditLog;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
 
 class AuditLogViewerService
@@ -44,6 +46,52 @@ class AuditLogViewerService
             ->latest('id')
             ->paginate($perPage)
             ->withQueryString();
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array<string, Collection>
+     */
+    public function businessAnalytics(User $actor, array $filters): array
+    {
+        if (! $actor->can('audit.business.view')) {
+            throw ValidationException::withMessages([
+                'authorization' => 'Not authorized for business audit analytics.',
+            ]);
+        }
+
+        $baseQuery = $this->buildBaseQuery($filters)->business();
+
+        $moduleSummary = (clone $baseQuery)
+            ->selectRaw('module_name as label, COUNT(*) as total')
+            ->groupBy('module_name')
+            ->orderByDesc('total')
+            ->limit(10)
+            ->get();
+
+        $actionSummary = (clone $baseQuery)
+            ->selectRaw('action_type as label, COUNT(*) as total')
+            ->groupBy('action_type')
+            ->orderByDesc('total')
+            ->limit(10)
+            ->get();
+
+        $dailyTrend = (clone $baseQuery)
+            ->select('created_at')
+            ->get()
+            ->groupBy(static fn ($row): string => Carbon::parse($row->created_at)->format('Y-m-d'))
+            ->map(static fn (Collection $rows, string $day): array => [
+                'label' => $day,
+                'total' => $rows->count(),
+            ])
+            ->sortBy('label')
+            ->values();
+
+        return [
+            'module_summary' => $moduleSummary,
+            'action_summary' => $actionSummary,
+            'daily_trend' => $dailyTrend,
+        ];
     }
 
     /**

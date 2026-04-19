@@ -15,6 +15,7 @@ use App\Models\PurchaseRequest;
 use App\Models\Role;
 use App\Models\SupplyRequest;
 use App\Models\User;
+use App\Support\DashboardStatusGroups;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
@@ -94,21 +95,34 @@ class DomainDashboardController extends Controller
                 ->values()
             : collect();
 
-        $readyForClaimCount = DistributionRecord::query()
+        $totalRequestsCount = SupplyRequest::query()->forOffice($officeId)->count();
+
+        $pendingRequestsCount = SupplyRequest::query()
             ->forOffice($officeId)
-            ->whereIn('status', ['RELEASED', 'RECEIVED'])
+            ->whereIn('status', DashboardStatusGroups::officePendingSupplyRequestStatuses())
+            ->whereDoesntHave('purchaseRequests')
+            ->whereDoesntHave('distributionRecords')
             ->count();
 
-        $completedRequestCount = SupplyRequest::query()
+        $readyForClaimCount = (int) DistributionRecord::query()
             ->forOffice($officeId)
-            ->whereIn('status', ['COMPLETED', 'RELEASED'])
-            ->count();
+            ->whereIn('status', DashboardStatusGroups::officeReadyForClaimDistributionStatuses())
+            ->distinct('supply_request_id')
+            ->count('supply_request_id');
+
+        $completedRequestCount = (int) DistributionRecord::query()
+            ->forOffice($officeId)
+            ->whereIn('status', DashboardStatusGroups::officeCompletedDistributionStatuses())
+            ->distinct('supply_request_id')
+            ->count('supply_request_id');
+
+        $processedRequestsCount = max($totalRequestsCount - $pendingRequestsCount, 0);
 
         $response = Inertia::render('Office/Tracking', [
             'summary' => [
-                'total_requests' => SupplyRequest::query()->forOffice($officeId)->count(),
-                'pending_requests' => SupplyRequest::query()->forOffice($officeId)->whereIn('status', ['DRAFT', 'SUBMITTED', 'IN_REVIEW', 'PENDING'])->count(),
-                'approved_requests' => PurchaseRequest::query()->forOffice($officeId)->processing()->count(),
+                'total_requests' => $totalRequestsCount,
+                'pending_requests' => $pendingRequestsCount,
+                'processed_requests' => $processedRequestsCount,
                 'ready_for_claim' => $readyForClaimCount,
                 'completed_requests' => $completedRequestCount,
             ],
@@ -138,10 +152,18 @@ class DomainDashboardController extends Controller
 
         $response = Inertia::render('Procurement/Tracking', [
             'summary' => [
-                'pending_requests' => PurchaseRequest::query()->open()->count(),
-                'approved_requests' => PurchaseRequest::query()->processing()->count(),
-                'ongoing_procurement' => PurchaseOrder::query()->placed()->count(),
-                'completed_procurements' => PurchaseOrder::query()->where('status', 'COMPLETED')->count(),
+                'pending_requests' => PurchaseRequest::query()
+                    ->whereIn('status', DashboardStatusGroups::procurementPendingPurchaseRequestStatuses())
+                    ->count(),
+                'processing_requests' => PurchaseRequest::query()
+                    ->whereIn('status', DashboardStatusGroups::procurementInProgressPurchaseRequestStatuses())
+                    ->count(),
+                'ongoing_procurement' => PurchaseOrder::query()
+                    ->whereIn('status', DashboardStatusGroups::procurementOngoingPurchaseOrderStatuses())
+                    ->count(),
+                'completed_procurements' => PurchaseOrder::query()
+                    ->whereIn('status', DashboardStatusGroups::procurementCompletedPurchaseOrderStatuses())
+                    ->count(),
             ],
             'recentPurchaseRequests' => $recentPurchaseRequests->map(fn (PurchaseRequest $request): array => [
                 'purchase_request_id' => (int) $request->purchase_request_id,
@@ -159,7 +181,7 @@ class DomainDashboardController extends Controller
             ])->values(),
         ]);
 
-        $this->logIfSlow('procurement', $startedAt, (int) (auth()->id() ?? 0));
+        $this->logIfSlow('procurement', $startedAt, (int) (auth()->user()?->id ?? 0));
 
         return $response;
     }
@@ -175,11 +197,13 @@ class DomainDashboardController extends Controller
                 'movement_count' => InventoryMovement::query()->count(),
                 'released_distribution_count' => DistributionRecord::query()->released()->count(),
                 'received_distribution_count' => DistributionRecord::query()->received()->count(),
-                'open_claim_count' => Claim::query()->open()->count(),
+                'open_claim_count' => Claim::query()
+                    ->whereIn('status', DashboardStatusGroups::claimActiveStatuses())
+                    ->count(),
             ],
         ]);
 
-        $this->logIfSlow('inventory', $startedAt, (int) (auth()->id() ?? 0));
+        $this->logIfSlow('inventory', $startedAt, (int) (auth()->user()?->id ?? 0));
 
         return $response;
     }

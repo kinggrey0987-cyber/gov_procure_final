@@ -1,4 +1,4 @@
-import { ExecutiveChartCard, GroupedComparisonChart, HorizontalBarChart } from '@/Components/Executive/Charts';
+import { ExecutiveChartCard, GroupedComparisonChart, HorizontalBarChart, TrendLineChart } from '@/Components/Executive/Charts';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, router } from '@inertiajs/react';
 import { FormEvent, useState } from 'react';
@@ -57,6 +57,10 @@ type Props = {
         anomaly_count: number;
         alert_count: number;
     }>;
+    monthly_trends: {
+        anomalies: Array<{ month: string; total: number }>;
+        alerts: Array<{ month: string; total: number }>;
+    };
     recent: {
         anomalies: AnomalyRow[];
         alerts: AlertRow[];
@@ -71,6 +75,7 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
     anomaly_type_breakdown,
     alert_severity_breakdown,
     office_comparison,
+    monthly_trends,
     recent,
 }: Props) {
     const [form, setForm] = useState({
@@ -92,6 +97,8 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
         { label: 'High Severity Alerts', value: totals.high_severity_alert_count },
     ];
 
+    const mergedTrend = mergeMonthlyTrends(monthly_trends.anomalies, monthly_trends.alerts);
+
     return (
         <AuthenticatedLayout header="Anomalies and Alerts Monitoring">
             <Head title="Anomalies and Alerts Monitoring" />
@@ -104,18 +111,9 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                         <p className="text-sm text-red-100">Price anomalies are procurement-linked and grouped by requesting office for oversight context.</p>
                     </div>
                     <div className="p-6">
-                    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                            <h3 className="text-xl font-semibold text-slate-900">Monitoring Filter Bar</h3>
-                            <p className="mt-1 text-sm text-slate-600">Focus risk intelligence by office, severity, status, anomaly type, and detection window.</p>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => router.get(route('executive.anomalies-monitoring'))}
-                            className="rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 transition hover:border-red-500 hover:bg-red-50"
-                        >
-                            Reset
-                        </button>
+                    <div className="mb-4">
+                        <h3 className="text-xl font-semibold text-slate-900">Monitoring Filter Bar</h3>
+                        <p className="mt-1 text-sm text-slate-600">Focus risk intelligence by office, severity, status, anomaly type, and detection window.</p>
                     </div>
 
                     <form onSubmit={onSubmit} className="grid gap-3 md:grid-cols-6">
@@ -185,6 +183,16 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                                 value={form.to_date}
                                 onChange={(event) => setForm((current) => ({ ...current, to_date: event.target.value }))}
                             />
+                        </div>
+
+                        <div className="md:col-span-6 flex flex-wrap justify-end gap-2 pt-1">
+                            <button
+                                type="button"
+                                onClick={() => router.get(route('executive.anomalies-monitoring'))}
+                                className="rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 transition hover:border-red-500 hover:bg-red-50"
+                            >
+                                Reset
+                            </button>
                             <button type="submit" className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
                                 Apply
                             </button>
@@ -206,6 +214,15 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                 </div>
 
                 <div className="grid gap-6 xl:grid-cols-12">
+                    <div className="xl:col-span-12">
+                    <ExecutiveChartCard title="Incident Trend Over Time" subtitle="Monthly anomalies and alerts in the selected scope" eyebrow="Trend" tone="critical">
+                        <TrendLineChart
+                            data={mergedTrend}
+                            emptyText="No incident trend data available for the selected filters."
+                        />
+                    </ExecutiveChartCard>
+                    </div>
+
                     <div className="xl:col-span-8">
                     <ExecutiveChartCard title="Anomaly Type Distribution" subtitle="Most frequent anomaly categories in the current filter scope" eyebrow="Primary Risk Mix" tone="critical">
                         <HorizontalBarChart
@@ -292,6 +309,38 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
             </div>
         </AuthenticatedLayout>
     );
+}
+
+function mergeMonthlyTrends(
+    anomalyTrend: Array<{ month: string; total: number }>,
+    alertTrend: Array<{ month: string; total: number }>,
+) {
+    const monthMap = new Map<string, number>();
+
+    anomalyTrend.forEach((row) => {
+        monthMap.set(row.month, (monthMap.get(row.month) ?? 0) + row.total);
+    });
+
+    alertTrend.forEach((row) => {
+        monthMap.set(row.month, (monthMap.get(row.month) ?? 0) + row.total);
+    });
+
+    return [...monthMap.entries()]
+        .sort(([monthA], [monthB]) => monthA.localeCompare(monthB))
+        .map(([month, total]) => ({
+            label: formatMonth(month),
+            value: total,
+        }));
+}
+
+function formatMonth(value: string): string {
+    const date = new Date(`${value}-01T00:00:00`);
+
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
+
+    return date.toLocaleDateString('en-PH', { month: 'short', year: 'numeric' });
 }
 
 function formatAnomalyType(value: string): string {

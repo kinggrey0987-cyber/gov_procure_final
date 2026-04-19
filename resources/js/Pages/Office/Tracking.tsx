@@ -5,7 +5,7 @@ type Props = {
     summary: {
         total_requests: number;
         pending_requests: number;
-        approved_requests: number;
+        processed_requests: number;
         ready_for_claim: number;
         completed_requests: number;
     };
@@ -36,7 +36,7 @@ export default function OfficeTracking({ summary, recentRequests, notificationPr
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <MetricCard label="Total Requests" value={summary.total_requests} tone="slate" />
                     <MetricCard label="Pending Requests" value={summary.pending_requests} tone="amber" />
-                    <MetricCard label="Approved Requests" value={summary.approved_requests} tone="emerald" />
+                    <MetricCard label="Processed Requests" value={summary.processed_requests} tone="emerald" />
                     <MetricCard label="Supplies Ready for Claim" value={summary.ready_for_claim} tone="sky" />
                 </div>
 

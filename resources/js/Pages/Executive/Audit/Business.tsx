@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { ExecutiveChartCard, HorizontalBarChart } from '@/Components/Executive/Charts';
+import { ExecutiveChartCard, HorizontalBarChart, TrendLineChart } from '@/Components/Executive/Charts';
 import { Head, router } from '@inertiajs/react';
 import { FormEvent, useState } from 'react';
 
@@ -24,9 +24,14 @@ type Props = {
         from_date?: string;
         to_date?: string;
     };
+    analytics: {
+        module_summary: Array<{ label: string; total: number }>;
+        action_summary: Array<{ label: string; total: number }>;
+        daily_trend: Array<{ label: string; total: number }>;
+    };
 };
 
-export default function BusinessAudit({ auditLogs, filters }: Props) {
+export default function BusinessAudit({ auditLogs, filters, analytics }: Props) {
     const [form, setForm] = useState({
         module_name: filters.module_name ?? '',
         action_type: filters.action_type ?? '',
@@ -40,16 +45,20 @@ export default function BusinessAudit({ auditLogs, filters }: Props) {
         router.get(route('executive.audit.business'), form, { preserveState: true, replace: true });
     };
 
-    const moduleSummary = Object.values(
-        auditLogs.data.reduce<Record<string, { label: string; value: number }>>((acc, log) => {
-            const key = log.module_name || 'N/A';
-            const current = acc[key] ?? { label: key, value: 0 };
-            acc[key] = { ...current, value: current.value + 1 };
-            return acc;
-        }, {}),
-    )
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 6);
+    const moduleSummary = analytics.module_summary.map((row) => ({
+        label: row.label || 'N/A',
+        value: row.total,
+    }));
+
+    const actionSummary = analytics.action_summary.map((row) => ({
+        label: row.label || 'N/A',
+        value: row.total,
+    }));
+
+    const auditTrend = analytics.daily_trend.map((row) => ({
+        label: formatDateLabel(row.label),
+        value: row.total,
+    }));
 
     return (
         <AuthenticatedLayout header="Audit Trail">
@@ -68,33 +77,66 @@ export default function BusinessAudit({ auditLogs, filters }: Props) {
                             <input className="rounded-lg border-red-200 text-sm" placeholder="User ID" value={form.user_id} onChange={(e) => setForm((v) => ({ ...v, user_id: e.target.value }))} />
                             <input type="date" className="rounded-lg border-red-200 text-sm" value={form.from_date} onChange={(e) => setForm((v) => ({ ...v, from_date: e.target.value }))} />
                             <input type="date" className="rounded-lg border-red-200 text-sm" value={form.to_date} onChange={(e) => setForm((v) => ({ ...v, to_date: e.target.value }))} />
-                            <div className="flex gap-2">
-                                <button className="w-full rounded-lg bg-red-700 px-4 py-2 text-xs font-semibold text-white hover:bg-red-800" type="submit">
-                                    Apply
-                                </button>
+
+                            <div className="md:col-span-6 flex flex-wrap justify-end gap-2 pt-1">
                                 <button
                                     type="button"
                                     onClick={() => router.get(route('executive.audit.business'))}
-                                    className="rounded-lg border border-red-300 px-4 py-2 text-xs font-semibold text-red-700 hover:bg-red-50"
+                                    className="rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
                                 >
                                     Reset
+                                </button>
+                                <button className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800" type="submit">
+                                    Apply
                                 </button>
                             </div>
                         </form>
                     </div>
                 </section>
 
-                <ExecutiveChartCard
-                    title="Actions by Module"
-                    subtitle="Compact summary from the currently filtered audit log result set"
-                    eyebrow="Quick Summary"
-                    tone="neutral"
-                >
-                    <HorizontalBarChart
-                        data={moduleSummary}
-                        emptyText="No audit activity in the current filter scope."
-                    />
-                </ExecutiveChartCard>
+                <div className="grid gap-6 xl:grid-cols-12">
+                    <div className="xl:col-span-12">
+                    <ExecutiveChartCard
+                        title="Business Audit Activity Trend"
+                        subtitle="Daily event volume from the active filter scope"
+                        eyebrow="Trend"
+                        tone="critical"
+                    >
+                        <TrendLineChart
+                            data={auditTrend}
+                            emptyText="No business audit trend data in the current filter scope."
+                        />
+                    </ExecutiveChartCard>
+                    </div>
+
+                    <div className="xl:col-span-6">
+                    <ExecutiveChartCard
+                        title="Actions by Module"
+                        subtitle="Module concentration in the current audit slice"
+                        eyebrow="Module Mix"
+                        tone="neutral"
+                    >
+                        <HorizontalBarChart
+                            data={moduleSummary}
+                            emptyText="No audit activity in the current filter scope."
+                        />
+                    </ExecutiveChartCard>
+                    </div>
+
+                    <div className="xl:col-span-6">
+                    <ExecutiveChartCard
+                        title="Actions by Type"
+                        subtitle="Most common action types in current filters"
+                        eyebrow="Action Mix"
+                        tone="default"
+                    >
+                        <HorizontalBarChart
+                            data={actionSummary}
+                            emptyText="No action summary is available in the current filter scope."
+                        />
+                    </ExecutiveChartCard>
+                    </div>
+                </div>
 
                 <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
                     <div className="border-b border-slate-200 px-6 py-5">
@@ -135,4 +177,13 @@ export default function BusinessAudit({ auditLogs, filters }: Props) {
             </div>
         </AuthenticatedLayout>
     );
+}
+
+function formatDateLabel(value: string): string {
+    const parsed = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) {
+        return value;
+    }
+
+    return parsed.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
 }

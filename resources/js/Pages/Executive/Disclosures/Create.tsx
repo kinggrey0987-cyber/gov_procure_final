@@ -12,12 +12,18 @@ export default function DisclosureCreate() {
     });
 
     return (
-        <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Create Disclosure Draft</h2>}>
+        <AuthenticatedLayout header="Create Disclosure Draft">
             <Head title="Create Disclosure Draft" />
-            <div className="py-10">
-                <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+            <div className="space-y-6 py-8">
+                <section className="rounded-2xl border border-red-200 bg-white px-6 py-5 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-700">Disclosure Drafting</p>
+                    <h3 className="mt-1 text-2xl font-semibold text-slate-900">Create Disclosure Draft</h3>
+                    <p className="mt-1 text-sm text-slate-600">Prepare a disclosure draft for governance review and publication workflow.</p>
+                </section>
+
+                <div className="mx-auto w-full max-w-3xl">
                     <form
-                        className="space-y-3 rounded border bg-white p-6"
+                        className="space-y-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
                         onSubmit={(e) => {
                             e.preventDefault();
                             form.post(route('executive.disclosures.store'));
@@ -29,7 +35,7 @@ export default function DisclosureCreate() {
                         <input className="w-full rounded border px-3 py-2" placeholder="Reference ID" value={form.data.reference_id} onChange={(e) => form.setData('reference_id', e.target.value)} />
                         <input className="w-full rounded border px-3 py-2" placeholder="File Path" value={form.data.file_path} onChange={(e) => form.setData('file_path', e.target.value)} />
                         <textarea className="w-full rounded border px-3 py-2" placeholder="Description" value={form.data.description} onChange={(e) => form.setData('description', e.target.value)} />
-                        <button type="submit" className="rounded bg-indigo-600 px-4 py-2 text-sm text-white">Save Draft</button>
+                        <button type="submit" className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">Save Draft</button>
                     </form>
                 </div>
             </div>

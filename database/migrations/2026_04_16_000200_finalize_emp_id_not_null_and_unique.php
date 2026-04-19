@@ -16,7 +16,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        DB::statement("UPDATE users SET emp_id = CONCAT('LEGACY-', id) WHERE emp_id IS NULL OR BTRIM(emp_id) = ''");
+        $driver = DB::getDriverName();
+
+        if ($driver === 'sqlite') {
+            DB::statement("UPDATE users SET emp_id = 'LEGACY-' || id WHERE emp_id IS NULL OR TRIM(emp_id) = ''");
+        } else {
+            DB::statement("UPDATE users SET emp_id = CONCAT('LEGACY-', id) WHERE emp_id IS NULL OR BTRIM(emp_id) = ''");
+        }
 
         // Drop the Phase 1 partial unique index (no longer needed post-NOT NULL)
         DB::statement('DROP INDEX IF EXISTS idx_users_emp_id_not_null');

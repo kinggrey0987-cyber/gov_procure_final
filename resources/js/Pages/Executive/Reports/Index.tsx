@@ -1,4 +1,4 @@
-import { ExecutiveChartCard, HorizontalBarChart } from '@/Components/Executive/Charts';
+import { DonutChart, ExecutiveChartCard, HorizontalBarChart, TrendLineChart } from '@/Components/Executive/Charts';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link } from '@inertiajs/react';
 
@@ -24,10 +24,17 @@ type Props = {
         published_disclosures: number;
     };
     audit_modules: ModuleSummary[];
+    audit_actions: Array<{ action_type: string; total: number }>;
+    monthly_business_trend: Array<{ month: string; total: number }>;
     latest_business_logs: AuditRow[];
 };
 
-export default function ExecutiveReportsIndex({ counts, audit_modules, latest_business_logs }: Props) {
+export default function ExecutiveReportsIndex({ counts, audit_modules, audit_actions, monthly_business_trend, latest_business_logs }: Props) {
+    const riskMix = [
+        { label: 'Anomalies', value: counts.anomalies },
+        { label: 'Alerts', value: counts.alerts },
+    ];
+
     return (
         <AuthenticatedLayout header="Reports">
             <Head title="Executive Reports" />
@@ -64,6 +71,20 @@ export default function ExecutiveReportsIndex({ counts, audit_modules, latest_bu
                 </section>
 
                 <div className="grid gap-6 xl:grid-cols-12">
+                    <div className="xl:col-span-12">
+                    <ExecutiveChartCard
+                        title="Monthly Business Audit Trend"
+                        subtitle="Executive evidence generation velocity over time"
+                        eyebrow="Trend"
+                        tone="critical"
+                    >
+                        <TrendLineChart
+                            data={monthly_business_trend.map((row) => ({ label: formatMonth(row.month), value: row.total }))}
+                            emptyText="No monthly audit trend data is available."
+                        />
+                    </ExecutiveChartCard>
+                    </div>
+
                     <div className="xl:col-span-5">
                     <ExecutiveChartCard
                         title="Top Business Audit Modules"
@@ -74,6 +95,31 @@ export default function ExecutiveReportsIndex({ counts, audit_modules, latest_bu
                         <HorizontalBarChart
                             data={audit_modules.map((row) => ({ label: row.module_name, value: row.total }))}
                             emptyText="No audit module activity in the current reporting scope."
+                        />
+                    </ExecutiveChartCard>
+                    </div>
+
+                    <div className="xl:col-span-3">
+                    <ExecutiveChartCard
+                        title="Risk Case Mix"
+                        subtitle="Anomaly and alert volume"
+                        eyebrow="Risk"
+                        tone="warning"
+                    >
+                        <DonutChart data={riskMix} centerLabel="Cases" emptyText="No risk case counts are available." />
+                    </ExecutiveChartCard>
+                    </div>
+
+                    <div className="xl:col-span-4">
+                    <ExecutiveChartCard
+                        title="Action Type Distribution"
+                        subtitle="Most frequent business log actions"
+                        eyebrow="Action Mix"
+                        tone="default"
+                    >
+                        <HorizontalBarChart
+                            data={audit_actions.map((row) => ({ label: row.action_type || 'N/A', value: row.total }))}
+                            emptyText="No action-type summary found in current report scope."
                         />
                     </ExecutiveChartCard>
                     </div>
@@ -115,6 +161,16 @@ export default function ExecutiveReportsIndex({ counts, audit_modules, latest_bu
             </div>
         </AuthenticatedLayout>
     );
+}
+
+function formatMonth(value: string): string {
+    const date = new Date(`${value}-01T00:00:00`);
+
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
+
+    return date.toLocaleDateString('en-PH', { month: 'short', year: 'numeric' });
 }
 
 function Card({ label, value }: { label: string; value: number }) {

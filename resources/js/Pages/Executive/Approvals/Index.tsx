@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import { DonutChart, ExecutiveChartCard, HorizontalBarChart } from '@/Components/Executive/Charts';
 import PpmpDecisionModal from '@/Components/PpmpDecisionModal';
 import useSmartRefresh from '@/hooks/useSmartRefresh';
 import { Head, Link, router, useForm } from '@inertiajs/react';
@@ -40,9 +41,10 @@ type Props = {
         offices: OfficeOption[];
         statuses: string[];
     };
+    office_breakdown: Array<{ office_id: number; office_name: string; total: number }>;
 };
 
-export default function ExecutiveApprovalsIndex({ records, summary, filters, filter_options }: Props) {
+export default function ExecutiveApprovalsIndex({ records, summary, filters, filter_options, office_breakdown }: Props) {
     const { isRefreshing, lastRefreshedAt } = useSmartRefresh({
         only: ['records', 'summary', 'filters', 'filter_options'],
         refreshOnFocus: true,
@@ -124,6 +126,13 @@ export default function ExecutiveApprovalsIndex({ records, summary, filters, fil
 
     const activeDecision = decisionTarget ? decisionMeta[decisionTarget.status] : null;
 
+    const statusMix = [
+        { label: 'Pending', value: summary.pending_ppmp_approvals },
+        { label: 'Returned', value: summary.returned_for_revision },
+        { label: 'Approved (30d)', value: summary.recently_approved },
+        { label: 'Rejected', value: summary.rejected },
+    ];
+
     return (
         <AuthenticatedLayout header="Executive Approvals">
             <Head title="Executive Approvals" />
@@ -150,18 +159,11 @@ export default function ExecutiveApprovalsIndex({ records, summary, filters, fil
                 </div>
 
                 <section className="rounded-2xl border border-red-200 bg-white p-6 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
-                    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                    <div className="mb-4">
                         <div>
                             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-700">Executive Filters</p>
                             <h3 className="text-lg font-semibold text-slate-900">Approval Queue Filters</h3>
                         </div>
-                        <button
-                            type="button"
-                            onClick={() => router.get(route('executive.ppmp-approvals.index'))}
-                            className="rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 transition hover:border-red-500 hover:bg-red-50"
-                        >
-                            Reset
-                        </button>
                     </div>
 
                     <form onSubmit={onSubmit} className="grid gap-3 md:grid-cols-6">
@@ -213,11 +215,41 @@ export default function ExecutiveApprovalsIndex({ records, summary, filters, fil
                             onChange={(event) => setForm((current) => ({ ...current, search: event.target.value }))}
                         />
 
-                        <button type="submit" className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
-                            Apply
-                        </button>
+                        <div className="md:col-span-6 flex flex-wrap justify-end gap-2 pt-1">
+                            <button
+                                type="button"
+                                onClick={() => router.get(route('executive.ppmp-approvals.index'))}
+                                className="rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 transition hover:border-red-500 hover:bg-red-50"
+                            >
+                                Reset
+                            </button>
+                            <button type="submit" className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
+                                Apply
+                            </button>
+                        </div>
                     </form>
                 </section>
+
+                <div className="grid gap-6 xl:grid-cols-12">
+                    <div className="xl:col-span-5">
+                    <ExecutiveChartCard title="Approval Status Mix" subtitle="Current PPMP decision-state distribution" eyebrow="Queue Mix" tone="default">
+                        <DonutChart
+                            data={statusMix}
+                            centerLabel="Queue"
+                            emptyText="No approval status metrics are available."
+                        />
+                    </ExecutiveChartCard>
+                    </div>
+
+                    <div className="xl:col-span-7">
+                    <ExecutiveChartCard title="Office Queue Distribution" subtitle="Workflow records by office" eyebrow="Cross-Office" tone="neutral">
+                        <HorizontalBarChart
+                            data={office_breakdown.map((row) => ({ label: row.office_name, value: row.total }))}
+                            emptyText="No office-level queue data is available."
+                        />
+                    </ExecutiveChartCard>
+                    </div>
+                </div>
 
                 <section className="space-y-3">
                     {records.data.length === 0 && (

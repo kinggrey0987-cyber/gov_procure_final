@@ -100,19 +100,10 @@ export default function ProcurementAnalyticsIndex({
 
             <div className="space-y-6 py-8">
                 <section className="rounded-2xl border border-red-200 bg-white p-6 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
-                    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-700">Executive Controls</p>
-                            <h3 className="text-xl font-semibold text-slate-900">Analytics Filter Bar</h3>
-                            <p className="mt-1 text-sm text-slate-600">Adjust office, workflow states, and date scope before reading chart outputs.</p>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => router.get(route('executive.procurement-analytics'))}
-                            className="rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 transition hover:border-red-500 hover:bg-red-50"
-                        >
-                            Reset
-                        </button>
+                    <div className="mb-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-700">Executive Controls</p>
+                        <h3 className="text-xl font-semibold text-slate-900">Analytics Filter Bar</h3>
+                        <p className="mt-1 text-sm text-slate-600">Adjust office, workflow states, and date scope before reading chart outputs.</p>
                     </div>
 
                     <form onSubmit={onSubmit} className="grid gap-3 md:grid-cols-6">
@@ -168,9 +159,18 @@ export default function ProcurementAnalyticsIndex({
                             onChange={(event) => setForm((current) => ({ ...current, to_date: event.target.value }))}
                         />
 
-                        <button type="submit" className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white shadow-[0_8px_18px_rgba(185,28,28,0.2)] hover:bg-red-800">
-                            Apply
-                        </button>
+                        <div className="md:col-span-6 flex flex-wrap justify-end gap-2 pt-1">
+                            <button
+                                type="button"
+                                onClick={() => router.get(route('executive.procurement-analytics'))}
+                                className="rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 transition hover:border-red-500 hover:bg-red-50"
+                            >
+                                Reset
+                            </button>
+                            <button type="submit" className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white shadow-[0_8px_18px_rgba(185,28,28,0.2)] hover:bg-red-800">
+                                Apply
+                            </button>
+                        </div>
                     </form>
                 </section>
 
