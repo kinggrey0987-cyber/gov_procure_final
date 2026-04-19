@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { DonutChart, ExecutiveChartCard, GroupedComparisonChart, HorizontalBarChart, TrendLineChart } from '@/Components/Executive/Charts';
+import { DonutChart, ExecutiveChartCard, HorizontalBarChart, TrendGroupedBarChart } from '@/Components/Executive/Charts';
 import { Head } from '@inertiajs/react';
 
 type OfficeBreakdown = {
@@ -60,6 +60,9 @@ export default function ExecutiveDashboardIndex({
     alert_severity_breakdown,
     recent_business_logs,
 }: Props) {
+    const activeAnomalies = summary.open_anomaly_count + summary.in_review_anomaly_count;
+    const activeAlerts = summary.open_alert_count + summary.in_review_alert_count;
+
     const officeOversight = summary.office_breakdown
         .map((office) => ({
             label: office.name,
@@ -68,26 +71,36 @@ export default function ExecutiveDashboardIndex({
         .sort((a, b) => b.value - a.value)
         .slice(0, 8);
 
-    const riskSnapshot = [
-        { label: 'Open', first: summary.open_anomaly_count, second: summary.open_alert_count },
-        { label: 'In Review', first: summary.in_review_anomaly_count, second: summary.in_review_alert_count },
-        { label: 'High Severity', first: summary.high_severity_anomaly_count, second: summary.high_severity_alert_count },
-    ];
-
-    const procurementTrend = mergeTrend(
+    const procurementTrend = mergeGroupedTrend(
         procurement.monthly_trends.purchase_requests,
         procurement.monthly_trends.purchase_orders,
     );
+
+    const anomalyRanked = [
+        { label: 'Open anomalies', value: summary.open_anomaly_count },
+        { label: 'In review anomalies', value: summary.in_review_anomaly_count },
+        { label: 'High severity anomalies', value: summary.high_severity_anomaly_count },
+    ].sort((a, b) => b.value - a.value);
 
     const approvalStatusMix = approvals.status_mix.map((row) => ({
         label: row.status,
         value: row.total,
     }));
 
-    const alertSeverityMix = alert_severity_breakdown.map((row) => ({
-        label: row.label || 'N/A',
-        value: row.total,
-    }));
+    const alertSeverityMix = alert_severity_breakdown
+        .map((row) => ({
+            label: row.label || 'N/A',
+            value: row.total,
+        }))
+        .sort((a, b) => b.value - a.value);
+
+    const throughputMix = [
+        { label: 'Purchase Requests', value: procurement.purchase_request_count },
+        { label: 'Purchase Orders', value: procurement.purchase_order_count },
+        { label: 'Pending PPMP Approvals', value: approvals.pending_ppmp_approvals },
+    ].sort((a, b) => b.value - a.value);
+
+    const latestLogs = recent_business_logs.slice(0, 5);
 
     const exportCsv = () => {
         const lines = [
@@ -108,11 +121,11 @@ export default function ExecutiveDashboardIndex({
         <AuthenticatedLayout header="Executive Dashboard">
             <Head title="Executive Dashboard" />
 
-            <div className="space-y-6 py-8">
+            <div className="space-y-5 py-8">
                 <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-200 bg-white px-5 py-4 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
                     <div>
-                        <h2 className="text-2xl font-semibold text-slate-900">Executive DSS Home</h2>
-                        <p className="text-sm text-slate-600">Live oversight</p>
+                        <h2 className="text-2xl font-semibold text-slate-900">Executive Oversight Overview</h2>
+                        <p className="text-sm text-slate-600">Summary first, trend signals second, evidence details last.</p>
                     </div>
                     <div className="flex items-center gap-2">
                         <button
@@ -132,107 +145,181 @@ export default function ExecutiveDashboardIndex({
                     </div>
                 </section>
 
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <MetricCard label="Open Anomalies" value={summary.open_anomaly_count} tone="rose" />
-                    <MetricCard label="Open Alerts" value={summary.open_alert_count} tone="amber" />
-                    <MetricCard label="Purchase Requests" value={procurement.purchase_request_count} tone="sky" />
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+                    <MetricCard label="Purchase Requests" value={procurement.purchase_request_count} tone="neutral" />
+                    <MetricCard label="Purchase Orders" value={procurement.purchase_order_count} tone="neutral" />
+                    <MetricCard
+                        label="Procurement Spend"
+                        value={formatCurrency(procurement.total_purchase_order_amount)}
+                        tone="sky"
+                    />
+                    <MetricCard label="Active Anomalies" value={activeAnomalies} tone="rose" />
+                    <MetricCard label="Active Alerts" value={activeAlerts} tone="amber" />
                     <MetricCard label="Published Disclosures" value={transparency.published_disclosure_count} tone="emerald" />
                 </div>
 
                 <div className="grid gap-6 xl:grid-cols-12">
                     <div className="xl:col-span-8">
-                    <ExecutiveChartCard
-                        title="Procurement Trend"
-                        subtitle="PR and PO movement"
-                        tone="critical"
-                    >
-                        <TrendLineChart
-                            data={procurementTrend}
-                            emptyText="No data in current filter scope"
-                        />
-                    </ExecutiveChartCard>
+                        <ExecutiveChartCard
+                            title="Procurement Activity Trend"
+                            subtitle="PR versus PO movement"
+                            tone="neutral"
+                        >
+                            {procurementTrend.length === 0 ? (
+                                <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-600">
+                                    No data in current filter scope.
+                                </p>
+                            ) : procurementTrend.length === 1 ? (
+                                <div className="grid gap-3 md:grid-cols-3">
+                                    <MiniStat label="Month" value={procurementTrend[0].label} />
+                                    <MiniStat label="Purchase Requests" value={procurementTrend[0].first} />
+                                    <MiniStat label="Purchase Orders" value={procurementTrend[0].second} />
+                                </div>
+                            ) : (
+                                <TrendGroupedBarChart
+                                    data={procurementTrend}
+                                    firstLabel="Purchase Requests"
+                                    secondLabel="Purchase Orders"
+                                    emptyText="No data in current filter scope"
+                                />
+                            )}
+                        </ExecutiveChartCard>
                     </div>
 
                     <div className="xl:col-span-4">
-                    <ExecutiveChartCard
-                        title="PPMP Workflow Mix"
-                        subtitle="Approval state"
-                        tone="default"
-                    >
-                        <DonutChart
-                            data={approvalStatusMix}
-                            centerLabel="PPMP"
-                            emptyText="No data in current filter scope"
-                        />
-                    </ExecutiveChartCard>
+                        <ExecutiveChartCard
+                            title="PPMP Workflow Summary"
+                            subtitle="Approval status distribution"
+                            tone="default"
+                        >
+                            <div className="space-y-4">
+                                <DonutChart
+                                    data={approvalStatusMix}
+                                    centerLabel="PPMP"
+                                    emptyText="No data in current filter scope"
+                                />
+                                <div className="grid grid-cols-3 gap-2">
+                                    <MiniStat label="Pending" value={approvals.pending_ppmp_approvals} />
+                                    <MiniStat label="Returned" value={approvals.returned_for_revision} />
+                                    <MiniStat label="Approved" value={approvals.recently_approved} />
+                                </div>
+                            </div>
+                        </ExecutiveChartCard>
+                    </div>
+
+                    <div className="xl:col-span-4">
+                        <ExecutiveChartCard
+                            title="Risk Summary"
+                            subtitle="Active anomaly and alert pressure"
+                            tone="critical"
+                        >
+                            <div className="space-y-3">
+                                <RiskStrip
+                                    label="Active Anomalies"
+                                    value={activeAnomalies}
+                                    max={Math.max(activeAnomalies, activeAlerts, 1)}
+                                    tone="rose"
+                                />
+                                <RiskStrip
+                                    label="Active Alerts"
+                                    value={activeAlerts}
+                                    max={Math.max(activeAnomalies, activeAlerts, 1)}
+                                    tone="amber"
+                                />
+                                <RiskStrip
+                                    label="High Severity (Anomaly + Alert)"
+                                    value={summary.high_severity_anomaly_count + summary.high_severity_alert_count}
+                                    max={Math.max(activeAnomalies, activeAlerts, 1)}
+                                    tone="slate"
+                                />
+                            </div>
+                        </ExecutiveChartCard>
                     </div>
 
                     <div className="xl:col-span-8">
-                    <ExecutiveChartCard
-                        title="Risk Snapshot"
-                        subtitle="Anomalies vs alerts"
-                        tone="critical"
-                    >
-                        <GroupedComparisonChart
-                            data={riskSnapshot}
-                            firstLabel="Anomalies"
-                            secondLabel="Alerts"
-                            emptyText="No data in current filter scope"
-                        />
-                    </ExecutiveChartCard>
+                        <ExecutiveChartCard
+                            title="Risk Breakdown"
+                            subtitle="Top anomaly focus and alert severity"
+                            tone="warning"
+                        >
+                            <div className="grid gap-5 lg:grid-cols-2">
+                                <div>
+                                    <p className="mb-2 text-sm font-semibold text-slate-700">Top anomaly categories</p>
+                                    <HorizontalBarChart data={anomalyRanked} emptyText="No data in current filter scope" />
+                                </div>
+                                <div>
+                                    <p className="mb-2 text-sm font-semibold text-slate-700">Alert severity summary</p>
+                                    <HorizontalBarChart data={alertSeverityMix} emptyText="No data in current filter scope" />
+                                </div>
+                            </div>
+                        </ExecutiveChartCard>
                     </div>
 
                     <div className="xl:col-span-4">
-                    <ExecutiveChartCard
-                        title="Alert Severity Mix"
-                        subtitle="Current alert pressure"
-                        tone="warning"
-                    >
-                        <DonutChart
-                            data={alertSeverityMix}
-                            centerLabel="Alerts"
-                            emptyText="No data in current filter scope"
-                        />
-                    </ExecutiveChartCard>
+                        <ExecutiveChartCard
+                            title="Procurement Throughput"
+                            subtitle="Volume by process lane"
+                            tone="neutral"
+                        >
+                            <HorizontalBarChart data={throughputMix} emptyText="No data in current filter scope" />
+                        </ExecutiveChartCard>
                     </div>
 
-                    <div className="xl:col-span-12">
-                    <ExecutiveChartCard
-                        title="Office Oversight Comparison"
-                        subtitle="Risk volume by office"
-                        tone="neutral"
-                    >
-                        <HorizontalBarChart data={officeOversight} emptyText="No data in current filter scope" />
-                    </ExecutiveChartCard>
+                    <div className="xl:col-span-8">
+                        <ExecutiveChartCard
+                            title="Office Oversight Comparison"
+                            subtitle="Risk concentration by office"
+                            tone="neutral"
+                        >
+                            <HorizontalBarChart data={officeOversight} emptyText="No data in current filter scope" />
+                        </ExecutiveChartCard>
+                    </div>
+
+                    <div className="xl:col-span-4">
+                        <ExecutiveChartCard
+                            title="Disclosure Summary"
+                            subtitle="Transparency publication snapshot"
+                            tone="default"
+                        >
+                            <div className="grid gap-2">
+                                <MiniStat label="Published" value={transparency.published_disclosure_count} />
+                                <MiniStat label="Draft" value={transparency.draft_disclosure_count} />
+                                <MiniStat label="Public Reports Available" value={transparency.published_disclosure_count} />
+                            </div>
+                        </ExecutiveChartCard>
                     </div>
                 </div>
 
                 <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-                    <div className="border-b border-slate-200 px-6 py-5">
-                        <h3 className="text-xl font-semibold text-slate-900">Latest Executive Logs</h3>
+                    <div className="border-b border-slate-200 px-5 py-4">
+                        <h3 className="text-lg font-semibold text-slate-900">Recent Executive Activity</h3>
                     </div>
-                    {recent_business_logs.length === 0 ? (
-                        <p className="px-6 py-8 text-sm text-slate-500">No data in current filter scope</p>
+                    {latestLogs.length === 0 ? (
+                        <p className="px-5 py-6 text-sm text-slate-500">No data in current filter scope</p>
                     ) : (
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-slate-200 text-sm">
                                 <thead className="bg-slate-50">
                                     <tr>
-                                        <th className="px-4 py-2 text-left">When</th>
-                                        <th className="px-4 py-2 text-left">Module</th>
-                                        <th className="px-4 py-2 text-left">Action</th>
-                                        <th className="px-4 py-2 text-left">User</th>
-                                        <th className="px-4 py-2 text-left">Office</th>
+                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">When</th>
+                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Module</th>
+                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Action</th>
+                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">User</th>
+                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Office</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {recent_business_logs.map((row) => (
+                                    {latestLogs.map((row) => (
                                         <tr key={row.id}>
-                                            <td className="px-4 py-2">{new Date(row.created_at).toLocaleString()}</td>
-                                            <td className="px-4 py-2">{formatModuleLabel(row.module_name)}</td>
-                                            <td className="px-4 py-2">{formatActionLabel(row.action_type)}</td>
-                                            <td className="px-4 py-2">{row.user?.name ?? 'System'}</td>
-                                            <td className="px-4 py-2">{row.office?.name ?? 'N/A'}</td>
+                                            <td className="px-4 py-2 text-slate-700">{new Date(row.created_at).toLocaleString()}</td>
+                                            <td className="px-4 py-2 text-slate-700">{formatModuleLabel(row.module_name)}</td>
+                                            <td className="px-4 py-2">
+                                                <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                                                    {formatActionLabel(row.action_type)}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-2 text-slate-700">{row.user?.name ?? 'System'}</td>
+                                            <td className="px-4 py-2 text-slate-700">{row.office?.name ?? 'N/A'}</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -245,26 +332,19 @@ export default function ExecutiveDashboardIndex({
     );
 }
 
-function mergeTrend(
+function mergeGroupedTrend(
     requestTrend: Array<{ month: string; total: number }>,
     orderTrend: Array<{ month: string; total: number }>,
 ) {
-    const monthMap = new Map<string, number>();
+    const requestMap = new Map(requestTrend.map((row) => [row.month, row.total]));
+    const orderMap = new Map(orderTrend.map((row) => [row.month, row.total]));
+    const allMonths = [...new Set([...requestMap.keys(), ...orderMap.keys()])].sort((a, b) => a.localeCompare(b));
 
-    requestTrend.forEach((row) => {
-        monthMap.set(row.month, (monthMap.get(row.month) ?? 0) + row.total);
-    });
-
-    orderTrend.forEach((row) => {
-        monthMap.set(row.month, (monthMap.get(row.month) ?? 0) + row.total);
-    });
-
-    return [...monthMap.entries()]
-        .sort(([monthA], [monthB]) => monthA.localeCompare(monthB))
-        .map(([month, total]) => ({
-            label: formatMonth(month),
-            value: total,
-        }));
+    return allMonths.map((month) => ({
+        label: formatMonth(month),
+        first: requestMap.get(month) ?? 0,
+        second: orderMap.get(month) ?? 0,
+    }));
 }
 
 function formatMonth(value: string): string {
@@ -277,20 +357,77 @@ function formatMonth(value: string): string {
     return date.toLocaleDateString('en-PH', { month: 'short', year: 'numeric' });
 }
 
-function MetricCard({ label, value, tone }: { label: string; value: number; tone: 'rose' | 'amber' | 'sky' | 'emerald' }) {
+function MetricCard({
+    label,
+    value,
+    tone,
+}: {
+    label: string;
+    value: number | string;
+    tone: 'rose' | 'amber' | 'sky' | 'emerald' | 'neutral';
+}) {
     const toneClass: Record<typeof tone, string> = {
         rose: 'border-rose-300 bg-gradient-to-b from-rose-100 to-rose-50 text-rose-900 shadow-[0_8px_18px_rgba(244,63,94,0.15)]',
         amber: 'border-amber-300 bg-gradient-to-b from-amber-100 to-amber-50 text-amber-900 shadow-[0_8px_18px_rgba(245,158,11,0.14)]',
         sky: 'border-sky-300 bg-gradient-to-b from-sky-100 to-sky-50 text-sky-900 shadow-[0_8px_18px_rgba(56,189,248,0.14)]',
         emerald: 'border-emerald-300 bg-gradient-to-b from-emerald-100 to-emerald-50 text-emerald-900 shadow-[0_8px_18px_rgba(16,185,129,0.14)]',
+        neutral: 'border-slate-200 bg-gradient-to-b from-slate-100 to-white text-slate-900 shadow-[0_8px_18px_rgba(100,116,139,0.12)]',
     };
 
     return (
-        <div className={`rounded-2xl border p-5 shadow-sm ${toneClass[tone]}`}>
-            <p className="text-sm font-semibold uppercase tracking-wide">{label}</p>
-            <p className="mt-1.5 text-4xl font-bold">{value}</p>
+        <div className={`flex min-h-[132px] flex-col justify-between rounded-2xl border p-4 ${toneClass[tone]}`}>
+            <p className="text-xs font-semibold uppercase tracking-wide">{label}</p>
+            <p className="mt-2 text-3xl font-bold leading-none sm:text-[2rem]">{value}</p>
         </div>
     );
+}
+
+function MiniStat({ label, value }: { label: string; value: number | string }) {
+    return (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">{label}</p>
+            <p className="mt-1 text-lg font-bold text-slate-900">{value}</p>
+        </div>
+    );
+}
+
+function RiskStrip({
+    label,
+    value,
+    max,
+    tone,
+}: {
+    label: string;
+    value: number;
+    max: number;
+    tone: 'rose' | 'amber' | 'slate';
+}) {
+    const width = `${Math.max((value / max) * 100, value > 0 ? 8 : 0)}%`;
+    const barTone: Record<typeof tone, string> = {
+        rose: 'from-rose-700 to-rose-500',
+        amber: 'from-amber-600 to-amber-400',
+        slate: 'from-slate-700 to-slate-500',
+    };
+
+    return (
+        <div className="space-y-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+            <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-slate-700">{label}</p>
+                <p className="text-base font-bold text-slate-900">{value}</p>
+            </div>
+            <div className="h-2 rounded-full bg-slate-200">
+                <div className={`h-2 rounded-full bg-gradient-to-r ${barTone[tone]}`} style={{ width }} />
+            </div>
+        </div>
+    );
+}
+
+function formatCurrency(amount: number): string {
+    return new Intl.NumberFormat('en-PH', {
+        style: 'currency',
+        currency: 'PHP',
+        maximumFractionDigits: 0,
+    }).format(amount);
 }
 
 function csvValue(value: string): string {
