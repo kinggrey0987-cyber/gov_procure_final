@@ -12,42 +12,86 @@ type Props = {
 };
 
 export default function PublicDisclosureIndex({ disclosures }: Props) {
+    const rows = disclosures.data ?? [];
+
     return (
         <>
             <Head title="Public Disclosures" />
-            <div className="min-h-screen bg-slate-50 py-10">
-                <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-                    <h1 className="text-2xl font-bold text-slate-900">Public Disclosures</h1>
-                    <p className="mt-1 text-sm text-slate-600">Approved and published records only.</p>
+            <div className="min-h-screen bg-slate-50 py-12">
+                <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+                    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_8px_24px_rgba(15,23,42,0.06)] sm:p-8">
+                        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Public Disclosures</h1>
+                        <p className="mt-2 text-sm text-slate-600">Published procurement records available for public transparency.</p>
 
-                    <div className="mt-6 overflow-hidden rounded border bg-white">
-                        <table className="min-w-full divide-y divide-gray-200 text-sm">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th className="px-4 py-2 text-left">Title</th>
-                                    <th className="px-4 py-2 text-left">Type</th>
-                                    <th className="px-4 py-2 text-left">Published</th>
-                                    <th className="px-4 py-2 text-left">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {disclosures.data.map((row) => (
-                                    <tr key={row.disclosure_id}>
-                                        <td className="px-4 py-2">{row.title}</td>
-                                        <td className="px-4 py-2">{row.type}</td>
-                                        <td className="px-4 py-2">{row.published_at}</td>
-                                        <td className="px-4 py-2">
-                                            <Link href={route('public.disclosures.show', row.disclosure_id)} className="rounded bg-indigo-600 px-3 py-1 text-xs text-white">
-                                                View
-                                            </Link>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                        <div className="mt-6 overflow-hidden rounded-xl border border-slate-200">
+                            {rows.length === 0 ? (
+                                <div className="px-6 py-12 text-center">
+                                    <p className="text-base font-medium text-slate-800">No public disclosures available yet.</p>
+                                </div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full divide-y divide-slate-200 text-sm">
+                                        <thead className="bg-slate-50">
+                                            <tr>
+                                                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Title</th>
+                                                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Type</th>
+                                                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Published</th>
+                                                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 bg-white">
+                                            {rows.map((row) => (
+                                                <tr key={row.disclosure_id} className="transition-colors hover:bg-slate-50/80">
+                                                    <td className="px-5 py-3.5 text-sm font-medium text-slate-900">{row.title}</td>
+                                                    <td className="px-5 py-3.5 text-slate-700">{formatTypeLabel(row.type)}</td>
+                                                    <td className="px-5 py-3.5 text-slate-700">{formatPublishedDate(row.published_at)}</td>
+                                                    <td className="px-5 py-3.5">
+                                                        <Link
+                                                            href={route('public.disclosures.show', row.disclosure_id)}
+                                                            className="inline-flex rounded-lg bg-red-700 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-800"
+                                                        >
+                                                            View Disclosure
+                                                        </Link>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
         </>
     );
+}
+
+function formatTypeLabel(value: string): string {
+    return value
+        .replaceAll('_', ' ')
+        .toLowerCase()
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatPublishedDate(value: string): string {
+    const parsed = new Date(value);
+
+    if (Number.isNaN(parsed.getTime())) {
+        return value;
+    }
+
+    const date = parsed.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+    });
+
+    const time = parsed.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+    });
+
+    return `${date} • ${time}`;
 }
