@@ -10,10 +10,15 @@ php artisan storage:link || true
 php artisan optimize:clear || true
 php artisan migrate --force
 
-if [ "${RUN_DEMO_SEED:-false}" = "true" ]; then
-  php artisan db:seed --force
-fi
-
 php-fpm -D
+
+if [ "${RUN_DEMO_SEED:-false}" = "true" ]; then
+  (
+    sleep 10
+    echo "[seed] starting demo seed..."
+    php artisan db:seed --force
+    echo "[seed] demo seed finished."
+  ) &
+fi
 
 exec nginx -g 'daemon off;'
