@@ -378,6 +378,19 @@ function formatMonth(value: string): string {
 }
 
 function formatStatusLabel(value: string): string {
+    const aliases: Record<string, string> = {
+        APPROVED: 'Approved',
+        RETURNED_FOR_REVISION: 'Returned for Revision',
+        SUBMITTED: 'Submitted',
+        PENDING: 'Pending',
+    };
+
+    const normalized = value.toUpperCase();
+
+    if (aliases[normalized]) {
+        return aliases[normalized];
+    }
+
     return value.replaceAll('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
