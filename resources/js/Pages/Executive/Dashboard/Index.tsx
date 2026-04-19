@@ -112,7 +112,7 @@ export default function ExecutiveDashboardIndex({
                 <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-200 bg-white px-5 py-4 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
                     <div>
                         <h2 className="text-2xl font-semibold text-slate-900">Executive DSS Home</h2>
-                        <p className="text-sm text-slate-600">Live oversight view</p>
+                        <p className="text-sm text-slate-600">Live oversight</p>
                     </div>
                     <div className="flex items-center gap-2">
                         <button
@@ -144,7 +144,6 @@ export default function ExecutiveDashboardIndex({
                     <ExecutiveChartCard
                         title="Procurement Trend"
                         subtitle="PR and PO movement"
-                        eyebrow="Main Insight"
                         tone="critical"
                     >
                         <TrendLineChart
@@ -158,7 +157,6 @@ export default function ExecutiveDashboardIndex({
                     <ExecutiveChartCard
                         title="PPMP Workflow Mix"
                         subtitle="Approval state"
-                        eyebrow="Main Insight"
                         tone="default"
                     >
                         <DonutChart
@@ -173,7 +171,6 @@ export default function ExecutiveDashboardIndex({
                     <ExecutiveChartCard
                         title="Risk Snapshot"
                         subtitle="Anomalies vs alerts"
-                        eyebrow="Secondary Insight"
                         tone="critical"
                     >
                         <GroupedComparisonChart
@@ -189,7 +186,6 @@ export default function ExecutiveDashboardIndex({
                     <ExecutiveChartCard
                         title="Alert Severity Mix"
                         subtitle="Current alert pressure"
-                        eyebrow="Secondary Insight"
                         tone="warning"
                     >
                         <DonutChart
@@ -204,7 +200,6 @@ export default function ExecutiveDashboardIndex({
                     <ExecutiveChartCard
                         title="Office Oversight Comparison"
                         subtitle="Risk volume by office"
-                        eyebrow="Comparative Insight"
                         tone="neutral"
                     >
                         <HorizontalBarChart data={officeOversight} emptyText="No data in current filter scope" />
@@ -234,8 +229,8 @@ export default function ExecutiveDashboardIndex({
                                     {recent_business_logs.map((row) => (
                                         <tr key={row.id}>
                                             <td className="px-4 py-2">{new Date(row.created_at).toLocaleString()}</td>
-                                            <td className="px-4 py-2">{row.module_name}</td>
-                                            <td className="px-4 py-2">{row.action_type}</td>
+                                            <td className="px-4 py-2">{formatModuleLabel(row.module_name)}</td>
+                                            <td className="px-4 py-2">{formatActionLabel(row.action_type)}</td>
                                             <td className="px-4 py-2">{row.user?.name ?? 'System'}</td>
                                             <td className="px-4 py-2">{row.office?.name ?? 'N/A'}</td>
                                         </tr>
@@ -291,19 +286,11 @@ function MetricCard({ label, value, tone }: { label: string; value: number; tone
     };
 
     return (
-        <div className={`rounded-2xl border p-6 shadow-sm ${toneClass[tone]}`}>
+        <div className={`rounded-2xl border p-5 shadow-sm ${toneClass[tone]}`}>
             <p className="text-sm font-semibold uppercase tracking-wide">{label}</p>
-            <p className="mt-2 text-4xl font-bold">{value}</p>
+            <p className="mt-1.5 text-4xl font-bold">{value}</p>
         </div>
     );
-}
-
-function formatCurrency(value: number): string {
-    return new Intl.NumberFormat('en-PH', {
-        style: 'currency',
-        currency: 'PHP',
-        maximumFractionDigits: 2,
-    }).format(value ?? 0);
 }
 
 function csvValue(value: string): string {
@@ -320,4 +307,33 @@ function downloadFile(content: string, fileName: string, mimeType: string): void
     anchor.click();
     anchor.remove();
     window.URL.revokeObjectURL(url);
+}
+
+function formatModuleLabel(value: string): string {
+    const aliases: Record<string, string> = {
+        'Executive.Anomaly': 'Anomaly Detection',
+        'Executive.Alert': 'Alert Monitoring',
+        'Executive.PPMP': 'PPMP Approval',
+        'Executive.PublicDisclosure': 'Transparency Disclosure',
+        'Office.SupplyRequest': 'Supply Request Submission',
+        'Procurement.PurchaseOrder': 'Procurement Order Processing',
+        'Inventory.Distribution': 'Distribution Activity',
+        'Inventory.Claim': 'Claims Review',
+    };
+
+    return aliases[value] ?? value.replaceAll('.', ' ').replaceAll('_', ' ');
+}
+
+function formatActionLabel(value: string): string {
+    const aliases: Record<string, string> = {
+        CREATE_DRAFT: 'Draft Created',
+        UPDATE_DRAFT: 'Draft Updated',
+        PUBLISH: 'Disclosure Published',
+        APPROVE: 'Approved',
+        REJECTED: 'Rejected',
+        RETURNED_FOR_REVISION: 'Returned for Revision',
+    };
+
+    const raw = aliases[value] ?? value;
+    return raw.replaceAll('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase());
 }

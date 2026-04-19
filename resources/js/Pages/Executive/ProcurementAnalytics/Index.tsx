@@ -1,4 +1,4 @@
-import { DonutChart, ExecutiveChartCard, GroupedComparisonChart, HorizontalBarChart } from '@/Components/Executive/Charts';
+import { DonutChart, ExecutiveChartCard, HorizontalBarChart, TrendGroupedBarChart } from '@/Components/Executive/Charts';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, router } from '@inertiajs/react';
 import { FormEvent, useState } from 'react';
@@ -104,7 +104,6 @@ export default function ProcurementAnalyticsIndex({
         value: row.total,
     }));
 
-    const spendingDonut = officeValueBreakdown.slice(0, 8);
     const crossOfficeActivity = office_comparison.filter((row) => row.purchase_request_count > 0 || row.purchase_order_count > 0).length;
 
     const exportCsv = () => {
@@ -130,7 +129,7 @@ export default function ProcurementAnalyticsIndex({
                 <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-200 bg-white px-5 py-4 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
                     <div>
                         <h2 className="text-2xl font-semibold text-slate-900">Procurement Insights</h2>
-                        <p className="text-sm text-slate-600">Graph-first procurement decisions</p>
+                        <p className="text-sm text-slate-600">Executive procurement signals</p>
                     </div>
                     <div className="flex items-center gap-2">
                         <button type="button" onClick={() => window.print()} className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
@@ -225,10 +224,9 @@ export default function ProcurementAnalyticsIndex({
                         <ExecutiveChartCard
                             title="PR vs PO Trend"
                             subtitle="Monthly movement"
-                            eyebrow="Trend"
                             tone="critical"
                         >
-                            <GroupedComparisonChart
+                            <TrendGroupedBarChart
                                 data={monthlyMerged}
                                 firstLabel="Purchase Requests"
                                 secondLabel="Purchase Orders"
@@ -238,17 +236,17 @@ export default function ProcurementAnalyticsIndex({
                     </div>
 
                     <div className="xl:col-span-4">
-                    <ExecutiveChartCard title="Spending by Office" subtitle="PO concentration" eyebrow="Distribution" tone="warning">
-                        <DonutChart
-                            data={spendingDonut}
-                            centerLabel="Spending"
+                    <ExecutiveChartCard title="Top Procurement Concentration" subtitle="Office spending ranking" tone="neutral">
+                        <HorizontalBarChart
+                            data={officeValueBreakdown}
+                            valueFormatter={formatCurrency}
                             emptyText="No data in current filter scope"
                         />
                     </ExecutiveChartCard>
                     </div>
 
                     <div className="xl:col-span-6">
-                    <ExecutiveChartCard title="PR Status Mix" subtitle="Request lifecycle" eyebrow="Status" tone="default">
+                    <ExecutiveChartCard title="PR Status Mix" subtitle="Request lifecycle" tone="default">
                         <DonutChart
                             data={statusMixPr}
                             centerLabel="PR"
@@ -258,20 +256,10 @@ export default function ProcurementAnalyticsIndex({
                     </div>
 
                     <div className="xl:col-span-6">
-                    <ExecutiveChartCard title="PO Status Mix" subtitle="Order progression" eyebrow="Status" tone="default">
+                    <ExecutiveChartCard title="PO Status Mix" subtitle="Order progression" tone="default">
                         <DonutChart
                             data={statusMixPo}
                             centerLabel="PO"
-                            emptyText="No data in current filter scope"
-                        />
-                    </ExecutiveChartCard>
-                    </div>
-
-                    <div className="xl:col-span-12">
-                    <ExecutiveChartCard title="Top Procurement Concentration" subtitle="Office spending ranking" eyebrow="Comparison" tone="neutral">
-                        <HorizontalBarChart
-                            data={officeValueBreakdown}
-                            valueFormatter={formatCurrency}
                             emptyText="No data in current filter scope"
                         />
                     </ExecutiveChartCard>

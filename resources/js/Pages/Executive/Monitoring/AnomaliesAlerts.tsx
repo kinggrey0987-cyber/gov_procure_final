@@ -124,7 +124,7 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                 <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-200 bg-white px-5 py-4 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
                     <div>
                         <h2 className="text-2xl font-semibold text-slate-900">Risk & Alerts</h2>
-                        <p className="text-sm text-slate-600">Executive risk cockpit</p>
+                        <p className="text-sm text-slate-600">Risk command view</p>
                     </div>
                     <div className="flex items-center gap-2">
                         <button type="button" onClick={() => window.print()} className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
@@ -230,7 +230,7 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
 
                 <div className="grid gap-6 xl:grid-cols-12">
                     <div className="xl:col-span-12">
-                    <ExecutiveChartCard title="Incident Trend Over Time" subtitle="Monthly risk movement" eyebrow="Trend" tone="critical">
+                    <ExecutiveChartCard title="Incident Trend" subtitle="Monthly risk movement" tone="critical">
                         <TrendLineChart
                             data={mergedTrend}
                             emptyText="No data in current filter scope"
@@ -239,7 +239,7 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                     </div>
 
                     <div className="xl:col-span-4">
-                    <ExecutiveChartCard title="Anomaly Type Distribution" subtitle="Anomaly categories" eyebrow="Distribution" tone="critical">
+                    <ExecutiveChartCard title="Anomaly Type Mix" subtitle="Category distribution" tone="critical">
                         <DonutChart
                             data={anomaly_type_breakdown.map((row) => ({ label: formatAnomalyType(row.label || 'N/A'), value: row.total }))}
                             centerLabel="Anomalies"
@@ -249,7 +249,7 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                     </div>
 
                     <div className="xl:col-span-8">
-                    <ExecutiveChartCard title="Severity Distribution" subtitle="Anomalies vs alerts by severity" eyebrow="Severity" tone="default">
+                    <ExecutiveChartCard title="Severity Distribution" subtitle="Anomalies vs alerts" tone="default">
                         <GroupedComparisonChart
                             data={severityComparison}
                             firstLabel="Anomalies"
@@ -260,7 +260,7 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                     </div>
 
                     <div className="xl:col-span-6">
-                    <ExecutiveChartCard title="Office Risk Comparison" subtitle="Total incidents by office" eyebrow="Cross-Office" tone="neutral">
+                    <ExecutiveChartCard title="Office Risk Comparison" subtitle="Total incidents by office" tone="neutral">
                         <HorizontalBarChart
                             data={officeRisk}
                             emptyText="No data in current filter scope"
@@ -269,7 +269,7 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                     </div>
 
                     <div className="xl:col-span-6">
-                    <ExecutiveChartCard title="Status Breakdown" subtitle="Anomaly and alert statuses side-by-side" eyebrow="Resolution Flow" tone="default">
+                    <ExecutiveChartCard title="Status Breakdown" subtitle="Current resolution flow" tone="default">
                         <GroupedComparisonChart
                             data={mergeStatus(status_breakdown.anomalies, status_breakdown.alerts)}
                             firstLabel="Anomalies"
@@ -348,7 +348,7 @@ function formatMonth(value: string): string {
 
 function formatAnomalyType(value: string): string {
     if (value === 'PRICE_Z_SCORE') {
-        return 'Procurement Price Anomaly (Grouped by Requesting Office)';
+        return 'Procurement Price Anomaly';
     }
 
     return value;

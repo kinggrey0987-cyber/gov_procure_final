@@ -121,7 +121,7 @@ export default function TransparencyMonitoringIndex({
                 <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-200 bg-white px-5 py-4 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
                     <div>
                         <h2 className="text-2xl font-semibold text-slate-900">Transparency & Disclosures</h2>
-                        <p className="text-sm text-slate-600">Disclosure governance module</p>
+                        <p className="text-sm text-slate-600">Disclosure governance</p>
                     </div>
                     <div className="flex items-center gap-2">
                         <button type="button" onClick={() => window.print()} className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
@@ -230,7 +230,6 @@ export default function TransparencyMonitoringIndex({
                         <ExecutiveChartCard
                             title="Publication Trend"
                             subtitle="Monthly publication movement"
-                            eyebrow="Trend"
                             tone="critical"
                         >
                             <TrendLineChart
@@ -241,7 +240,7 @@ export default function TransparencyMonitoringIndex({
                         </div>
 
                         <div className="xl:col-span-4">
-                        <ExecutiveChartCard title="Status Mix" subtitle="Disclosure state" eyebrow="Status" tone="default">
+                        <ExecutiveChartCard title="Status Mix" subtitle="Disclosure state" tone="default">
                             <DonutChart
                                 data={status_breakdown.map((row) => ({ label: row.status || 'N/A', value: row.total }))}
                                 centerLabel="Status"
@@ -251,7 +250,7 @@ export default function TransparencyMonitoringIndex({
                         </div>
 
                         <div className="xl:col-span-4">
-                        <ExecutiveChartCard title="Type Mix" subtitle="Disclosure categories" eyebrow="Type" tone="warning">
+                        <ExecutiveChartCard title="Type Mix" subtitle="Disclosure categories" tone="warning">
                             <HorizontalBarChart
                                 data={type_breakdown.map((row) => ({ label: row.type || 'N/A', value: row.total }))}
                                 emptyText="No data in current filter scope"
@@ -260,7 +259,7 @@ export default function TransparencyMonitoringIndex({
                         </div>
 
                         <div className="xl:col-span-4">
-                        <ExecutiveChartCard title="Publication Snapshot" subtitle="Published, draft, and pending" eyebrow="Snapshot" tone="neutral">
+                        <ExecutiveChartCard title="Publication Snapshot" subtitle="Published, draft, pending" tone="neutral">
                             <HorizontalBarChart
                                 data={publicationStateSnapshot}
                                 emptyText="No data in current filter scope"
@@ -269,7 +268,7 @@ export default function TransparencyMonitoringIndex({
                         </div>
 
                         <div className="xl:col-span-12">
-                        <ExecutiveChartCard title="Office Publication Mix" subtitle="Published disclosures by office" eyebrow="Office Mix" tone="neutral">
+                        <ExecutiveChartCard title="Office Publication Mix" subtitle="Published disclosures by office" tone="neutral">
                             <HorizontalBarChart
                                 data={office_publication_mix.map((row) => ({ label: row.label || 'N/A', value: row.total }))}
                                 emptyText="No data in current filter scope"
@@ -282,7 +281,10 @@ export default function TransparencyMonitoringIndex({
                 {activeTab === 'published' && (
                     <section className="space-y-3">
                         {published_disclosures.length === 0 ? (
-                            <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600">No data in current filter scope</div>
+                            <EmptyDisclosureState
+                                title="No published disclosures in scope"
+                                subtitle="Adjust filters or publish a draft disclosure to populate this tab."
+                            />
                         ) : (
                             published_disclosures.map((row) => (
                                 <article key={row.disclosure_id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -318,7 +320,10 @@ export default function TransparencyMonitoringIndex({
                         </div>
 
                         {draft_disclosures.length === 0 ? (
-                            <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600">No data in current filter scope</div>
+                            <EmptyDisclosureState
+                                title="No draft disclosures in scope"
+                                subtitle="Create a new disclosure draft to start executive review."
+                            />
                         ) : (
                             draft_disclosures.map((row) => (
                                 <article key={row.disclosure_id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -362,6 +367,15 @@ function Card({ label, value }: { label: string; value: number }) {
         <div className="rounded-2xl border border-red-200 bg-gradient-to-r from-red-50 to-white p-6 shadow-[0_8px_18px_rgba(15,23,42,0.06)]">
             <p className="text-sm font-semibold uppercase tracking-wide text-slate-600">{label}</p>
             <p className="mt-2 text-4xl font-bold text-red-700">{value}</p>
+        </div>
+    );
+}
+
+function EmptyDisclosureState({ title, subtitle }: { title: string; subtitle: string }) {
+    return (
+        <div className="rounded-2xl border border-dashed border-red-200 bg-gradient-to-br from-red-50 to-white p-8 text-center">
+            <p className="text-base font-semibold text-red-700">{title}</p>
+            <p className="mt-1 text-sm text-slate-600">{subtitle}</p>
         </div>
     );
 }

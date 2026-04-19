@@ -66,12 +66,12 @@ export default function BusinessAudit({ auditLogs, filters, analytics, filter_op
     };
 
     const moduleSummary = analytics.module_summary.map((row) => ({
-        label: row.label || 'N/A',
+        label: formatModuleLabel(row.label || 'N/A'),
         value: row.total,
     }));
 
     const actionSummary = analytics.action_summary.map((row) => ({
-        label: row.label || 'N/A',
+        label: formatActionLabel(row.label || 'N/A'),
         value: row.total,
     }));
 
@@ -112,7 +112,7 @@ export default function BusinessAudit({ auditLogs, filters, analytics, filter_op
                 <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-200 bg-white px-5 py-4 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
                     <div>
                         <h2 className="text-2xl font-semibold text-slate-900">Governance Logs</h2>
-                        <p className="text-sm text-slate-600">Business activity evidence</p>
+                        <p className="text-sm text-slate-600">Governance activity evidence</p>
                     </div>
                     <div className="flex items-center gap-2">
                         <button type="button" onClick={() => window.print()} className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
@@ -130,14 +130,14 @@ export default function BusinessAudit({ auditLogs, filters, analytics, filter_op
                             <select className="h-10 rounded-lg border-red-200 text-sm" value={form.module_name} onChange={(e) => setForm((v) => ({ ...v, module_name: e.target.value }))}>
                                 <option value="">All modules</option>
                                 {filter_options.modules.map((moduleName) => (
-                                    <option key={moduleName} value={moduleName}>{moduleName}</option>
+                                    <option key={moduleName} value={moduleName}>{formatModuleLabel(moduleName)}</option>
                                 ))}
                             </select>
 
                             <select className="h-10 rounded-lg border-red-200 text-sm" value={form.action_type} onChange={(e) => setForm((v) => ({ ...v, action_type: e.target.value }))}>
                                 <option value="">All actions</option>
                                 {filter_options.actions.map((actionName) => (
-                                    <option key={actionName} value={actionName}>{actionName}</option>
+                                    <option key={actionName} value={actionName}>{formatActionLabel(actionName)}</option>
                                 ))}
                             </select>
 
@@ -178,7 +178,6 @@ export default function BusinessAudit({ auditLogs, filters, analytics, filter_op
                     <ExecutiveChartCard
                         title="Activity Trend"
                         subtitle="Daily event volume"
-                        eyebrow="Trend"
                         tone="critical"
                     >
                         <TrendLineChart
@@ -192,7 +191,6 @@ export default function BusinessAudit({ auditLogs, filters, analytics, filter_op
                     <ExecutiveChartCard
                         title="Module Mix"
                         subtitle="Activity by module"
-                        eyebrow="Module Mix"
                         tone="neutral"
                     >
                         <HorizontalBarChart
@@ -206,7 +204,6 @@ export default function BusinessAudit({ auditLogs, filters, analytics, filter_op
                     <ExecutiveChartCard
                         title="Action Mix"
                         subtitle="Event type distribution"
-                        eyebrow="Action Mix"
                         tone="default"
                     >
                         <DonutChart
@@ -241,10 +238,10 @@ export default function BusinessAudit({ auditLogs, filters, analytics, filter_op
                                         <tr key={log.id} className="align-top">
                                             <td className="px-4 py-3 text-slate-600">{new Date(log.created_at).toLocaleString()}</td>
                                             <td className="px-4 py-3 font-semibold text-slate-800">{log.user?.name ?? 'System'}</td>
-                                            <td className="px-4 py-3 text-red-700">{log.action_type}</td>
+                                            <td className="px-4 py-3 text-red-700">{formatActionLabel(log.action_type)}</td>
                                             <td className="px-4 py-3 text-slate-600">
-                                                <p>{log.module_name}</p>
-                                                <p className="text-xs">{log.office?.name ?? 'N/A'} - {log.reference_type} #{log.reference_id}</p>
+                                                <p>{formatModuleLabel(log.module_name)}</p>
+                                                <p className="text-xs">{log.office?.name ?? 'N/A'} - {formatReferenceLabel(log.reference_type)} #{log.reference_id}</p>
                                             </td>
                                         </tr>
                                     ))}
@@ -265,4 +262,49 @@ function formatDateLabel(value: string): string {
     }
 
     return parsed.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+}
+
+function formatModuleLabel(value: string): string {
+    const aliases: Record<string, string> = {
+        'Executive.Anomaly': 'Anomaly Detection',
+        'Executive.Alert': 'Alert Monitoring',
+        'Executive.PPMP': 'PPMP Approval',
+        'Executive.PublicDisclosure': 'Transparency Disclosure',
+        'Office.SupplyRequest': 'Supply Request Submission',
+        'Procurement.PurchaseOrder': 'Procurement Order Processing',
+        'Inventory.Distribution': 'Distribution Activity',
+        'Inventory.Claim': 'Claims Review',
+    };
+
+    return aliases[value] ?? value.replaceAll('.', ' ').replaceAll('_', ' ');
+}
+
+function formatActionLabel(value: string): string {
+    const aliases: Record<string, string> = {
+        CREATE_DRAFT: 'Draft Created',
+        UPDATE_DRAFT: 'Draft Updated',
+        PUBLISH: 'Disclosure Published',
+        APPROVE: 'Approved',
+        REJECTED: 'Rejected',
+        RETURNED_FOR_REVISION: 'Returned for Revision',
+    };
+
+    const raw = aliases[value] ?? value;
+    return raw.replaceAll('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatReferenceLabel(value: string): string {
+    const aliases: Record<string, string> = {
+        'App\\Models\\Ppmp': 'PPMP Record',
+        'App\\Models\\SupplyRequest': 'Supply Request',
+        'App\\Models\\PurchaseRequest': 'Purchase Request',
+        'App\\Models\\PurchaseOrder': 'Purchase Order',
+        'App\\Models\\DistributionRecord': 'Distribution Record',
+        'App\\Models\\Claim': 'Claim Record',
+        'App\\Models\\PublicDisclosure': 'Public Disclosure',
+        'App\\Models\\Alert': 'Alert Record',
+        'App\\Models\\Anomaly': 'Anomaly Record',
+    };
+
+    return aliases[value] ?? value.split('\\').pop()?.replaceAll('_', ' ') ?? 'Record';
 }

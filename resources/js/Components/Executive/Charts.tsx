@@ -11,6 +11,76 @@ export type GroupedChartPoint = {
     second: number;
 };
 
+export function TrendGroupedBarChart({
+    data,
+    firstLabel,
+    secondLabel,
+    emptyText,
+}: {
+    data: GroupedChartPoint[];
+    firstLabel: string;
+    secondLabel: string;
+    emptyText: string;
+}) {
+    if (data.length === 0) {
+        return <EmptyState text={emptyText} />;
+    }
+
+    const width = Math.max(620, data.length * 70 + 120);
+    const height = 230;
+    const chartTop = 24;
+    const chartBottom = 180;
+    const plotHeight = chartBottom - chartTop;
+    const max = Math.max(1, ...data.map((item) => Math.max(item.first, item.second)));
+    const groupWidth = (width - 90) / data.length;
+    const barWidth = Math.max(10, Math.min(20, groupWidth * 0.24));
+
+    return (
+        <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-4 text-xs font-semibold text-slate-600">
+                <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-red-600" />{firstLabel}</span>
+                <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" />{secondLabel}</span>
+            </div>
+
+            <div className="overflow-x-auto">
+                <svg viewBox={`0 0 ${width} ${height}`} className="h-56 w-full min-w-[520px]">
+                    <line x1="50" y1={chartBottom} x2={width - 20} y2={chartBottom} stroke="rgb(203 213 225)" strokeWidth="1.5" />
+
+                    {data.map((item, index) => {
+                        const x = 58 + index * groupWidth;
+                        const firstHeight = (item.first / max) * plotHeight;
+                        const secondHeight = (item.second / max) * plotHeight;
+
+                        return (
+                            <g key={item.label}>
+                                <rect
+                                    x={x}
+                                    y={chartBottom - firstHeight}
+                                    width={barWidth}
+                                    height={Math.max(firstHeight, item.first > 0 ? 3 : 0)}
+                                    rx="3"
+                                    fill="rgb(220 38 38)"
+                                />
+                                <rect
+                                    x={x + barWidth + 6}
+                                    y={chartBottom - secondHeight}
+                                    width={barWidth}
+                                    height={Math.max(secondHeight, item.second > 0 ? 3 : 0)}
+                                    rx="3"
+                                    fill="rgb(245 158 11)"
+                                />
+                                <text x={x + barWidth} y={chartBottom + 14} textAnchor="middle" className="fill-slate-600 text-[10px]">
+                                    {item.label.length > 11 ? `${item.label.slice(0, 11)}...` : item.label}
+                                </text>
+                            </g>
+                        );
+                    })}
+                </svg>
+            </div>
+        </div>
+    );
+}
+
 export function ExecutiveChartCard({
     title,
     subtitle,
@@ -39,18 +109,18 @@ export function ExecutiveChartCard({
 
     return (
         <section className={`overflow-hidden rounded-2xl border ${toneClass[tone].shell}`}>
-            <div className="border-b border-slate-200 px-6 py-5">
+            <div className="border-b border-slate-200 px-5 py-4">
                 {eyebrow ? (
-                    <div className="mb-2 flex items-center justify-between gap-3">
+                    <div className="mb-1.5 flex items-center justify-between gap-3">
                         <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide ${toneClass[tone].badge}`}>
                             {eyebrow}
                         </span>
                     </div>
                 ) : null}
-                <h3 className="text-xl font-semibold text-slate-900">{title}</h3>
-                {subtitle && <p className="mt-1 text-sm text-slate-600">{subtitle}</p>}
+                <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+                {subtitle && <p className="mt-0.5 text-sm text-slate-600">{subtitle}</p>}
             </div>
-            <div className="p-6">{children}</div>
+            <div className="p-5">{children}</div>
         </section>
     );
 }
@@ -71,17 +141,17 @@ export function HorizontalBarChart({
     const max = Math.max(...data.map((item) => item.value), 1);
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-3.5">
             {data.map((item) => {
                 const width = `${Math.max((item.value / max) * 100, item.value > 0 ? 7 : 0)}%`;
 
                 return (
                     <div key={item.label} className="space-y-1">
                         <div className="flex items-center justify-between text-sm">
-                            <span className="font-medium text-slate-700">{item.label}</span>
+                            <span className="truncate pr-3 font-medium text-slate-700" title={item.label}>{item.label}</span>
                             <span className="font-semibold text-slate-900">{valueFormatter ? valueFormatter(item.value) : item.value}</span>
                         </div>
-                        <div className="h-2.5 rounded-full bg-red-100/70">
+                        <div className="h-2.5 rounded-full bg-slate-200/70">
                             <div className="h-2.5 rounded-full bg-gradient-to-r from-red-700 to-red-500" style={{ width }} />
                         </div>
                     </div>
@@ -112,10 +182,10 @@ export function GroupedComparisonChart({
     );
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-3.5">
             {data.map((item) => (
                 <div key={item.label} className="space-y-2">
-                    <p className="text-sm font-medium text-slate-700">{item.label}</p>
+                    <p className="truncate text-sm font-medium text-slate-700" title={item.label}>{item.label}</p>
                     <MetricBar
                         title={firstLabel}
                         value={item.first}
@@ -147,8 +217,12 @@ export function TrendLineChart({
         return <EmptyState text={emptyText} />;
     }
 
+    if (data.length <= 2) {
+        return <CompactTrendBars data={data} valueFormatter={valueFormatter} />;
+    }
+
     const width = 680;
-    const height = 260;
+    const height = 220;
     const paddingX = 28;
     const paddingY = 24;
     const plotWidth = width - paddingX * 2;
@@ -167,23 +241,11 @@ export function TrendLineChart({
     const polylinePoints = points.map((point) => `${point.x},${point.y}`).join(' ');
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-3">
             <div className="overflow-x-auto">
-                <svg viewBox={`0 0 ${width} ${height}`} className="h-60 w-full min-w-[560px]">
-                    <defs>
-                        <linearGradient id="execTrendFill" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="rgba(220, 38, 38, 0.24)" />
-                            <stop offset="100%" stopColor="rgba(220, 38, 38, 0.02)" />
-                        </linearGradient>
-                    </defs>
-
-                    <line x1={paddingX} y1={height - paddingY} x2={width - paddingX} y2={height - paddingY} stroke="rgb(254 202 202)" strokeWidth="2" />
-                    <line x1={paddingX} y1={paddingY} x2={paddingX} y2={height - paddingY} stroke="rgb(254 202 202)" strokeWidth="2" />
-
-                    <polygon
-                        points={`${paddingX},${height - paddingY} ${polylinePoints} ${width - paddingX},${height - paddingY}`}
-                        fill="url(#execTrendFill)"
-                    />
+                <svg viewBox={`0 0 ${width} ${height}`} className="h-52 w-full min-w-[520px]">
+                    <line x1={paddingX} y1={height - paddingY} x2={width - paddingX} y2={height - paddingY} stroke="rgb(203 213 225)" strokeWidth="1.5" />
+                    <line x1={paddingX} y1={paddingY} x2={paddingX} y2={height - paddingY} stroke="rgb(203 213 225)" strokeWidth="1.5" />
 
                     <polyline
                         points={polylinePoints}
@@ -196,17 +258,17 @@ export function TrendLineChart({
 
                     {points.map((point) => (
                         <g key={point.label}>
-                            <circle cx={point.x} cy={point.y} r="4.5" fill="rgb(220 38 38)" />
+                            <circle cx={point.x} cy={point.y} r="3.6" fill="rgb(220 38 38)" />
                             <title>{`${point.label}: ${valueFormatter ? valueFormatter(point.value) : point.value}`}</title>
                         </g>
                     ))}
                 </svg>
             </div>
 
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                 {data.map((point) => (
-                    <div key={point.label} className="rounded-lg border border-red-100 bg-red-50/50 px-3 py-2 text-xs">
-                        <p className="font-semibold text-slate-700">{point.label}</p>
+                    <div key={point.label} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
+                        <p className="truncate font-semibold text-slate-700" title={point.label}>{point.label}</p>
                         <p className="mt-1 text-sm font-bold text-red-700">{valueFormatter ? valueFormatter(point.value) : point.value}</p>
                     </div>
                 ))}
@@ -234,20 +296,13 @@ export function DonutChart({
     const radius = 72;
     const strokeWidth = 24;
     const circumference = 2 * Math.PI * radius;
-    const palette = [
-        'rgb(185 28 28)',
-        'rgb(239 68 68)',
-        'rgb(251 113 133)',
-        'rgb(14 116 144)',
-        'rgb(245 158 11)',
-        'rgb(71 85 105)',
-    ];
+    const palette = ['rgb(185 28 28)', 'rgb(245 158 11)', 'rgb(37 99 235)', 'rgb(22 163 74)', 'rgb(71 85 105)', 'rgb(225 29 72)'];
 
     let runningOffset = 0;
 
     return (
-        <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,220px)_minmax(0,1fr)] lg:items-center">
-            <div className="mx-auto h-[220px] w-[220px]">
+        <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,210px)_minmax(0,1fr)] lg:items-center">
+            <div className="mx-auto h-[210px] w-[210px]">
                 <svg viewBox="0 0 220 220" className="h-full w-full">
                     <circle
                         cx="110"
@@ -294,7 +349,7 @@ export function DonutChart({
                     const percent = total > 0 ? Math.round((segment.value / total) * 100) : 0;
 
                     return (
-                        <div key={segment.label} className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-red-100 bg-white px-3 py-2 text-sm">
+                        <div key={segment.label} className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm">
                             <div className="flex min-w-0 items-center gap-2">
                                 <span className="h-3 w-3 rounded-full" style={{ backgroundColor: palette[index % palette.length] }} />
                                 <span className="truncate font-medium text-slate-700" title={segment.label}>{segment.label}</span>
@@ -339,6 +394,36 @@ function EmptyState({ text }: { text: string }) {
         <div className="rounded-xl border border-dashed border-red-200 bg-gradient-to-br from-red-50 to-white px-4 py-10 text-center text-sm text-slate-600">
             <p className="font-medium text-red-700">No data in the current scope</p>
             <p className="mt-1">{text}</p>
+        </div>
+    );
+}
+
+function CompactTrendBars({
+    data,
+    valueFormatter,
+}: {
+    data: ChartPoint[];
+    valueFormatter?: (value: number) => string;
+}) {
+    const max = Math.max(...data.map((point) => point.value), 1);
+
+    return (
+        <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+                {data.map((point) => {
+                    const height = `${Math.max((point.value / max) * 100, point.value > 0 ? 14 : 0)}%`;
+
+                    return (
+                        <div key={point.label} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p className="truncate text-xs font-semibold uppercase tracking-wide text-slate-600" title={point.label}>{point.label}</p>
+                            <div className="mt-2 flex h-28 items-end rounded-lg bg-white p-2">
+                                <div className="w-full rounded-md bg-gradient-to-t from-red-700 to-red-500" style={{ height }} />
+                            </div>
+                            <p className="mt-2 text-sm font-bold text-red-700">{valueFormatter ? valueFormatter(point.value) : point.value}</p>
+                        </div>
+                    );
+                })}
+            </div>
         </div>
     );
 }

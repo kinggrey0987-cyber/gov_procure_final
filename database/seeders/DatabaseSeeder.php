@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
             SampleUsersSeeder::class,
             ItemCatalogSeeder::class,
             DemoWorkflowSeeder::class,
+            ExecutiveDisclosureDemoSeeder::class,
         ]);
     }
 }
