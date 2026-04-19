@@ -71,7 +71,7 @@ export default function DisclosureEdit({ disclosure, eligibleSources }: Props) {
 
                 <div className="mx-auto w-full max-w-3xl">
                     <form
-                        className="space-y-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+                        className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_8px_24px_rgba(15,23,42,0.06)]"
                         onSubmit={(e) => {
                             e.preventDefault();
                             form.put(route('executive.disclosures.update', disclosure.disclosure_id));
@@ -79,7 +79,7 @@ export default function DisclosureEdit({ disclosure, eligibleSources }: Props) {
                     >
                         <div className="rounded-xl border border-red-200 bg-red-50 p-4">
                             <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Disclosure Eligibility Source</p>
-                            <select className="mt-3 w-full rounded border px-3 py-2 text-sm" onChange={(e) => onSelectSource(e.target.value)} defaultValue="">
+                            <select className="mt-3 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm" onChange={(e) => onSelectSource(e.target.value)} defaultValue="">
                                 <option value="">Keep current source mapping</option>
                                 {sourceOptions.map((source) => (
                                     <option key={`${source.reference_type}-${source.reference_id}`} value={`${source.reference_type}:${source.reference_id}`}>
@@ -89,18 +89,40 @@ export default function DisclosureEdit({ disclosure, eligibleSources }: Props) {
                             </select>
                         </div>
 
-                        <input className="w-full rounded border px-3 py-2" placeholder="Title" value={form.data.title} onChange={(e) => form.setData('title', e.target.value)} />
-                        <input className="w-full rounded border px-3 py-2" placeholder="Type" value={form.data.type} onChange={(e) => form.setData('type', e.target.value)} />
-                        <input className="w-full rounded border px-3 py-2" placeholder="Reference Type" value={form.data.reference_type} onChange={(e) => form.setData('reference_type', e.target.value)} />
-                        <input className="w-full rounded border px-3 py-2" placeholder="Reference ID" value={form.data.reference_id} onChange={(e) => form.setData('reference_id', e.target.value)} />
-                        <input className="w-full rounded border px-3 py-2" placeholder="Public File Path (optional, storage path)" value={form.data.file_path} onChange={(e) => form.setData('file_path', e.target.value)} />
-                        <textarea className="w-full rounded border px-3 py-2" placeholder="Description" value={form.data.description} onChange={(e) => form.setData('description', e.target.value)} />
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            <Field label="Title" required>
+                                <input className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm" placeholder="Disclosure title" value={form.data.title} onChange={(e) => form.setData('title', e.target.value)} />
+                            </Field>
+                            <Field label="Type" required>
+                                <input className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm" placeholder="DISCLOSURE_TYPE" value={form.data.type} onChange={(e) => form.setData('type', e.target.value)} />
+                            </Field>
+                            <Field label="Reference Type">
+                                <input className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm" placeholder="App\\Models\\..." value={form.data.reference_type} onChange={(e) => form.setData('reference_type', e.target.value)} />
+                            </Field>
+                            <Field label="Reference ID">
+                                <input className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm" placeholder="Reference ID" value={form.data.reference_id} onChange={(e) => form.setData('reference_id', e.target.value)} />
+                            </Field>
+                        </div>
 
-                        <select className="w-full rounded border px-3 py-2" value={form.data.status} onChange={(e) => form.setData('status', e.target.value as 'DRAFT' | 'PUBLISHED')}>
-                            <option value="DRAFT">Keep as Draft</option>
-                            <option value="PUBLISHED">Publish Now</option>
-                        </select>
-                        <textarea className="w-full rounded border px-3 py-2" placeholder="Publication remarks (optional)" value={form.data.remarks} onChange={(e) => form.setData('remarks', e.target.value)} />
+                        <Field label="Public File Path">
+                            <input className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm" placeholder="Storage path if report file exists" value={form.data.file_path} onChange={(e) => form.setData('file_path', e.target.value)} />
+                        </Field>
+
+                        <Field label="Description">
+                            <textarea className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" rows={5} placeholder="Public-facing summary of this disclosure" value={form.data.description} onChange={(e) => form.setData('description', e.target.value)} />
+                        </Field>
+
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            <Field label="Action">
+                                <select className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm" value={form.data.status} onChange={(e) => form.setData('status', e.target.value as 'DRAFT' | 'PUBLISHED')}>
+                                    <option value="DRAFT">Keep as Draft</option>
+                                    <option value="PUBLISHED">Publish Now</option>
+                                </select>
+                            </Field>
+                            <Field label="Publication Remarks">
+                                <input className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm" placeholder="Optional remarks" value={form.data.remarks} onChange={(e) => form.setData('remarks', e.target.value)} />
+                            </Field>
+                        </div>
 
                         <div className="flex flex-wrap items-center gap-2">
                             <button type="submit" className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
@@ -114,5 +136,25 @@ export default function DisclosureEdit({ disclosure, eligibleSources }: Props) {
                 </div>
             </div>
         </AuthenticatedLayout>
+    );
+}
+
+function Field({
+    label,
+    children,
+    required,
+}: {
+    label: string;
+    children: React.ReactNode;
+    required?: boolean;
+}) {
+    return (
+        <label className="block space-y-1">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                {label}
+                {required ? ' *' : ''}
+            </span>
+            {children}
+        </label>
     );
 }

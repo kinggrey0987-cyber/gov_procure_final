@@ -1,4 +1,4 @@
-import { DonutChart, ExecutiveChartCard, GroupedComparisonChart, HorizontalBarChart, TrendLineChart } from '@/Components/Executive/Charts';
+import { ExecutiveChartCard, HorizontalBarChart, TrendGroupedBarChart } from '@/Components/Executive/Charts';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, router } from '@inertiajs/react';
 import { FormEvent, useState } from 'react';
@@ -13,6 +13,12 @@ type AnomalyRow = {
     status: string;
     detected_at: string | null;
     office?: { id: number; name: string } | null;
+    reference_type?: string | null;
+    reference_id?: number | null;
+    item_id?: number | null;
+    detected_value?: number | string | null;
+    expected_value?: number | string | null;
+    threshold_value?: number | string | null;
 };
 
 type AlertRow = {
@@ -22,6 +28,11 @@ type AlertRow = {
     status: string;
     detected_at: string | null;
     office?: { id: number; name: string } | null;
+    anomaly_id?: number | null;
+    supply_request_id?: number | null;
+    purchase_order_id?: number | null;
+    supplier_id?: number | null;
+    alert_message?: string | null;
 };
 
 type Props = {
@@ -94,15 +105,22 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
         router.get(route('executive.anomalies-monitoring'), form, { preserveState: true, replace: true });
     };
 
-    const mergedTrend = mergeMonthlyTrends(monthly_trends.anomalies, monthly_trends.alerts);
-    const severityComparison = mergeSeverity(anomaly_severity_breakdown, alert_severity_breakdown);
+    const trendData = mergeMonthlyTrends(monthly_trends.anomalies, monthly_trends.alerts);
     const officeRisk = office_comparison
         .map((row) => ({
             label: row.office_name,
             value: row.anomaly_count + row.alert_count,
         }))
         .sort((a, b) => b.value - a.value)
-        .slice(0, 10);
+        .slice(0, 8);
+
+    const anomalyTypeMix = anomaly_type_breakdown
+        .map((row) => ({ label: formatAnomalyType(row.label || 'N/A'), value: row.total }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 6);
+
+    const severityMix = mergeSeverity(anomaly_severity_breakdown, alert_severity_breakdown);
+    const statusMix = mergeStatus(status_breakdown.anomalies, status_breakdown.alerts);
 
     const exportCsv = () => {
         const rows = [
@@ -124,7 +142,7 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                 <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-200 bg-white px-5 py-4 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
                     <div>
                         <h2 className="text-2xl font-semibold text-slate-900">Risk & Alerts</h2>
-                        <p className="text-sm text-slate-600">Risk command view</p>
+                        <p className="text-sm text-slate-600">Executive risk signal tracking and impact evidence.</p>
                     </div>
                     <div className="flex items-center gap-2">
                         <button type="button" onClick={() => window.print()} className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
@@ -222,93 +240,141 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                 </section>
 
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <StatCard label="Anomalies" value={totals.anomaly_count} tone="rose" />
-                    <StatCard label="Alerts" value={totals.alert_count} tone="amber" />
-                    <StatCard label="High Severity Anomalies" value={totals.high_severity_anomaly_count} tone="fuchsia" />
-                    <StatCard label="High Severity Alerts" value={totals.high_severity_alert_count} tone="orange" />
+                    <StatCard label="Anomalies" value={totals.anomaly_count} />
+                    <StatCard label="Alerts" value={totals.alert_count} />
+                    <StatCard label="High Severity Anomalies" value={totals.high_severity_anomaly_count} />
+                    <StatCard label="High Severity Alerts" value={totals.high_severity_alert_count} />
                 </div>
 
                 <div className="grid gap-6 xl:grid-cols-12">
-                    <div className="xl:col-span-12">
-                    <ExecutiveChartCard title="Incident Trend" subtitle="Monthly risk movement" tone="critical">
-                        <TrendLineChart
-                            data={mergedTrend}
-                            emptyText="No data in current filter scope"
-                        />
-                    </ExecutiveChartCard>
+                    <div className="xl:col-span-7">
+                        <ExecutiveChartCard title="Incident Trend" subtitle="Anomaly and alert movement" tone="critical">
+                            {trendData.length === 0 ? (
+                                <CompactEmpty text="No incident trend data in current filter scope." />
+                            ) : trendData.length === 1 ? (
+                                <div className="grid gap-3 md:grid-cols-3">
+                                    <MiniStat label="Month" value={trendData[0].label} />
+                                    <MiniStat label="Anomalies" value={trendData[0].first} />
+                                    <MiniStat label="Alerts" value={trendData[0].second} />
+                                </div>
+                            ) : (
+                                <TrendGroupedBarChart
+                                    data={trendData}
+                                    firstLabel="Anomalies"
+                                    secondLabel="Alerts"
+                                    emptyText="No data in current filter scope"
+                                />
+                            )}
+                        </ExecutiveChartCard>
                     </div>
 
-                    <div className="xl:col-span-4">
-                    <ExecutiveChartCard title="Anomaly Type Mix" subtitle="Category distribution" tone="critical">
-                        <DonutChart
-                            data={anomaly_type_breakdown.map((row) => ({ label: formatAnomalyType(row.label || 'N/A'), value: row.total }))}
-                            centerLabel="Anomalies"
-                            emptyText="No data in current filter scope"
-                        />
-                    </ExecutiveChartCard>
-                    </div>
-
-                    <div className="xl:col-span-8">
-                    <ExecutiveChartCard title="Severity Distribution" subtitle="Anomalies vs alerts" tone="default">
-                        <GroupedComparisonChart
-                            data={severityComparison}
-                            firstLabel="Anomalies"
-                            secondLabel="Alerts"
-                            emptyText="No data in current filter scope"
-                        />
-                    </ExecutiveChartCard>
+                    <div className="xl:col-span-5">
+                        <ExecutiveChartCard title="Office Risk Ranking" subtitle="Total incidents by office" tone="neutral">
+                            <HorizontalBarChart data={officeRisk} emptyText="No data in current filter scope" />
+                        </ExecutiveChartCard>
                     </div>
 
                     <div className="xl:col-span-6">
-                    <ExecutiveChartCard title="Office Risk Comparison" subtitle="Total incidents by office" tone="neutral">
-                        <HorizontalBarChart
-                            data={officeRisk}
-                            emptyText="No data in current filter scope"
-                        />
-                    </ExecutiveChartCard>
+                        <ExecutiveChartCard title="Top Anomaly Categories" subtitle="Most frequent anomaly types" tone="warning">
+                            <HorizontalBarChart data={anomalyTypeMix} emptyText="No data in current filter scope" />
+                        </ExecutiveChartCard>
                     </div>
 
                     <div className="xl:col-span-6">
-                    <ExecutiveChartCard title="Status Breakdown" subtitle="Current resolution flow" tone="default">
-                        <GroupedComparisonChart
-                            data={mergeStatus(status_breakdown.anomalies, status_breakdown.alerts)}
-                            firstLabel="Anomalies"
-                            secondLabel="Alerts"
-                            emptyText="No data in current filter scope"
-                        />
-                    </ExecutiveChartCard>
+                        <ExecutiveChartCard title="Severity and Status Snapshot" subtitle="Compact comparison" tone="default">
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <div>
+                                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">Severity</p>
+                                    <HorizontalBarChart data={severityMix} emptyText="No data in current filter scope" />
+                                </div>
+                                <div>
+                                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">Status</p>
+                                    <HorizontalBarChart data={statusMix} emptyText="No data in current filter scope" />
+                                </div>
+                            </div>
+                        </ExecutiveChartCard>
                     </div>
                 </div>
 
-                <div className="grid gap-6 xl:grid-cols-2">
-                    <TableSection
-                        title="Recent Anomalies"
-                        headers={['Type', 'Severity', 'Status', 'Office', 'Detected']}
-                        rows={recent.anomalies.map((row) => [
-                            formatAnomalyType(row.anomaly_type),
-                            row.severity,
-                            row.status,
-                            row.office?.name ?? 'N/A',
-                            row.detected_at ? new Date(row.detected_at).toLocaleDateString() : 'N/A',
-                        ])}
-                        emptyText="No anomalies found for the selected filters."
-                        subtitle="Latest records"
-                    />
+                <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+                    <div className="border-b border-slate-200 px-5 py-4">
+                        <h3 className="text-lg font-semibold text-slate-900">Recent Anomalies</h3>
+                        <p className="mt-1 text-sm text-slate-600">Most recent anomaly records with executive impact context.</p>
+                    </div>
+                    {recent.anomalies.length === 0 ? (
+                        <p className="px-5 py-6 text-sm text-slate-500">No anomalies found for the selected filters.</p>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-slate-200 text-sm">
+                                <thead className="bg-slate-50">
+                                    <tr>
+                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Anomaly</th>
+                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Severity</th>
+                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Office</th>
+                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Source</th>
+                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Detected vs Expected</th>
+                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Impact Summary</th>
+                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Detected</th>
+                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {recent.anomalies.slice(0, 5).map((row) => (
+                                        <tr key={row.anomaly_id}>
+                                            <td className="px-4 py-2 font-medium text-slate-800">{formatAnomalyType(row.anomaly_type)}</td>
+                                            <td className="px-4 py-2">{SeverityBadge(row.severity)}</td>
+                                            <td className="px-4 py-2 text-slate-700">{row.office?.name ?? 'N/A'}</td>
+                                            <td className="px-4 py-2 text-slate-700">{formatAnomalySource(row)}</td>
+                                            <td className="px-4 py-2 text-slate-700">{formatDetectionVsExpected(row)}</td>
+                                            <td className="px-4 py-2 text-slate-700">{buildAnomalyImpact(row)}</td>
+                                            <td className="px-4 py-2 text-slate-700">{formatDate(row.detected_at)}</td>
+                                            <td className="px-4 py-2">{StatusPill(row.status)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </section>
 
-                    <TableSection
-                        title="Recent Alerts"
-                        headers={['Type', 'Severity', 'Status', 'Office', 'Detected']}
-                        rows={recent.alerts.map((row) => [
-                            row.alert_type,
-                            row.severity,
-                            row.status,
-                            row.office?.name ?? 'N/A',
-                            row.detected_at ? new Date(row.detected_at).toLocaleDateString() : 'N/A',
-                        ])}
-                        emptyText="No alerts found for the selected filters."
-                        subtitle="Latest records"
-                    />
-                </div>
+                <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+                    <div className="border-b border-slate-200 px-5 py-4">
+                        <h3 className="text-lg font-semibold text-slate-900">Recent Alerts</h3>
+                        <p className="mt-1 text-sm text-slate-600">Latest alerts with source context and executive relevance.</p>
+                    </div>
+                    {recent.alerts.length === 0 ? (
+                        <p className="px-5 py-6 text-sm text-slate-500">No alerts found for the selected filters.</p>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-slate-200 text-sm">
+                                <thead className="bg-slate-50">
+                                    <tr>
+                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Alert Type</th>
+                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Severity</th>
+                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Office</th>
+                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Source Context</th>
+                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Impact Summary</th>
+                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Detected</th>
+                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {recent.alerts.slice(0, 5).map((row) => (
+                                        <tr key={row.alerts_id}>
+                                            <td className="px-4 py-2 font-medium text-slate-800">{formatAlertType(row.alert_type)}</td>
+                                            <td className="px-4 py-2">{SeverityBadge(row.severity)}</td>
+                                            <td className="px-4 py-2 text-slate-700">{row.office?.name ?? 'N/A'}</td>
+                                            <td className="px-4 py-2 text-slate-700">{formatAlertSource(row)}</td>
+                                            <td className="px-4 py-2 text-slate-700">{buildAlertImpact(row)}</td>
+                                            <td className="px-4 py-2 text-slate-700">{formatDate(row.detected_at)}</td>
+                                            <td className="px-4 py-2">{StatusPill(row.status)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </section>
             </div>
         </AuthenticatedLayout>
     );
@@ -318,40 +384,25 @@ function mergeMonthlyTrends(
     anomalyTrend: Array<{ month: string; total: number }>,
     alertTrend: Array<{ month: string; total: number }>,
 ) {
-    const monthMap = new Map<string, number>();
+    const monthMap = new Map<string, { anomaly: number; alert: number }>();
 
     anomalyTrend.forEach((row) => {
-        monthMap.set(row.month, (monthMap.get(row.month) ?? 0) + row.total);
+        const current = monthMap.get(row.month) ?? { anomaly: 0, alert: 0 };
+        monthMap.set(row.month, { ...current, anomaly: row.total });
     });
 
     alertTrend.forEach((row) => {
-        monthMap.set(row.month, (monthMap.get(row.month) ?? 0) + row.total);
+        const current = monthMap.get(row.month) ?? { anomaly: 0, alert: 0 };
+        monthMap.set(row.month, { ...current, alert: row.total });
     });
 
     return [...monthMap.entries()]
-        .sort(([monthA], [monthB]) => monthA.localeCompare(monthB))
-        .map(([month, total]) => ({
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([month, values]) => ({
             label: formatMonth(month),
-            value: total,
+            first: values.anomaly,
+            second: values.alert,
         }));
-}
-
-function formatMonth(value: string): string {
-    const date = new Date(`${value}-01T00:00:00`);
-
-    if (Number.isNaN(date.getTime())) {
-        return value;
-    }
-
-    return date.toLocaleDateString('en-PH', { month: 'short', year: 'numeric' });
-}
-
-function formatAnomalyType(value: string): string {
-    if (value === 'PRICE_Z_SCORE') {
-        return 'Procurement Price Anomaly';
-    }
-
-    return value;
 }
 
 function mergeStatus(anomalyRows: BreakdownRow[], alertRows: BreakdownRow[]) {
@@ -371,11 +422,10 @@ function mergeStatus(anomalyRows: BreakdownRow[], alertRows: BreakdownRow[]) {
 
     return [...statusMap.entries()]
         .map(([label, values]) => ({
-            label,
-            first: values.anomaly,
-            second: values.alert,
+            label: formatStatus(label),
+            value: values.anomaly + values.alert,
         }))
-        .sort((a, b) => (b.first + b.second) - (a.first + a.second));
+        .sort((a, b) => b.value - a.value);
 }
 
 function mergeSeverity(
@@ -398,85 +448,196 @@ function mergeSeverity(
 
     return [...severityMap.entries()]
         .map(([label, values]) => ({
-            label,
-            first: values.anomaly,
-            second: values.alert,
+            label: formatStatus(label),
+            value: values.anomaly + values.alert,
         }))
-        .sort((a, b) => (b.first + b.second) - (a.first + a.second));
+        .sort((a, b) => b.value - a.value);
 }
 
-function StatCard({
-    label,
-    value,
-    tone,
-}: {
-    label: string;
-    value: number;
-    tone: 'rose' | 'amber' | 'fuchsia' | 'orange';
-}) {
-    const toneClass: Record<typeof tone, string> = {
-        rose: 'border-red-300 bg-gradient-to-b from-red-100 to-red-50 text-red-900 shadow-[0_8px_20px_rgba(185,28,28,0.18)]',
-        amber: 'border-orange-300 bg-gradient-to-b from-orange-100 to-orange-50 text-orange-900 shadow-[0_8px_20px_rgba(234,88,12,0.16)]',
-        fuchsia: 'border-rose-300 bg-gradient-to-b from-rose-100 to-rose-50 text-rose-900 shadow-[0_8px_20px_rgba(225,29,72,0.16)]',
-        orange: 'border-amber-300 bg-gradient-to-b from-amber-100 to-amber-50 text-amber-900 shadow-[0_8px_20px_rgba(217,119,6,0.16)]',
+function formatMonth(value: string): string {
+    const date = new Date(`${value}-01T00:00:00`);
+
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
+
+    return date.toLocaleDateString('en-PH', { month: 'short', year: 'numeric' });
+}
+
+function formatDate(value: string | null): string {
+    if (!value) {
+        return 'N/A';
+    }
+
+    const parsed = new Date(value);
+
+    if (Number.isNaN(parsed.getTime())) {
+        return value;
+    }
+
+    return parsed.toLocaleString('en-PH', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+
+function formatStatus(value: string): string {
+    return value.replaceAll('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatAnomalyType(value: string): string {
+    const aliases: Record<string, string> = {
+        PRICE_Z_SCORE: 'Procurement Price Anomaly',
+        FREQUENT_REQUEST_WINDOW: 'Frequent Request Spike',
+        PPMP_OVER_REQUEST: 'PPMP Over-Request',
     };
 
+    const raw = aliases[value] ?? value;
+    return raw.replaceAll('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatAlertType(value: string): string {
+    return value.replaceAll('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatAnomalySource(row: AnomalyRow): string {
+    const reference = row.reference_type
+        ? `${row.reference_type.split('\\').pop()} #${row.reference_id ?? 'N/A'}`
+        : 'N/A';
+
+    if (row.item_id) {
+        return `${reference} | Item #${row.item_id}`;
+    }
+
+    return reference;
+}
+
+function formatDetectionVsExpected(row: AnomalyRow): string {
+    const detected = toCompactNumber(row.detected_value);
+    const expected = toCompactNumber(row.expected_value);
+    const threshold = toCompactNumber(row.threshold_value);
+
+    if (!detected && !expected && !threshold) {
+        return 'No quantitative values available';
+    }
+
+    const expectedPart = expected ? `Expected ${expected}` : 'Expected N/A';
+    const thresholdPart = threshold ? `Threshold ${threshold}` : null;
+
+    return [
+        detected ? `Detected ${detected}` : 'Detected N/A',
+        expectedPart,
+        thresholdPart,
+    ].filter(Boolean).join(' | ');
+}
+
+function formatAlertSource(row: AlertRow): string {
+    if (row.anomaly_id) {
+        return `Anomaly #${row.anomaly_id}`;
+    }
+
+    if (row.purchase_order_id) {
+        return `Purchase Order #${row.purchase_order_id}`;
+    }
+
+    if (row.supply_request_id) {
+        return `Supply Request #${row.supply_request_id}`;
+    }
+
+    if (row.supplier_id) {
+        return `Supplier #${row.supplier_id}`;
+    }
+
+    return 'General monitoring signal';
+}
+
+function buildAnomalyImpact(row: AnomalyRow): string {
+    const detected = toCompactNumber(row.detected_value);
+    const threshold = toCompactNumber(row.threshold_value);
+
+    if (detected && threshold) {
+        return `Detected value ${detected} against threshold ${threshold}; requires executive review.`;
+    }
+
+    if (detected) {
+        return `Detected value ${detected}; requires executive verification.`;
+    }
+
+    return `${formatAnomalyType(row.anomaly_type)} flagged for executive monitoring.`;
+}
+
+function buildAlertImpact(row: AlertRow): string {
+    if (row.alert_message && row.alert_message.trim().length > 0) {
+        return row.alert_message;
+    }
+
+    return `${formatAlertType(row.alert_type)} requires attention due to ${formatStatus(row.severity)} severity.`;
+}
+
+function toCompactNumber(value: number | string | null | undefined): string | null {
+    if (value === null || value === undefined || value === '') {
+        return null;
+    }
+
+    const numeric = Number(value);
+
+    if (Number.isNaN(numeric)) {
+        return String(value);
+    }
+
+    return new Intl.NumberFormat('en-PH', {
+        maximumFractionDigits: 2,
+    }).format(numeric);
+}
+
+function StatusPill(value: string) {
+    const normalized = value.toUpperCase();
+    const tone = normalized.includes('OPEN')
+        ? 'border-rose-200 bg-rose-50 text-rose-700'
+        : normalized.includes('REVIEW')
+            ? 'border-amber-200 bg-amber-50 text-amber-700'
+            : 'border-emerald-200 bg-emerald-50 text-emerald-700';
+
+    return <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${tone}`}>{formatStatus(value)}</span>;
+}
+
+function SeverityBadge(value: string) {
+    const normalized = value.toUpperCase();
+    const tone = normalized === 'HIGH'
+        ? 'border-rose-200 bg-rose-50 text-rose-700'
+        : normalized === 'MEDIUM'
+            ? 'border-amber-200 bg-amber-50 text-amber-700'
+            : 'border-slate-200 bg-slate-50 text-slate-700';
+
+    return <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${tone}`}>{formatStatus(value)}</span>;
+}
+
+function CompactEmpty({ text }: { text: string }) {
     return (
-        <div className={`rounded-2xl border p-6 shadow-sm ${toneClass[tone]}`}>
-            <p className="text-sm font-semibold uppercase tracking-wide">{label}</p>
-            <p className="mt-2 text-4xl font-bold">{value}</p>
+        <div className="rounded-xl border border-dashed border-red-200 bg-gradient-to-br from-red-50 to-white px-4 py-8 text-center text-sm text-slate-600">
+            {text}
         </div>
     );
 }
 
-function TableSection({
-    title,
-    headers,
-    rows,
-    emptyText,
-    subtitle,
-}: {
-    title: string;
-    headers: string[];
-    rows: string[][];
-    emptyText: string;
-    subtitle?: string;
-}) {
+function StatCard({ label, value }: { label: string; value: number }) {
     return (
-        <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-            <div className="border-b border-slate-200 px-6 py-5">
-                <h3 className="text-xl font-semibold text-slate-800">{title}</h3>
-                {subtitle ? <p className="mt-1 text-sm text-slate-500">{subtitle}</p> : null}
-            </div>
-            {rows.length === 0 ? (
-                <p className="px-6 py-8 text-sm text-slate-500">{emptyText}</p>
-            ) : (
-                <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-slate-200 text-sm">
-                        <thead className="bg-slate-50">
-                            <tr>
-                                {headers.map((header) => (
-                                    <th key={header} className="px-4 py-2 text-left font-semibold text-slate-600">
-                                        {header}
-                                    </th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {rows.map((columns, rowIndex) => (
-                                <tr key={`${title}-${rowIndex}`}>
-                                    {columns.map((column, columnIndex) => (
-                                        <td key={`${title}-${rowIndex}-${columnIndex}`} className="px-4 py-2 text-slate-700">
-                                            {column}
-                                        </td>
-                                    ))}
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            )}
-        </section>
+        <div className="rounded-2xl border border-red-200 bg-gradient-to-r from-red-50 to-white p-6 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
+            <p className="text-sm font-semibold uppercase tracking-wide text-slate-600">{label}</p>
+            <p className="mt-2 text-4xl font-bold text-red-700">{value}</p>
+        </div>
+    );
+}
+
+function MiniStat({ label, value }: { label: string; value: string | number }) {
+    return (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">{label}</p>
+            <p className="mt-1 text-lg font-bold text-slate-900">{value}</p>
+        </div>
     );
 }
 

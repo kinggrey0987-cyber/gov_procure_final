@@ -628,8 +628,8 @@ export default function Authenticated({
                     </nav>
 
                     <div className="mt-auto border-t border-red-100 bg-red-50/70 px-4 py-4">
-                        <p className="text-sm font-semibold text-red-800">Executive Monitoring Suite</p>
-                        <p className="text-xs text-red-700/80">Oversight-only controls with real-time governance signals.</p>
+                        <p className="text-sm font-semibold text-red-800">Executive Governance Suite</p>
+                        <p className="text-xs text-red-700/80">Executive disclosure preparation, review, and publication governance workflow.</p>
                     </div>
                 </aside>
 

@@ -23,6 +23,9 @@ class StorePublicDisclosureRequest extends FormRequest
             'reference_id' => ['nullable', 'integer'],
             'description' => ['nullable', 'string'],
             'file_path' => ['nullable', 'string', 'max:255'],
+            'main_file' => ['nullable', 'file', 'max:10240'],
+            'supporting_files' => ['nullable', 'array'],
+            'supporting_files.*' => ['file', 'max:10240'],
             'status' => ['nullable', 'string', 'in:DRAFT,PUBLISHED'],
             'remarks' => ['nullable', 'string'],
         ];

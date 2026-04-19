@@ -1,4 +1,4 @@
-import { DonutChart, ExecutiveChartCard, HorizontalBarChart, TrendLineChart } from '@/Components/Executive/Charts';
+import { ExecutiveChartCard, HorizontalBarChart } from '@/Components/Executive/Charts';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router } from '@inertiajs/react';
 import { FormEvent, useState } from 'react';
@@ -45,7 +45,6 @@ export default function TransparencyMonitoringIndex({
     status_breakdown,
     type_breakdown,
     office_publication_mix,
-    monthly_publication_trend,
     recent_disclosures,
     published_disclosures,
     draft_disclosures,
@@ -56,6 +55,25 @@ export default function TransparencyMonitoringIndex({
         from_date: filters.from_date ?? '',
         to_date: filters.to_date ?? '',
     });
+
+    const activeTab = filters.tab ?? 'overview';
+    const pendingOrOtherCount = Math.max(totals.disclosure_count - totals.published_count - totals.draft_count, 0);
+
+    const publicationStateSnapshot = [
+        { label: 'Published', value: totals.published_count },
+        { label: 'Draft', value: totals.draft_count },
+        { label: 'Pending / Other', value: pendingOrOtherCount },
+    ];
+
+    const typeMix = type_breakdown
+        .map((row) => ({ label: row.type || 'N/A', value: row.total }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 6);
+
+    const statusMix = status_breakdown
+        .map((row) => ({ label: formatStatus(row.status || 'N/A'), value: row.total }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 6);
 
     const onSubmit = (event: FormEvent) => {
         event.preventDefault();
@@ -68,15 +86,6 @@ export default function TransparencyMonitoringIndex({
             { preserveState: true, replace: true },
         );
     };
-
-    const pendingOrOtherCount = Math.max(totals.disclosure_count - totals.published_count - totals.draft_count, 0);
-    const publicationStateSnapshot = [
-        { label: 'Published', value: totals.published_count },
-        { label: 'Draft', value: totals.draft_count },
-        { label: 'Pending or Other', value: pendingOrOtherCount },
-    ];
-
-    const activeTab = filters.tab ?? 'overview';
 
     const switchTab = (tab: 'overview' | 'published' | 'drafts') => {
         router.get(
@@ -121,7 +130,7 @@ export default function TransparencyMonitoringIndex({
                 <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-200 bg-white px-5 py-4 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
                     <div>
                         <h2 className="text-2xl font-semibold text-slate-900">Transparency & Disclosures</h2>
-                        <p className="text-sm text-slate-600">Disclosure governance</p>
+                        <p className="text-sm text-slate-600">Executive disclosure review and publication workflow.</p>
                     </div>
                     <div className="flex items-center gap-2">
                         <button type="button" onClick={() => window.print()} className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
@@ -193,9 +202,9 @@ export default function TransparencyMonitoringIndex({
                 </section>
 
                 <div className="grid gap-4 sm:grid-cols-3">
-                    <Card label="Disclosures" value={totals.disclosure_count} />
                     <Card label="Published" value={totals.published_count} />
-                    <Card label="Draft" value={totals.draft_count} />
+                    <Card label="Drafts" value={totals.draft_count} />
+                    <Card label="Pending / Review" value={pendingOrOtherCount} />
                 </div>
 
                 <section className="rounded-2xl border border-red-200 bg-white p-2 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
@@ -225,56 +234,87 @@ export default function TransparencyMonitoringIndex({
                 </section>
 
                 {activeTab === 'overview' && (
-                    <div className="grid gap-6 xl:grid-cols-12">
-                        <div className="xl:col-span-12">
-                        <ExecutiveChartCard
-                            title="Publication Trend"
-                            subtitle="Monthly publication movement"
-                            tone="critical"
-                        >
-                            <TrendLineChart
-                                data={monthly_publication_trend.map((row) => ({ label: formatMonth(row.month), value: row.total }))}
-                                emptyText="No data in current filter scope"
-                            />
-                        </ExecutiveChartCard>
+                    <div className="space-y-6">
+                        <div className="grid gap-6 xl:grid-cols-12">
+                            <div className="xl:col-span-6">
+                                <ExecutiveChartCard title="Publication Snapshot" subtitle="Disclosure state totals" tone="default">
+                                    <HorizontalBarChart
+                                        data={publicationStateSnapshot}
+                                        emptyText="No data in current filter scope"
+                                    />
+                                </ExecutiveChartCard>
+                            </div>
+
+                            <div className="xl:col-span-6">
+                                <ExecutiveChartCard title="Type Distribution" subtitle="Most common disclosure types" tone="neutral">
+                                    <HorizontalBarChart
+                                        data={typeMix}
+                                        emptyText="No data in current filter scope"
+                                    />
+                                </ExecutiveChartCard>
+                            </div>
                         </div>
 
-                        <div className="xl:col-span-4">
-                        <ExecutiveChartCard title="Status Mix" subtitle="Disclosure state" tone="default">
-                            <DonutChart
-                                data={status_breakdown.map((row) => ({ label: row.status || 'N/A', value: row.total }))}
-                                centerLabel="Status"
-                                emptyText="No data in current filter scope"
-                            />
-                        </ExecutiveChartCard>
-                        </div>
+                        <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+                            <div className="border-b border-slate-200 px-6 py-5">
+                                <h3 className="text-lg font-semibold text-slate-900">Recent Disclosure Activity</h3>
+                                <p className="mt-1 text-sm text-slate-600">Latest records for publication oversight.</p>
+                            </div>
+                            {recent_disclosures.length === 0 ? (
+                                <p className="px-6 py-8 text-sm text-slate-500">No data in current filter scope</p>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full divide-y divide-slate-200 text-sm">
+                                        <thead className="bg-slate-50">
+                                            <tr>
+                                                <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Title</th>
+                                                <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Type</th>
+                                                <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Status</th>
+                                                <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Published</th>
+                                                <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {recent_disclosures.slice(0, 8).map((row) => (
+                                                <tr key={row.disclosure_id}>
+                                                    <td className="px-4 py-2 text-slate-800">{row.title}</td>
+                                                    <td className="px-4 py-2 text-slate-700">{row.type}</td>
+                                                    <td className="px-4 py-2">{StatusBadge(row.status)}</td>
+                                                    <td className="px-4 py-2 text-slate-700">{formatDate(row.published_at)}</td>
+                                                    <td className="px-4 py-2">
+                                                        <Link href={route('executive.disclosures.show', row.disclosure_id)} className="rounded-lg border border-red-300 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-50">
+                                                            Open
+                                                        </Link>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </section>
 
-                        <div className="xl:col-span-4">
-                        <ExecutiveChartCard title="Type Mix" subtitle="Disclosure categories" tone="warning">
-                            <HorizontalBarChart
-                                data={type_breakdown.map((row) => ({ label: row.type || 'N/A', value: row.total }))}
-                                emptyText="No data in current filter scope"
-                            />
-                        </ExecutiveChartCard>
-                        </div>
+                        <section className="rounded-2xl border border-red-100 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+                            <h3 className="text-base font-semibold text-slate-900">Office Publication Mix</h3>
+                            <p className="mt-1 text-sm text-slate-600">Published disclosures by office ownership.</p>
+                            <div className="mt-4">
+                                <HorizontalBarChart
+                                    data={office_publication_mix.map((row) => ({ label: row.label || 'N/A', value: row.total }))}
+                                    emptyText="No data in current filter scope"
+                                />
+                            </div>
+                        </section>
 
-                        <div className="xl:col-span-4">
-                        <ExecutiveChartCard title="Publication Snapshot" subtitle="Published, draft, pending" tone="neutral">
-                            <HorizontalBarChart
-                                data={publicationStateSnapshot}
-                                emptyText="No data in current filter scope"
-                            />
-                        </ExecutiveChartCard>
-                        </div>
-
-                        <div className="xl:col-span-12">
-                        <ExecutiveChartCard title="Office Publication Mix" subtitle="Published disclosures by office" tone="neutral">
-                            <HorizontalBarChart
-                                data={office_publication_mix.map((row) => ({ label: row.label || 'N/A', value: row.total }))}
-                                emptyText="No data in current filter scope"
-                            />
-                        </ExecutiveChartCard>
-                        </div>
+                        <section className="rounded-2xl border border-red-100 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+                            <h3 className="text-base font-semibold text-slate-900">Status Distribution</h3>
+                            <p className="mt-1 text-sm text-slate-600">Compact summary by disclosure status.</p>
+                            <div className="mt-4">
+                                <HorizontalBarChart
+                                    data={statusMix}
+                                    emptyText="No data in current filter scope"
+                                />
+                            </div>
+                        </section>
                     </div>
                 )}
 
@@ -291,7 +331,7 @@ export default function TransparencyMonitoringIndex({
                                     <div className="flex flex-wrap items-start justify-between gap-3">
                                         <div>
                                             <p className="text-lg font-semibold text-slate-900">{row.title}</p>
-                                            <p className="text-sm text-slate-600">{row.type} | {row.publisher?.name ?? 'N/A'}</p>
+                                            <p className="text-sm text-slate-600">{row.type} | {row.publisher?.name ?? 'N/A'} | {formatDate(row.published_at)}</p>
                                         </div>
                                         <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">{row.status}</span>
                                     </div>
@@ -352,16 +392,6 @@ export default function TransparencyMonitoringIndex({
     );
 }
 
-function formatMonth(value: string): string {
-    const date = new Date(`${value}-01T00:00:00`);
-
-    if (Number.isNaN(date.getTime())) {
-        return value;
-    }
-
-    return date.toLocaleDateString('en-PH', { month: 'short', year: 'numeric' });
-}
-
 function Card({ label, value }: { label: string; value: number }) {
     return (
         <div className="rounded-2xl border border-red-200 bg-gradient-to-r from-red-50 to-white p-6 shadow-[0_8px_18px_rgba(15,23,42,0.06)]">
@@ -378,4 +408,33 @@ function EmptyDisclosureState({ title, subtitle }: { title: string; subtitle: st
             <p className="mt-1 text-sm text-slate-600">{subtitle}</p>
         </div>
     );
+}
+
+function StatusBadge(value: string) {
+    const normalized = value.toUpperCase();
+    const tone = normalized === 'PUBLISHED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800';
+
+    return <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${tone}`}>{formatStatus(value)}</span>;
+}
+
+function formatStatus(value: string): string {
+    return value.replaceAll('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatDate(value: string | null): string {
+    if (!value) {
+        return 'N/A';
+    }
+
+    const parsed = new Date(value);
+
+    if (Number.isNaN(parsed.getTime())) {
+        return value;
+    }
+
+    return parsed.toLocaleDateString('en-PH', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+    });
 }

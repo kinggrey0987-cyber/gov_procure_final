@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { DonutChart, ExecutiveChartCard, HorizontalBarChart, TrendLineChart } from '@/Components/Executive/Charts';
+import { HorizontalBarChart } from '@/Components/Executive/Charts';
 import { Head, router } from '@inertiajs/react';
 import { FormEvent, useState } from 'react';
 
@@ -65,20 +65,25 @@ export default function BusinessAudit({ auditLogs, filters, analytics, filter_op
         );
     };
 
-    const moduleSummary = analytics.module_summary.map((row) => ({
-        label: formatModuleLabel(row.label || 'N/A'),
-        value: row.total,
-    }));
+    const moduleSummary = analytics.module_summary
+        .map((row) => ({
+            label: formatModuleLabel(row.label || 'N/A'),
+            value: row.total,
+        }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 6);
 
-    const actionSummary = analytics.action_summary.map((row) => ({
-        label: formatActionLabel(row.label || 'N/A'),
-        value: row.total,
-    }));
+    const actionSummary = analytics.action_summary
+        .map((row) => ({
+            label: formatActionLabel(row.label || 'N/A'),
+            value: row.total,
+        }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 6);
 
-    const auditTrend = analytics.daily_trend.map((row) => ({
-        label: formatDateLabel(row.label),
-        value: row.total,
-    }));
+    const totalEvents = analytics.daily_trend.reduce((sum, row) => sum + row.total, 0);
+    const activeModules = moduleSummary.length;
+    const activeActions = actionSummary.length;
 
     const exportCsv = () => {
         const rows = [
@@ -112,7 +117,7 @@ export default function BusinessAudit({ auditLogs, filters, analytics, filter_op
                 <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-200 bg-white px-5 py-4 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
                     <div>
                         <h2 className="text-2xl font-semibold text-slate-900">Governance Logs</h2>
-                        <p className="text-sm text-slate-600">Governance activity evidence</p>
+                        <p className="text-sm text-slate-600">Evidence-first business activity tracking for executive oversight.</p>
                     </div>
                     <div className="flex items-center gap-2">
                         <button type="button" onClick={() => window.print()} className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
@@ -127,14 +132,14 @@ export default function BusinessAudit({ auditLogs, filters, analytics, filter_op
                 <section className="rounded-2xl border border-red-200 bg-white p-5 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
                     <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3">
                         <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                            <select className="h-10 rounded-lg border-red-200 text-sm" value={form.module_name} onChange={(e) => setForm((v) => ({ ...v, module_name: e.target.value }))}>
+                            <select className="h-10 rounded-lg border-slate-300 text-sm" value={form.module_name} onChange={(e) => setForm((v) => ({ ...v, module_name: e.target.value }))}>
                                 <option value="">All modules</option>
                                 {filter_options.modules.map((moduleName) => (
                                     <option key={moduleName} value={moduleName}>{formatModuleLabel(moduleName)}</option>
                                 ))}
                             </select>
 
-                            <select className="h-10 rounded-lg border-red-200 text-sm" value={form.action_type} onChange={(e) => setForm((v) => ({ ...v, action_type: e.target.value }))}>
+                            <select className="h-10 rounded-lg border-slate-300 text-sm" value={form.action_type} onChange={(e) => setForm((v) => ({ ...v, action_type: e.target.value }))}>
                                 <option value="">All actions</option>
                                 {filter_options.actions.map((actionName) => (
                                     <option key={actionName} value={actionName}>{formatActionLabel(actionName)}</option>
@@ -143,7 +148,7 @@ export default function BusinessAudit({ auditLogs, filters, analytics, filter_op
 
                             <input
                                 list="governance-users"
-                                className="h-10 rounded-lg border-red-200 text-sm"
+                                className="h-10 rounded-lg border-slate-300 text-sm"
                                 placeholder="Search user"
                                 value={form.user_query}
                                 onChange={(e) => setForm((v) => ({ ...v, user_query: e.target.value }))}
@@ -154,8 +159,8 @@ export default function BusinessAudit({ auditLogs, filters, analytics, filter_op
                                 ))}
                             </datalist>
 
-                            <input type="date" className="h-10 rounded-lg border-red-200 text-sm" value={form.from_date} onChange={(e) => setForm((v) => ({ ...v, from_date: e.target.value }))} />
-                            <input type="date" className="h-10 rounded-lg border-red-200 text-sm" value={form.to_date} onChange={(e) => setForm((v) => ({ ...v, to_date: e.target.value }))} />
+                            <input type="date" className="h-10 rounded-lg border-slate-300 text-sm" value={form.from_date} onChange={(e) => setForm((v) => ({ ...v, from_date: e.target.value }))} />
+                            <input type="date" className="h-10 rounded-lg border-slate-300 text-sm" value={form.to_date} onChange={(e) => setForm((v) => ({ ...v, to_date: e.target.value }))} />
                         </div>
 
                         <div className="ml-auto flex items-center gap-2">
@@ -173,51 +178,39 @@ export default function BusinessAudit({ auditLogs, filters, analytics, filter_op
                     </form>
                 </section>
 
-                <div className="grid gap-6 xl:grid-cols-12">
-                    <div className="xl:col-span-12">
-                    <ExecutiveChartCard
-                        title="Activity Trend"
-                        subtitle="Daily event volume"
-                        tone="critical"
-                    >
-                        <TrendLineChart
-                            data={auditTrend}
-                            emptyText="No data in current filter scope"
-                        />
-                    </ExecutiveChartCard>
-                    </div>
+                <div className="grid gap-4 sm:grid-cols-3">
+                    <KpiCard label="Events in Scope" value={totalEvents} />
+                    <KpiCard label="Modules Involved" value={activeModules} />
+                    <KpiCard label="Action Types" value={activeActions} />
+                </div>
 
-                    <div className="xl:col-span-6">
-                    <ExecutiveChartCard
-                        title="Module Mix"
-                        subtitle="Activity by module"
-                        tone="neutral"
-                    >
-                        <HorizontalBarChart
-                            data={moduleSummary}
-                            emptyText="No data in current filter scope"
-                        />
-                    </ExecutiveChartCard>
-                    </div>
+                <div className="grid gap-6 xl:grid-cols-2">
+                    <section className="rounded-2xl border border-red-100 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+                        <h3 className="text-base font-semibold text-slate-900">Module Summary</h3>
+                        <p className="mt-1 text-sm text-slate-600">Most active governance modules in current filters.</p>
+                        <div className="mt-4">
+                            <HorizontalBarChart
+                                data={moduleSummary}
+                                emptyText="No data in current filter scope"
+                            />
+                        </div>
+                    </section>
 
-                    <div className="xl:col-span-6">
-                    <ExecutiveChartCard
-                        title="Action Mix"
-                        subtitle="Event type distribution"
-                        tone="default"
-                    >
-                        <DonutChart
-                            data={actionSummary}
-                            centerLabel="Actions"
-                            emptyText="No data in current filter scope"
-                        />
-                    </ExecutiveChartCard>
-                    </div>
+                    <section className="rounded-2xl border border-red-100 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+                        <h3 className="text-base font-semibold text-slate-900">Action Summary</h3>
+                        <p className="mt-1 text-sm text-slate-600">Most common governance actions in current filters.</p>
+                        <div className="mt-4">
+                            <HorizontalBarChart
+                                data={actionSummary}
+                                emptyText="No data in current filter scope"
+                            />
+                        </div>
+                    </section>
                 </div>
 
                 <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
                     <div className="border-b border-slate-200 px-6 py-5">
-                        <h3 className="text-xl font-semibold text-slate-900">Latest Business Logs</h3>
+                        <h3 className="text-lg font-semibold text-slate-900">Governance Activity Evidence</h3>
                     </div>
 
                     {auditLogs.data.length === 0 ? (
@@ -229,20 +222,25 @@ export default function BusinessAudit({ auditLogs, filters, analytics, filter_op
                                     <tr>
                                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Timestamp</th>
                                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">User</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Module</th>
                                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Action</th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Details</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Reference</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Office</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {auditLogs.data.map((log) => (
+                                    {auditLogs.data.slice(0, 30).map((log) => (
                                         <tr key={log.id} className="align-top">
-                                            <td className="px-4 py-3 text-slate-600">{new Date(log.created_at).toLocaleString()}</td>
-                                            <td className="px-4 py-3 font-semibold text-slate-800">{log.user?.name ?? 'System'}</td>
-                                            <td className="px-4 py-3 text-red-700">{formatActionLabel(log.action_type)}</td>
-                                            <td className="px-4 py-3 text-slate-600">
-                                                <p>{formatModuleLabel(log.module_name)}</p>
-                                                <p className="text-xs">{log.office?.name ?? 'N/A'} - {formatReferenceLabel(log.reference_type)} #{log.reference_id}</p>
+                                            <td className="px-4 py-3 text-slate-700">{new Date(log.created_at).toLocaleString()}</td>
+                                            <td className="px-4 py-3 text-slate-800">{log.user?.name ?? 'System'}</td>
+                                            <td className="px-4 py-3 text-slate-700">{formatModuleLabel(log.module_name)}</td>
+                                            <td className="px-4 py-3">
+                                                <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                                                    {formatActionLabel(log.action_type)}
+                                                </span>
                                             </td>
+                                            <td className="px-4 py-3 text-slate-700">{formatReferenceLabel(log.reference_type)} #{log.reference_id}</td>
+                                            <td className="px-4 py-3 text-slate-700">{log.office?.name ?? 'N/A'}</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -255,13 +253,13 @@ export default function BusinessAudit({ auditLogs, filters, analytics, filter_op
     );
 }
 
-function formatDateLabel(value: string): string {
-    const parsed = new Date(`${value}T00:00:00`);
-    if (Number.isNaN(parsed.getTime())) {
-        return value;
-    }
-
-    return parsed.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+function KpiCard({ label, value }: { label: string; value: number }) {
+    return (
+        <div className="rounded-2xl border border-red-200 bg-gradient-to-r from-red-50 to-white p-6 shadow-[0_8px_18px_rgba(15,23,42,0.06)]">
+            <p className="text-sm font-semibold uppercase tracking-wide text-slate-600">{label}</p>
+            <p className="mt-2 text-4xl font-bold text-red-700">{value}</p>
+        </div>
+    );
 }
 
 function formatModuleLabel(value: string): string {

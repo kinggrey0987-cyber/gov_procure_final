@@ -367,11 +367,11 @@ function MetricCard({
     tone: 'rose' | 'amber' | 'sky' | 'emerald' | 'neutral';
 }) {
     const toneClass: Record<typeof tone, string> = {
-        rose: 'border-rose-300 bg-gradient-to-b from-rose-100 to-rose-50 text-rose-900 shadow-[0_8px_18px_rgba(244,63,94,0.15)]',
-        amber: 'border-amber-300 bg-gradient-to-b from-amber-100 to-amber-50 text-amber-900 shadow-[0_8px_18px_rgba(245,158,11,0.14)]',
-        sky: 'border-sky-300 bg-gradient-to-b from-sky-100 to-sky-50 text-sky-900 shadow-[0_8px_18px_rgba(56,189,248,0.14)]',
-        emerald: 'border-emerald-300 bg-gradient-to-b from-emerald-100 to-emerald-50 text-emerald-900 shadow-[0_8px_18px_rgba(16,185,129,0.14)]',
-        neutral: 'border-slate-200 bg-gradient-to-b from-slate-100 to-white text-slate-900 shadow-[0_8px_18px_rgba(100,116,139,0.12)]',
+        rose: 'border-red-200 bg-gradient-to-r from-red-50 to-white text-slate-900 shadow-[0_8px_18px_rgba(15,23,42,0.06)]',
+        amber: 'border-red-200 bg-gradient-to-r from-red-50 to-white text-slate-900 shadow-[0_8px_18px_rgba(15,23,42,0.06)]',
+        sky: 'border-red-200 bg-gradient-to-r from-red-50 to-white text-slate-900 shadow-[0_8px_18px_rgba(15,23,42,0.06)]',
+        emerald: 'border-red-200 bg-gradient-to-r from-red-50 to-white text-slate-900 shadow-[0_8px_18px_rgba(15,23,42,0.06)]',
+        neutral: 'border-red-200 bg-gradient-to-r from-red-50 to-white text-slate-900 shadow-[0_8px_18px_rgba(15,23,42,0.06)]',
     };
 
     return (

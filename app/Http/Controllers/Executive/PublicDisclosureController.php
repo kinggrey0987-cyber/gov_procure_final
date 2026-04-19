@@ -10,9 +10,11 @@ use App\Services\Analytics\PublicDisclosureService;
 use App\Services\Documents\DocumentService;
 use App\Services\Executive\DisclosureEligibilityService;
 use App\Services\History\HistoryTimelineService;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -26,19 +28,13 @@ class PublicDisclosureController
     ) {
     }
 
-    public function index(): Response
+    public function index(): RedirectResponse
     {
         $user = Auth::user();
         abort_unless($user && $user->can('public-disclosure.view'), 403);
 
-        $disclosures = PublicDisclosure::query()
-            ->with('publisher')
-            ->orderByDesc('created_at')
-            ->paginate(20);
-
-        return Inertia::render('Executive/Disclosures/Index', [
-            'disclosures' => $disclosures,
-        ]);
+        // Keep the legacy endpoint but route runtime usage to the active disclosure management surface.
+        return Redirect::route('executive.transparency-monitoring');
     }
 
     public function create(): Response
@@ -69,7 +65,28 @@ class PublicDisclosureController
         $user = Auth::user();
         abort_unless($user && $user->can('public-disclosure.manage'), 403);
 
-        $disclosure = $this->disclosureService->createFromPayload($user, $request->validated());
+        $payload = $request->validated();
+
+        if ($request->hasFile('main_file')) {
+            /** @var UploadedFile $mainFile */
+            $mainFile = $request->file('main_file');
+            $storedFileName = Str::uuid()->toString().'_'.$mainFile->getClientOriginalName();
+            $payload['file_path'] = $mainFile->storeAs('public_disclosures', $storedFileName, 'public');
+        }
+
+        $disclosure = $this->disclosureService->createFromPayload($user, $payload);
+
+        $supportingFiles = $request->file('supporting_files', []);
+        foreach ($supportingFiles as $supportingFile) {
+            if (! $supportingFile instanceof UploadedFile) {
+                continue;
+            }
+
+            $this->documentService->upload($user, 'public_disclosures', (int) $disclosure->disclosure_id, [
+                'title' => pathinfo($supportingFile->getClientOriginalName(), PATHINFO_FILENAME),
+                'file' => $supportingFile,
+            ]);
+        }
 
         return Redirect::route('executive.disclosures.show', $disclosure->disclosure_id)
             ->with('success', (string) $disclosure->status === 'PUBLISHED' ? 'Disclosure published successfully.' : 'Disclosure draft created successfully.');

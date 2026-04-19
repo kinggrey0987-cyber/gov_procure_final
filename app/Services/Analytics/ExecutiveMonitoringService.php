@@ -361,11 +361,38 @@ class ExecutiveMonitoringService
                 'anomalies' => (clone $anomalyBase)
                     ->latest('detected_at')
                     ->limit(10)
-                    ->get(['anomaly_id', 'anomaly_type', 'severity', 'status', 'office_id', 'detected_at', 'created_at']),
+                    ->get([
+                        'anomaly_id',
+                        'anomaly_type',
+                        'severity',
+                        'status',
+                        'office_id',
+                        'detected_at',
+                        'created_at',
+                        'reference_type',
+                        'reference_id',
+                        'item_id',
+                        'detected_value',
+                        'expected_value',
+                        'threshold_value',
+                    ]),
                 'alerts' => (clone $alertBase)
                     ->latest('detected_at')
                     ->limit(10)
-                    ->get(['alerts_id', 'alert_type', 'severity', 'status', 'office_id', 'detected_at', 'created_at']),
+                    ->get([
+                        'alerts_id',
+                        'alert_type',
+                        'severity',
+                        'status',
+                        'office_id',
+                        'detected_at',
+                        'created_at',
+                        'anomaly_id',
+                        'supply_request_id',
+                        'purchase_order_id',
+                        'supplier_id',
+                        'alert_message',
+                    ]),
             ],
         ];
     }

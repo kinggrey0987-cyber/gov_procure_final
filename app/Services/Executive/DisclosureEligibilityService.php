@@ -28,6 +28,10 @@ class DisclosureEligibilityService
                     (int) $ppmp->fiscal_year,
                     number_format((float) $ppmp->total_estimated_budget, 2)
                 ),
+                'source_group' => 'Approved PPMP',
+                'source_code' => sprintf('PPMP-%d', (int) $ppmp->ppmp_id),
+                'office' => $ppmp->office?->name ?? 'Unknown Office',
+                'release_date' => optional($ppmp->updated_at)?->format('Y-m-d'),
                 'reference_type' => Ppmp::class,
                 'reference_id' => (int) $ppmp->ppmp_id,
                 'suggested_type' => 'PPMP_SUMMARY',
@@ -48,6 +52,10 @@ class DisclosureEligibilityService
                     $order->purchaseRequest?->office?->name ?? 'Unknown Office',
                     number_format((float) $order->total_amount, 2)
                 ),
+                'source_group' => 'Completed Purchase Order',
+                'source_code' => (string) ($order->po_number ?? ('PO-'.$order->purchase_order_id)),
+                'office' => $order->purchaseRequest?->office?->name ?? 'Unknown Office',
+                'release_date' => optional($order->updated_at)?->format('Y-m-d'),
                 'reference_type' => PurchaseOrder::class,
                 'reference_id' => (int) $order->purchase_order_id,
                 'suggested_type' => 'PROCUREMENT_SUMMARY',
@@ -68,6 +76,10 @@ class DisclosureEligibilityService
                     $record->office?->name ?? 'Unknown Office',
                     optional($record->release_date)?->format('Y-m-d') ?? 'N/A'
                 ),
+                'source_group' => 'Distribution Summary',
+                'source_code' => (string) ($record->distribution_code ?? ('DIST-'.$record->distribution_record_id)),
+                'office' => $record->office?->name ?? 'Unknown Office',
+                'release_date' => optional($record->release_date)?->format('Y-m-d'),
                 'reference_type' => DistributionRecord::class,
                 'reference_id' => (int) $record->distribution_record_id,
                 'suggested_type' => 'DISTRIBUTION_SUMMARY',

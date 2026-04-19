@@ -44,7 +44,7 @@ export default function ExecutiveMonitoringSummary({ summary }: Props) {
                     <Link href={route('executive.alerts.index')} className="rounded bg-emerald-600 px-4 py-2 text-sm text-white">
                         View Alerts
                     </Link>
-                    <Link href={route('executive.disclosures.index')} className="rounded bg-sky-600 px-4 py-2 text-sm text-white">
+                    <Link href={route('executive.transparency-monitoring')} className="rounded bg-sky-600 px-4 py-2 text-sm text-white">
                         Manage Disclosures
                     </Link>
                 </div>
