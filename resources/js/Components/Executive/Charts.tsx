@@ -301,8 +301,8 @@ export function DonutChart({
     let runningOffset = 0;
 
     return (
-        <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,160px)_minmax(0,1fr)] lg:items-center">
-            <div className="mx-auto h-[160px] w-[160px] lg:h-[170px] lg:w-[170px]">
+        <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,148px)_minmax(0,1fr)] lg:items-center">
+            <div className="mx-auto h-[152px] w-[152px] lg:h-[164px] lg:w-[164px]">
                 <svg viewBox="0 0 220 220" className="h-full w-full">
                     <circle
                         cx="110"
@@ -349,15 +349,15 @@ export function DonutChart({
                     const percent = total > 0 ? Math.round((segment.value / total) * 100) : 0;
 
                     return (
-                        <div key={segment.label} className="flex min-w-0 items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm">
+                        <div key={segment.label} className="grid min-w-0 grid-cols-[12px_minmax(0,1fr)_76px] items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
                             <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: palette[index % palette.length] }} />
                             <span
-                                className="min-w-0 flex-1 pr-2 font-medium leading-5 text-slate-700 [overflow-wrap:normal] [word-break:normal]"
+                                className="min-w-0 pr-1 font-medium leading-5 text-slate-700 [overflow-wrap:normal] [word-break:normal] lg:whitespace-nowrap"
                                 title={segment.label}
                             >
                                 {segment.label}
                             </span>
-                            <span className="w-[86px] shrink-0 whitespace-nowrap text-right font-semibold text-slate-900">{segment.value} ({percent}%)</span>
+                            <span className="whitespace-nowrap border-l border-slate-100 pl-2 text-right font-semibold text-slate-900">{segment.value} ({percent}%)</span>
                         </div>
                     );
                 })}
