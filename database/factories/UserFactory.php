@@ -48,6 +48,7 @@ class UserFactory extends Factory
         return [
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
+            'emp_id' => sprintf('TST-%08d', fake()->unique()->numberBetween(1, 99999999)),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'role_id' => $defaultRole->id,
