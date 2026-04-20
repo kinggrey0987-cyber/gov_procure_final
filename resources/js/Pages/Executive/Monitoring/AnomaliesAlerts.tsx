@@ -651,7 +651,7 @@ function toCompactNumber(value: number | string | null | undefined): string | nu
     }
 
     return new Intl.NumberFormat('en-PH', {
-        maximumFractionDigits: 2,
+        maximumFractionDigits: 0,
     }).format(numeric);
 }
 
