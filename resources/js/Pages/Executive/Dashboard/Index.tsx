@@ -226,60 +226,60 @@ export default function ExecutiveDashboardIndex({
                                 </div>
                             ) : (
                                 <div className="space-y-4">
-                                    <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,156px)_minmax(0,1fr)] xl:grid-cols-[minmax(0,168px)_minmax(0,1fr)] lg:items-center">
-                                        <div className="mx-auto h-[150px] w-[150px] lg:h-[160px] lg:w-[160px]">
-                                            <svg viewBox="0 0 220 220" className="h-full w-full">
-                                                <circle cx="110" cy="110" r={72} fill="none" stroke="rgb(254 226 226)" strokeWidth={24} />
-                                                {approvalStatusMix.map((segment, index) => {
-                                                    const total = approvalStatusMix.reduce((sum, row) => sum + row.value, 0);
-                                                    const circumference = 2 * Math.PI * 72;
-                                                    const segmentLength = (segment.value / total) * circumference;
-                                                    const offset = approvalStatusMix.slice(0, index).reduce((sum, row) => sum + (row.value / total) * circumference, 0);
-
-                                                    return (
-                                                        <circle
-                                                            key={segment.label}
-                                                            cx="110"
-                                                            cy="110"
-                                                            r={72}
-                                                            fill="none"
-                                                            stroke={['rgb(185 28 28)', 'rgb(245 158 11)', 'rgb(37 99 235)', 'rgb(22 163 74)'][index % 4]}
-                                                            strokeWidth={24}
-                                                            strokeDasharray={`${segmentLength} ${circumference - segmentLength}`}
-                                                            strokeDashoffset={-offset}
-                                                            transform="rotate(-90 110 110)"
-                                                            strokeLinecap="butt"
-                                                        />
-                                                    );
-                                                })}
-
-                                                <text x="110" y="105" textAnchor="middle" className="fill-slate-500 text-[10px] uppercase tracking-[0.14em]">
-                                                    PPMP
-                                                </text>
-                                                <text x="110" y="128" textAnchor="middle" className="fill-slate-900 text-[22px] font-bold">
-                                                    {approvals.ppmp_workflow_total}
-                                                </text>
-                                            </svg>
-                                        </div>
-
-                                        <div className="min-w-0 space-y-2">
+                                    <div className="mx-auto h-[150px] w-[150px] lg:h-[160px] lg:w-[160px]">
+                                        <svg viewBox="0 0 220 220" className="h-full w-full">
+                                            <circle cx="110" cy="110" r={72} fill="none" stroke="rgb(254 226 226)" strokeWidth={24} />
                                             {approvalStatusMix.map((segment, index) => {
                                                 const total = approvalStatusMix.reduce((sum, row) => sum + row.value, 0);
-                                                const percent = total > 0 ? Math.round((segment.value / total) * 100) : 0;
+                                                const circumference = 2 * Math.PI * 72;
+                                                const segmentLength = (segment.value / total) * circumference;
+                                                const offset = approvalStatusMix.slice(0, index).reduce((sum, row) => sum + (row.value / total) * circumference, 0);
 
                                                 return (
-                                                    <div key={segment.label} className="grid min-w-0 grid-cols-[12px_minmax(0,1fr)_max-content] items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
-                                                        <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: ['rgb(185 28 28)', 'rgb(245 158 11)', 'rgb(37 99 235)', 'rgb(22 163 74)'][index % 4] }} />
-                                                        <span className="min-w-0 pr-3 font-medium leading-5 text-slate-700 [overflow-wrap:normal] [word-break:normal] lg:whitespace-nowrap">
-                                                            {segment.label}
-                                                        </span>
-                                                        <span className="justify-self-end whitespace-nowrap border-l border-slate-100 pl-2 text-right font-semibold text-slate-900">
-                                                            {segment.value} ({percent}%)
-                                                        </span>
-                                                    </div>
+                                                    <circle
+                                                        key={segment.label}
+                                                        cx="110"
+                                                        cy="110"
+                                                        r={72}
+                                                        fill="none"
+                                                        stroke={['rgb(185 28 28)', 'rgb(245 158 11)', 'rgb(37 99 235)', 'rgb(22 163 74)'][index % 4]}
+                                                        strokeWidth={24}
+                                                        strokeDasharray={`${segmentLength} ${circumference - segmentLength}`}
+                                                        strokeDashoffset={-offset}
+                                                        transform="rotate(-90 110 110)"
+                                                        strokeLinecap="butt"
+                                                    />
                                                 );
                                             })}
-                                        </div>
+
+                                            <text x="110" y="105" textAnchor="middle" className="fill-slate-500 text-[10px] uppercase tracking-[0.14em]">
+                                                PPMP
+                                            </text>
+                                            <text x="110" y="128" textAnchor="middle" className="fill-slate-900 text-[22px] font-bold">
+                                                {approvals.ppmp_workflow_total}
+                                            </text>
+                                        </svg>
+                                    </div>
+
+                                    <div className="grid gap-2">
+                                        {approvalStatusMix.map((segment, index) => {
+                                            const total = approvalStatusMix.reduce((sum, row) => sum + row.value, 0);
+                                            const percent = total > 0 ? Math.round((segment.value / total) * 100) : 0;
+
+                                            return (
+                                                <div key={segment.label} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                                                    <div className="flex min-w-0 items-start gap-2">
+                                                        <span className="mt-1 h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: ['rgb(185 28 28)', 'rgb(245 158 11)', 'rgb(37 99 235)', 'rgb(22 163 74)'][index % 4] }} />
+                                                        <span className="min-w-0 flex-1 break-words font-medium leading-5 text-slate-700">
+                                                            {segment.label}
+                                                        </span>
+                                                    </div>
+                                                    <div className="mt-1 pl-5 text-sm font-semibold text-slate-900">
+                                                        {segment.value} ({percent}%)
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                     <div className="grid grid-cols-3 gap-2">
                                         <MiniStat label="Pending" value={approvals.pending_ppmp_approvals} />
