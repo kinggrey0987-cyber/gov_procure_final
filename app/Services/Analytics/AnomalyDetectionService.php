@@ -29,13 +29,17 @@ class AnomalyDetectionService
             ]);
         }
 
-        return collect()
+        $detected = collect()
             ->merge($this->detectPriceZScoreAnomalies($actor))
             ->merge($this->detectFrequentRequestAnomalies($actor))
             ->merge($this->detectExcessiveQuantityAnomalies($actor))
             ->merge($this->detectPpmpOverRequestAnomalies($actor))
             ->merge($this->detectPpmpEarlyDepletionAnomalies($actor))
             ->merge($this->detectPpmpFrequencyIrregularities($actor));
+
+        $this->anomalyService->collapseActiveDuplicates();
+
+        return $detected;
     }
 
     /**
@@ -81,7 +85,7 @@ class AnomalyDetectionService
             $purchaseOrder = $latest->purchaseOrder;
             $officeId = (int) ($purchaseOrder?->purchaseRequest?->office_id ?? $purchaseOrder?->supplyRequest?->office_id ?? 0) ?: null;
 
-            $created->push($this->anomalyService->create($actor, [
+            $created->push($this->anomalyService->createOrUpdateSystemDetected([
                 'anomaly_type' => 'PRICE_Z_SCORE',
                 'reference_type' => PurchaseOrderItem::class,
                 'reference_id' => (int) $latest->purchase_order_item_id,
@@ -137,7 +141,7 @@ class AnomalyDetectionService
                 continue;
             }
 
-            $created->push($this->anomalyService->create($actor, [
+            $created->push($this->anomalyService->createOrUpdateSystemDetected([
                 'anomaly_type' => 'FREQUENT_REQUEST_WINDOW',
                 'reference_type' => SupplyRequest::class,
                 'reference_id' => (int) $latestRequest->supply_request_id,
@@ -186,7 +190,7 @@ class AnomalyDetectionService
                 continue;
             }
 
-            $created->push($this->anomalyService->create($actor, [
+            $created->push($this->anomalyService->createOrUpdateSystemDetected([
                 'anomaly_type' => 'EXCESSIVE_QUANTITY',
                 'reference_type' => SupplyRequestItem::class,
                 'reference_id' => (int) $latest->supply_request_item_id,
@@ -247,7 +251,7 @@ class AnomalyDetectionService
 
             $overRequestAmount = $totalRequested - $plannedQuantity;
 
-            $created->push($this->anomalyService->create($actor, [
+            $created->push($this->anomalyService->createOrUpdateSystemDetected([
                 'anomaly_type' => 'PPMP_OVER_REQUEST',
                 'reference_type' => SupplyRequestItem::class,
                 'reference_id' => (int) $latest->supply_request_item_id,
@@ -338,7 +342,7 @@ class AnomalyDetectionService
 
             $expectedConsumptionAtMidpoint = $plannedQuantity * 0.50;
 
-            $created->push($this->anomalyService->create($actor, [
+            $created->push($this->anomalyService->createOrUpdateSystemDetected([
                 'anomaly_type' => 'PPMP_EARLY_DEPLETION',
                 'reference_type' => SupplyRequestItem::class,
                 'reference_id' => (int) $latest->supply_request_item_id,
@@ -407,7 +411,7 @@ class AnomalyDetectionService
                 continue;
             }
 
-            $created->push($this->anomalyService->create($actor, [
+            $created->push($this->anomalyService->createOrUpdateSystemDetected([
                 'anomaly_type' => 'PPMP_FREQUENCY_IRREGULARITY',
                 'reference_type' => SupplyRequestItem::class,
                 'reference_id' => (int) $latestRequestItem->supply_request_item_id,

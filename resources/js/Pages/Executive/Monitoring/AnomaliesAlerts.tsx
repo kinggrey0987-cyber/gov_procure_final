@@ -121,6 +121,8 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
 
     const severityMix = mergeSeverity(anomaly_severity_breakdown, alert_severity_breakdown);
     const statusMix = mergeStatus(status_breakdown.anomalies, status_breakdown.alerts);
+    const anomalyGroups = buildAnomalyGroups(recent.anomalies).slice(0, 5);
+    const representativeAnomalies = anomalyGroups.map((group) => group.representative);
 
     const exportCsv = () => {
         const rows = [
@@ -299,13 +301,23 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                 <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
                     <div className="border-b border-slate-200 px-5 py-4">
                         <h3 className="text-lg font-semibold text-slate-900">Recent Anomalies</h3>
-                        <p className="mt-1 text-sm text-slate-600">Most recent anomaly records with executive impact context.</p>
+                        <p className="mt-1 text-sm text-slate-600">Distinct anomaly groups first, with representative records for executive triage.</p>
                     </div>
                     {recent.anomalies.length === 0 ? (
                         <p className="px-5 py-6 text-sm text-slate-500">No anomalies found for the selected filters.</p>
                     ) : (
-                        <div className="space-y-3 px-4 py-4">
-                            {recent.anomalies.slice(0, 5).map((row) => (
+                        <div className="space-y-4 px-4 py-4">
+                            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                                {anomalyGroups.map((group) => (
+                                    <article key={group.key} className="rounded-lg border border-red-100 bg-red-50/50 px-3 py-2">
+                                        <p className="text-sm font-semibold text-slate-900">{group.label}</p>
+                                        <p className="mt-1 text-xs text-slate-600">{group.office} • {group.source}</p>
+                                        <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-red-700">{group.count} related record{group.count > 1 ? 's' : ''}</p>
+                                    </article>
+                                ))}
+                            </div>
+
+                            {representativeAnomalies.map((row) => (
                                 <article key={row.anomaly_id} className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
                                     <div className="flex flex-wrap items-start justify-between gap-3">
                                         <p className="text-sm font-semibold text-slate-900">{formatAnomalyType(row.anomaly_type)}</p>
@@ -485,13 +497,68 @@ function formatStatus(value: string): string {
 
 function formatAnomalyType(value: string): string {
     const aliases: Record<string, string> = {
-        PRICE_Z_SCORE: 'Procurement Price Anomaly',
+        PRICE_Z_SCORE: 'Price Anomaly',
+        PRICE_ANOMALY: 'Price Anomaly',
+        Z_SCORE_PRICE_ANOMALY: 'Price Anomaly',
         FREQUENT_REQUEST_WINDOW: 'Frequent Request Spike',
+        FREQUENT_REQUEST_SPIKE: 'Frequent Request Spike',
+        EXCESSIVE_QUANTITY: 'Excessive Quantity Anomaly',
         PPMP_OVER_REQUEST: 'PPMP Over-Request',
+        PPMP_EARLY_DEPLETION: 'PPMP Early Depletion',
+        PPMP_FREQUENCY_IRREGULARITY: 'PPMP Frequency Irregularity',
     };
 
-    const raw = aliases[value] ?? value;
+    const normalized = value.toUpperCase();
+    const raw = aliases[normalized] ?? value;
     return raw.replaceAll('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function buildAnomalyGroups(rows: AnomalyRow[]): Array<{ key: string; label: string; office: string; source: string; count: number; representative: AnomalyRow }> {
+    const grouped = new Map<string, { key: string; label: string; office: string; source: string; count: number; representative: AnomalyRow; timestamp: number }>();
+
+    rows.forEach((row) => {
+        const office = row.office?.name ?? 'Unassigned Office';
+        const sourceType = row.reference_type ? row.reference_type.split('\\').pop() ?? 'Source' : 'Source';
+        const itemPart = row.item_id ? `item-${row.item_id}` : 'item-na';
+        const key = `${row.anomaly_type}|${office}|${sourceType}|${itemPart}`;
+        const timestamp = toTimestamp(row.detected_at);
+
+        const existing = grouped.get(key);
+
+        if (!existing) {
+            grouped.set(key, {
+                key,
+                label: formatAnomalyType(row.anomaly_type),
+                office,
+                source: sourceType,
+                count: 1,
+                representative: row,
+                timestamp,
+            });
+
+            return;
+        }
+
+        existing.count += 1;
+
+        if (timestamp >= existing.timestamp) {
+            existing.timestamp = timestamp;
+            existing.representative = row;
+        }
+    });
+
+    return [...grouped.values()]
+        .sort((a, b) => (b.count - a.count) || (b.timestamp - a.timestamp))
+        .map(({ key, label, office, source, count, representative }) => ({ key, label, office, source, count, representative }));
+}
+
+function toTimestamp(value: string | null): number {
+    if (!value) {
+        return 0;
+    }
+
+    const parsed = new Date(value).getTime();
+    return Number.isNaN(parsed) ? 0 : parsed;
 }
 
 function formatAlertType(value: string): string {

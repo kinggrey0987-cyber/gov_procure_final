@@ -77,9 +77,23 @@ export default function ExecutiveAnomalyIndex({ anomalies, filters }: Props) {
 }
 
 function formatAnomalyType(value: string): string {
-    if (value === 'PRICE_Z_SCORE') {
-        return 'Procurement Price Anomaly';
+    const aliases: Record<string, string> = {
+        PRICE_Z_SCORE: 'Price Anomaly',
+        PRICE_ANOMALY: 'Price Anomaly',
+        Z_SCORE_PRICE_ANOMALY: 'Price Anomaly',
+        FREQUENT_REQUEST_WINDOW: 'Frequent Request Spike',
+        FREQUENT_REQUEST_SPIKE: 'Frequent Request Spike',
+        EXCESSIVE_QUANTITY: 'Excessive Quantity Anomaly',
+        PPMP_OVER_REQUEST: 'PPMP Over-Request',
+        PPMP_EARLY_DEPLETION: 'PPMP Early Depletion',
+        PPMP_FREQUENCY_IRREGULARITY: 'PPMP Frequency Irregularity',
+    };
+
+    const normalized = value.toUpperCase();
+
+    if (aliases[normalized]) {
+        return aliases[normalized];
     }
 
-    return value;
+    return value.replaceAll('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase());
 }

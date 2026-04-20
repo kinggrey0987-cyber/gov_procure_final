@@ -101,10 +101,10 @@ class ExecutiveMonitoringService
                     ->orderByDesc('total')
                     ->get(),
                 'recent_anomalies' => Anomaly::query()
-                    ->select(['anomaly_id', 'anomaly_type', 'severity', 'status', 'office_id', 'detected_at', 'created_at'])
+                    ->select(['anomaly_id', 'anomaly_type', 'severity', 'status', 'office_id', 'detected_at', 'created_at', 'reference_type', 'reference_id', 'item_id'])
                     ->with('office:id,name')
                     ->latest('detected_at')
-                    ->limit(5)
+                    ->limit(20)
                     ->get(),
                 'recent_alerts' => Alert::query()
                     ->select(['alerts_id', 'alert_type', 'severity', 'status', 'office_id', 'detected_at', 'created_at'])
@@ -313,7 +313,20 @@ class ExecutiveMonitoringService
                 'offices' => Office::query()->select(['id', 'name'])->orderBy('name')->get(),
                 'severities' => $this->distinctValues([Anomaly::query(), Alert::query()], 'severity'),
                 'statuses' => $this->distinctValues([Anomaly::query(), Alert::query()], 'status'),
-                'anomaly_types' => Anomaly::query()->select('anomaly_type')->whereNotNull('anomaly_type')->distinct()->orderBy('anomaly_type')->pluck('anomaly_type')->values(),
+                'anomaly_types' => collect(array_merge(
+                    Anomaly::intendedTypes(),
+                    Anomaly::query()
+                        ->select('anomaly_type')
+                        ->whereNotNull('anomaly_type')
+                        ->distinct()
+                        ->orderBy('anomaly_type')
+                        ->pluck('anomaly_type')
+                        ->all(),
+                ))
+                    ->filter(fn ($value): bool => is_string($value) && $value !== '')
+                    ->map(fn ($value): string => strtoupper((string) $value))
+                    ->unique()
+                    ->values(),
             ],
             'totals' => [
                 'anomaly_count' => (clone $anomalyBase)->count(),

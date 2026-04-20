@@ -13,6 +13,13 @@ class Anomaly extends Model
 {
     use HasFactory;
 
+    public const TYPE_PRICE_Z_SCORE = 'PRICE_Z_SCORE';
+    public const TYPE_FREQUENT_REQUEST_WINDOW = 'FREQUENT_REQUEST_WINDOW';
+    public const TYPE_EXCESSIVE_QUANTITY = 'EXCESSIVE_QUANTITY';
+    public const TYPE_PPMP_OVER_REQUEST = 'PPMP_OVER_REQUEST';
+    public const TYPE_PPMP_EARLY_DEPLETION = 'PPMP_EARLY_DEPLETION';
+    public const TYPE_PPMP_FREQUENCY_IRREGULARITY = 'PPMP_FREQUENCY_IRREGULARITY';
+
     protected $primaryKey = 'anomaly_id';
 
     public function getRouteKeyName(): string
@@ -91,5 +98,20 @@ class Anomaly extends Model
     public function scopeByType(Builder $query, string $anomalyType): Builder
     {
         return $query->where('anomaly_type', strtoupper($anomalyType));
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function intendedTypes(): array
+    {
+        return [
+            self::TYPE_PRICE_Z_SCORE,
+            self::TYPE_FREQUENT_REQUEST_WINDOW,
+            self::TYPE_EXCESSIVE_QUANTITY,
+            self::TYPE_PPMP_OVER_REQUEST,
+            self::TYPE_PPMP_EARLY_DEPLETION,
+            self::TYPE_PPMP_FREQUENCY_IRREGULARITY,
+        ];
     }
 }

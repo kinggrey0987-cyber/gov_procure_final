@@ -22,6 +22,7 @@ use App\Models\SupplyRequestItem;
 use App\Models\User;
 use App\Services\Analytics\AlertService;
 use App\Services\Analytics\AnomalyDetectionService;
+use App\Services\Analytics\AnomalyService;
 use App\Services\Delivery\DeliveryService;
 use App\Services\Delivery\DeliveryVerificationService;
 use App\Services\Executive\PpmpApprovalService;
@@ -239,6 +240,8 @@ class DemoWorkflowSeeder extends Seeder
                 );
 
                 app(AnomalyDetectionService::class)->runExecutiveDetections($execUser);
+                $dedupedAnomalies = app(AnomalyService::class)->collapseActiveDuplicates();
+                $this->outputLine(sprintf('Anomaly duplicate cleanup dismissed %d duplicate active record(s).', $dedupedAnomalies));
 
                 $afterCounts = $this->snapshotCounts();
                 $this->reportCounterDelta($beforeCounts, $afterCounts);

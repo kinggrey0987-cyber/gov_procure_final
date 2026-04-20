@@ -8,7 +8,9 @@ use App\Models\StatusHistory;
 use App\Models\User;
 use App\Services\AuditLogService;
 use App\Services\NotificationService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -32,18 +34,10 @@ class AnomalyService
         $this->assertReferenceExists($referenceType, $referenceId);
 
         return DB::transaction(function () use ($actor, $payload): Anomaly {
-            $existing = Anomaly::query()
-                ->where('anomaly_type', strtoupper((string) $payload['anomaly_type']))
-                ->where('reference_type', (string) $payload['reference_type'])
-                ->where('reference_id', (int) $payload['reference_id'])
-                ->where('item_id', $payload['item_id'] ?? null)
-                ->where('office_id', $payload['office_id'] ?? null)
-                ->where('detection_method', $payload['detection_method'] ?? null)
-                ->whereIn('status', ['OPEN', 'IN_REVIEW'])
-                ->first();
+            $existing = $this->findExistingActiveAnomaly($payload, true);
 
             if ($existing instanceof Anomaly) {
-                return $existing;
+                return $this->refreshExistingAnomaly($existing, $payload);
             }
 
             $anomaly = Anomaly::query()->create([
@@ -132,28 +126,10 @@ class AnomalyService
             $anomalyType = strtoupper((string) $payload['anomaly_type']);
             $detectionMethod = $payload['detection_method'] ?? null;
 
-            $existing = Anomaly::query()
-                ->where('anomaly_type', $anomalyType)
-                ->where('reference_type', (string) $payload['reference_type'])
-                ->where('reference_id', (int) $payload['reference_id'])
-                ->where('item_id', $payload['item_id'] ?? null)
-                ->where('office_id', $payload['office_id'] ?? null)
-                ->where('detection_method', $detectionMethod)
-                ->whereIn('status', ['OPEN', 'IN_REVIEW'])
-                ->first();
+            $existing = $this->findExistingActiveAnomaly($payload, true);
 
             if ($existing instanceof Anomaly) {
-                $existing->forceFill([
-                    'detected_value' => $payload['detected_value'] ?? $existing->detected_value,
-                    'expected_value' => $payload['expected_value'] ?? $existing->expected_value,
-                    'threshold_value' => $payload['threshold_value'] ?? $existing->threshold_value,
-                    'z_score' => $payload['z_score'] ?? $existing->z_score,
-                    'severity' => strtoupper((string) ($payload['severity'] ?? $existing->severity ?? 'MEDIUM')),
-                    'detected_at' => $payload['detected_at'] ?? now(),
-                    'remarks' => $payload['remarks'] ?? $existing->remarks,
-                ])->save();
-
-                return $existing->fresh() ?? $existing;
+                return $this->refreshExistingAnomaly($existing, $payload);
             }
 
             $anomaly = Anomaly::query()->create([
@@ -185,6 +161,139 @@ class AnomalyService
 
             return $anomaly;
         });
+    }
+
+    public function collapseActiveDuplicates(): int
+    {
+        $duplicateGroups = Anomaly::query()
+            ->whereIn('status', ['OPEN', 'IN_REVIEW'])
+            ->selectRaw('anomaly_type, reference_type, reference_id, item_id, office_id, detection_method, MAX(anomaly_id) as keep_id, COUNT(*) as total')
+            ->groupBy('anomaly_type', 'reference_type', 'reference_id', 'item_id', 'office_id', 'detection_method')
+            ->havingRaw('COUNT(*) > 1')
+            ->get();
+
+        $deduplicated = 0;
+
+        foreach ($duplicateGroups as $group) {
+            $query = Anomaly::query()
+                ->where('anomaly_type', (string) $group->anomaly_type)
+                ->where('reference_type', (string) $group->reference_type)
+                ->where('reference_id', (int) $group->reference_id)
+                ->whereIn('status', ['OPEN', 'IN_REVIEW']);
+
+            $this->applyNullableConstraint($query, 'item_id', $group->item_id);
+            $this->applyNullableConstraint($query, 'office_id', $group->office_id);
+            $this->applyNullableConstraint($query, 'detection_method', $group->detection_method);
+
+            $duplicateIds = (clone $query)
+                ->where('anomaly_id', '!=', (int) $group->keep_id)
+                ->pluck('anomaly_id')
+                ->map(fn ($value): int => (int) $value)
+                ->all();
+
+            if ($duplicateIds === []) {
+                continue;
+            }
+
+            Anomaly::query()
+                ->whereIn('anomaly_id', $duplicateIds)
+                ->update([
+                    'status' => 'DISMISSED',
+                    'remarks' => 'Auto-dismissed duplicate anomaly record after idempotency cleanup.',
+                ]);
+
+            foreach ($duplicateIds as $anomalyId) {
+                StatusHistory::query()->create([
+                    'reference_type' => Anomaly::class,
+                    'reference_id' => $anomalyId,
+                    'old_status' => 'OPEN',
+                    'new_status' => 'DISMISSED',
+                    'changed_by' => null,
+                    'remarks' => 'Duplicate anomaly auto-dismissed by cleanup routine.',
+                    'changed_at' => now(),
+                ]);
+            }
+
+            $deduplicated += count($duplicateIds);
+        }
+
+        return $deduplicated;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function findExistingActiveAnomaly(array $payload, bool $allowContextFallback): ?Anomaly
+    {
+        $anomalyType = strtoupper((string) $payload['anomaly_type']);
+        $detectionMethod = $payload['detection_method'] ?? null;
+
+        $exact = Anomaly::query()
+            ->where('anomaly_type', $anomalyType)
+            ->where('reference_type', (string) $payload['reference_type'])
+            ->where('reference_id', (int) $payload['reference_id'])
+            ->where('item_id', $payload['item_id'] ?? null)
+            ->where('office_id', $payload['office_id'] ?? null)
+            ->where('detection_method', $detectionMethod)
+            ->whereIn('status', ['OPEN', 'IN_REVIEW'])
+            ->latest('detected_at')
+            ->latest('anomaly_id')
+            ->first();
+
+        if ($exact instanceof Anomaly) {
+            return $exact;
+        }
+
+        if (! $allowContextFallback || $detectionMethod === null) {
+            return null;
+        }
+
+        $fallback = Anomaly::query()
+            ->where('anomaly_type', $anomalyType)
+            ->where('reference_type', (string) $payload['reference_type'])
+            ->where('detection_method', $detectionMethod)
+            ->whereIn('status', ['OPEN', 'IN_REVIEW']);
+
+        $this->applyNullableConstraint($fallback, 'item_id', $payload['item_id'] ?? null);
+        $this->applyNullableConstraint($fallback, 'office_id', $payload['office_id'] ?? null);
+
+        return $fallback
+            ->latest('detected_at')
+            ->latest('anomaly_id')
+            ->first();
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function refreshExistingAnomaly(Anomaly $existing, array $payload): Anomaly
+    {
+        $existing->forceFill([
+            'reference_type' => (string) ($payload['reference_type'] ?? $existing->reference_type),
+            'reference_id' => (int) ($payload['reference_id'] ?? $existing->reference_id),
+            'item_id' => $payload['item_id'] ?? $existing->item_id,
+            'office_id' => $payload['office_id'] ?? $existing->office_id,
+            'detected_value' => $payload['detected_value'] ?? $existing->detected_value,
+            'expected_value' => $payload['expected_value'] ?? $existing->expected_value,
+            'threshold_value' => $payload['threshold_value'] ?? $existing->threshold_value,
+            'z_score' => $payload['z_score'] ?? $existing->z_score,
+            'severity' => strtoupper((string) ($payload['severity'] ?? $existing->severity ?? 'MEDIUM')),
+            'detected_at' => $payload['detected_at'] ?? now(),
+            'remarks' => $payload['remarks'] ?? $existing->remarks,
+        ])->save();
+
+        return $existing->fresh() ?? $existing;
+    }
+
+    private function applyNullableConstraint(Builder|QueryBuilder $query, string $column, mixed $value): void
+    {
+        if ($value === null || $value === '') {
+            $query->whereNull($column);
+
+            return;
+        }
+
+        $query->where($column, $value);
     }
 
     private function assertExecutive(User $actor): void

@@ -50,6 +50,9 @@ type Props = {
         status: string;
         detected_at?: string | null;
         office?: { id: number; name: string } | null;
+        reference_type?: string | null;
+        reference_id?: number | null;
+        item_id?: number | null;
     }>;
     recent_alerts: Array<{
         alerts_id: number;
@@ -131,6 +134,8 @@ export default function ExecutiveDashboardIndex({
             return status !== 'PUBLISHED' && status !== 'DRAFT';
         })
         .reduce((total, row) => total + row.total, 0);
+
+    const recentAnomalyGroups = buildDashboardAnomalyGroups(recent_anomalies).slice(0, 5);
 
     const exportCsv = () => {
         const lines = [
@@ -295,18 +300,20 @@ export default function ExecutiveDashboardIndex({
                                     <thead className="bg-slate-50">
                                         <tr>
                                             <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Type</th>
+                                            <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Related Records</th>
                                             <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Severity</th>
                                             <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Office</th>
                                             <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Status</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {recent_anomalies.slice(0, 5).map((row) => (
-                                            <tr key={row.anomaly_id}>
-                                                <td className="px-4 py-2 text-slate-700">{formatAnomalyType(row.anomaly_type)}</td>
-                                                <td className="px-4 py-2">{SeverityBadge(row.severity)}</td>
-                                                <td className="px-4 py-2 text-slate-700">{row.office?.name ?? 'N/A'}</td>
-                                                <td className="px-4 py-2">{StatusBadge(row.status)}</td>
+                                        {recentAnomalyGroups.map((group) => (
+                                            <tr key={group.key}>
+                                                <td className="px-4 py-2 text-slate-700">{group.label}</td>
+                                                <td className="px-4 py-2 text-slate-700">{group.count}</td>
+                                                <td className="px-4 py-2">{SeverityBadge(group.representative.severity)}</td>
+                                                <td className="px-4 py-2 text-slate-700">{group.office}</td>
+                                                <td className="px-4 py-2">{StatusBadge(group.representative.status)}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -396,13 +403,58 @@ function formatStatusLabel(value: string): string {
 
 function formatAnomalyType(value: string): string {
     const aliases: Record<string, string> = {
-        PRICE_Z_SCORE: 'Procurement Price Anomaly',
+        PRICE_Z_SCORE: 'Price Anomaly',
+        PRICE_ANOMALY: 'Price Anomaly',
+        Z_SCORE_PRICE_ANOMALY: 'Price Anomaly',
         FREQUENT_REQUEST_WINDOW: 'Frequent Request Spike',
+        FREQUENT_REQUEST_SPIKE: 'Frequent Request Spike',
+        EXCESSIVE_QUANTITY: 'Excessive Quantity Anomaly',
         PPMP_OVER_REQUEST: 'PPMP Over-Request',
+        PPMP_EARLY_DEPLETION: 'PPMP Early Depletion',
+        PPMP_FREQUENCY_IRREGULARITY: 'PPMP Frequency Irregularity',
     };
 
-    const raw = aliases[value] ?? value;
+    const normalized = value.toUpperCase();
+    const raw = aliases[normalized] ?? value;
     return raw.replaceAll('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function buildDashboardAnomalyGroups(rows: Props['recent_anomalies']): Array<{ key: string; label: string; office: string; count: number; representative: Props['recent_anomalies'][number] }> {
+    const grouped = new Map<string, { key: string; label: string; office: string; count: number; representative: Props['recent_anomalies'][number]; timestamp: number }>();
+
+    rows.forEach((row) => {
+        const office = row.office?.name ?? 'N/A';
+        const sourceType = row.reference_type ? row.reference_type.split('\\').pop() ?? 'Source' : 'Source';
+        const itemPart = row.item_id ? `item-${row.item_id}` : 'item-na';
+        const key = `${row.anomaly_type}|${office}|${sourceType}|${itemPart}`;
+        const timestamp = row.detected_at ? new Date(row.detected_at).getTime() : 0;
+
+        const existing = grouped.get(key);
+
+        if (!existing) {
+            grouped.set(key, {
+                key,
+                label: formatAnomalyType(row.anomaly_type),
+                office,
+                count: 1,
+                representative: row,
+                timestamp: Number.isNaN(timestamp) ? 0 : timestamp,
+            });
+
+            return;
+        }
+
+        existing.count += 1;
+
+        if ((Number.isNaN(timestamp) ? 0 : timestamp) >= existing.timestamp) {
+            existing.timestamp = Number.isNaN(timestamp) ? 0 : timestamp;
+            existing.representative = row;
+        }
+    });
+
+    return [...grouped.values()]
+        .sort((a, b) => (b.count - a.count) || (b.timestamp - a.timestamp))
+        .map(({ key, label, office, count, representative }) => ({ key, label, office, count, representative }));
 }
 
 function MetricCard({ label, value }: { label: string; value: number | string }) {
