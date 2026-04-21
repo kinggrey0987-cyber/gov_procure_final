@@ -63,7 +63,35 @@ class DeliveryController
     {
         abort_unless(auth()->user()->can('delivery.view', $delivery), 403);
 
-        $delivery->load(['purchaseOrder', 'supplier', 'receiver', 'items.item', 'verifications.verifier']);
+        $delivery->load(['purchaseOrder', 'supplier', 'receiver', 'items.purchaseOrderItem.item', 'verifications.verifier']);
+
+        $items = collect();
+        if ($delivery->relationLoaded('items') && $delivery->items instanceof \Illuminate\Database\Eloquent\Collection) {
+            $items = $delivery->items->map(fn ($item): array => [
+                'delivery_item_id' => (int) $item->delivery_item_id,
+                'expected_quantity' => (float) $item->expected_quantity,
+                'received_quantity' => (float) $item->received_quantity,
+                'damaged_quantity' => (float) $item->damaged_quantity,
+                'missing_quantity' => (float) $item->missing_quantity,
+                'item_condition' => $item->item_condition,
+                'item' => ($item->relationLoaded('purchaseOrderItem') && $item->purchaseOrderItem && $item->purchaseOrderItem->relationLoaded('item') && $item->purchaseOrderItem->item) ? [
+                    'item_name' => (string) $item->purchaseOrderItem->item->item_name,
+                ] : null,
+            ])->values();
+        }
+
+        $verifications = collect();
+        if ($delivery->relationLoaded('verifications') && $delivery->verifications instanceof \Illuminate\Database\Eloquent\Collection) {
+            $verifications = $delivery->verifications->map(fn ($verification): array => [
+                'delivery_verification_id' => (int) $verification->delivery_verification_id,
+                'verification_status' => (string) $verification->verification_status,
+                'verification_date' => optional($verification->verification_date)?->toDateString(),
+                'discrepancy_notes' => $verification->discrepancy_notes,
+                'verifier' => ($verification->relationLoaded('verifier') && $verification->verifier) ? [
+                    'name' => (string) $verification->verifier->name,
+                ] : null,
+            ])->values();
+        }
 
         return Inertia::render('Inventory/Delivery/Show', [
             'delivery' => [
@@ -83,26 +111,8 @@ class DeliveryController
                 'receiver' => $delivery->receiver ? [
                     'name' => (string) $delivery->receiver->name,
                 ] : null,
-                'items' => $delivery->items->map(fn ($item): array => [
-                    'delivery_item_id' => (int) $item->delivery_item_id,
-                    'expected_quantity' => (float) $item->expected_quantity,
-                    'received_quantity' => (float) $item->received_quantity,
-                    'damaged_quantity' => (float) $item->damaged_quantity,
-                    'missing_quantity' => (float) $item->missing_quantity,
-                    'item_condition' => $item->item_condition,
-                    'item' => $item->item ? [
-                        'item_name' => (string) $item->item->item_name,
-                    ] : null,
-                ])->values(),
-                'verifications' => $delivery->verifications->map(fn ($verification): array => [
-                    'delivery_verification_id' => (int) $verification->delivery_verification_id,
-                    'verification_status' => (string) $verification->verification_status,
-                    'verification_date' => optional($verification->verification_date)?->toDateString(),
-                    'discrepancy_notes' => $verification->discrepancy_notes,
-                    'verifier' => $verification->verifier ? [
-                        'name' => (string) $verification->verifier->name,
-                    ] : null,
-                ])->values(),
+                'items' => $items->values(),
+                'verifications' => $verifications->values(),
             ],
         ]);
     }
