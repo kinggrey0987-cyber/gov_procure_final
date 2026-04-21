@@ -30,14 +30,30 @@ class PurchaseOrderController extends Controller
     {
         abort_unless($request->user()?->can('procurement.purchase-order.view-any'), 403);
 
+        $status = strtoupper(trim((string) $request->input('status', '')));
+        $search = trim((string) $request->input('search', ''));
+
         $purchaseOrders = PurchaseOrder::query()
             ->with(['purchaseRequest.office', 'supplyRequest', 'supplier'])
             ->withCount('deliveries')
+            ->when($status !== '', fn ($query) => $query->where('status', $status))
+            ->when($search !== '', function ($query) use ($search): void {
+                $query->where(function ($nested) use ($search): void {
+                    $nested->where('po_number', 'like', '%'.$search.'%')
+                        ->orWhereHas('supplier', fn ($supplierQuery) => $supplierQuery->where('supplier_name', 'like', '%'.$search.'%'))
+                        ->orWhereHas('purchaseRequest.office', fn ($officeQuery) => $officeQuery->where('name', 'like', '%'.$search.'%'));
+                });
+            })
             ->latest('purchase_order_id')
-            ->paginate(15);
+            ->paginate(15)
+            ->withQueryString();
 
         return Inertia::render('Procurement/PurchaseOrders/Index', [
             'purchaseOrders' => $purchaseOrders,
+            'filters' => [
+                'status' => $status,
+                'search' => $search,
+            ],
         ]);
     }
 
@@ -51,6 +67,7 @@ class PurchaseOrderController extends Controller
                 'office:id,code,name',
                 'supplyRequest:supply_request_id,request_code,requested_by',
                 'supplyRequest.requester:id,name',
+                'items.item.category:item_category_id,category_name',
             ])
             ->latest('purchase_request_id')
             ->get(['purchase_request_id', 'supply_request_id', 'office_id', 'status', 'requested_by', 'created_at'])
@@ -71,6 +88,13 @@ class PurchaseOrderController extends Controller
                     'id' => (int) $purchaseRequest->supplyRequest->requester->id,
                     'name' => (string) $purchaseRequest->supplyRequest->requester->name,
                 ] : null,
+                'items' => $purchaseRequest->items->map(fn ($item): array => [
+                    'purchase_request_item_id' => (int) $item->purchase_request_item_id,
+                    'item_name' => (string) ($item->item?->item_name ?? 'Unknown item'),
+                    'category_name' => (string) ($item->item?->category?->category_name ?? 'Uncategorized'),
+                    'quantity_requested' => (float) ($item->quantity_requested ?? 0),
+                    'remarks' => $item->remarks,
+                ])->values(),
             ])
             ->values();
 
@@ -141,11 +165,22 @@ class PurchaseOrderController extends Controller
             ])->values();
 
         return Inertia::render('Procurement/PurchaseOrders/Show', [
-            'purchaseOrder' => $purchaseOrder->load(['items', 'supplier', 'creator', 'purchaseRequest', 'supplyRequest']),
+            'purchaseOrder' => $purchaseOrder->load([
+                'items.item.category',
+                'supplier',
+                'creator',
+                'purchaseRequest.office',
+                'supplyRequest.requester',
+            ]),
             'attachments' => $documents,
             'attachmentPermissions' => [
                 'upload' => $request->user()?->can('procurement.purchase-order.view', $purchaseOrder) ?? false,
                 'delete' => $request->user()?->can('procurement.purchase-order.view', $purchaseOrder) ?? false,
+            ],
+            'permissions' => [
+                'edit' => $request->user()?->can('procurement.purchase-order.update', $purchaseOrder) ?? false,
+                'manageItems' => $request->user()?->can('procurement.purchase-order.update', $purchaseOrder) ?? false,
+                'place' => $request->user()?->can('procurement.purchase-order.place', $purchaseOrder) ?? false,
             ],
             'statusHistory' => $history['status']->map(fn ($entry): array => [
                 'id' => (int) $entry->id,

@@ -19,6 +19,13 @@ type PurchaseRequestOption = {
         id: number;
         name: string;
     } | null;
+    items: Array<{
+        purchase_request_item_id: number;
+        item_name: string;
+        category_name: string;
+        quantity_requested: number;
+        remarks?: string | null;
+    }>;
 };
 
 type SupplierOption = {
@@ -52,6 +59,8 @@ export default function PurchaseOrdersCreate({ eligiblePurchaseRequests, supplie
     const hasEligiblePurchaseRequests = eligiblePurchaseRequests.length > 0;
     const hasSuppliers = suppliers.length > 0;
     const canSubmit = hasEligiblePurchaseRequests && hasSuppliers && !form.processing;
+    const selectedItems = selectedPurchaseRequest?.items ?? [];
+    const selectedTotalQty = selectedItems.reduce((sum, row) => sum + Number(row.quantity_requested ?? 0), 0);
 
     // Warn before leaving if form has unsaved changes
     useEffect(() => {
@@ -157,6 +166,54 @@ export default function PurchaseOrdersCreate({ eligiblePurchaseRequests, supplie
                                     label="Linked Supply Request"
                                     value={selectedPurchaseRequest?.supply_request?.supply_request_id ? `#${selectedPurchaseRequest.supply_request.supply_request_id}` : 'N/A'}
                                 />
+                            </div>
+                        </section>
+
+                        <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                                <div>
+                                    <p className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Requested Item Context</p>
+                                    <p className="mt-1 text-sm text-slate-700">Review requested lines before creating the PO. Final vendor pricing is encoded in the next step (<span className="font-semibold">Manage Items</span>) after PO creation.</p>
+                                </div>
+                                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-right">
+                                    <p className="text-xs uppercase tracking-wide text-slate-500">Line Count</p>
+                                    <p className="text-base font-semibold text-slate-800">{selectedItems.length}</p>
+                                    <p className="mt-1 text-xs uppercase tracking-wide text-slate-500">Total Quantity</p>
+                                    <p className="text-base font-semibold text-slate-800">{selectedTotalQty.toFixed(2)}</p>
+                                </div>
+                            </div>
+
+                            <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                                <table className="min-w-full divide-y divide-slate-200 text-sm">
+                                    <thead className="bg-slate-50">
+                                        <tr>
+                                            <th className="px-3 py-2 text-left font-semibold text-slate-700">Item</th>
+                                            <th className="px-3 py-2 text-left font-semibold text-slate-700">Category</th>
+                                            <th className="px-3 py-2 text-left font-semibold text-slate-700">Qty Requested</th>
+                                            <th className="px-3 py-2 text-left font-semibold text-slate-700">Cost</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {selectedItems.map((row) => (
+                                            <tr key={row.purchase_request_item_id}>
+                                                <td className="px-3 py-2 text-slate-900">
+                                                    <p className="font-medium">{row.item_name}</p>
+                                                    <p className="text-xs text-slate-500">{row.remarks || 'No line remarks'}</p>
+                                                </td>
+                                                <td className="px-3 py-2 text-slate-700">{row.category_name || 'Uncategorized'}</td>
+                                                <td className="px-3 py-2 text-slate-700">{Number(row.quantity_requested ?? 0).toFixed(2)}</td>
+                                                <td className="px-3 py-2 text-slate-600">To be encoded upon supplier quote (Manage Items)</td>
+                                            </tr>
+                                        ))}
+                                        {selectedItems.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={4} className="px-3 py-6 text-center text-slate-500">
+                                                    No request items loaded for this source.
+                                                </td>
+                                            </tr>
+                                        ) : null}
+                                    </tbody>
+                                </table>
                             </div>
                         </section>
 

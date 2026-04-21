@@ -24,15 +24,31 @@ class PurchaseRequestController extends Controller
     {
         abort_unless($request->user()?->can('procurement.purchase-request.view-any'), 403);
 
+        $status = strtoupper(trim((string) $request->input('status', '')));
+        $search = trim((string) $request->input('search', ''));
+
         $purchaseRequests = PurchaseRequest::query()
             ->with(['office', 'requester', 'supplyRequest', 'items.item.category'])
             ->withCount('items')
             ->withSum('items', 'quantity_requested')
+            ->when($status !== '', fn ($query) => $query->where('status', $status))
+            ->when($search !== '', function ($query) use ($search): void {
+                $query->where(function ($nested) use ($search): void {
+                    $nested->where('purchase_request_id', 'like', '%'.$search.'%')
+                        ->orWhereHas('supplyRequest', fn ($supplyRequestQuery) => $supplyRequestQuery->where('request_code', 'like', '%'.$search.'%'))
+                        ->orWhereHas('office', fn ($officeQuery) => $officeQuery->where('name', 'like', '%'.$search.'%'));
+                });
+            })
             ->latest('purchase_request_id')
-            ->paginate(15);
+            ->paginate(15)
+            ->withQueryString();
 
         return Inertia::render('Procurement/PurchaseRequests/Index', [
             'purchaseRequests' => $purchaseRequests,
+            'filters' => [
+                'status' => $status,
+                'search' => $search,
+            ],
         ]);
     }
 
@@ -40,8 +56,22 @@ class PurchaseRequestController extends Controller
     {
         abort_unless($request->user()?->can('procurement.purchase-request.view', $purchaseRequest), 403);
 
+        $mode = strtolower(trim((string) $request->input('mode', 'view')));
+        $isReviewMode = $mode === 'review';
+
         return Inertia::render('Procurement/PurchaseRequests/Show', [
-            'purchaseRequest' => $purchaseRequest->load(['items', 'office', 'requester', 'supplyRequest']),
+            'purchaseRequest' => $purchaseRequest->load([
+                'items.item.category',
+                'office',
+                'requester',
+                'supplyRequest.requester',
+            ]),
+            'reviewMode' => $isReviewMode,
+            'permissions' => [
+                'update' => $request->user()?->can('procurement.purchase-request.update', $purchaseRequest) ?? false,
+                'manageItems' => $request->user()?->can('procurement.purchase-request.update', $purchaseRequest) ?? false,
+                'process' => $request->user()?->can('procurement.purchase-request.process', $purchaseRequest) ?? false,
+            ],
         ]);
     }
 

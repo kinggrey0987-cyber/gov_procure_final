@@ -13,29 +13,66 @@ type Supplier = {
 
 type Props = {
     supplier: Supplier;
+    permissions?: {
+        update?: boolean;
+    };
 };
 
-export default function SuppliersShow({ supplier }: Props) {
+export default function SuppliersShow({ supplier, permissions }: Props) {
     return (
         <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Supplier</h2>}>
             <Head title="Supplier" />
 
             <div className="py-10">
-                <div className="mx-auto max-w-4xl space-y-4 px-4 sm:px-6 lg:px-8">
-                    <div className="rounded-lg border bg-white p-6 text-sm">
-                        <p><strong>Name:</strong> {supplier.supplier_name}</p>
-                        <p><strong>Contact Person:</strong> {supplier.contact_person ?? '-'}</p>
-                        <p><strong>Email:</strong> {supplier.email ?? '-'}</p>
-                        <p><strong>Phone:</strong> {supplier.phone ?? '-'}</p>
-                        <p><strong>Address:</strong> {supplier.address ?? '-'}</p>
-                        <p><strong>Status:</strong> {supplier.status}</p>
-                    </div>
+                <div className="mx-auto max-w-5xl space-y-4 px-4 sm:px-6 lg:px-8">
+                    <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                                <p className="text-xs uppercase tracking-[0.15em] text-slate-500">Supplier Profile</p>
+                                <h3 className="mt-1 text-xl font-semibold text-slate-900">{supplier.supplier_name}</h3>
+                            </div>
+                            <span className={statusClass(supplier.status)}>{supplier.status}</span>
+                        </div>
 
-                    <Link href={route('procurement.suppliers.edit', supplier.supplier_id)} className="rounded bg-indigo-600 px-4 py-2 text-sm text-white">
-                        Edit Supplier
-                    </Link>
+                        <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
+                            <Info label="Contact Person" value={supplier.contact_person ?? '-'} />
+                            <Info label="Email" value={supplier.email ?? '-'} />
+                            <Info label="Phone" value={supplier.phone ?? '-'} />
+                            <Info label="Address" value={supplier.address ?? '-'} />
+                        </dl>
+                    </section>
+
+                    <div className="flex flex-wrap gap-3">
+                        {permissions?.update ? (
+                            <Link href={route('procurement.suppliers.edit', supplier.supplier_id)} className="rounded bg-indigo-600 px-4 py-2 text-sm text-white">
+                                Edit Supplier
+                            </Link>
+                        ) : null}
+                        <Link href={route('procurement.suppliers.index')} className="rounded border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                            Back to Suppliers
+                        </Link>
+                    </div>
                 </div>
             </div>
         </AuthenticatedLayout>
     );
+}
+
+function Info({ label, value }: { label: string; value: string }) {
+    return (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+            <dt className="text-xs uppercase tracking-wide text-slate-500">{label}</dt>
+            <dd className="mt-1 font-medium text-slate-800">{value}</dd>
+        </div>
+    );
+}
+
+function statusClass(status: string) {
+    const base = 'inline-flex rounded-full px-2.5 py-1 text-xs font-semibold';
+    const map: Record<string, string> = {
+        ACTIVE: `${base} bg-emerald-100 text-emerald-700`,
+        INACTIVE: `${base} bg-slate-200 text-slate-700`,
+    };
+
+    return map[status] ?? `${base} bg-slate-100 text-slate-700`;
 }

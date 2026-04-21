@@ -1,7 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import useSmartRefresh from '@/hooks/useSmartRefresh';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { FormEvent, ReactNode, useCallback, useMemo, useState } from 'react';
+import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 type PpmpOption = {
     ppmp_id: number;
@@ -132,20 +132,28 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
         await fetchPpmpItems(value);
     };
 
+    const selectedPpmpIdRef = useRef(form.data.ppmp_id);
+
+    useEffect(() => {
+        selectedPpmpIdRef.current = form.data.ppmp_id;
+    }, [form.data.ppmp_id]);
+
+    const handleReferenceRefresh = useCallback(async () => {
+        await new Promise<void>((resolve) => {
+            router.reload({
+                only: ['ppmpOptions', 'requestDate'],
+                onFinish: () => resolve(),
+            });
+        });
+
+        if (selectedPpmpIdRef.current) {
+            await fetchPpmpItems(selectedPpmpIdRef.current);
+        }
+    }, [fetchPpmpItems]);
+
     const { isRefreshing, lastRefreshedAt, refreshNow } = useSmartRefresh({
         only: ['ppmpOptions', 'requestDate'],
-        onRefresh: async () => {
-            await new Promise<void>((resolve) => {
-                router.reload({
-                    only: ['ppmpOptions', 'requestDate'],
-                    onFinish: () => resolve(),
-                });
-            });
-
-            if (form.data.ppmp_id) {
-                await fetchPpmpItems(form.data.ppmp_id);
-            }
-        },
+        onRefresh: handleReferenceRefresh,
         refreshOnFocus: true,
         refreshOnMount: true,
     });
@@ -235,6 +243,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                 value={form.data.needed_by_date}
                                 onChange={(event) => form.setData('needed_by_date', event.target.value)}
                             />
+                            {form.errors.needed_by_date ? <p className="mt-1 text-xs text-rose-600">{form.errors.needed_by_date}</p> : null}
                         </Field>
 
                         <Field label="Request Category">
@@ -248,6 +257,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                 <option value="IT_EQUIPMENT">IT Equipment</option>
                                 <option value="FACILITY">Facility</option>
                             </select>
+                            {form.errors.request_category ? <p className="mt-1 text-xs text-rose-600">{form.errors.request_category}</p> : null}
                         </Field>
 
                         <Field label="Priority Level">
@@ -261,6 +271,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                 <option value="HIGH">High</option>
                                 <option value="URGENT">Urgent</option>
                             </select>
+                            {form.errors.priority_level ? <p className="mt-1 text-xs text-rose-600">{form.errors.priority_level}</p> : null}
                         </Field>
                     </div>
 
@@ -271,6 +282,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                 value={form.data.purpose}
                                 onChange={(event) => form.setData('purpose', event.target.value)}
                             />
+                            {form.errors.purpose ? <p className="mt-1 text-xs text-rose-600">{form.errors.purpose}</p> : null}
                         </Field>
                         <Field label="Notes (Optional)">
                             <textarea
@@ -278,6 +290,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                 value={form.data.review_notes}
                                 onChange={(event) => form.setData('review_notes', event.target.value)}
                             />
+                            {form.errors.review_notes ? <p className="mt-1 text-xs text-rose-600">{form.errors.review_notes}</p> : null}
                         </Field>
                     </div>
                 </section>
@@ -328,6 +341,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                                     </option>
                                                 ))}
                                             </select>
+                                            {form.errors[`items.${index}.ppmp_item_id`] ? <p className="mt-1 text-xs text-rose-600">{form.errors[`items.${index}.ppmp_item_id`]}</p> : null}
                                         </Field>
 
                                         <Field label="Item Snapshot" hint="Auto-filled from the selected PPMP item.">
@@ -347,6 +361,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                                 onChange={(event) => updateItem(index, { quantity_requested: event.target.value })}
                                                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                                             />
+                                            {form.errors[`items.${index}.quantity_requested`] ? <p className="mt-1 text-xs text-rose-600">{form.errors[`items.${index}.quantity_requested`]}</p> : null}
                                         </Field>
 
                                     </div>
@@ -385,6 +400,13 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                 </section>
 
                 <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                    {Object.keys(form.errors).length > 0 ? (
+                        <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                            <p className="font-semibold">Unable to save supply request.</p>
+                            <p className="mt-1">Please fix the highlighted fields and submit again.</p>
+                        </div>
+                    ) : null}
+
                     <div className="flex justify-end gap-2">
                         <Link
                             href={route('office.supply-requests.index')}

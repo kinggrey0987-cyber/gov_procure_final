@@ -1,6 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import useSmartRefresh from '@/hooks/useSmartRefresh';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
+import { FormEvent } from 'react';
 
 type PurchaseRequestRow = {
     purchase_request_id: number;
@@ -30,15 +31,37 @@ type Props = {
             active: boolean;
         }>;
     };
+    filters?: {
+        status?: string;
+        search?: string;
+    };
 };
 
-export default function PurchaseRequestsIndex({ purchaseRequests }: Props) {
+export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Props) {
     const { isRefreshing, lastRefreshedAt } = useSmartRefresh({
         only: ['purchaseRequests'],
         refreshOnFocus: true,
         refreshOnMount: true,
         pollIntervalMs: 30000,
     });
+
+    const filterForm = useForm({
+        status: filters?.status ?? '',
+        search: filters?.search ?? '',
+    });
+
+    const submitFilters = (event: FormEvent) => {
+        event.preventDefault();
+
+        router.get(route('procurement.purchase-requests.index'), filterForm.data, {
+            preserveState: true,
+            replace: true,
+        });
+    };
+
+    const resetFilters = () => {
+        router.get(route('procurement.purchase-requests.index'));
+    };
 
     return (
         <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Request Review</h2>}>
@@ -54,6 +77,41 @@ export default function PurchaseRequestsIndex({ purchaseRequests }: Props) {
                             ? `Updated ${lastRefreshedAt.toLocaleTimeString()}`
                             : 'Auto-refresh every 30 seconds while this page is open'}
                     </p>
+                </section>
+
+                <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <form onSubmit={submitFilters} className="grid gap-3 md:grid-cols-5">
+                        <select
+                            value={filterForm.data.status}
+                            onChange={(event) => filterForm.setData('status', event.target.value)}
+                            className="rounded-lg border-slate-300 text-sm"
+                        >
+                            <option value="">All Statuses</option>
+                            <option value="OPEN">Open</option>
+                            <option value="PROCESSING">Processing</option>
+                            <option value="APPROVED">Approved</option>
+                            <option value="REJECTED">Rejected</option>
+                        </select>
+
+                        <input
+                            type="text"
+                            value={filterForm.data.search}
+                            onChange={(event) => filterForm.setData('search', event.target.value)}
+                            placeholder="Search request code, office, or PR ID"
+                            className="md:col-span-2 rounded-lg border-slate-300 text-sm"
+                        />
+
+                        <button type="submit" className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
+                            Apply
+                        </button>
+                        <button
+                            type="button"
+                            onClick={resetFilters}
+                            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                            Reset
+                        </button>
+                    </form>
                 </section>
 
                 <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -94,14 +152,12 @@ export default function PurchaseRequestsIndex({ purchaseRequests }: Props) {
                                                 <Link href={route('procurement.purchase-requests.show', row.purchase_request_id)} className="text-sm font-semibold text-red-700 hover:text-red-900">
                                                     View
                                                 </Link>
-                                                <Link href={route('procurement.purchase-requests.show', row.purchase_request_id)} className="text-sm font-semibold text-slate-700 hover:text-slate-900">
+                                                <Link
+                                                    href={route('procurement.purchase-requests.show', { purchase_request: row.purchase_request_id, mode: 'review' })}
+                                                    className="text-sm font-semibold text-slate-700 hover:text-slate-900"
+                                                >
                                                     Review
                                                 </Link>
-                                                {row.status === 'OPEN' ? (
-                                                    <Link href={route('procurement.purchase-requests.show', row.purchase_request_id)} className="text-sm font-semibold text-emerald-700 hover:text-emerald-900">
-                                                        Forward
-                                                    </Link>
-                                                ) : null}
                                             </div>
                                         </td>
                                     </tr>

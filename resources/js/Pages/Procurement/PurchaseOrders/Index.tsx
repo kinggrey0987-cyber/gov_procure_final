@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
+import { FormEvent } from 'react';
 
 type PurchaseOrderRow = {
     purchase_order_id: number;
@@ -28,9 +29,31 @@ type Props = {
             active: boolean;
         }>;
     };
+    filters?: {
+        status?: string;
+        search?: string;
+    };
 };
 
-export default function PurchaseOrdersIndex({ purchaseOrders }: Props) {
+export default function PurchaseOrdersIndex({ purchaseOrders, filters }: Props) {
+    const filterForm = useForm({
+        status: filters?.status ?? '',
+        search: filters?.search ?? '',
+    });
+
+    const submitFilters = (event: FormEvent) => {
+        event.preventDefault();
+
+        router.get(route('procurement.purchase-orders.index'), filterForm.data, {
+            preserveState: true,
+            replace: true,
+        });
+    };
+
+    const resetFilters = () => {
+        router.get(route('procurement.purchase-orders.index'));
+    };
+
     return (
         <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Purchase Orders</h2>}>
             <Head title="Purchase Orders" />
@@ -41,6 +64,40 @@ export default function PurchaseOrdersIndex({ purchaseOrders }: Props) {
                     <Link href={route('procurement.purchase-orders.create')} className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
                         Create PO
                     </Link>
+                </section>
+
+                <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <form onSubmit={submitFilters} className="grid gap-3 md:grid-cols-5">
+                        <select
+                            value={filterForm.data.status}
+                            onChange={(event) => filterForm.setData('status', event.target.value)}
+                            className="rounded-lg border-slate-300 text-sm"
+                        >
+                            <option value="">All Statuses</option>
+                            <option value="DRAFT">Draft</option>
+                            <option value="PLACED">Placed</option>
+                            <option value="COMPLETED">Completed</option>
+                        </select>
+
+                        <input
+                            type="text"
+                            value={filterForm.data.search}
+                            onChange={(event) => filterForm.setData('search', event.target.value)}
+                            placeholder="Search PO number, supplier, office"
+                            className="md:col-span-2 rounded-lg border-slate-300 text-sm"
+                        />
+
+                        <button type="submit" className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
+                            Apply
+                        </button>
+                        <button
+                            type="button"
+                            onClick={resetFilters}
+                            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                            Reset
+                        </button>
+                    </form>
                 </section>
 
                 <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -71,21 +128,28 @@ export default function PurchaseOrdersIndex({ purchaseOrders }: Props) {
                                     </td>
                                     <td className="px-4 py-3 text-slate-600">{formatDate(row.created_at)}</td>
                                     <td className="px-4 py-3 text-right">
-                                        <div className="flex justify-end gap-3">
-                                            <Link href={route('procurement.purchase-orders.show', row.purchase_order_id)} className="text-sm font-semibold text-red-700 hover:text-red-900">
+                                        <div className="flex flex-wrap justify-end gap-2">
+                                            <Link href={route('procurement.purchase-orders.show', row.purchase_order_id)} className="rounded border border-red-300 px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-50">
                                                 View
                                             </Link>
-                                            <Link href={route('procurement.purchase-orders.edit', row.purchase_order_id)} className="text-sm font-semibold text-slate-700 hover:text-slate-900">
-                                                Update Status
-                                            </Link>
-                                            <span className="text-sm font-semibold text-slate-400" title="No direct mark-complete route is available in current backend workflow.">
-                                                Mark Complete
-                                            </span>
-                                            {Number(row.deliveries_count ?? 0) > 0 ? (
-                                                <Link href={route('procurement.purchase-orders.show', row.purchase_order_id)} className="text-sm font-semibold text-blue-700 hover:text-blue-900">
-                                                    Delivery Link
+                                            {row.status === 'DRAFT' ? (
+                                                <Link href={route('procurement.purchase-orders.edit', row.purchase_order_id)} className="rounded border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                                                    Update Header
                                                 </Link>
                                             ) : null}
+                                            {row.status === 'DRAFT' ? (
+                                                <Link href={route('procurement.purchase-orders.items.index', row.purchase_order_id)} className="rounded border border-emerald-300 px-3 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50">
+                                                    Manage Items
+                                                </Link>
+                                            ) : null}
+                                            <span
+                                                className={`rounded px-3 py-1 text-xs font-semibold ${Number(row.deliveries_count ?? 0) > 0 ? 'border border-blue-300 text-blue-700' : 'border border-slate-200 text-slate-500'}`}
+                                            >
+                                                Deliveries: {Number(row.deliveries_count ?? 0)}
+                                            </span>
+                                            <Link href={route('procurement.purchase-orders.records')} className="rounded border border-amber-300 px-3 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-50">
+                                                Tracking Records
+                                            </Link>
                                         </div>
                                     </td>
                                 </tr>

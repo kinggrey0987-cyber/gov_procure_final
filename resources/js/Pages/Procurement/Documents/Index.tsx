@@ -160,6 +160,16 @@ export default function ProcurementDocumentsIndex({
                         </div>
 
                         <div className="space-y-4 p-6">
+                            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                                <p className="font-semibold">Document scope and publishing flow</p>
+                                <ul className="mt-2 list-disc space-y-1 pl-5 text-amber-800">
+                                    <li>Accepted files: PDF, DOC, DOCX, XLS, XLSX, CSV, PNG, JPG, JPEG.</li>
+                                    <li>Maximum file size: 10 MB per upload.</li>
+                                    <li>This BAC repository is internal. Uploaded files do not automatically become public disclosures.</li>
+                                    <li>Executive users can later prepare and publish public disclosures through the Executive module, then attach selected disclosure documents for public release.</li>
+                                </ul>
+                            </div>
+
                             <form onSubmit={submitFilters} className="grid gap-3 md:grid-cols-5">
                                 <select
                                     className="rounded-lg border-red-200 text-sm"

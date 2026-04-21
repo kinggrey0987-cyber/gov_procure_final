@@ -47,6 +47,7 @@ class HandleInertiaRequests extends Middleware
                     'email' => $user->email,
                     'role_code' => $roleCode,
                     'office_id' => $user->office_id,
+                    'office_name' => $user->office?->name,
                 ] : null,
                 'can' => $domainAccess,
             ],

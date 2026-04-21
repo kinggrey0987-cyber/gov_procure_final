@@ -181,7 +181,7 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Needed By</th>
                                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Stock Assessment</th>
                                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Progress</th>
-                                <th className="px-4 py-3 text-right font-semibold text-slate-700">Action</th>
+                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Action</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -211,11 +211,11 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                                         <p className="text-xs text-slate-500">Workflow: {displayWorkflowBucket(request.workflow_bucket)}</p>
                                         <p className="text-xs text-slate-500">Distribution records: {request.distribution_records_count}</p>
                                     </td>
-                                    <td className="px-4 py-3 text-right">
-                                        <div className="space-y-1">
+                                    <td className="px-4 py-3 align-top">
+                                        <div className="flex min-w-[220px] flex-col items-start gap-2">
                                             <Link
                                                 href={route('inventory.office-supply-requests.show', request.supply_request_id)}
-                                                className="inline-block text-xs font-semibold text-slate-600 hover:text-slate-800"
+                                                className="inline-flex rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                                             >
                                                 View Full Request
                                             </Link>
@@ -225,18 +225,18 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                                                     type="button"
                                                     disabled={processingRequestId === request.supply_request_id}
                                                     onClick={() => processDistribution(request.supply_request_id)}
-                                                    className="text-sm font-semibold text-red-700 hover:text-red-900 disabled:cursor-not-allowed disabled:opacity-60"
+                                                    className="inline-flex rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-100 hover:text-red-900 disabled:cursor-not-allowed disabled:opacity-60"
                                                 >
                                                     {processingRequestId === request.supply_request_id ? 'Opening Supply Distribution...' : 'Process Distribution'}
                                                 </button>
                                             ) : request.has_purchase_request ? (
-                                                <span className="text-sm font-semibold text-slate-500">Queued for Procurement</span>
+                                                <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">Queued for Procurement</span>
                                             ) : (
                                                 <button
                                                     type="button"
                                                     disabled={queueingRequestId === request.supply_request_id}
                                                     onClick={() => queueProcurement(request.supply_request_id)}
-                                                    className="text-sm font-semibold text-rose-700 hover:text-rose-900"
+                                                    className="inline-flex rounded-md border border-rose-200 bg-rose-50 px-3 py-1.5 text-sm font-semibold text-rose-700 hover:bg-rose-100 hover:text-rose-900 disabled:cursor-not-allowed disabled:opacity-60"
                                                 >
                                                     {queueingRequestId === request.supply_request_id ? 'Initiating...' : 'Initiate Purchase Request'}
                                                 </button>

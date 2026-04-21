@@ -19,6 +19,7 @@ type AuthUser = {
     name: string;
     email: string;
     role_code?: string;
+    office_name?: string | null;
 };
 
 type NotificationState = {
@@ -441,6 +442,9 @@ export default function Authenticated({
             .replaceAll('_', ' ')
             .toLowerCase()
             .replace(/\b\w/g, (char) => char.toUpperCase());
+        const officeLabel = user.office_name && user.office_name.trim().length > 0
+            ? user.office_name
+            : 'Municipal Department';
 
         return (
             <div className="min-h-screen bg-slate-100 md:flex">
@@ -539,7 +543,7 @@ export default function Authenticated({
                         {header && (
                             <header className="mb-6 border-b border-slate-200 pb-4">
                                 <div className="text-4xl font-bold text-slate-800">{header}</div>
-                                <p className="mt-1 text-xl text-slate-500">Municipality of E.B. Magalona - Municipal Department</p>
+                                <p className="mt-1 text-xl text-slate-500">Municipality of E.B. Magalona - {officeLabel}</p>
                             </header>
                         )}
 

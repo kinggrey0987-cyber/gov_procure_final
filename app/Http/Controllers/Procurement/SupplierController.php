@@ -74,6 +74,9 @@ class SupplierController extends Controller
 
         return Inertia::render('Procurement/Suppliers/Show', [
             'supplier' => $supplier,
+            'permissions' => [
+                'update' => $request->user()?->can('procurement.supplier.update', $supplier) ?? false,
+            ],
         ]);
     }
 
