@@ -1,5 +1,6 @@
 import { ExecutiveChartCard, HorizontalBarChart, TrendGroupedBarChart } from '@/Components/Executive/Charts';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import { printSectionById } from '@/lib/printSection';
 import { Head, router } from '@inertiajs/react';
 import { FormEvent, useState } from 'react';
 
@@ -91,6 +92,8 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
     monthly_trends,
     recent,
 }: Props) {
+    const printSectionId = 'risk-alerts-print-section';
+
     const [form, setForm] = useState({
         office_id: filters.office_id ? String(filters.office_id) : '',
         severity: filters.severity ?? '',
@@ -136,18 +139,22 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
         downloadCsv(rows, 'risk-and-alerts.csv');
     };
 
+    const exportPdf = () => {
+        printSectionById(printSectionId, { title: 'Risk & Alerts' });
+    };
+
     return (
         <AuthenticatedLayout header="Risk & Alerts">
             <Head title="Risk & Alerts" />
 
-            <div className="space-y-6 py-8">
+            <div id={printSectionId} className="space-y-6 py-8">
                 <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-200 bg-white px-5 py-4 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
                     <div>
                         <h2 className="text-2xl font-semibold text-slate-900">Risk & Alerts</h2>
                         <p className="text-sm text-slate-600">Executive risk signal tracking and impact evidence.</p>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <button type="button" onClick={() => window.print()} className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
+                    <div className="print-hide flex items-center gap-2">
+                        <button type="button" onClick={exportPdf} className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
                             Export PDF
                         </button>
                         <button type="button" onClick={exportCsv} className="rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white hover:bg-red-800">
