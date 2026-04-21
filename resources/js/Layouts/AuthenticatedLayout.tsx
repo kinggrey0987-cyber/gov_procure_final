@@ -240,8 +240,8 @@ export default function Authenticated({
                     <div className="mx-auto w-full max-w-[1300px] px-4 py-6 sm:px-6">
                         {header && (
                             <header className="mb-6">
-                                <div className="text-4xl font-bold text-slate-800">{header}</div>
                                 <p className="mt-1 text-xl text-slate-500">Municipality of E.B. Magalona - {roleLabel}</p>
+                                <div className="mt-3 text-4xl font-bold text-slate-800">{header}</div>
                             </header>
                         )}
 
@@ -387,8 +387,8 @@ export default function Authenticated({
                     <div className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6">
                         {header && (
                             <header className="mb-6 border-b border-slate-200 pb-4">
-                                <div className="text-4xl font-bold text-slate-800">{header}</div>
                                 <p className="mt-1 text-xl text-slate-500">Municipality of E.B. Magalona - Procurement / BAC Staff</p>
+                                <div className="mt-3 text-4xl font-bold text-slate-800">{header}</div>
                             </header>
                         )}
 
@@ -542,8 +542,8 @@ export default function Authenticated({
                     <div className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6">
                         {header && (
                             <header className="mb-6 border-b border-slate-200 pb-4">
-                                <div className="text-4xl font-bold text-slate-800">{header}</div>
                                 <p className="mt-1 text-xl text-slate-500">Municipality of E.B. Magalona - {officeLabel}</p>
+                                <div className="mt-3 text-4xl font-bold text-slate-800">{header}</div>
                             </header>
                         )}
 
@@ -693,8 +693,8 @@ export default function Authenticated({
                     <div className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6">
                         {header && (
                             <header className="mb-6 border-b border-slate-200 pb-4">
-                                <div className="text-4xl font-bold text-slate-800">{header}</div>
                                 <p className="mt-1 text-xl text-slate-500">Municipality of E.B. Magalona - Executive Oversight</p>
+                                <div className="mt-3 text-4xl font-bold text-slate-800">{header}</div>
                             </header>
                         )}
 
@@ -871,8 +871,8 @@ export default function Authenticated({
                     <div className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6">
                         {header && (
                             <header className="mb-6 border-b border-slate-200 pb-4">
-                                <div className="text-4xl font-bold text-slate-800">{header}</div>
                                 <p className="mt-1 text-xl text-slate-500">Municipality of E.B. Magalona - Inventory and Logistics</p>
+                                <div className="mt-3 text-4xl font-bold text-slate-800">{header}</div>
                             </header>
                         )}
 

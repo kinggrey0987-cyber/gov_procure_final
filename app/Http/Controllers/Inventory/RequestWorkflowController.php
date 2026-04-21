@@ -392,9 +392,8 @@ class RequestWorkflowController
 
         if (! $supplyRequest instanceof SupplyRequest) {
             return redirect()
-                ->route('inventory.office-supply-requests.index', [
-                    'stock_assessment' => 'SHORTAGE_REQUIRES_PROCUREMENT',
-                    'q' => (string) ($inventory->item?->item_name ?? ''),
+                ->route('inventory.procurement-requests.index', [
+                    'focus_inventory_id' => (int) $inventory->inventory_id,
                 ])
                 ->with('error', 'No submitted shortage request is currently eligible for procurement initiation for this low-stock item.');
         }
