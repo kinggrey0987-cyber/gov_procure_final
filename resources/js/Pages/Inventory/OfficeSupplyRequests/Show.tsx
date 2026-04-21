@@ -33,11 +33,11 @@ export default function InventoryOfficeSupplyRequestShow({ request }: Props) {
     return (
         <AuthenticatedLayout
             header={
-                <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="space-y-3">
                     <h2 className="text-xl font-semibold leading-tight text-gray-800">Office Supply Request Details</h2>
                     <Link
                         href={route('inventory.office-supply-requests.index')}
-                        className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                        className="inline-flex rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                     >
                         Back to Office Supply Requests
                     </Link>

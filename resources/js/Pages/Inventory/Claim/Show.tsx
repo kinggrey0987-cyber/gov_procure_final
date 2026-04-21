@@ -62,11 +62,11 @@ export default function ClaimShow({ claim, linkedDistribution, attachments, atta
     return (
         <AuthenticatedLayout
             header={
-                <div className="flex flex-wrap items-center gap-3">
-                    <Link href={route('inventory.claims.index')} className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                <div className="space-y-3">
+                    <h2 className="text-xl font-semibold leading-tight text-gray-800">Claim Detail</h2>
+                    <Link href={route('inventory.claims.index')} className="inline-flex rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
                         Back to Claims and Adjustments
                     </Link>
-                    <h2 className="text-xl font-semibold leading-tight text-gray-800">Claim Detail</h2>
                 </div>
             }
         >
