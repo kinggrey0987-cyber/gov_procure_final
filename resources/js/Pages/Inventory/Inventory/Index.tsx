@@ -174,14 +174,6 @@ export default function InventoryIndex({ inventories, categories, filters }: Pro
                                                 <Link href={route('inventory.inventory.show', row.inventory_id)} className="block text-sm font-semibold text-blue-600 hover:text-blue-800">
                                                     View
                                                 </Link>
-                                                {deficit > 0 ? (
-                                                    <Link
-                                                        href={route('inventory.procurement-requests.index', { focus_inventory_id: row.inventory_id })}
-                                                        className="block text-xs font-semibold text-red-700 hover:text-red-900"
-                                                    >
-                                                        Initiate Purchase Request
-                                                    </Link>
-                                                ) : null}
                                             </div>
                                         </td>
                                     </tr>

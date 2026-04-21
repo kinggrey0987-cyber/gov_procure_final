@@ -35,7 +35,6 @@ type LowStockItem = {
     available_stock: number;
     low_stock_threshold: number;
     deficit: number;
-    can_initiate: boolean;
 };
 
 type Props = {
@@ -134,21 +133,11 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                                     <p className="mt-1 text-xs font-semibold text-amber-700">Deficit: {item.deficit.toFixed(2)}</p>
                                     <button
                                         type="button"
-                                        disabled={initiatingInventoryId === item.inventory_id || !item.can_initiate}
-                                        onClick={() => {
-                                            if (!item.can_initiate) {
-                                                return;
-                                            }
-
-                                            initiateLowStockProcurement(item.inventory_id);
-                                        }}
-                                        className="mt-2 inline-flex rounded-md border border-red-300 bg-white px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-500"
+                                        disabled={initiatingInventoryId === item.inventory_id}
+                                        onClick={() => initiateLowStockProcurement(item.inventory_id)}
+                                        className="mt-2 inline-flex rounded-md border border-red-300 bg-white px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-50"
                                     >
-                                        {initiatingInventoryId === item.inventory_id
-                                            ? 'Initiating...'
-                                            : item.can_initiate
-                                            ? 'Initiate Purchase Request'
-                                            : 'No Eligible Shortage Request'}
+                                        {initiatingInventoryId === item.inventory_id ? 'Initiating...' : 'Initiate Purchase Request'}
                                     </button>
                                 </div>
                             ))}

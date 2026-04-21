@@ -576,7 +576,7 @@ class InventoryDistributionFoundationTest extends TestCase
         ]);
     }
 
-    public function test_low_stock_signal_without_eligible_shortage_request_is_not_initiable_and_creates_no_purchase_request(): void
+    public function test_low_stock_signal_without_eligible_shortage_request_creates_purchase_request_directly(): void
     {
         $category = ItemCategory::query()->create([
             'category_name' => 'No Shortage Candidate '.uniqid(),
@@ -604,22 +604,22 @@ class InventoryDistributionFoundationTest extends TestCase
         ]);
 
         $this->actingAs($this->gsoOfficer)
-            ->get(route('inventory.procurement-requests.index'))
-            ->assertInertia(fn (Assert $page) => $page
-                ->where('lowStockItems.0.inventory_id', (int) $inventory->inventory_id)
-                ->where('lowStockItems.0.item_name', 'Low Stock With No Candidate')
-                ->where('lowStockItems.0.can_initiate', false)
-            );
-
-        $purchaseRequestCountBefore = PurchaseRequest::query()->count();
-
-        $this->actingAs($this->gsoOfficer)
             ->post(route('inventory.procurement-requests.initiate-low-stock', (int) $inventory->inventory_id))
             ->assertRedirect(route('inventory.procurement-requests.index', [
                 'focus_inventory_id' => (int) $inventory->inventory_id,
             ]));
 
-        $this->assertSame($purchaseRequestCountBefore, PurchaseRequest::query()->count());
+        $created = PurchaseRequest::query()->latest('purchase_request_id')->firstOrFail();
+
+        $this->assertSame('OPEN', (string) $created->status);
+        $this->assertSame((int) $this->gsoOfficer->id, (int) $created->requested_by);
+        $this->assertStringContainsString('LOW_STOCK_SIGNAL:inventory:'.$inventory->inventory_id, (string) $created->remarks);
+
+        $this->assertDatabaseHas('purchase_request_items', [
+            'purchase_request_id' => (int) $created->purchase_request_id,
+            'item_id' => (int) $item->item_id,
+            'quantity_requested' => 3,
+        ]);
     }
 
     public function test_inventory_office_supply_request_show_exposes_real_items_without_hardcoded_data(): void

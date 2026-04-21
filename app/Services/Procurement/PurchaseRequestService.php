@@ -2,11 +2,15 @@
 
 namespace App\Services\Procurement;
 
+use App\Models\Inventory;
+use App\Models\Ppmp;
+use App\Models\PpmpItem;
 use App\Models\ApprovalHistory;
 use App\Models\PurchaseRequest;
 use App\Models\PurchaseRequestItem;
 use App\Models\StatusHistory;
 use App\Models\SupplyRequest;
+use App\Models\SupplyRequestItem;
 use App\Models\User;
 use App\Services\AuditLogService;
 use App\Services\NotificationService;
@@ -177,6 +181,132 @@ class PurchaseRequestService
                     referenceId: (int) $purchaseRequest->purchase_request_id,
                 );
             }
+
+            return $purchaseRequest->fresh(['items', 'office', 'requester', 'supplyRequest']) ?? $purchaseRequest;
+        });
+    }
+
+    public function createFromLowStockSignal(User $actor, Inventory $inventory, float $quantityRequested): PurchaseRequest
+    {
+        $this->assertGsoActor($actor);
+
+        if ((int) $inventory->item_id <= 0) {
+            throw ValidationException::withMessages([
+                'inventory_id' => 'Inventory record is not linked to a valid catalog item.',
+            ]);
+        }
+
+        if ($quantityRequested <= 0) {
+            throw ValidationException::withMessages([
+                'quantity_requested' => 'Low-stock purchase quantity must be greater than zero.',
+            ]);
+        }
+
+        $officeId = (int) ($actor->office_id ?? 0);
+        if ($officeId <= 0) {
+            throw ValidationException::withMessages([
+                'office_id' => 'GSO officer must belong to an office before creating low-stock purchase requests.',
+            ]);
+        }
+
+        $signalMarker = sprintf('LOW_STOCK_SIGNAL:inventory:%d', (int) $inventory->inventory_id);
+
+        $alreadyQueued = PurchaseRequest::query()
+            ->whereIn('status', ['OPEN', 'PROCESSING'])
+            ->where('remarks', 'like', '%'.$signalMarker.'%')
+            ->exists();
+
+        if ($alreadyQueued) {
+            throw ValidationException::withMessages([
+                'inventory_id' => 'An active purchase request is already queued from this low-stock signal.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($actor, $inventory, $quantityRequested, $officeId, $signalMarker): PurchaseRequest {
+            $inventory->loadMissing('item');
+
+            $item = $inventory->item;
+            $itemCategoryId = (int) ($item?->item_category_id ?? 0);
+
+            if ($itemCategoryId <= 0) {
+                throw ValidationException::withMessages([
+                    'inventory_id' => 'Inventory item must have a valid category for low-stock purchase request initiation.',
+                ]);
+            }
+
+            $ppmp = Ppmp::query()->create([
+                'office_id' => $officeId,
+                'prepared_by' => (int) $actor->id,
+                'approved_by' => null,
+                'fiscal_year' => (int) now()->format('Y'),
+                'status' => 'SUBMITTED',
+                'total_estimated_budget' => 0,
+                'date_prepared' => now()->toDateString(),
+                'date_approved' => null,
+                'remarks' => 'System-generated PPMP context for low-stock signal procurement.',
+            ]);
+
+            $ppmpItem = PpmpItem::query()->create([
+                'ppmp_id' => (int) $ppmp->ppmp_id,
+                'item_id' => (int) $inventory->item_id,
+                'item_category_id' => $itemCategoryId,
+                'quantity' => round($quantityRequested, 2),
+                'unit_cost' => 0,
+                'estimated_budget' => 0,
+                'procurement_schedule' => 'IMMEDIATE',
+                'fund_source' => 'General Fund',
+                'remarks' => 'System-generated from low-stock signal.',
+            ]);
+
+            $supplyRequest = SupplyRequest::query()->create([
+                'request_code' => sprintf('SR-LS-%s-%04d', now()->format('YmdHis'), random_int(1000, 9999)),
+                'office_id' => $officeId,
+                'requested_by' => (int) $actor->id,
+                'ppmp_id' => (int) $ppmp->ppmp_id,
+                'request_date' => now()->toDateString(),
+                'needed_by_date' => now()->addDays(7)->toDateString(),
+                'request_category' => 'GENERAL',
+                'purpose' => sprintf(
+                    'System-generated low-stock procurement trigger for %s (inventory #%d).',
+                    (string) ($inventory->item?->item_name ?? 'Unassigned Item'),
+                    (int) $inventory->inventory_id
+                ),
+                'priority_level' => 'HIGH',
+                'status' => 'SUBMITTED',
+                'review_notes' => null,
+                'approved_by' => null,
+                'approved_at' => null,
+            ]);
+
+            SupplyRequestItem::query()->create([
+                'supply_request_id' => (int) $supplyRequest->supply_request_id,
+                'item_id' => (int) $inventory->item_id,
+                'ppmp_item_id' => (int) $ppmpItem->ppmp_item_id,
+                'item_name_snapshot' => (string) ($item?->item_name ?? 'Unassigned Item'),
+                'quantity_requested' => round($quantityRequested, 2),
+            ]);
+
+            $purchaseRequest = PurchaseRequest::query()->create([
+                'supply_request_id' => (int) $supplyRequest->supply_request_id,
+                'office_id' => $officeId,
+                'requested_by' => (int) $actor->id,
+                'status' => 'OPEN',
+                'remarks' => sprintf(
+                    '%s | Auto-generated from low-stock signal for %s.',
+                    $signalMarker,
+                    (string) ($inventory->item?->item_name ?? 'Unassigned Item')
+                ),
+            ]);
+
+            PurchaseRequestItem::query()->create([
+                'purchase_request_id' => (int) $purchaseRequest->purchase_request_id,
+                'item_id' => (int) $inventory->item_id,
+                'quantity_requested' => round($quantityRequested, 2),
+                'remarks' => 'Quantity generated from low-stock deficit.',
+            ]);
+
+            $this->recordStatus($purchaseRequest, null, 'OPEN', $actor, 'Purchase request auto-generated from low-stock signal.');
+            $this->recordAudit($actor, 'AUTO_QUEUE_LOW_STOCK', $purchaseRequest);
 
             return $purchaseRequest->fresh(['items', 'office', 'requester', 'supplyRequest']) ?? $purchaseRequest;
         });
