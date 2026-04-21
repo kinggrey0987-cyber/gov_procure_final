@@ -53,7 +53,7 @@ export default function ClaimIndex({ claims }: Props) {
                                     <td className="px-4 py-3 font-mono text-xs text-slate-700">{row.claim_code}</td>
                                     <td className="px-4 py-3 text-slate-700">{row.claim_type}</td>
                                     <td className="px-4 py-3">
-                                        <span className={statusClass(row.status)}>{row.status}</span>
+                                        <span className={statusClass(row.status)}>{displayClaimStatus(row.status)}</span>
                                     </td>
                                     <td className="px-4 py-3 text-slate-600">{row.office?.name ?? row.office_id ?? '-'}</td>
                                     <td className="px-4 py-3 text-right">
@@ -71,9 +71,22 @@ export default function ClaimIndex({ claims }: Props) {
     );
 }
 
+function displayClaimStatus(status: string): string {
+    const map: Record<string, string> = {
+        OPEN: 'Pending Review',
+        FILED: 'Pending Review',
+        IN_REVIEW: 'In Claim Review',
+        RESOLVED: 'Resolved',
+        REJECTED: 'Rejected',
+    };
+
+    return map[status] ?? status;
+}
+
 function statusClass(status: string) {
     const base = 'inline-flex rounded-full px-2.5 py-1 text-xs font-semibold';
     const map: Record<string, string> = {
+        OPEN: `${base} bg-amber-100 text-amber-700`,
         FILED: `${base} bg-amber-100 text-amber-700`,
         IN_REVIEW: `${base} bg-blue-100 text-blue-700`,
         RESOLVED: `${base} bg-emerald-100 text-emerald-700`,

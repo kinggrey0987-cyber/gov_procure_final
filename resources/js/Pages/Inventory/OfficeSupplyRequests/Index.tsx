@@ -1,6 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import useSmartRefresh from '@/hooks/useSmartRefresh';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
+import { FormEvent, useEffect, useState } from 'react';
 
 type PaginationLink = {
     url: string | null;
@@ -22,6 +23,7 @@ type RequestRow = {
     stock_assessment: 'STOCK_READY' | 'SHORTAGE_REQUIRES_PROCUREMENT';
     has_purchase_request: boolean;
     distribution_records_count: number;
+    workflow_bucket: 'READY_FOR_DISTRIBUTION' | 'QUEUED_FOR_PROCUREMENT' | 'UNDER_VALIDATION';
 };
 
 type Props = {
@@ -29,15 +31,60 @@ type Props = {
         data: RequestRow[];
         links: PaginationLink[];
     };
+    offices: Array<{ id: number; name: string }>;
+    filters: {
+        q?: string;
+        office_id?: number | null;
+        status?: string;
+        stock_assessment?: string;
+        workflow_bucket?: string;
+    };
 };
 
-export default function OfficeSupplyRequestsIndex({ requests }: Props) {
+export default function OfficeSupplyRequestsIndex({ requests, offices, filters }: Props) {
+    const [q, setQ] = useState(filters.q ?? '');
+    const [officeId, setOfficeId] = useState(String(filters.office_id ?? ''));
+    const [status, setStatus] = useState(filters.status ?? '');
+    const [stockAssessment, setStockAssessment] = useState(filters.stock_assessment ?? '');
+    const [workflowBucket, setWorkflowBucket] = useState(filters.workflow_bucket ?? '');
+    const [queueingRequestId, setQueueingRequestId] = useState<number | null>(null);
+
+    useEffect(() => {
+        setQ(filters.q ?? '');
+        setOfficeId(String(filters.office_id ?? ''));
+        setStatus(filters.status ?? '');
+        setStockAssessment(filters.stock_assessment ?? '');
+        setWorkflowBucket(filters.workflow_bucket ?? '');
+    }, [filters.office_id, filters.q, filters.status, filters.stock_assessment, filters.workflow_bucket]);
+
     const { isRefreshing, lastRefreshedAt } = useSmartRefresh({
-        only: ['requests'],
+        only: ['requests', 'filters'],
         refreshOnFocus: true,
-        refreshOnMount: true,
-        pollIntervalMs: 30000,
+        refreshOnMount: false,
     });
+
+    const applyFilters = (event: FormEvent) => {
+        event.preventDefault();
+        router.get(
+            route('inventory.office-supply-requests.index'),
+            {
+                q,
+                office_id: officeId,
+                status,
+                stock_assessment: stockAssessment,
+                workflow_bucket: workflowBucket,
+            },
+            { preserveState: true, replace: true },
+        );
+    };
+
+    const queueProcurement = (requestId: number) => {
+        setQueueingRequestId(requestId);
+        router.post(route('inventory.office-supply-requests.queue', requestId), {}, {
+            preserveScroll: true,
+            onFinish: () => setQueueingRequestId(null),
+        });
+    };
 
     return (
         <AuthenticatedLayout
@@ -53,6 +100,47 @@ export default function OfficeSupplyRequestsIndex({ requests }: Props) {
             <Head title="Office Supply Requests" />
 
             <div className="space-y-4 py-8">
+                <form onSubmit={applyFilters} className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-6">
+                    <input
+                        value={q}
+                        onChange={(event) => setQ(event.target.value)}
+                        placeholder="Search request code, purpose, or office"
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm md:col-span-2"
+                    />
+                    <select value={officeId} onChange={(event) => setOfficeId(event.target.value)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                        <option value="">All offices</option>
+                        {offices.map((office) => (
+                            <option key={office.id} value={office.id}>
+                                {office.name}
+                            </option>
+                        ))}
+                    </select>
+                    <select value={workflowBucket} onChange={(event) => setWorkflowBucket(event.target.value)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                        <option value="">All workflow buckets</option>
+                        <option value="READY_FOR_DISTRIBUTION">Ready for Distribution</option>
+                        <option value="QUEUED_FOR_PROCUREMENT">Queued for Procurement</option>
+                        <option value="UNDER_VALIDATION">Submitted or Under Validation</option>
+                    </select>
+                    <select value={stockAssessment} onChange={(event) => setStockAssessment(event.target.value)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                        <option value="">All stock assessments</option>
+                        <option value="STOCK_READY">Stock Ready</option>
+                        <option value="SHORTAGE_REQUIRES_PROCUREMENT">Needs Procurement</option>
+                    </select>
+                    <select value={status} onChange={(event) => setStatus(event.target.value)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                        <option value="">All statuses</option>
+                        <option value="SUBMITTED">Submitted</option>
+                        <option value="VALIDATING">Validating</option>
+                        <option value="READY_FOR_DISTRIBUTION">Ready for Distribution</option>
+                        <option value="FOR_PROCUREMENT">For Procurement</option>
+                    </select>
+                    <button type="submit" className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
+                        Apply
+                    </button>
+                    <Link href={route('inventory.office-supply-requests.index')} className="rounded-lg border border-slate-300 px-4 py-2 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                        Reset
+                    </Link>
+                </form>
+
                 <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                     <p className="text-sm text-slate-600">
                         Review submitted office requests against current stock. Requests with shortages are forwarded to the procurement initiation queue; stock-ready
@@ -63,7 +151,7 @@ export default function OfficeSupplyRequestsIndex({ requests }: Props) {
                             ? 'Refreshing queue...'
                             : lastRefreshedAt
                             ? `Updated ${lastRefreshedAt.toLocaleTimeString()}`
-                            : 'Auto-refresh every 30 seconds while this page is open'}
+                            : 'Refreshes when you return to this tab or manually reload the page'}
                     </p>
                 </div>
 
@@ -98,11 +186,12 @@ export default function OfficeSupplyRequestsIndex({ requests }: Props) {
                                             {request.stock_assessment === 'STOCK_READY' ? 'Stock Ready' : 'Needs Procurement'}
                                         </span>
                                         {request.shortage_total > 0 ? (
-                                            <p className="mt-1 text-xs text-rose-600">Shortage: {request.shortage_total.toFixed(2)}</p>
+                                            <p className="mt-1 text-xs text-rose-600">Shortage against available stock: {request.shortage_total.toFixed(2)}</p>
                                         ) : null}
                                     </td>
                                     <td className="px-4 py-3 text-slate-600">
-                                        <p>Status: {request.status}</p>
+                                        <p>Status: {displaySupplyRequestStatus(request.status)}</p>
+                                        <p className="text-xs text-slate-500">Workflow: {displayWorkflowBucket(request.workflow_bucket)}</p>
                                         <p className="text-xs text-slate-500">Distribution records: {request.distribution_records_count}</p>
                                     </td>
                                     <td className="px-4 py-3 text-right">
@@ -114,16 +203,16 @@ export default function OfficeSupplyRequestsIndex({ requests }: Props) {
                                                 Process Distribution
                                             </Link>
                                         ) : request.has_purchase_request ? (
-                                            <span className="text-sm font-semibold text-slate-500">Queued</span>
+                                            <span className="text-sm font-semibold text-slate-500">Queued for Procurement</span>
                                         ) : (
-                                            <Link
-                                                href={route('inventory.office-supply-requests.queue', request.supply_request_id)}
-                                                method="post"
-                                                as="button"
+                                            <button
+                                                type="button"
+                                                disabled={queueingRequestId === request.supply_request_id}
+                                                onClick={() => queueProcurement(request.supply_request_id)}
                                                 className="text-sm font-semibold text-rose-700 hover:text-rose-900"
                                             >
-                                                Queue Procurement
-                                            </Link>
+                                                {queueingRequestId === request.supply_request_id ? 'Queueing...' : 'Queue Procurement'}
+                                            </button>
                                         )}
                                     </td>
                                 </tr>
@@ -158,3 +247,25 @@ export default function OfficeSupplyRequestsIndex({ requests }: Props) {
 
 const stockReadyClass = 'inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700';
 const shortageClass = 'inline-flex rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700';
+
+function displayWorkflowBucket(bucket: string): string {
+    const map: Record<string, string> = {
+        READY_FOR_DISTRIBUTION: 'Ready for Distribution',
+        QUEUED_FOR_PROCUREMENT: 'Queued for Procurement',
+        UNDER_VALIDATION: 'Submitted or Under Validation',
+    };
+
+    return map[bucket] ?? bucket;
+}
+
+function displaySupplyRequestStatus(status: string): string {
+    const map: Record<string, string> = {
+        OPEN: 'Pending Review',
+        SUBMITTED: 'Submitted',
+        VALIDATING: 'Validating',
+        FOR_PROCUREMENT: 'Queued for Procurement',
+        READY_FOR_DISTRIBUTION: 'Ready for Distribution',
+    };
+
+    return map[status] ?? status;
+}

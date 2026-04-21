@@ -40,7 +40,6 @@ type Delivery = {
         contact_person?: string | null;
     };
     receiver?: {
-        full_name?: string;
         name?: string;
     };
     items: DeliveryItem[];
@@ -81,7 +80,7 @@ export default function DeliveryShow({ delivery }: Props) {
                 <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:grid-cols-2 xl:grid-cols-4">
                     <InfoCell label="Delivery Code" value={delivery.delivery_code} mono />
                     <InfoCell label="Status" value={<span className={statusClass(delivery.receipt_status)}>{delivery.receipt_status}</span>} />
-                    <InfoCell label="Received By" value={delivery.receiver?.full_name ?? delivery.receiver?.name ?? '-'} />
+                    <InfoCell label="Received By" value={delivery.receiver?.name ?? '-'} />
                     <InfoCell label="Created" value={new Date(delivery.created_at).toLocaleDateString()} />
                 </div>
 
@@ -91,15 +90,7 @@ export default function DeliveryShow({ delivery }: Props) {
                         <dl className="mt-3 space-y-2 text-sm">
                             <MetaRow
                                 label="PO Number"
-                                value={
-                                    delivery.purchase_order?.purchase_order_id ? (
-                                        <Link href={route('procurement.purchase-orders.show', delivery.purchase_order.purchase_order_id)} className="font-semibold text-blue-600 hover:text-blue-800">
-                                            {delivery.purchase_order.po_number ?? '-'}
-                                        </Link>
-                                    ) : (
-                                        '-'
-                                    )
-                                }
+                                value={delivery.purchase_order?.po_number ?? '-'}
                             />
                             <MetaRow label="Status" value={delivery.purchase_order?.status ?? '-'} />
                         </dl>
@@ -139,6 +130,13 @@ export default function DeliveryShow({ delivery }: Props) {
                                         <td className="px-4 py-2 text-slate-700">{item.item_condition || '-'}</td>
                                     </tr>
                                 ))}
+                                {delivery.items.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-500">
+                                            No delivery items are linked to this record yet.
+                                        </td>
+                                    </tr>
+                                ) : null}
                             </tbody>
                         </table>
                     </div>

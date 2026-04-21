@@ -5,8 +5,10 @@ type MovementRow = {
     movement_id: number;
     movement_type: string;
     inventory_id: number | string;
-    quantity: string;
+    item_name: string;
+    quantity: number;
     movement_date: string;
+    reference_label: string;
 };
 
 type Props = {
@@ -24,10 +26,11 @@ export default function MovementIndex({ movements }: Props) {
                     <table className="min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-slate-50">
                             <tr>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Type</th>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Inventory</th>
+                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Movement Type</th>
+                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Item / Inventory</th>
                                 <th className="px-4 py-3 text-right font-semibold text-slate-700">Quantity</th>
                                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Date</th>
+                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Reference Source</th>
                                 <th className="px-4 py-3 text-right font-semibold text-slate-700">Action</th>
                             </tr>
                         </thead>
@@ -35,9 +38,13 @@ export default function MovementIndex({ movements }: Props) {
                             {movements.data.map((row) => (
                                 <tr key={row.movement_id} className="hover:bg-slate-50/60">
                                     <td className="px-4 py-3 text-slate-700">{row.movement_type}</td>
-                                    <td className="px-4 py-3 text-slate-700">#{row.inventory_id}</td>
-                                    <td className="px-4 py-3 text-right font-semibold text-slate-700">{row.quantity}</td>
+                                    <td className="px-4 py-3 text-slate-700">
+                                        <p>{row.item_name}</p>
+                                        <p className="text-xs text-slate-500">Inventory #{row.inventory_id}</p>
+                                    </td>
+                                    <td className="px-4 py-3 text-right font-semibold text-slate-700">{row.quantity.toFixed(2)}</td>
                                     <td className="px-4 py-3 text-slate-600">{row.movement_date}</td>
+                                    <td className="px-4 py-3 text-slate-600">{row.reference_label}</td>
                                     <td className="px-4 py-3 text-right">
                                         <Link
                                             href={route('inventory.inventory-movements.show', row.movement_id)}
@@ -48,6 +55,13 @@ export default function MovementIndex({ movements }: Props) {
                                     </td>
                                 </tr>
                             ))}
+                            {movements.data.length === 0 ? (
+                                <tr>
+                                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-500">
+                                        No movement logs are available yet.
+                                    </td>
+                                </tr>
+                            ) : null}
                         </tbody>
                     </table>
                 </div>

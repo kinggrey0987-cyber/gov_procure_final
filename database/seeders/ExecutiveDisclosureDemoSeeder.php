@@ -93,6 +93,111 @@ class ExecutiveDisclosureDemoSeeder extends Seeder
             ],
             service: $service,
         );
+
+        $approvedPpmps = Ppmp::query()
+            ->where('status', 'APPROVED')
+            ->latest('updated_at')
+            ->take(3)
+            ->get();
+
+        $purchaseOrders = PurchaseOrder::query()
+            ->whereIn('status', ['COMPLETED', 'PLACED'])
+            ->latest('updated_at')
+            ->take(3)
+            ->get();
+
+        $receivedDistributions = DistributionRecord::query()
+            ->whereIn('status', ['RECEIVED', 'RELEASED'])
+            ->latest('updated_at')
+            ->take(3)
+            ->get();
+
+        $primaryPpmp = $approvedPpmps->first();
+        $secondaryPpmp = $approvedPpmps->skip(1)->first();
+        $tertiaryPpmp = $approvedPpmps->skip(2)->first();
+        $secondaryPurchaseOrder = $purchaseOrders->skip(1)->first();
+        $primaryDistribution = $receivedDistributions->first();
+        $secondaryDistribution = $receivedDistributions->skip(1)->first();
+
+        if ($secondaryPpmp instanceof Ppmp) {
+            Storage::disk('public')->put(
+                'public_disclosures/q1-procurement-brief.txt',
+                "GovSupply Connect quarter-start procurement brief\nGenerated for executive DSS demo seeding.\n"
+            );
+
+            $this->ensurePublishedDisclosure(
+                title: 'Quarterly Procurement Brief',
+                actor: $executive,
+                payload: [
+                    'title' => 'Quarterly Procurement Brief',
+                    'type' => 'PROCUREMENT_SUMMARY',
+                    'reference_type' => Ppmp::class,
+                    'reference_id' => (int) $secondaryPpmp->ppmp_id,
+                    'description' => 'Quarterly procurement summary for a different approved office plan.',
+                    'file_path' => 'public_disclosures/q1-procurement-brief.txt',
+                    'status' => 'PUBLISHED',
+                    'remarks' => 'Published for public-facing procurement transparency.',
+                ],
+                service: $service,
+            );
+        }
+
+        if ($primaryDistribution instanceof DistributionRecord) {
+            Storage::disk('public')->put(
+                'public_disclosures/distribution-release-brief.txt',
+                "GovSupply Connect distribution release brief\nGenerated for executive DSS demo seeding.\n"
+            );
+
+            $this->ensurePublishedDisclosure(
+                title: 'Distribution Release Brief',
+                actor: $executive,
+                payload: [
+                    'title' => 'Distribution Release Brief',
+                    'type' => 'DISTRIBUTION_SUMMARY',
+                    'reference_type' => DistributionRecord::class,
+                    'reference_id' => (int) $primaryDistribution->distribution_record_id,
+                    'description' => 'Published office distribution brief for public transparency.',
+                    'file_path' => 'public_disclosures/distribution-release-brief.txt',
+                    'status' => 'PUBLISHED',
+                    'remarks' => 'Published from a real received distribution record.',
+                ],
+                service: $service,
+            );
+        }
+
+        if ($tertiaryPpmp instanceof Ppmp) {
+            $this->ensureDraftDisclosure(
+                title: 'Pending Budget Transparency Note',
+                actor: $executive,
+                payload: [
+                    'title' => 'Pending Budget Transparency Note',
+                    'type' => 'PROCUREMENT_SUMMARY',
+                    'reference_type' => Ppmp::class,
+                    'reference_id' => (int) $tertiaryPpmp->ppmp_id,
+                    'description' => 'Draft transparency note retained for executive review.',
+                    'file_path' => null,
+                    'status' => 'DRAFT',
+                ],
+                service: $service,
+            );
+        }
+
+        if ($secondaryPurchaseOrder instanceof PurchaseOrder) {
+            $this->ensureDraftDisclosure(
+                title: 'Pending Procurement Notice',
+                actor: $executive,
+                payload: [
+                    'title' => 'Pending Procurement Notice',
+                    'type' => 'PROCUREMENT_SUMMARY',
+                    'reference_type' => PurchaseOrder::class,
+                    'reference_id' => (int) $secondaryPurchaseOrder->purchase_order_id,
+                    'description' => 'Draft procurement notice waiting on final executive signoff.',
+                    'file_path' => null,
+                    'status' => 'DRAFT',
+                ],
+                service: $service,
+            );
+        }
     }
 
     /**

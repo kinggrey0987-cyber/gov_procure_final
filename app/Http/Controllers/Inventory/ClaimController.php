@@ -47,10 +47,21 @@ class ClaimController
         $distributionRecords = DistributionRecord::query()
             ->when(auth()->user()->isOfficeUser(), fn ($query) => $query->where('office_id', auth()->user()->office_id))
             ->whereIn('status', ['RELEASED', 'RECEIVED'])
+            ->with(['office', 'supplyRequest'])
+            ->orderByDesc('release_date')
+            ->orderByDesc('distribution_record_id')
             ->get();
 
         return Inertia::render('Inventory/Claim/Create', [
-            'distributionRecords' => $distributionRecords,
+            'distributionRecords' => $distributionRecords->map(fn (DistributionRecord $record): array => [
+                'distribution_record_id' => (int) $record->distribution_record_id,
+                'distribution_code' => (string) $record->distribution_code,
+                'office_id' => (int) $record->office_id,
+                'office_name' => (string) ($record->office?->name ?? 'Unknown Office'),
+                'release_date' => optional($record->release_date)?->toDateString(),
+                'status' => (string) $record->status,
+                'request_code' => (string) ($record->supplyRequest?->request_code ?? '-'),
+            ])->values(),
         ]);
     }
 
@@ -91,7 +102,7 @@ class ClaimController
 
         $history = $this->historyTimelineService->forRecord(auth()->user(), $claim);
 
-        $claim->load(['distributionRecord.items', 'claimant', 'office']);
+        $claim->load(['distributionRecord.items.item.category', 'distributionRecord.office', 'distributionRecord.supplyRequest', 'claimant', 'office']);
 
         $documents = $this->documentService
             ->listForRelated(auth()->user(), 'claims', (int) $claim->claims_id)
@@ -106,6 +117,21 @@ class ClaimController
 
         return Inertia::render('Inventory/Claim/Show', [
             'claim' => $claim,
+            'linkedDistribution' => $claim->distributionRecord ? [
+                'distribution_record_id' => (int) $claim->distributionRecord->distribution_record_id,
+                'distribution_code' => (string) $claim->distributionRecord->distribution_code,
+                'status' => (string) $claim->distributionRecord->status,
+                'release_date' => optional($claim->distributionRecord->release_date)?->toDateString(),
+                'office_name' => (string) ($claim->distributionRecord->office?->name ?? '-'),
+                'request_code' => (string) ($claim->distributionRecord->supplyRequest?->request_code ?? '-'),
+                'items' => $claim->distributionRecord->items->map(fn ($item): array => [
+                    'distribution_item_id' => (int) $item->distribution_item_id,
+                    'item_name' => (string) ($item->item?->item_name ?? $item->item_name_snapshot),
+                    'category_name' => (string) ($item->item?->category?->category_name ?? ''),
+                    'quantity_released' => (float) $item->quantity_released,
+                    'unit' => (string) $item->unit,
+                ])->values(),
+            ] : null,
             'attachments' => $documents,
             'attachmentPermissions' => [
                 'upload' => auth()->user()->can('claim.view', $claim),

@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Inventory;
 
 use App\Models\Inventory;
+use App\Models\Office;
 use App\Models\PurchaseRequest;
 use App\Models\SupplyRequest;
 use App\Services\Procurement\PurchaseRequestService;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -18,53 +20,126 @@ class RequestWorkflowController
     {
     }
 
-    public function officeSupplyRequests(): Response
+    public function officeSupplyRequests(Request $request): Response
     {
         abort_unless(Auth::user()?->can('inventory.view-any'), 403);
 
-        $requests = SupplyRequest::query()
+        $query = SupplyRequest::query()
             ->with(['office', 'requester', 'items.item.inventory', 'purchaseRequests'])
             ->withCount('distributionRecords')
-            ->latest('supply_request_id')
-            ->paginate(15);
+            ->latest('supply_request_id');
 
-        $requests->setCollection(
-            $requests->getCollection()->map(function (SupplyRequest $request): array {
-                $requestedTotal = 0.0;
-                $shortageTotal = 0.0;
+        $search = trim((string) $request->query('q', ''));
+        if ($search !== '') {
+            $query->where(function ($builder) use ($search): void {
+                $builder
+                    ->where('request_code', 'like', '%'.$search.'%')
+                    ->orWhere('purpose', 'like', '%'.$search.'%')
+                    ->orWhereHas('office', fn ($officeQuery) => $officeQuery->where('name', 'like', '%'.$search.'%'));
+            });
+        }
 
-                foreach ($request->items as $item) {
-                    $requested = (float) $item->quantity_requested;
-                    $available = (float) ($item->item?->inventory?->available_stock ?? 0);
+        $officeId = (int) $request->query('office_id', 0);
+        if ($officeId > 0) {
+            $query->where('office_id', $officeId);
+        }
 
-                    $requestedTotal += $requested;
-                    $shortageTotal += max($requested - $available, 0);
-                }
+        $status = trim((string) $request->query('status', ''));
+        if ($status !== '') {
+            $query->where('status', $status);
+        }
 
-                return [
-                    'supply_request_id' => (int) $request->supply_request_id,
-                    'request_code' => (string) $request->request_code,
-                    'status' => (string) $request->status,
-                    'priority_level' => (string) $request->priority_level,
-                    'needed_by_date' => optional($request->needed_by_date)?->toDateString(),
-                    'office' => $request->office ? [
-                        'name' => (string) $request->office->name,
-                    ] : null,
-                    'requester' => $request->requester ? [
-                        'name' => (string) $request->requester->name,
-                    ] : null,
-                    'item_count' => $request->items->count(),
-                    'requested_total' => round($requestedTotal, 2),
-                    'shortage_total' => round($shortageTotal, 2),
-                    'stock_assessment' => $shortageTotal > 0 ? 'SHORTAGE_REQUIRES_PROCUREMENT' : 'STOCK_READY',
-                    'has_purchase_request' => $request->purchaseRequests->isNotEmpty(),
-                    'distribution_records_count' => (int) $request->distribution_records_count,
-                ];
-            })
+        $rawRequests = $query->get();
+
+        $rows = $rawRequests->map(function (SupplyRequest $request): array {
+            $requestedTotal = 0.0;
+            $shortageTotal = 0.0;
+
+            foreach ($request->items as $item) {
+                $requested = (float) $item->quantity_requested;
+                $available = (float) ($item->item?->inventory?->available_stock ?? 0);
+
+                $requestedTotal += $requested;
+                $shortageTotal += max($requested - $available, 0);
+            }
+
+            $hasPurchaseRequest = $request->purchaseRequests->isNotEmpty();
+            $stockAssessment = $shortageTotal > 0 ? 'SHORTAGE_REQUIRES_PROCUREMENT' : 'STOCK_READY';
+
+            $workflowBucket = 'UNDER_VALIDATION';
+            if ($hasPurchaseRequest) {
+                $workflowBucket = 'QUEUED_FOR_PROCUREMENT';
+            } elseif ($stockAssessment === 'STOCK_READY' && (string) $request->status === 'SUBMITTED') {
+                $workflowBucket = 'READY_FOR_DISTRIBUTION';
+            }
+
+            return [
+                'supply_request_id' => (int) $request->supply_request_id,
+                'request_code' => (string) $request->request_code,
+                'status' => (string) $request->status,
+                'priority_level' => (string) $request->priority_level,
+                'needed_by_date' => optional($request->needed_by_date)?->toDateString(),
+                'office' => $request->office ? [
+                    'id' => (int) $request->office->id,
+                    'name' => (string) $request->office->name,
+                ] : null,
+                'requester' => $request->requester ? [
+                    'name' => (string) $request->requester->name,
+                ] : null,
+                'item_count' => $request->items->count(),
+                'requested_total' => round($requestedTotal, 2),
+                'shortage_total' => round($shortageTotal, 2),
+                'stock_assessment' => $stockAssessment,
+                'has_purchase_request' => $hasPurchaseRequest,
+                'distribution_records_count' => (int) $request->distribution_records_count,
+                'workflow_bucket' => $workflowBucket,
+            ];
+        });
+
+        $stockAssessmentFilter = trim((string) $request->query('stock_assessment', ''));
+        if ($stockAssessmentFilter !== '') {
+            $rows = $rows->where('stock_assessment', $stockAssessmentFilter);
+        }
+
+        $workflowBucketFilter = trim((string) $request->query('workflow_bucket', ''));
+        if ($workflowBucketFilter !== '') {
+            $rows = $rows->where('workflow_bucket', $workflowBucketFilter);
+        }
+
+        $rows = $rows->values();
+
+        $perPage = 15;
+        $page = LengthAwarePaginator::resolveCurrentPage();
+        $requests = new LengthAwarePaginator(
+            $rows->forPage($page, $perPage)->values(),
+            $rows->count(),
+            $perPage,
+            $page,
+            [
+                'path' => $request->url(),
+                'query' => $request->query(),
+            ]
         );
+
+        $offices = Office::query()
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn (Office $office): array => [
+                'id' => (int) $office->id,
+                'name' => (string) $office->name,
+            ])
+            ->values();
 
         return Inertia::render('Inventory/OfficeSupplyRequests/Index', [
             'requests' => $requests,
+            'offices' => $offices,
+            'filters' => [
+                'q' => $search,
+                'office_id' => $officeId > 0 ? $officeId : null,
+                'status' => $status,
+                'stock_assessment' => $stockAssessmentFilter,
+                'workflow_bucket' => $workflowBucketFilter,
+            ],
         ]);
     }
 
@@ -142,7 +217,7 @@ class RequestWorkflowController
         ]);
 
         return redirect()
-            ->route('inventory.procurement-requests.index')
+            ->route('inventory.office-supply-requests.index', $request->query())
             ->with('success', 'Supply request queued for procurement processing.');
     }
 }

@@ -239,6 +239,8 @@ class DemoWorkflowSeeder extends Seeder
                     ],
                 );
 
+                $this->normalizeGsoLinkedDemoData($gsoUser);
+
                 app(AnomalyDetectionService::class)->runExecutiveDetections($execUser);
                 $dedupedAnomalies = app(AnomalyService::class)->collapseActiveDuplicates();
                 $this->outputLine(sprintf('Anomaly duplicate cleanup dismissed %d duplicate active record(s).', $dedupedAnomalies));
@@ -1271,6 +1273,96 @@ class DemoWorkflowSeeder extends Seeder
                 'office_id' => (int) $gsoUser->office_id,
                 'alert_message' => 'Delivery was received after the expected date and was partially verified.',
                 'detected_at' => now(),
+            ]);
+        }
+    }
+
+    private function normalizeGsoLinkedDemoData(User $gsoUser): void
+    {
+        $distributionService = app(DistributionRecordService::class);
+        $claimService = app(ClaimService::class);
+
+        $records = DistributionRecord::query()
+            ->with(['supplyRequest.items', 'items', 'claims'])
+            ->whereIn('status', ['RELEASED', 'RECEIVED'])
+            ->orderBy('distribution_record_id')
+            ->get();
+
+        foreach ($records as $record) {
+            if (! $record instanceof DistributionRecord) {
+                continue;
+            }
+
+            if ($record->items->isNotEmpty()) {
+                continue;
+            }
+
+            $supplyItems = $record->supplyRequest?->items ?? collect();
+            foreach ($supplyItems as $supplyItem) {
+                $inventory = Inventory::query()->where('item_id', (int) $supplyItem->item_id)->first();
+                if (! $inventory instanceof Inventory) {
+                    continue;
+                }
+
+                $releaseQty = min((float) $supplyItem->quantity_requested, max((float) $inventory->available_stock, 0));
+                if ($releaseQty <= 0) {
+                    continue;
+                }
+
+                try {
+                    $distributionService->addDistributionItem($record, $gsoUser, [
+                        'item_id' => (int) $supplyItem->item_id,
+                        'received_by' => $record->received_by,
+                        'item_name_snapshot' => (string) $supplyItem->item_name_snapshot,
+                        'quantity_released' => round($releaseQty, 2),
+                        'unit' => 'piece',
+                        'remarks' => 'Seeder normalization: linked released item from supply request context.',
+                    ]);
+                } catch (Throwable $exception) {
+                    Log::warning('DemoWorkflowSeeder distribution item normalization skipped.', [
+                        'distribution_record_id' => (int) $record->distribution_record_id,
+                        'item_id' => (int) $supplyItem->item_id,
+                        'message' => $exception->getMessage(),
+                    ]);
+                }
+            }
+        }
+
+        $claimTarget = DistributionRecord::query()
+            ->with(['items'])
+            ->whereIn('status', ['RELEASED', 'RECEIVED'])
+            ->whereHas('items')
+            ->whereDoesntHave('claims')
+            ->orderByDesc('distribution_record_id')
+            ->first();
+
+        if (! $claimTarget instanceof DistributionRecord) {
+            return;
+        }
+
+        $officeUser = User::query()
+            ->where('office_id', (int) $claimTarget->office_id)
+            ->whereHas('role', fn ($query) => $query->where('role_code', 'OFFICE_USER'))
+            ->first();
+
+        if (! $officeUser instanceof User) {
+            return;
+        }
+
+        try {
+            $claimService->createClaim($officeUser, [
+                'distribution_record_id' => (int) $claimTarget->distribution_record_id,
+                'office_id' => (int) $claimTarget->office_id,
+                'claim_type' => 'QUANTITY_MISMATCH',
+                'claim_date' => now()->toDateString(),
+                'claim_location' => 'Office receiving point',
+                'remarks' => 'Seeder normalization: quantity mismatch issue linked to a released record.',
+                'distribution_record' => $claimTarget,
+            ]);
+        } catch (Throwable $exception) {
+            Log::warning('DemoWorkflowSeeder claim normalization skipped.', [
+                'distribution_record_id' => (int) $claimTarget->distribution_record_id,
+                'message' => $exception->getMessage(),
             ]);
         }
     }

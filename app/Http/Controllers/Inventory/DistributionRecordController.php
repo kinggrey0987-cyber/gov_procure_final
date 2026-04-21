@@ -25,6 +25,8 @@ class DistributionRecordController
 
         $records = DistributionRecord::query()
             ->with(['supplyRequest', 'delivery', 'office', 'preparer', 'receiver'])
+            ->withCount(['items', 'claims'])
+            ->whereIn('status', ['RELEASED', 'RECEIVED'])
             ->orderByDesc('created_at')
             ->paginate(20);
 
@@ -83,10 +85,68 @@ class DistributionRecordController
     {
         abort_unless(auth()->user()->can('distribution.view', $distribution_record), 403);
 
-        $distribution_record->load(['items.item', 'claims.claimant', 'supplyRequest', 'delivery', 'office', 'preparer', 'receiver']);
+        $distribution_record->load([
+            'items.item.category',
+            'claims.claimant',
+            'supplyRequest.office',
+            'delivery',
+            'office',
+            'preparer',
+            'receiver',
+        ]);
 
         return Inertia::render('Inventory/Distribution/Show', [
-            'record' => $distribution_record,
+            'record' => [
+                'distribution_record_id' => (int) $distribution_record->distribution_record_id,
+                'distribution_code' => (string) $distribution_record->distribution_code,
+                'status' => (string) $distribution_record->status,
+                'release_date' => optional($distribution_record->release_date)?->toDateString(),
+                'storage_location' => $distribution_record->storage_location,
+                'notes' => $distribution_record->notes,
+                'office' => $distribution_record->office ? [
+                    'id' => (int) $distribution_record->office->id,
+                    'name' => (string) $distribution_record->office->name,
+                ] : null,
+                'supply_request' => $distribution_record->supplyRequest ? [
+                    'supply_request_id' => (int) $distribution_record->supplyRequest->supply_request_id,
+                    'request_code' => (string) $distribution_record->supplyRequest->request_code,
+                    'status' => (string) $distribution_record->supplyRequest->status,
+                ] : null,
+                'delivery' => $distribution_record->delivery ? [
+                    'delivery_id' => (int) $distribution_record->delivery->delivery_id,
+                    'delivery_code' => (string) $distribution_record->delivery->delivery_code,
+                ] : null,
+                'preparer' => $distribution_record->preparer ? [
+                    'id' => (int) $distribution_record->preparer->id,
+                    'name' => (string) $distribution_record->preparer->name,
+                ] : null,
+                'receiver' => $distribution_record->receiver ? [
+                    'id' => (int) $distribution_record->receiver->id,
+                    'name' => (string) $distribution_record->receiver->name,
+                ] : null,
+                'items' => $distribution_record->items->map(fn ($item): array => [
+                    'distribution_item_id' => (int) $item->distribution_item_id,
+                    'item_id' => (int) $item->item_id,
+                    'item_name_snapshot' => (string) $item->item_name_snapshot,
+                    'quantity_released' => (float) $item->quantity_released,
+                    'unit' => (string) $item->unit,
+                    'remarks' => $item->remarks,
+                    'item' => $item->item ? [
+                        'item_name' => (string) $item->item->item_name,
+                        'category_name' => (string) ($item->item->category?->category_name ?? ''),
+                    ] : null,
+                ])->values(),
+                'claims' => $distribution_record->claims->map(fn ($claim): array => [
+                    'claims_id' => (int) $claim->claims_id,
+                    'claim_code' => (string) $claim->claim_code,
+                    'status' => (string) $claim->status,
+                    'claim_type' => (string) $claim->claim_type,
+                    'claim_date' => optional($claim->claim_date)?->toDateString(),
+                    'claimant' => $claim->claimant ? [
+                        'name' => (string) $claim->claimant->name,
+                    ] : null,
+                ])->values(),
+            ],
         ]);
     }
 

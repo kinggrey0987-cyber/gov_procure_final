@@ -1,7 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import useSmartRefresh from '@/hooks/useSmartRefresh';
 import { Head, Link, router } from '@inertiajs/react';
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 
 type ItemRow = {
     item_id: number;
@@ -43,13 +43,19 @@ type Props = {
 export default function ItemCatalogIndex({ items, categories, filters, canManage }: Props) {
     const { isRefreshing, refreshNow } = useSmartRefresh({
         only: ['items', 'categories', 'filters', 'canManage'],
-        refreshOnFocus: true,
-        refreshOnMount: true,
+        refreshOnFocus: false,
+        refreshOnMount: false,
     });
 
     const [q, setQ] = useState(filters.q ?? '');
     const [status, setStatus] = useState(filters.status ?? '');
     const [categoryId, setCategoryId] = useState(String(filters.category_id ?? ''));
+
+    useEffect(() => {
+        setQ(filters.q ?? '');
+        setStatus(filters.status ?? '');
+        setCategoryId(String(filters.category_id ?? ''));
+    }, [filters.category_id, filters.q, filters.status]);
 
     const submitFilters = (event: FormEvent) => {
         event.preventDefault();

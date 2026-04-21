@@ -23,7 +23,7 @@ class InventoryController
         abort_unless(auth()->user()->can('inventory.view-any'), 403);
 
         $inventories = Inventory::query()
-            ->with('item')
+            ->with('item.category')
             ->orderByDesc('last_updated')
             ->paginate(20);
 
@@ -36,10 +36,18 @@ class InventoryController
     {
         abort_unless(auth()->user()->can('inventory.view', $inventory), 403);
 
-        $inventory->load(['item', 'movements.performer']);
+        $inventory->load(['item.category']);
+
+        $recentMovements = $inventory->movements()
+            ->with('performer')
+            ->orderByDesc('movement_date')
+            ->orderByDesc('movement_id')
+            ->limit(10)
+            ->get();
 
         return Inertia::render('Inventory/Inventory/Show', [
             'inventory' => $inventory,
+            'recentMovements' => $recentMovements,
         ]);
     }
 

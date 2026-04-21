@@ -389,7 +389,7 @@ class InventoryDistributionFoundationTest extends TestCase
 
         $this->actingAs($this->gsoOfficer)
             ->post(route('inventory.office-supply-requests.queue', $context['supplyRequest']->supply_request_id))
-            ->assertRedirect(route('inventory.procurement-requests.index'));
+            ->assertRedirect(route('inventory.office-supply-requests.index'));
 
         $purchaseRequest = PurchaseRequest::query()
             ->where('supply_request_id', $context['supplyRequest']->supply_request_id)
@@ -410,7 +410,7 @@ class InventoryDistributionFoundationTest extends TestCase
 
         $this->actingAs($this->gsoOfficer)
             ->post(route('inventory.office-supply-requests.queue', $context['supplyRequest']->supply_request_id))
-            ->assertRedirect(route('inventory.procurement-requests.index'));
+            ->assertRedirect(route('inventory.office-supply-requests.index'));
 
         $this->actingAs($this->gsoOfficer)
             ->post(route('inventory.office-supply-requests.queue', $context['supplyRequest']->supply_request_id))

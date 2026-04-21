@@ -6,6 +6,9 @@ type RecordRow = {
     distribution_code: string;
     status: string;
     release_date?: string | null;
+    supply_request?: { request_code?: string | null } | null;
+    items_count: number;
+    claims_count: number;
     office?: { name?: string | null } | null;
     office_id?: number | string;
 };
@@ -41,9 +44,11 @@ export default function DistributionIndex({ records }: Props) {
                         <thead className="bg-slate-50">
                             <tr>
                                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Code</th>
+                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Linked Office Request</th>
                                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Office</th>
                                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Status</th>
                                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Release Date</th>
+                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Items / Claims</th>
                                 <th className="px-4 py-3 text-right font-semibold text-slate-700">Action</th>
                             </tr>
                         </thead>
@@ -51,11 +56,13 @@ export default function DistributionIndex({ records }: Props) {
                             {records.data.map((row) => (
                                 <tr key={row.distribution_record_id} className="hover:bg-slate-50/60">
                                     <td className="px-4 py-3 font-mono text-xs text-slate-700">{row.distribution_code}</td>
+                                    <td className="px-4 py-3 font-mono text-xs text-slate-700">{row.supply_request?.request_code ?? '-'}</td>
                                     <td className="px-4 py-3 text-slate-700">{row.office?.name ?? row.office_id ?? '-'}</td>
                                     <td className="px-4 py-3">
-                                        <span className={statusClass(row.status)}>{row.status}</span>
+                                        <span className={statusClass(row.status)}>{displayDistributionStatus(row.status)}</span>
                                     </td>
                                     <td className="px-4 py-3 text-slate-600">{row.release_date || '-'}</td>
+                                    <td className="px-4 py-3 text-slate-600">{row.items_count} released / {row.claims_count} claim(s)</td>
                                     <td className="px-4 py-3 text-right">
                                         <Link
                                             href={route('inventory.distribution-records.show', row.distribution_record_id)}
@@ -84,4 +91,13 @@ function statusClass(status: string) {
     };
 
     return map[status] ?? `${base} bg-slate-100 text-slate-700`;
+}
+
+function displayDistributionStatus(status: string): string {
+    const map: Record<string, string> = {
+        RELEASED: 'Released to Office',
+        RECEIVED: 'Received by Office',
+    };
+
+    return map[status] ?? status;
 }

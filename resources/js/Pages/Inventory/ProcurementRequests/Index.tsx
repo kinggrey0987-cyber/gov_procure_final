@@ -81,6 +81,7 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                             This queue identifies office requests that cannot be fulfilled from current stock. It prepares purchase request initiation inputs and does not perform
                             BAC approval or adjudication.
                         </p>
+                        <p className="mt-2 text-xs text-slate-500">Shortage values are computed against currently available stock in inventory.</p>
                         <div className="mt-4 space-y-3">
                             {shortageCandidates.slice(0, 6).map((candidate) => (
                                 <div key={candidate.supply_request_id} className="rounded-lg border border-rose-100 bg-rose-50/60 p-3">
@@ -95,12 +96,15 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
 
                     <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Low Stock Signals</h3>
+                        <p className="mt-2 text-xs text-slate-500">
+                            Low Stock Threshold is the minimum safety stock level. Deficit is the gap between current available stock and that threshold.
+                        </p>
                         <div className="mt-4 space-y-3">
                             {lowStockItems.slice(0, 6).map((item) => (
                                 <div key={item.inventory_id} className="rounded-lg border border-amber-100 bg-amber-50/70 p-3">
                                     <p className="text-sm font-semibold text-slate-800">{item.item_name}</p>
                                     <p className="text-xs text-slate-600">
-                                        Available {item.available_stock.toFixed(2)} / Threshold {item.low_stock_threshold.toFixed(2)}
+                                        Available {item.available_stock.toFixed(2)} / Low Stock Threshold {item.low_stock_threshold.toFixed(2)}
                                     </p>
                                     <p className="mt-1 text-xs font-semibold text-amber-700">Deficit: {item.deficit.toFixed(2)}</p>
                                 </div>
@@ -129,7 +133,7 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                                     <td className="px-4 py-3 font-mono text-xs text-slate-700">{request.supply_request?.request_code ?? '-'}</td>
                                     <td className="px-4 py-3 text-slate-700">{request.office?.name ?? '-'}</td>
                                     <td className="px-4 py-3">
-                                        <span className="inline-flex rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">{request.status}</span>
+                                        <span className="inline-flex rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">{displayPurchaseRequestStatus(request.status)}</span>
                                     </td>
                                     <td className="px-4 py-3 text-right text-xs font-semibold text-slate-700">PR-{String(request.purchase_request_id).padStart(6, '0')}</td>
                                 </tr>
@@ -160,4 +164,15 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
             </div>
         </AuthenticatedLayout>
     );
+}
+
+function displayPurchaseRequestStatus(status: string): string {
+    const map: Record<string, string> = {
+        OPEN: 'Queued for Procurement',
+        PROCESSING: 'In Procurement Processing',
+        COMPLETED: 'Completed',
+        PENDING: 'Pending Review',
+    };
+
+    return map[status] ?? status;
 }
