@@ -576,6 +576,52 @@ class InventoryDistributionFoundationTest extends TestCase
         ]);
     }
 
+    public function test_low_stock_signal_without_eligible_shortage_request_is_not_initiable_and_creates_no_purchase_request(): void
+    {
+        $category = ItemCategory::query()->create([
+            'category_name' => 'No Shortage Candidate '.uniqid(),
+            'standard_delivery_days' => 7,
+            'description' => 'Low stock without shortage-request candidate',
+            'status' => 'ACTIVE',
+        ]);
+
+        $item = Item::query()->create([
+            'item_category_id' => $category->item_category_id,
+            'item_name' => 'Low Stock With No Candidate',
+            'description' => 'No candidate test item',
+            'default_unit' => 'PCS',
+            'status' => 'ACTIVE',
+        ]);
+
+        $inventory = Inventory::query()->create([
+            'item_id' => $item->item_id,
+            'available_stock' => 1,
+            'stock_on_hand' => 1,
+            'reserved_quantity' => 0,
+            'released_quantity' => 0,
+            'low_stock_threshold' => 4,
+            'last_updated' => now(),
+        ]);
+
+        $this->actingAs($this->gsoOfficer)
+            ->get(route('inventory.procurement-requests.index'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('lowStockItems.0.inventory_id', (int) $inventory->inventory_id)
+                ->where('lowStockItems.0.item_name', 'Low Stock With No Candidate')
+                ->where('lowStockItems.0.can_initiate', false)
+            );
+
+        $purchaseRequestCountBefore = PurchaseRequest::query()->count();
+
+        $this->actingAs($this->gsoOfficer)
+            ->post(route('inventory.procurement-requests.initiate-low-stock', (int) $inventory->inventory_id))
+            ->assertRedirect(route('inventory.procurement-requests.index', [
+                'focus_inventory_id' => (int) $inventory->inventory_id,
+            ]));
+
+        $this->assertSame($purchaseRequestCountBefore, PurchaseRequest::query()->count());
+    }
+
     public function test_inventory_office_supply_request_show_exposes_real_items_without_hardcoded_data(): void
     {
         $context = $this->createSubmittedSupplyRequestForQueue($this->officeA, $this->officeUserA, 9021, 9, 4);

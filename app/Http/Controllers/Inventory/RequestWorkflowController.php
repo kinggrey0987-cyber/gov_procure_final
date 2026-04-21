@@ -244,6 +244,28 @@ class RequestWorkflowController
 
         $focusInventoryId = (int) request()->query('focus_inventory_id', 0);
 
+        $shortageCandidateItemIds = SupplyRequest::query()
+            ->submitted()
+            ->whereDoesntHave('purchaseRequests')
+            ->whereDoesntHave('distributionRecords')
+            ->with(['items.item.inventory'])
+            ->get()
+            ->flatMap(function (SupplyRequest $request) {
+                return $request->items
+                    ->filter(function (SupplyRequestItem $item): bool {
+                        $requested = (float) $item->quantity_requested;
+                        $available = (float) ($item->item?->inventory?->available_stock ?? 0);
+
+                        return max($requested - $available, 0) > 0;
+                    })
+                    ->map(fn (SupplyRequestItem $item): int => (int) $item->item_id);
+            })
+            ->unique()
+            ->values()
+            ->all();
+
+        $shortageCandidateItemLookup = array_flip($shortageCandidateItemIds);
+
         $purchaseRequests = PurchaseRequest::query()
             ->with(['office', 'requester', 'supplyRequest'])
             ->latest('purchase_request_id')
@@ -288,13 +310,18 @@ class RequestWorkflowController
             ->orderByRaw('(low_stock_threshold - available_stock) DESC')
             ->limit(12)
             ->get()
-            ->map(fn (Inventory $inventory): array => [
-                'inventory_id' => (int) $inventory->inventory_id,
-                'item_name' => (string) ($inventory->item?->item_name ?? 'Unassigned Item'),
-                'available_stock' => (float) $inventory->available_stock,
-                'low_stock_threshold' => (float) $inventory->low_stock_threshold,
-                'deficit' => round(max((float) $inventory->low_stock_threshold - (float) $inventory->available_stock, 0), 2),
-            ])
+            ->map(function (Inventory $inventory) use ($shortageCandidateItemLookup): array {
+                $itemId = (int) $inventory->item_id;
+
+                return [
+                    'inventory_id' => (int) $inventory->inventory_id,
+                    'item_name' => (string) ($inventory->item?->item_name ?? 'Unassigned Item'),
+                    'available_stock' => (float) $inventory->available_stock,
+                    'low_stock_threshold' => (float) $inventory->low_stock_threshold,
+                    'deficit' => round(max((float) $inventory->low_stock_threshold - (float) $inventory->available_stock, 0), 2),
+                    'can_initiate' => isset($shortageCandidateItemLookup[$itemId]),
+                ];
+            })
             ->filter(fn (array $row): bool => $row['deficit'] > 0)
             ->values();
 
