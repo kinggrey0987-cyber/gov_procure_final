@@ -223,8 +223,9 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
             $this->outputLine('Stage: January office requests seeded.');
 
             $this->outputLine('Stage: February procurement scenarios started.');
-            $this->seedAt('2026-02-10', function () use (&$requests, &$purchaseOrders, $procUser, $supplier, $secondarySupplier): void {
+            $this->seedAt('2026-02-10', function () use (&$requests, &$purchaseOrders, $gsoUser, $procUser, $supplier, $secondarySupplier): void {
                     $purchaseOrders['mpdo-jan-paper'] = $this->seedProcurementFlow(
+                        gsoActor: $gsoUser,
                         actor: $procUser,
                         supplyRequest: $requests['mpdo-jan-paper'],
                         supplier: $supplier,
@@ -235,6 +236,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                     );
 
                     $purchaseOrders['mpdo-jan-file'] = $this->seedProcurementFlow(
+                        gsoActor: $gsoUser,
                         actor: $procUser,
                         supplyRequest: $requests['mpdo-jan-file'],
                         supplier: $supplier,
@@ -245,6 +247,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                     );
 
                     $purchaseOrders['mswdo-jan-hygiene'] = $this->seedProcurementFlow(
+                        gsoActor: $gsoUser,
                         actor: $procUser,
                         supplyRequest: $requests['mswdo-jan-hygiene'],
                         supplier: $secondarySupplier,
@@ -255,6 +258,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                     );
 
                     $purchaseOrders['eng-jan-ink'] = $this->seedProcurementFlow(
+                        gsoActor: $gsoUser,
                         actor: $procUser,
                         supplyRequest: $requests['eng-jan-ink'],
                         supplier: $supplier,
@@ -310,8 +314,9 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
             $this->outputLine('Stage: February office requests seeded.');
 
             $this->outputLine('Stage: March procurement scenarios started.');
-            $this->seedAt('2026-03-12', function () use (&$requests, &$purchaseOrders, $procUser, $supplier, $secondarySupplier): void {
+            $this->seedAt('2026-03-12', function () use (&$requests, &$purchaseOrders, $gsoUser, $procUser, $supplier, $secondarySupplier): void {
                     $purchaseOrders['mpdo-feb-paper'] = $this->seedProcurementFlow(
+                        gsoActor: $gsoUser,
                         actor: $procUser,
                         supplyRequest: $requests['mpdo-feb-paper'],
                         supplier: $supplier,
@@ -322,6 +327,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                     );
 
                     $purchaseOrders['mswdo-feb-cleaning'] = $this->seedProcurementFlow(
+                        gsoActor: $gsoUser,
                         actor: $procUser,
                         supplyRequest: $requests['mswdo-feb-cleaning'],
                         supplier: $secondarySupplier,
@@ -332,6 +338,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                     );
 
                     $purchaseOrders['eng-feb-mouse'] = $this->seedProcurementFlow(
+                        gsoActor: $gsoUser,
                         actor: $procUser,
                         supplyRequest: $requests['eng-feb-mouse'],
                         supplier: $supplier,
@@ -388,8 +395,9 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
             });
             $this->outputLine('Stage: March office requests seeded.');
 
-            $this->seedAt('2026-03-22', function () use (&$requests, &$purchaseOrders, $procUser, $supplier, $secondarySupplier): void {
+            $this->seedAt('2026-03-22', function () use (&$requests, &$purchaseOrders, $gsoUser, $procUser, $supplier, $secondarySupplier): void {
                     $purchaseOrders['mpdo-mar-forms'] = $this->seedProcurementFlow(
+                        gsoActor: $gsoUser,
                         actor: $procUser,
                         supplyRequest: $requests['mpdo-mar-forms'],
                         supplier: $supplier,
@@ -400,6 +408,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                     );
 
                     $purchaseOrders['mswdo-mar-cleaning'] = $this->seedProcurementFlow(
+                        gsoActor: $gsoUser,
                         actor: $procUser,
                         supplyRequest: $requests['mswdo-mar-cleaning'],
                         supplier: $secondarySupplier,
@@ -410,6 +419,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                     );
 
                     $purchaseOrders['eng-mar-print'] = $this->seedProcurementFlow(
+                        gsoActor: $gsoUser,
                         actor: $procUser,
                         supplyRequest: $requests['eng-mar-print'],
                         supplier: $supplier,
@@ -448,7 +458,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                 );
             });
 
-            $this->seedAt('2026-04-10', function () use (&$requests, &$purchaseOrders, $mpdoUser, $engUser, $approvedPpmps, $procUser, $supplier, $secondarySupplier): void {
+            $this->seedAt('2026-04-10', function () use (&$requests, &$purchaseOrders, $gsoUser, $mpdoUser, $engUser, $approvedPpmps, $procUser, $supplier, $secondarySupplier): void {
                     $requests['mpdo-apr-paper'] = $this->seedSupplyRequest(
                         actor: $mpdoUser,
                         ppmp: $approvedPpmps['MPDO'],
@@ -489,6 +499,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                     );
 
                     $purchaseOrders['mpdo-apr-paper'] = $this->seedProcurementFlow(
+                        gsoActor: $gsoUser,
                         actor: $procUser,
                         supplyRequest: $requests['mpdo-apr-paper'],
                         supplier: $supplier,
@@ -499,6 +510,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                     );
 
                     $purchaseOrders['mpdo-apr-surge'] = $this->seedProcurementFlow(
+                        gsoActor: $gsoUser,
                         actor: $procUser,
                         supplyRequest: $requests['mpdo-apr-surge'],
                         supplier: $supplier,
@@ -509,6 +521,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                     );
 
                     $purchaseOrders['eng-apr-ink'] = $this->seedProcurementFlow(
+                        gsoActor: $gsoUser,
                         actor: $procUser,
                         supplyRequest: $requests['eng-apr-ink'],
                         supplier: $secondarySupplier,
@@ -599,8 +612,9 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                     );
             });
 
-            $this->seedAt('2026-04-23', function () use (&$purchaseOrders, $procUser, $supplier, $secondarySupplier, $requests): void {
+            $this->seedAt('2026-04-23', function () use (&$purchaseOrders, $gsoUser, $procUser, $supplier, $secondarySupplier, $requests): void {
                     $purchaseOrders['mpdo-apr-burst-1'] = $this->seedProcurementFlow(
+                        gsoActor: $gsoUser,
                         actor: $procUser,
                         supplyRequest: $requests['mpdo-apr-burst-1'],
                         supplier: $supplier,
@@ -611,6 +625,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                     );
 
                     $purchaseOrders['mpdo-apr-burst-2'] = $this->seedProcurementFlow(
+                        gsoActor: $gsoUser,
                         actor: $procUser,
                         supplyRequest: $requests['mpdo-apr-burst-2'],
                         supplier: $supplier,
@@ -621,6 +636,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                     );
 
                     $purchaseOrders['mpdo-apr-burst-3'] = $this->seedProcurementFlow(
+                        gsoActor: $gsoUser,
                         actor: $procUser,
                         supplyRequest: $requests['mpdo-apr-burst-3'],
                         supplier: $secondarySupplier,
@@ -631,6 +647,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                     );
 
                     $purchaseOrders['mswdo-apr-hygiene'] = $this->seedProcurementFlow(
+                        gsoActor: $gsoUser,
                         actor: $procUser,
                         supplyRequest: $requests['mswdo-apr-hygiene'],
                         supplier: $secondarySupplier,
@@ -641,6 +658,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                     );
 
                     $purchaseOrders['eng-apr-ink-burst'] = $this->seedProcurementFlow(
+                        gsoActor: $gsoUser,
                         actor: $procUser,
                         supplyRequest: $requests['eng-apr-ink-burst'],
                         supplier: $supplier,
@@ -1001,6 +1019,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
     }
 
     private function seedProcurementFlow(
+        User $gsoActor,
         User $actor,
         SupplyRequest $supplyRequest,
         Supplier $supplier,
@@ -1014,9 +1033,11 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
 
         $purchaseRequest = PurchaseRequest::query()->where('supply_request_id', (int) $supplyRequest->supply_request_id)->first();
         if (! $purchaseRequest instanceof PurchaseRequest) {
-            $purchaseRequest = $purchaseRequestService->createFromSupplyRequest($actor, [
+            $this->forceShortageForSupplyRequest($supplyRequest);
+
+            $purchaseRequest = $purchaseRequestService->queueFromSupplyRequest($gsoActor, [
                 'supply_request_id' => (int) $supplyRequest->supply_request_id,
-                'remarks' => 'Auto-created from longitudinal demo supply request.',
+                'remarks' => 'Queued by GSO during longitudinal demo shortage validation.',
             ]);
         }
 
@@ -1195,6 +1216,36 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
             'approved_by' => (int) $gsoUser->id,
             'approved_at' => now(),
         ])->save();
+    }
+
+    private function forceShortageForSupplyRequest(SupplyRequest $supplyRequest): void
+    {
+        $supplyRequest->loadMissing('items');
+
+        foreach ($supplyRequest->items as $requestItem) {
+            if (! $requestItem instanceof SupplyRequestItem) {
+                continue;
+            }
+
+            $requested = (float) $requestItem->quantity_requested;
+            if ($requested <= 0) {
+                continue;
+            }
+
+            $inventory = Inventory::query()->where('item_id', (int) $requestItem->item_id)->first();
+            if (! $inventory instanceof Inventory) {
+                continue;
+            }
+
+            $forcedAvailable = max(min((float) $inventory->available_stock, $requested - 2), 0);
+            $forcedOnHand = max((float) $inventory->stock_on_hand, $forcedAvailable);
+
+            $inventory->forceFill([
+                'available_stock' => $forcedAvailable,
+                'stock_on_hand' => $forcedOnHand,
+                'last_updated' => now(),
+            ])->save();
+        }
     }
 
     private function seedClaimForDelivery(

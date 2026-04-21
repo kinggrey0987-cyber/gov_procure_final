@@ -35,6 +35,7 @@ class DemoDataResetService
             'supply_requests',
             'ppmp_items',
             'ppmp',
+            'suppliers',
             'public_disclosures',
             'documents',
             'two_factor_challenges',
@@ -53,6 +54,8 @@ class DemoDataResetService
         });
 
         Storage::disk('public')->deleteDirectory('public_disclosures');
+        Storage::disk('public')->deleteDirectory('documents/public_disclosures');
+        Storage::disk('public')->deleteDirectory('reports/public_disclosures');
 
         return $tables;
     }

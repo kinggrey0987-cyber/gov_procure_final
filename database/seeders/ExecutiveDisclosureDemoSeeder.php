@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Document;
 use App\Models\DistributionRecord;
 use App\Models\Ppmp;
 use App\Models\PublicDisclosure;
@@ -9,6 +10,7 @@ use App\Models\PurchaseOrder;
 use App\Models\User;
 use App\Services\Analytics\PublicDisclosureService;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 
 class ExecutiveDisclosureDemoSeeder extends Seeder
@@ -25,9 +27,27 @@ class ExecutiveDisclosureDemoSeeder extends Seeder
             return;
         }
 
-        $ppmp = Ppmp::query()->where('status', 'APPROVED')->latest('updated_at')->first();
-        $purchaseOrder = PurchaseOrder::query()->whereIn('status', ['COMPLETED', 'PLACED'])->latest('updated_at')->first();
-        $distribution = DistributionRecord::query()->where('status', 'RECEIVED')->latest('updated_at')->first();
+        $approvedPpmps = Ppmp::query()
+            ->where('status', 'APPROVED')
+            ->latest('updated_at')
+            ->take(4)
+            ->get();
+
+        $purchaseOrders = PurchaseOrder::query()
+            ->whereIn('status', ['COMPLETED', 'PLACED'])
+            ->latest('updated_at')
+            ->take(4)
+            ->get();
+
+        $receivedDistributions = DistributionRecord::query()
+            ->whereIn('status', ['RECEIVED', 'RELEASED'])
+            ->latest('updated_at')
+            ->take(4)
+            ->get();
+
+        $ppmp = $approvedPpmps->first();
+        $purchaseOrder = $purchaseOrders->first();
+        $distribution = $receivedDistributions->first();
 
         if (! $ppmp || ! $purchaseOrder || ! $distribution) {
             $this->command?->warn('ExecutiveDisclosureDemoSeeder skipped: eligible workflow records are incomplete.');
@@ -35,49 +55,99 @@ class ExecutiveDisclosureDemoSeeder extends Seeder
             return;
         }
 
-        Storage::disk('public')->put(
-            'public_disclosures/procurement-summary-notice.txt',
-            "GovSupply Connect procurement summary notice\nGenerated for executive DSS demo seeding.\n"
-        );
-
-        Storage::disk('public')->put(
-            'public_disclosures/distribution-summary-notice.txt',
-            "GovSupply Connect distribution summary notice\nGenerated for executive DSS demo seeding.\n"
-        );
-
         $service = app(PublicDisclosureService::class);
 
-        $this->ensurePublishedDisclosure(
-            title: 'Procurement Summary Notice',
-            actor: $executive,
-            payload: [
+        $primaryPpmp = $approvedPpmps->first();
+        $secondaryPpmp = $approvedPpmps->skip(1)->first();
+        $tertiaryPpmp = $approvedPpmps->skip(2)->first();
+        $secondaryPurchaseOrder = $purchaseOrders->skip(1)->first();
+        $primaryDistribution = $receivedDistributions->first();
+        $secondaryDistribution = $receivedDistributions->skip(1)->first();
+
+        $publishedDefinitions = [
+            [
                 'title' => 'Procurement Summary Notice',
                 'type' => 'PROCUREMENT_SUMMARY',
                 'reference_type' => Ppmp::class,
                 'reference_id' => (int) $ppmp->ppmp_id,
                 'description' => 'Executive-approved PPMP procurement summary for public transparency.',
-                'file_path' => 'public_disclosures/procurement-summary-notice.txt',
-                'status' => 'PUBLISHED',
                 'remarks' => 'Published as part of executive transparency briefing.',
+                'attachments' => [
+                    ['title' => 'Procurement Summary CSV', 'suffix' => 'procurement-summary.csv', 'body' => "office,doc_type,reference_id,generated_at\nMULTI-OFFICE,PROCUREMENT_SUMMARY,{$ppmp->ppmp_id},".now()->toIso8601String()."\n"],
+                    ['title' => 'Procurement Certification', 'suffix' => 'procurement-certification.txt', 'body' => "Certification\nSource record: PPMP #{$ppmp->ppmp_id}\nStatus: APPROVED\n"],
+                ],
             ],
-            service: $service,
-        );
-
-        $this->ensurePublishedDisclosure(
-            title: 'Office Supply Distribution Summary',
-            actor: $executive,
-            payload: [
+            [
                 'title' => 'Office Supply Distribution Summary',
                 'type' => 'DISTRIBUTION_SUMMARY',
                 'reference_type' => DistributionRecord::class,
                 'reference_id' => (int) $distribution->distribution_record_id,
                 'description' => 'Completed office supply distribution summary for public visibility.',
-                'file_path' => 'public_disclosures/distribution-summary-notice.txt',
-                'status' => 'PUBLISHED',
                 'remarks' => 'Published after delivery verification completion.',
+                'attachments' => [
+                    ['title' => 'Distribution Register', 'suffix' => 'distribution-register.csv', 'body' => "distribution_record_id,status,generated_at\n{$distribution->distribution_record_id},{$distribution->status},".now()->toIso8601String()."\n"],
+                ],
             ],
-            service: $service,
-        );
+        ];
+
+        if ($secondaryPpmp instanceof Ppmp) {
+            $publishedDefinitions[] = [
+                'title' => 'Quarterly Procurement Brief',
+                'type' => 'PROCUREMENT_SUMMARY',
+                'reference_type' => Ppmp::class,
+                'reference_id' => (int) $secondaryPpmp->ppmp_id,
+                'description' => 'Quarterly procurement summary for a different approved office plan.',
+                'remarks' => 'Published for public-facing procurement transparency.',
+                'attachments' => [
+                    ['title' => 'Q1 Procurement Breakdown', 'suffix' => 'q1-procurement-breakdown.txt', 'body' => "Quarterly Breakdown\nPPMP: {$secondaryPpmp->ppmp_id}\nPublished: ".now()->toDateString()."\n"],
+                ],
+            ];
+        }
+
+        if ($primaryDistribution instanceof DistributionRecord) {
+            $publishedDefinitions[] = [
+                'title' => 'Distribution Release Brief',
+                'type' => 'DISTRIBUTION_SUMMARY',
+                'reference_type' => DistributionRecord::class,
+                'reference_id' => (int) $primaryDistribution->distribution_record_id,
+                'description' => 'Published office distribution brief for public transparency.',
+                'remarks' => 'Published from a real received distribution record.',
+                'attachments' => [
+                    ['title' => 'Release Acknowledgement', 'suffix' => 'distribution-release-ack.txt', 'body' => "Distribution Acknowledgement\nDistribution: {$primaryDistribution->distribution_record_id}\nStatus: {$primaryDistribution->status}\n"],
+                ],
+            ];
+        }
+
+        foreach ($publishedDefinitions as $definition) {
+            $reportPath = $this->writeDisclosureMainFile(
+                title: (string) $definition['title'],
+                type: (string) $definition['type'],
+                referenceType: (string) $definition['reference_type'],
+                referenceId: (int) $definition['reference_id'],
+            );
+
+            $disclosure = $this->ensurePublishedDisclosure(
+                title: (string) $definition['title'],
+                actor: $executive,
+                payload: [
+                    'title' => (string) $definition['title'],
+                    'type' => (string) $definition['type'],
+                    'reference_type' => (string) $definition['reference_type'],
+                    'reference_id' => (int) $definition['reference_id'],
+                    'description' => (string) $definition['description'],
+                    'file_path' => $reportPath,
+                    'status' => 'PUBLISHED',
+                    'remarks' => (string) $definition['remarks'],
+                ],
+                service: $service,
+            );
+
+            $this->syncDisclosureAttachments(
+                disclosure: $disclosure,
+                actor: $executive,
+                attachments: $definition['attachments'] ?? [],
+            );
+        }
 
         $this->ensureDraftDisclosure(
             title: 'Draft Transparency Notice',
@@ -93,77 +163,6 @@ class ExecutiveDisclosureDemoSeeder extends Seeder
             ],
             service: $service,
         );
-
-        $approvedPpmps = Ppmp::query()
-            ->where('status', 'APPROVED')
-            ->latest('updated_at')
-            ->take(3)
-            ->get();
-
-        $purchaseOrders = PurchaseOrder::query()
-            ->whereIn('status', ['COMPLETED', 'PLACED'])
-            ->latest('updated_at')
-            ->take(3)
-            ->get();
-
-        $receivedDistributions = DistributionRecord::query()
-            ->whereIn('status', ['RECEIVED', 'RELEASED'])
-            ->latest('updated_at')
-            ->take(3)
-            ->get();
-
-        $primaryPpmp = $approvedPpmps->first();
-        $secondaryPpmp = $approvedPpmps->skip(1)->first();
-        $tertiaryPpmp = $approvedPpmps->skip(2)->first();
-        $secondaryPurchaseOrder = $purchaseOrders->skip(1)->first();
-        $primaryDistribution = $receivedDistributions->first();
-        $secondaryDistribution = $receivedDistributions->skip(1)->first();
-
-        if ($secondaryPpmp instanceof Ppmp) {
-            Storage::disk('public')->put(
-                'public_disclosures/q1-procurement-brief.txt',
-                "GovSupply Connect quarter-start procurement brief\nGenerated for executive DSS demo seeding.\n"
-            );
-
-            $this->ensurePublishedDisclosure(
-                title: 'Quarterly Procurement Brief',
-                actor: $executive,
-                payload: [
-                    'title' => 'Quarterly Procurement Brief',
-                    'type' => 'PROCUREMENT_SUMMARY',
-                    'reference_type' => Ppmp::class,
-                    'reference_id' => (int) $secondaryPpmp->ppmp_id,
-                    'description' => 'Quarterly procurement summary for a different approved office plan.',
-                    'file_path' => 'public_disclosures/q1-procurement-brief.txt',
-                    'status' => 'PUBLISHED',
-                    'remarks' => 'Published for public-facing procurement transparency.',
-                ],
-                service: $service,
-            );
-        }
-
-        if ($primaryDistribution instanceof DistributionRecord) {
-            Storage::disk('public')->put(
-                'public_disclosures/distribution-release-brief.txt',
-                "GovSupply Connect distribution release brief\nGenerated for executive DSS demo seeding.\n"
-            );
-
-            $this->ensurePublishedDisclosure(
-                title: 'Distribution Release Brief',
-                actor: $executive,
-                payload: [
-                    'title' => 'Distribution Release Brief',
-                    'type' => 'DISTRIBUTION_SUMMARY',
-                    'reference_type' => DistributionRecord::class,
-                    'reference_id' => (int) $primaryDistribution->distribution_record_id,
-                    'description' => 'Published office distribution brief for public transparency.',
-                    'file_path' => 'public_disclosures/distribution-release-brief.txt',
-                    'status' => 'PUBLISHED',
-                    'remarks' => 'Published from a real received distribution record.',
-                ],
-                service: $service,
-            );
-        }
 
         if ($tertiaryPpmp instanceof Ppmp) {
             $this->ensureDraftDisclosure(
@@ -203,21 +202,35 @@ class ExecutiveDisclosureDemoSeeder extends Seeder
     /**
      * @param  array<string, mixed>  $payload
      */
-    private function ensurePublishedDisclosure(string $title, User $actor, array $payload, PublicDisclosureService $service): void
+    private function ensurePublishedDisclosure(string $title, User $actor, array $payload, PublicDisclosureService $service): PublicDisclosure
     {
         $existing = PublicDisclosure::query()->where('title', $title)->latest('disclosure_id')->first();
 
         if (! $existing instanceof PublicDisclosure) {
-            $service->createFromPayload($actor, $payload);
+            $created = $service->createFromPayload($actor, $payload);
 
-            return;
+            return $created->fresh() ?? $created;
         }
 
-        if ((string) $existing->status === 'PUBLISHED') {
-            return;
+        if ((string) $existing->status === 'DRAFT') {
+            $service->updateDraft($existing, $actor, $payload);
+            $published = $service->publish($existing->fresh() ?? $existing, $actor, $payload['remarks'] ?? null);
+
+            return $published->fresh() ?? $published;
         }
 
-        $service->publish($existing, $actor, $payload['remarks'] ?? null);
+        $existing->forceFill([
+            'type' => strtoupper((string) ($payload['type'] ?? $existing->type)),
+            'reference_type' => $payload['reference_type'] ?? $existing->reference_type,
+            'reference_id' => $payload['reference_id'] ?? $existing->reference_id,
+            'description' => $payload['description'] ?? $existing->description,
+            'file_path' => $payload['file_path'] ?? $existing->file_path,
+            'status' => 'PUBLISHED',
+            'published_by' => (int) ($existing->published_by ?? $actor->id),
+            'published_at' => $existing->published_at ?? now(),
+        ])->save();
+
+        return $existing->fresh() ?? $existing;
     }
 
     /**
@@ -235,5 +248,55 @@ class ExecutiveDisclosureDemoSeeder extends Seeder
         }
 
         $service->createFromPayload($actor, $payload);
+    }
+
+    private function writeDisclosureMainFile(string $title, string $type, string $referenceType, int $referenceId): string
+    {
+        $slug = strtolower(str_replace(' ', '-', trim($title)));
+        $path = sprintf('reports/public_disclosures/%s.txt', $slug);
+
+        Storage::disk('public')->put(
+            $path,
+            implode("\n", [
+                'GovSupply Connect Public Disclosure Report',
+                'Title: '.$title,
+                'Type: '.$type,
+                'Reference Type: '.$referenceType,
+                'Reference ID: '.$referenceId,
+                'Generated At: '.Carbon::now()->toIso8601String(),
+            ])."\n"
+        );
+
+        return $path;
+    }
+
+    /**
+     * @param  array<int, array{title: string, suffix: string, body: string}>  $attachments
+     */
+    private function syncDisclosureAttachments(PublicDisclosure $disclosure, User $actor, array $attachments): void
+    {
+        foreach ($attachments as $attachment) {
+            $path = sprintf(
+                'documents/public_disclosures/%d/%s',
+                (int) $disclosure->disclosure_id,
+                (string) $attachment['suffix'],
+            );
+
+            Storage::disk('public')->put($path, (string) $attachment['body']);
+
+            Document::query()->updateOrCreate(
+                [
+                    'related_module' => 'public_disclosures',
+                    'related_reference_id' => (int) $disclosure->disclosure_id,
+                    'title' => (string) $attachment['title'],
+                ],
+                [
+                    'uploaded_by' => (int) $actor->id,
+                    'file_name' => basename($path),
+                    'file_path' => $path,
+                    'uploaded_at' => now(),
+                ],
+            );
+        }
     }
 }
