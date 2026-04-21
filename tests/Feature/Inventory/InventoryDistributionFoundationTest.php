@@ -556,9 +556,9 @@ class InventoryDistributionFoundationTest extends TestCase
             );
     }
 
-    public function test_low_stock_signal_initiation_queues_matching_shortage_request_and_redirects_to_procurement_requests(): void
+    public function test_low_stock_signal_initiation_creates_purchase_request_and_redirects_to_procurement_requests(): void
     {
-        $context = $this->createSubmittedSupplyRequestForQueue($this->officeA, $this->officeUserA, 9020, 10, 2);
+        $context = $this->createSubmittedSupplyRequestForQueue($this->officeA, $this->officeUserA, 9020, 10, 1);
 
         $inventoryId = (int) Inventory::query()
             ->where('item_id', (int) $context['item']->item_id)
@@ -570,9 +570,14 @@ class InventoryDistributionFoundationTest extends TestCase
                 'focus_inventory_id' => $inventoryId,
             ]));
 
-        $this->assertDatabaseHas('purchase_requests', [
-            'supply_request_id' => $context['supplyRequest']->supply_request_id,
-            'status' => 'OPEN',
+        $created = PurchaseRequest::query()->latest('purchase_request_id')->firstOrFail();
+
+        $this->assertSame('OPEN', (string) $created->status);
+        $this->assertStringContainsString('LOW_STOCK_SIGNAL:inventory:'.$inventoryId, (string) $created->remarks);
+
+        $this->assertDatabaseHas('purchase_request_items', [
+            'purchase_request_id' => (int) $created->purchase_request_id,
+            'item_id' => (int) $context['item']->item_id,
         ]);
     }
 

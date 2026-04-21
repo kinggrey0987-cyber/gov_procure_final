@@ -35,6 +35,9 @@ type LowStockItem = {
     available_stock: number;
     low_stock_threshold: number;
     deficit: number;
+    suggested_quantity: number;
+    is_already_queued: boolean;
+    active_purchase_request_id?: number | null;
 };
 
 type Props = {
@@ -55,6 +58,7 @@ type Props = {
 
 export default function ProcurementRequestsIndex({ purchaseRequests, shortageCandidates, lowStockItems, atReorderItems, focusInventoryId = null }: Props) {
     const [initiatingInventoryId, setInitiatingInventoryId] = useState<number | null>(null);
+    const [quantityByInventoryId, setQuantityByInventoryId] = useState<Record<number, string>>({});
 
     const { isRefreshing, lastRefreshedAt } = useSmartRefresh({
         only: ['purchaseRequests', 'shortageCandidates', 'lowStockItems', 'atReorderItems', 'focusInventoryId'],
@@ -62,9 +66,17 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
         refreshOnMount: true,
     });
 
-    const initiateLowStockProcurement = (inventoryId: number) => {
-        setInitiatingInventoryId(inventoryId);
-        router.post(route('inventory.procurement-requests.initiate-low-stock', inventoryId), {}, {
+    const initiateLowStockProcurement = (item: LowStockItem) => {
+        const rawQuantity = quantityByInventoryId[item.inventory_id] ?? String(item.suggested_quantity);
+        const parsedQuantity = Number(rawQuantity);
+        const quantityRequested = Number.isFinite(parsedQuantity) && parsedQuantity > 0
+            ? parsedQuantity
+            : item.suggested_quantity;
+
+        setInitiatingInventoryId(item.inventory_id);
+        router.post(route('inventory.procurement-requests.initiate-low-stock', item.inventory_id), {
+            quantity_requested: quantityRequested,
+        }, {
             preserveScroll: true,
             onFinish: () => setInitiatingInventoryId(null),
         });
@@ -131,14 +143,39 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                                         Available {item.available_stock.toFixed(2)} / Low Stock Threshold {item.low_stock_threshold.toFixed(2)}
                                     </p>
                                     <p className="mt-1 text-xs font-semibold text-amber-700">Deficit: {item.deficit.toFixed(2)}</p>
+                                    <div className="mt-2">
+                                        <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-600">Requested Quantity</label>
+                                        <input
+                                            type="number"
+                                            min="0.01"
+                                            step="0.01"
+                                            value={quantityByInventoryId[item.inventory_id] ?? item.suggested_quantity.toFixed(2)}
+                                            disabled={item.is_already_queued}
+                                            onChange={(event) => {
+                                                const nextValue = event.target.value;
+                                                setQuantityByInventoryId((prev) => ({
+                                                    ...prev,
+                                                    [item.inventory_id]: nextValue,
+                                                }));
+                                            }}
+                                            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 disabled:cursor-not-allowed disabled:bg-slate-100"
+                                        />
+                                    </div>
                                     <button
                                         type="button"
-                                        disabled={initiatingInventoryId === item.inventory_id}
-                                        onClick={() => initiateLowStockProcurement(item.inventory_id)}
-                                        className="mt-2 inline-flex rounded-md border border-red-300 bg-white px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-50"
+                                        disabled={initiatingInventoryId === item.inventory_id || item.is_already_queued}
+                                        onClick={() => initiateLowStockProcurement(item)}
+                                        className="mt-2 inline-flex rounded-md border border-red-300 bg-white px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-500"
                                     >
-                                        {initiatingInventoryId === item.inventory_id ? 'Initiating...' : 'Initiate Purchase Request'}
+                                        {item.is_already_queued
+                                            ? 'Already Queued for Procurement'
+                                            : initiatingInventoryId === item.inventory_id
+                                            ? 'Initiating...'
+                                            : 'Initiate Purchase Request'}
                                     </button>
+                                    {item.is_already_queued && item.active_purchase_request_id ? (
+                                        <p className="mt-1 text-[11px] font-semibold text-slate-500">Active PR: PR-{String(item.active_purchase_request_id).padStart(6, '0')}</p>
+                                    ) : null}
                                 </div>
                             ))}
                             {lowStockItems.length === 0 ? <p className="text-sm text-slate-500">No low-stock items at the moment.</p> : null}

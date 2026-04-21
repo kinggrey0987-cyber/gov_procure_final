@@ -12,6 +12,7 @@ use App\Models\StatusHistory;
 use App\Models\SupplyRequest;
 use App\Models\SupplyRequestItem;
 use App\Models\User;
+use App\Services\Analytics\AnomalyService;
 use App\Services\AuditLogService;
 use App\Services\NotificationService;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +23,7 @@ class PurchaseRequestService
     public function __construct(
         private readonly AuditLogService $auditLogService,
         private readonly NotificationService $notificationService,
+        private readonly AnomalyService $anomalyService,
     ) {
     }
 
@@ -307,6 +309,27 @@ class PurchaseRequestService
 
             $this->recordStatus($purchaseRequest, null, 'OPEN', $actor, 'Purchase request auto-generated from low-stock signal.');
             $this->recordAudit($actor, 'AUTO_QUEUE_LOW_STOCK', $purchaseRequest);
+
+            $deficit = max((float) $inventory->low_stock_threshold - (float) $inventory->available_stock, 0);
+            $anomalyThreshold = max($deficit * 3, (float) $inventory->low_stock_threshold * 2, 1);
+
+            if ($quantityRequested > $anomalyThreshold) {
+                $severity = $quantityRequested > ($anomalyThreshold * 1.5) ? 'HIGH' : 'MEDIUM';
+
+                $this->anomalyService->createOrUpdateSystemDetected([
+                    'anomaly_type' => 'EXCESSIVE_QUANTITY',
+                    'reference_type' => PurchaseRequest::class,
+                    'reference_id' => (int) $purchaseRequest->purchase_request_id,
+                    'item_id' => (int) $inventory->item_id,
+                    'office_id' => $officeId,
+                    'detected_value' => round($quantityRequested, 2),
+                    'expected_value' => round($deficit, 2),
+                    'threshold_value' => round($anomalyThreshold, 2),
+                    'detection_method' => 'LOW_STOCK_SIGNAL_QUANTITY_GUARD',
+                    'severity' => $severity,
+                    'remarks' => 'Low-stock initiated quantity exceeds configured threshold guardrail.',
+                ]);
+            }
 
             return $purchaseRequest->fresh(['items', 'office', 'requester', 'supplyRequest']) ?? $purchaseRequest;
         });

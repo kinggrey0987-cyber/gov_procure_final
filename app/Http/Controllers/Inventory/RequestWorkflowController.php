@@ -244,6 +244,26 @@ class RequestWorkflowController
 
         $focusInventoryId = (int) request()->query('focus_inventory_id', 0);
 
+        $activeLowStockQueueByInventoryId = PurchaseRequest::query()
+            ->whereIn('status', ['OPEN', 'PROCESSING'])
+            ->where('remarks', 'like', '%LOW_STOCK_SIGNAL:inventory:%')
+            ->get(['purchase_request_id', 'remarks'])
+            ->reduce(function (array $carry, PurchaseRequest $request): array {
+                $remarks = (string) ($request->remarks ?? '');
+                if (preg_match('/LOW_STOCK_SIGNAL:inventory:(\d+)/', $remarks, $matches) !== 1) {
+                    return $carry;
+                }
+
+                $inventoryId = (int) ($matches[1] ?? 0);
+                if ($inventoryId <= 0 || isset($carry[$inventoryId])) {
+                    return $carry;
+                }
+
+                $carry[$inventoryId] = (int) $request->purchase_request_id;
+
+                return $carry;
+            }, []);
+
         $purchaseRequests = PurchaseRequest::query()
             ->with(['office', 'requester', 'supplyRequest'])
             ->latest('purchase_request_id')
@@ -288,13 +308,22 @@ class RequestWorkflowController
             ->orderByRaw('(low_stock_threshold - available_stock) DESC')
             ->limit(12)
             ->get()
-            ->map(fn (Inventory $inventory): array => [
-                'inventory_id' => (int) $inventory->inventory_id,
-                'item_name' => (string) ($inventory->item?->item_name ?? 'Unassigned Item'),
-                'available_stock' => (float) $inventory->available_stock,
-                'low_stock_threshold' => (float) $inventory->low_stock_threshold,
-                'deficit' => round(max((float) $inventory->low_stock_threshold - (float) $inventory->available_stock, 0), 2),
-            ])
+            ->map(function (Inventory $inventory) use ($activeLowStockQueueByInventoryId): array {
+                $inventoryId = (int) $inventory->inventory_id;
+                $deficit = round(max((float) $inventory->low_stock_threshold - (float) $inventory->available_stock, 0), 2);
+                $activePurchaseRequestId = $activeLowStockQueueByInventoryId[$inventoryId] ?? null;
+
+                return [
+                    'inventory_id' => $inventoryId,
+                    'item_name' => (string) ($inventory->item?->item_name ?? 'Unassigned Item'),
+                    'available_stock' => (float) $inventory->available_stock,
+                    'low_stock_threshold' => (float) $inventory->low_stock_threshold,
+                    'deficit' => $deficit,
+                    'suggested_quantity' => $deficit,
+                    'is_already_queued' => $activePurchaseRequestId !== null,
+                    'active_purchase_request_id' => $activePurchaseRequestId,
+                ];
+            })
             ->filter(fn (array $row): bool => $row['deficit'] > 0)
             ->values();
 
@@ -375,52 +404,29 @@ class RequestWorkflowController
     {
         abort_unless($request->user()?->can('inventory.view-any'), 403);
 
-        $supplyRequest = SupplyRequest::query()
-            ->submitted()
-            ->whereDoesntHave('purchaseRequests')
-            ->whereDoesntHave('distributionRecords')
-            ->whereHas('items', function ($query) use ($inventory): void {
-                $query->where('item_id', (int) $inventory->item_id);
-            })
-            ->with(['items.item.inventory'])
-            ->orderBy('needed_by_date')
-            ->orderBy('supply_request_id')
-            ->get()
-            ->first(function (SupplyRequest $candidate) use ($inventory): bool {
-                return $this->computeItemShortage($candidate, (int) $inventory->item_id) > 0;
-            });
-
-        if (! $supplyRequest instanceof SupplyRequest) {
-            $queued = $this->purchaseRequestService->createFromLowStockSignal(
-                actor: $request->user(),
-                inventory: $inventory,
-                quantityRequested: max((float) $inventory->low_stock_threshold - (float) $inventory->available_stock, 0)
-            );
-
-            return redirect()
-                ->route('inventory.procurement-requests.index', [
-                    'focus_inventory_id' => (int) $inventory->inventory_id,
-                ])
-                ->with('success', sprintf(
-                    'Purchase request PR-%06d auto-generated from low-stock signal for %s.',
-                    (int) $queued->purchase_request_id,
-                    (string) ($inventory->item?->item_name ?? 'selected item')
-                ));
-        }
-
-        $queued = $this->purchaseRequestService->queueFromSupplyRequest($request->user(), [
-            'supply_request_id' => (int) $supplyRequest->supply_request_id,
-            'remarks' => 'Queued by GSO from Low Stock Signals due to active shortage.',
+        $validated = $request->validate([
+            'quantity_requested' => ['nullable', 'numeric', 'gt:0'],
         ]);
+
+        $quantityRequested = isset($validated['quantity_requested'])
+            ? (float) $validated['quantity_requested']
+            : max((float) $inventory->low_stock_threshold - (float) $inventory->available_stock, 0);
+
+        $queued = $this->purchaseRequestService->createFromLowStockSignal(
+            actor: $request->user(),
+            inventory: $inventory,
+            quantityRequested: $quantityRequested
+        );
 
         return redirect()
             ->route('inventory.procurement-requests.index', [
                 'focus_inventory_id' => (int) $inventory->inventory_id,
             ])
             ->with('success', sprintf(
-                'Purchase request PR-%06d queued from low-stock signal using %s.',
+                'Purchase request PR-%06d queued from low-stock signal for %s (Qty %.2f).',
                 (int) $queued->purchase_request_id,
-                (string) $supplyRequest->request_code
+                (string) ($inventory->item?->item_name ?? 'selected item'),
+                $quantityRequested
             ));
     }
 
