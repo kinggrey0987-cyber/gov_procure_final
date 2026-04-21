@@ -47,108 +47,127 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
         $beforeCounts = $this->snapshotCounts();
 
         try {
-            DB::transaction(function () use ($beforeCounts): void {
-                $users = User::query()
-                    ->whereIn('email', [
-                        'rienz6977@gmail.com',
-                        'rienz123123@gmail.com',
-                        'rienyhulleza1022@gmail.com',
-                        'jayrossrusselherbias@gmail.com',
-                        'jeronopjer.chmsu@gmail.com',
-                        'jeronopjer@gmail.com',
-                        'govprocure86@gmail.com',
-                        'kinggrey0987@gmail.com',
-                        'roengwapo09@gmail.com',
-                    ])
-                    ->get()
-                    ->keyBy('email');
+            $this->outputLine('Stage: actor lookup and baseline context started.');
+            $users = User::query()
+                ->whereIn('email', [
+                    'rienz6977@gmail.com',
+                    'rienz123123@gmail.com',
+                    'rienyhulleza1022@gmail.com',
+                    'jayrossrusselherbias@gmail.com',
+                    'jeronopjer.chmsu@gmail.com',
+                    'jeronopjer@gmail.com',
+                    'govprocure86@gmail.com',
+                    'kinggrey0987@gmail.com',
+                    'roengwapo09@gmail.com',
+                ])
+                ->get()
+                ->keyBy('email');
 
-                $offices = Office::query()->pluck('id', 'code');
-                $items = Item::query()->pluck('item_id', 'item_name');
+            $offices = Office::query()->pluck('id', 'code');
+            $items = Item::query()->pluck('item_id', 'item_name');
 
-                $execUser = $this->requireUser($users, 'jeronopjer@gmail.com');
-                $mpdoUser = $this->requireUser($users, 'rienz6977@gmail.com');
-                $gsoUser = $this->requireUser($users, 'rienyhulleza1022@gmail.com');
-                $procUser = $this->requireUser($users, 'jayrossrusselherbias@gmail.com');
-                $mswdoUser = $this->requireUser($users, 'govprocure86@gmail.com');
-                $engUser = $this->requireUser($users, 'roengwapo09@gmail.com');
+            $execUser = $this->requireUser($users, 'jeronopjer@gmail.com');
+            $mpdoUser = $this->requireUser($users, 'rienz6977@gmail.com');
+            $gsoUser = $this->requireUser($users, 'rienyhulleza1022@gmail.com');
+            $procUser = $this->requireUser($users, 'jayrossrusselherbias@gmail.com');
+            $mswdoUser = $this->requireUser($users, 'govprocure86@gmail.com');
+            $engUser = $this->requireUser($users, 'roengwapo09@gmail.com');
 
-                $mpdoOfficeId = $this->requireOfficeId($offices, 'MPDO');
-                $mswdoOfficeId = $this->requireOfficeId($offices, 'MSWDO');
-                $engOfficeId = $this->requireOfficeId($offices, 'ENG');
+            $mpdoOfficeId = $this->requireOfficeId($offices, 'MPDO');
+            $mswdoOfficeId = $this->requireOfficeId($offices, 'MSWDO');
+            $engOfficeId = $this->requireOfficeId($offices, 'ENG');
 
-                $supplier = Supplier::query()->updateOrCreate(
-                    ['supplier_name' => 'Metro Office Depot Trading'],
-                    [
-                        'contact_person' => 'Mina Solis',
-                        'email' => 'orders@metroofficedepot.example',
-                        'phone' => '09171234567',
-                        'address' => 'Poblacion District, City Proper',
-                        'status' => 'ACTIVE',
+            $supplier = Supplier::query()->updateOrCreate(
+                ['supplier_name' => 'Metro Office Depot Trading'],
+                [
+                    'contact_person' => 'Mina Solis',
+                    'email' => 'orders@metroofficedepot.example',
+                    'phone' => '09171234567',
+                    'address' => 'Poblacion District, City Proper',
+                    'status' => 'ACTIVE',
+                ],
+            );
+
+            $secondarySupplier = Supplier::query()->updateOrCreate(
+                ['supplier_name' => 'Northbay General Merchandising'],
+                [
+                    'contact_person' => 'Arvin Reyes',
+                    'email' => 'sales@northbaymerch.example',
+                    'phone' => '09179876543',
+                    'address' => 'Industrial Road, City Proper',
+                    'status' => 'ACTIVE',
+                ],
+            );
+            $this->outputLine('Stage: actor lookup complete.');
+
+            $this->outputLine('Stage: inventory baseline seeding started.');
+            $this->seedInventory($items);
+            $this->outputLine('Stage: inventory baseline seeded.');
+
+            $this->outputLine('Stage: PPMP planning and approval scenarios started.');
+            $approvedPpmps = $this->seedAt('2025-12-18', function () use ($execUser, $mpdoUser, $mswdoUser, $engUser, $mpdoOfficeId, $mswdoOfficeId, $engOfficeId): array {
+                $this->seedPpmp(
+                    officeId: $mswdoOfficeId,
+                    preparer: $mswdoUser,
+                    approver: $execUser,
+                    fiscalYear: 2025,
+                    plannedItems: [
+                        ['item_name' => 'Rubbing Alcohol', 'quantity' => 30, 'unit_cost' => 24],
+                        ['item_name' => 'Detergent Powder', 'quantity' => 25, 'unit_cost' => 36],
                     ],
+                    desiredStatus: 'RETURNED_FOR_REVISION',
+                    remarks: 'Returned PPMP example retained for executive planning review demonstration.',
                 );
 
-                $secondarySupplier = Supplier::query()->updateOrCreate(
-                    ['supplier_name' => 'Northbay General Merchandising'],
-                    [
-                        'contact_person' => 'Arvin Reyes',
-                        'email' => 'sales@northbaymerch.example',
-                        'phone' => '09179876543',
-                        'address' => 'Industrial Road, City Proper',
-                        'status' => 'ACTIVE',
-                    ],
-                );
+                return [
+                    'MPDO' => $this->seedPpmp(
+                        officeId: $mpdoOfficeId,
+                        preparer: $mpdoUser,
+                        approver: $execUser,
+                        fiscalYear: 2026,
+                        plannedItems: [
+                            ['item_name' => 'Bond Paper', 'quantity' => 120, 'unit_cost' => 18],
+                            ['item_name' => 'Ballpen', 'quantity' => 180, 'unit_cost' => 6],
+                            ['item_name' => 'Folder', 'quantity' => 60, 'unit_cost' => 12],
+                        ],
+                        desiredStatus: 'APPROVED',
+                        remarks: 'Late-2025 planning for Q1 office stationery and filing support.',
+                    ),
+                    'MSWDO' => $this->seedPpmp(
+                        officeId: $mswdoOfficeId,
+                        preparer: $mswdoUser,
+                        approver: $execUser,
+                        fiscalYear: 2026,
+                        plannedItems: [
+                            ['item_name' => 'Rubbing Alcohol', 'quantity' => 80, 'unit_cost' => 25],
+                            ['item_name' => 'Detergent Powder', 'quantity' => 70, 'unit_cost' => 38],
+                            ['item_name' => 'Safety Gloves', 'quantity' => 40, 'unit_cost' => 45],
+                        ],
+                        desiredStatus: 'APPROVED',
+                        remarks: 'MSWDO revised PPMP approved for FY 2026 execution scenarios.',
+                    ),
+                    'ENG' => $this->seedPpmp(
+                        officeId: $engOfficeId,
+                        preparer: $engUser,
+                        approver: $execUser,
+                        fiscalYear: 2026,
+                        plannedItems: [
+                            ['item_name' => 'Printer Ink', 'quantity' => 24, 'unit_cost' => 850],
+                            ['item_name' => 'Mouse', 'quantity' => 30, 'unit_cost' => 325],
+                            ['item_name' => 'Logbook', 'quantity' => 20, 'unit_cost' => 120],
+                        ],
+                        desiredStatus: 'APPROVED',
+                        remarks: 'Engineering operating stock plan for first half of 2026.',
+                    ),
+                ];
+            });
+            $this->outputLine('Stage: PPMP planning and approval scenarios seeded.');
 
-                $this->seedInventory($items);
+            $requests = [];
+            $purchaseOrders = [];
+            $this->outputLine('Stage: January office requests started.');
 
-                $approvedPpmps = $this->seedAt('2025-12-18', function () use ($execUser, $mpdoUser, $mswdoUser, $engUser, $mpdoOfficeId, $mswdoOfficeId, $engOfficeId): array {
-                    return [
-                        'MPDO' => $this->seedPpmp(
-                            officeId: $mpdoOfficeId,
-                            preparer: $mpdoUser,
-                            approver: $execUser,
-                            fiscalYear: 2026,
-                            plannedItems: [
-                                ['item_name' => 'Bond Paper', 'quantity' => 120, 'unit_cost' => 18],
-                                ['item_name' => 'Ballpen', 'quantity' => 180, 'unit_cost' => 6],
-                                ['item_name' => 'Folder', 'quantity' => 60, 'unit_cost' => 12],
-                            ],
-                            desiredStatus: 'APPROVED',
-                            remarks: 'Late-2025 planning for Q1 office stationery and filing support.',
-                        ),
-                        'MSWDO' => $this->seedPpmp(
-                            officeId: $mswdoOfficeId,
-                            preparer: $mswdoUser,
-                            approver: $execUser,
-                            fiscalYear: 2026,
-                            plannedItems: [
-                                ['item_name' => 'Rubbing Alcohol', 'quantity' => 80, 'unit_cost' => 25],
-                                ['item_name' => 'Detergent Powder', 'quantity' => 70, 'unit_cost' => 38],
-                                ['item_name' => 'Safety Gloves', 'quantity' => 40, 'unit_cost' => 45],
-                            ],
-                            desiredStatus: 'RETURNED_FOR_REVISION',
-                            remarks: 'Returned after executive review for quantity alignment.',
-                        ),
-                        'ENG' => $this->seedPpmp(
-                            officeId: $engOfficeId,
-                            preparer: $engUser,
-                            approver: $execUser,
-                            fiscalYear: 2026,
-                            plannedItems: [
-                                ['item_name' => 'Printer Ink', 'quantity' => 24, 'unit_cost' => 850],
-                                ['item_name' => 'Mouse', 'quantity' => 30, 'unit_cost' => 325],
-                                ['item_name' => 'Logbook', 'quantity' => 20, 'unit_cost' => 120],
-                            ],
-                            desiredStatus: 'APPROVED',
-                            remarks: 'Engineering operating stock plan for first half of 2026.',
-                        ),
-                    ];
-                });
-
-                $requests = [];
-                $purchaseOrders = [];
-
-                $this->seedAt('2026-01-08', function () use (&$requests, $mpdoUser, $mswdoUser, $engUser, $approvedPpmps): void {
+            $this->seedAt('2026-01-08', function () use (&$requests, $mpdoUser, $mswdoUser, $engUser, $approvedPpmps): void {
                     $requests['mpdo-jan-paper'] = $this->seedSupplyRequest(
                         actor: $mpdoUser,
                         ppmp: $approvedPpmps['MPDO'],
@@ -200,9 +219,11 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                             ['item_name' => 'Printer Ink', 'quantity' => 4],
                         ],
                     );
-                });
+            });
+            $this->outputLine('Stage: January office requests seeded.');
 
-                $this->seedAt('2026-02-10', function () use (&$requests, &$purchaseOrders, $procUser, $supplier, $secondarySupplier): void {
+            $this->outputLine('Stage: February procurement scenarios started.');
+            $this->seedAt('2026-02-10', function () use (&$requests, &$purchaseOrders, $procUser, $supplier, $secondarySupplier): void {
                     $purchaseOrders['mpdo-jan-paper'] = $this->seedProcurementFlow(
                         actor: $procUser,
                         supplyRequest: $requests['mpdo-jan-paper'],
@@ -242,9 +263,11 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                         expectedDeliveryDate: '2026-02-21',
                         deliveryNotes: 'Printer consumables for engineering plotting and records work.',
                     );
-                });
+            });
+            $this->outputLine('Stage: February procurement scenarios seeded.');
 
-                $this->seedAt('2026-02-18', function () use (&$requests, $mpdoUser, $mswdoUser, $engUser, $approvedPpmps): void {
+            $this->outputLine('Stage: February office requests started.');
+            $this->seedAt('2026-02-18', function () use (&$requests, $mpdoUser, $mswdoUser, $engUser, $approvedPpmps): void {
                     $requests['mpdo-feb-paper'] = $this->seedSupplyRequest(
                         actor: $mpdoUser,
                         ppmp: $approvedPpmps['MPDO'],
@@ -283,9 +306,11 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                             ['item_name' => 'Mouse', 'quantity' => 6],
                         ],
                     );
-                });
+            });
+            $this->outputLine('Stage: February office requests seeded.');
 
-                $this->seedAt('2026-03-12', function () use (&$requests, &$purchaseOrders, $procUser, $supplier, $secondarySupplier): void {
+            $this->outputLine('Stage: March procurement scenarios started.');
+            $this->seedAt('2026-03-12', function () use (&$requests, &$purchaseOrders, $procUser, $supplier, $secondarySupplier): void {
                     $purchaseOrders['mpdo-feb-paper'] = $this->seedProcurementFlow(
                         actor: $procUser,
                         supplyRequest: $requests['mpdo-feb-paper'],
@@ -315,9 +340,11 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                         expectedDeliveryDate: '2026-03-20',
                         deliveryNotes: 'Engineering workstation replacement batch.',
                     );
-                });
+            });
+            $this->outputLine('Stage: March procurement scenarios seeded.');
 
-                $this->seedAt('2026-03-18', function () use (&$requests, $mpdoUser, $mswdoUser, $engUser, $approvedPpmps): void {
+            $this->outputLine('Stage: March office requests started.');
+            $this->seedAt('2026-03-18', function () use (&$requests, $mpdoUser, $mswdoUser, $engUser, $approvedPpmps): void {
                     $requests['mpdo-mar-forms'] = $this->seedSupplyRequest(
                         actor: $mpdoUser,
                         ppmp: $approvedPpmps['MPDO'],
@@ -358,9 +385,10 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                             ['item_name' => 'Printer Ink', 'quantity' => 5],
                         ],
                     );
-                });
+            });
+            $this->outputLine('Stage: March office requests seeded.');
 
-                $this->seedAt('2026-03-22', function () use (&$requests, &$purchaseOrders, $procUser, $supplier, $secondarySupplier): void {
+            $this->seedAt('2026-03-22', function () use (&$requests, &$purchaseOrders, $procUser, $supplier, $secondarySupplier): void {
                     $purchaseOrders['mpdo-mar-forms'] = $this->seedProcurementFlow(
                         actor: $procUser,
                         supplyRequest: $requests['mpdo-mar-forms'],
@@ -390,20 +418,37 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                         expectedDeliveryDate: '2026-03-31',
                         deliveryNotes: 'March engineering print consumables batch.',
                     );
-                });
+            });
 
-                $marchDelivery = $this->seedAt('2026-03-28', function () use ($gsoUser, $mpdoUser, $purchaseOrders, $supplier): Delivery {
-                    return $this->seedDeliveryAndDistributionFlow(
-                        gsoUser: $gsoUser,
-                        officeUser: $mpdoUser,
-                        purchaseOrder: $purchaseOrders['mpdo-mar-forms'],
-                        supplier: $purchaseOrders['mpdo-mar-forms']->supplier ?? $supplier,
-                    );
-                });
+            $this->outputLine('Stage: delivery and distribution scenarios started.');
+            $marchDelivery = $this->seedAt('2026-03-28', function () use ($gsoUser, $mpdoUser, $purchaseOrders, $supplier): Delivery {
+                return $this->seedDeliveryAndDistributionFlow(
+                    gsoUser: $gsoUser,
+                    officeUser: $mpdoUser,
+                    purchaseOrder: $purchaseOrders['mpdo-mar-forms'],
+                    supplier: $purchaseOrders['mpdo-mar-forms']->supplier ?? $supplier,
+                );
+            });
 
-                $this->resolveClaimForDelivery($marchDelivery, $gsoUser, 'Office count confirmed after a March release verification review.');
+            $this->seedAt('2026-03-30', function () use ($gsoUser, $mswdoUser, $purchaseOrders, $secondarySupplier): void {
+                $this->seedDeliveryAndDistributionFlow(
+                    gsoUser: $gsoUser,
+                    officeUser: $mswdoUser,
+                    purchaseOrder: $purchaseOrders['mswdo-mar-cleaning'],
+                    supplier: $purchaseOrders['mswdo-mar-cleaning']->supplier ?? $secondarySupplier,
+                );
+            });
 
-                $this->seedAt('2026-04-10', function () use (&$requests, &$purchaseOrders, $mpdoUser, $engUser, $approvedPpmps, $procUser, $supplier, $secondarySupplier): void {
+            $this->seedAt('2026-03-31', function () use ($gsoUser, $engUser, $purchaseOrders, $supplier): void {
+                $this->seedDeliveryAndDistributionFlow(
+                    gsoUser: $gsoUser,
+                    officeUser: $engUser,
+                    purchaseOrder: $purchaseOrders['eng-mar-print'],
+                    supplier: $purchaseOrders['eng-mar-print']->supplier ?? $supplier,
+                );
+            });
+
+            $this->seedAt('2026-04-10', function () use (&$requests, &$purchaseOrders, $mpdoUser, $engUser, $approvedPpmps, $procUser, $supplier, $secondarySupplier): void {
                     $requests['mpdo-apr-paper'] = $this->seedSupplyRequest(
                         actor: $mpdoUser,
                         ppmp: $approvedPpmps['MPDO'],
@@ -472,9 +517,9 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                         expectedDeliveryDate: '2026-04-24',
                         deliveryNotes: 'April engineering ink replenishment.',
                     );
-                });
+            });
 
-                $this->seedAt('2026-04-21', function () use (&$requests, $mpdoUser, $mswdoUser, $engUser, $approvedPpmps): void {
+            $this->seedAt('2026-04-21', function () use (&$requests, $mpdoUser, $mswdoUser, $engUser, $approvedPpmps): void {
                     $requests['mpdo-apr-burst-1'] = $this->seedSupplyRequest(
                         actor: $mpdoUser,
                         ppmp: $approvedPpmps['MPDO'],
@@ -552,9 +597,9 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                             ['item_name' => 'Printer Ink', 'quantity' => 6],
                         ],
                     );
-                });
+            });
 
-                $this->seedAt('2026-04-23', function () use (&$purchaseOrders, $procUser, $supplier, $secondarySupplier, $requests): void {
+            $this->seedAt('2026-04-23', function () use (&$purchaseOrders, $procUser, $supplier, $secondarySupplier, $requests): void {
                     $purchaseOrders['mpdo-apr-burst-1'] = $this->seedProcurementFlow(
                         actor: $procUser,
                         supplyRequest: $requests['mpdo-apr-burst-1'],
@@ -585,16 +630,6 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                         deliveryNotes: 'Negotiated emergency paper purchase for quarterly output.',
                     );
 
-                    $purchaseOrders['mpdo-apr-ready'] = $this->seedProcurementFlow(
-                        actor: $procUser,
-                        supplyRequest: $requests['mpdo-apr-ready'],
-                        supplier: $supplier,
-                        unitPrice: 7,
-                        procurementMethod: 'SMALL_VALUE_PROCUREMENT',
-                        expectedDeliveryDate: '2026-04-29',
-                        deliveryNotes: 'Stock-ready office replenishment for immediate release.',
-                    );
-
                     $purchaseOrders['mswdo-apr-hygiene'] = $this->seedProcurementFlow(
                         actor: $procUser,
                         supplyRequest: $requests['mswdo-apr-hygiene'],
@@ -614,59 +649,104 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                         expectedDeliveryDate: '2026-04-30',
                         deliveryNotes: 'April engineering print burst for drawings and logs.',
                     );
-                });
-
-                $aprilDelivery = $this->seedAt('2026-04-25', function () use ($gsoUser, $engUser, $purchaseOrders, $supplier): Delivery {
-                    return $this->seedDeliveryAndDistributionFlow(
-                        gsoUser: $gsoUser,
-                        officeUser: $engUser,
-                        purchaseOrder: $purchaseOrders['eng-apr-ink'],
-                        supplier: $purchaseOrders['eng-apr-ink']->supplier ?? $supplier,
-                    );
-                });
-
-                $burstDelivery = $this->seedAt('2026-04-29', function () use ($gsoUser, $mpdoUser, $purchaseOrders, $supplier): Delivery {
-                    return $this->seedDeliveryAndDistributionFlow(
-                        gsoUser: $gsoUser,
-                        officeUser: $mpdoUser,
-                        purchaseOrder: $purchaseOrders['mpdo-apr-burst-3'],
-                        supplier: $purchaseOrders['mpdo-apr-burst-3']->supplier ?? $supplier,
-                    );
-                });
-
-                $readyDelivery = $this->seedAt('2026-04-30', function () use ($gsoUser, $mpdoUser, $purchaseOrders, $supplier): Delivery {
-                    return $this->seedDeliveryAndDistributionFlow(
-                        gsoUser: $gsoUser,
-                        officeUser: $mpdoUser,
-                        purchaseOrder: $purchaseOrders['mpdo-apr-ready'],
-                        supplier: $purchaseOrders['mpdo-apr-ready']->supplier ?? $supplier,
-                    );
-                });
-
-                $this->resolveClaimForDelivery($aprilDelivery, $gsoUser, 'Resolved after engineering confirmed the release and counts matched.');
-                $this->resolveClaimForDelivery($burstDelivery, $gsoUser, 'Resolved after the April paper surge was partially re-counted and accepted.');
-
-                $this->seedAlerts($gsoUser, $purchaseOrders['mpdo-apr-paper'], $aprilDelivery);
-                $this->seedAlerts($gsoUser, $purchaseOrders['mpdo-apr-burst-3'], $burstDelivery);
-                $this->seedAlerts($gsoUser, $purchaseOrders['mpdo-apr-ready'], $readyDelivery);
-                $this->seedInventoryShowcases();
-                $this->normalizeGsoLinkedDemoData($gsoUser);
-                $this->seedInventoryShowcases();
-                $this->normalizeGsoLinkedDemoData($gsoUser);
-
-                app(AnomalyDetectionService::class)->runExecutiveDetections($execUser);
-                $dedupedAnomalies = app(AnomalyService::class)->collapseActiveDuplicates();
-                $this->outputLine(sprintf('Anomaly duplicate cleanup dismissed %d duplicate active record(s).', $dedupedAnomalies));
-
-                $afterCounts = $this->snapshotCounts();
-                $this->reportCounterDelta($beforeCounts, $afterCounts);
-
-                $this->outputLine(sprintf(
-                    'Longitudinal anchors seeded around %s through %s.',
-                    Carbon::parse('2025-12-18')->toDateString(),
-                    Carbon::parse('2026-04-25')->toDateString(),
-                ));
             });
+
+            $this->seedAt('2026-04-24', function () use ($gsoUser, $requests): void {
+                $this->seedStockReadyRelease(
+                    gsoUser: $gsoUser,
+                    supplyRequest: $requests['mpdo-apr-ready'],
+                    releaseNotes: 'Stock-ready request released directly from inventory without procurement cycle.',
+                );
+            });
+
+            $aprilDelivery = $this->seedAt('2026-04-25', function () use ($gsoUser, $engUser, $purchaseOrders, $supplier): Delivery {
+                return $this->seedDeliveryAndDistributionFlow(
+                    gsoUser: $gsoUser,
+                    officeUser: $engUser,
+                    purchaseOrder: $purchaseOrders['eng-apr-ink'],
+                    supplier: $purchaseOrders['eng-apr-ink']->supplier ?? $supplier,
+                );
+            });
+
+            $burstDelivery = $this->seedAt('2026-04-29', function () use ($gsoUser, $mpdoUser, $purchaseOrders, $supplier): Delivery {
+                return $this->seedDeliveryAndDistributionFlow(
+                    gsoUser: $gsoUser,
+                    officeUser: $mpdoUser,
+                    purchaseOrder: $purchaseOrders['mpdo-apr-burst-3'],
+                    supplier: $purchaseOrders['mpdo-apr-burst-3']->supplier ?? $supplier,
+                );
+            });
+
+            $this->seedAt('2026-04-30', function () use ($gsoUser, $mpdoUser, $purchaseOrders, $supplier): void {
+                $this->seedDeliveryAndDistributionFlow(
+                    gsoUser: $gsoUser,
+                    officeUser: $mpdoUser,
+                    purchaseOrder: $purchaseOrders['mpdo-apr-burst-1'],
+                    supplier: $purchaseOrders['mpdo-apr-burst-1']->supplier ?? $supplier,
+                );
+            });
+
+            $this->outputLine('Stage: delivery and distribution scenarios seeded.');
+
+            $this->outputLine('Stage: selective claims started.');
+            $this->seedClaimForDelivery(
+                delivery: $marchDelivery,
+                officeUser: $mpdoUser,
+                gsoUser: $gsoUser,
+                claimType: 'SHORTAGE',
+                claimLocation: 'Planning office receiving desk',
+                createRemarks: 'Selective claim: March distribution discrepancy reported by MPDO.',
+                resolveRemarks: 'Resolved after office count confirmation in post-release review.',
+            );
+
+            $this->seedClaimForDelivery(
+                delivery: $aprilDelivery,
+                officeUser: $engUser,
+                gsoUser: $gsoUser,
+                claimType: 'QUANTITY_MISMATCH',
+                claimLocation: 'Engineering receiving station',
+                createRemarks: 'Selective claim: April engineering release mismatch for traceability.',
+                resolveRemarks: 'Resolved after engineering confirmed final released count.',
+            );
+
+            $this->seedClaimForDelivery(
+                delivery: $burstDelivery,
+                officeUser: $mpdoUser,
+                gsoUser: $gsoUser,
+                claimType: 'SHORTAGE',
+                claimLocation: 'MPDO stock room',
+                createRemarks: 'Selective claim: April paper surge release shortage review.',
+                resolveRemarks: null,
+            );
+            $this->outputLine('Stage: selective claims seeded.');
+
+            $this->seedAlerts($gsoUser, $purchaseOrders['mpdo-apr-paper'], $aprilDelivery);
+            $this->seedAlerts($gsoUser, $purchaseOrders['mpdo-apr-burst-3'], $burstDelivery);
+
+            $this->outputLine('Stage: disclosure linkage confirmation: ExecutiveDisclosureDemoSeeder runs next in DatabaseSeeder chain.');
+
+            $this->outputLine('Stage: normalization started.');
+            $this->seedInventoryShowcases();
+            $this->normalizeGsoLinkedDemoData($gsoUser);
+            $this->outputLine('Stage: normalization finished.');
+
+            $this->outputLine('Stage: executive detections started.');
+            app(AnomalyDetectionService::class)->runExecutiveDetections($execUser);
+            $this->outputLine('Stage: executive detections finished.');
+
+            $this->outputLine('Stage: duplicate anomaly collapse started.');
+            $dedupedAnomalies = app(AnomalyService::class)->collapseActiveDuplicates();
+            $this->outputLine(sprintf('Anomaly duplicate cleanup dismissed %d duplicate active record(s).', $dedupedAnomalies));
+            $this->outputLine('Stage: duplicate anomaly collapse finished.');
+
+            $afterCounts = $this->snapshotCounts();
+            $this->reportCounterDelta($beforeCounts, $afterCounts);
+
+            $this->outputLine(sprintf(
+                'Longitudinal anchors seeded around %s through %s.',
+                Carbon::parse('2025-12-18')->toDateString(),
+                Carbon::parse('2026-04-25')->toDateString(),
+            ));
         } catch (Throwable $exception) {
             Log::error('LongitudinalDemoWorkflowSeeder failed.', [
                 'message' => $exception->getMessage(),
@@ -993,7 +1073,6 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
         $verificationService = app(DeliveryVerificationService::class);
         $inventoryService = app(InventoryService::class);
         $distributionService = app(DistributionRecordService::class);
-        $claimService = app(ClaimService::class);
 
         $delivery = Delivery::query()->where('purchase_order_id', (int) $purchaseOrder->purchase_order_id)->first();
         if (! $delivery instanceof Delivery) {
@@ -1079,26 +1158,92 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
             $distributionService->markReceivedByOffice($distributionRecord, $officeUser, 'Office acknowledged receipt of released supplies.');
         }
 
-        if (! $distributionRecord->claims()->exists()) {
-            $claim = $claimService->createClaim($officeUser, [
-                'distribution_record_id' => (int) $distributionRecord->distribution_record_id,
-                'office_id' => (int) $officeUser->office_id,
-                'claim_type' => 'SHORTAGE',
-                'claim_date' => now()->toDateString(),
-                'claim_location' => 'Office receiving desk',
-                'remarks' => 'Minor discrepancy claimed for demo traceability.',
-                'distribution_record' => $distributionRecord,
-            ]);
+        return $delivery->fresh(['purchaseOrder', 'supplier', 'receiver', 'items']) ?? $delivery;
+    }
 
-            if ((string) $claim->status === 'OPEN') {
-                $claimService->updateClaimStatus($claim, $gsoUser, [
-                    'status' => 'IN_REVIEW',
-                    'remarks' => 'Claim is under review for demo visibility.',
+    private function seedStockReadyRelease(User $gsoUser, SupplyRequest $supplyRequest, string $releaseNotes): void
+    {
+        $inventoryService = app(InventoryService::class);
+
+        $supplyRequest->loadMissing('items');
+        foreach ($supplyRequest->items as $requestItem) {
+            if (! $requestItem instanceof SupplyRequestItem) {
+                continue;
+            }
+
+            try {
+                $inventoryService->releaseStock(
+                    itemId: (int) $requestItem->item_id,
+                    quantity: (float) $requestItem->quantity_requested,
+                    actor: $gsoUser,
+                    referenceType: SupplyRequest::class,
+                    referenceId: (int) $supplyRequest->supply_request_id,
+                    remarks: 'Stock-ready request released directly from inventory.',
+                );
+            } catch (Throwable $exception) {
+                Log::warning('LongitudinalDemoWorkflowSeeder stock-ready release skipped for item.', [
+                    'supply_request_id' => (int) $supplyRequest->supply_request_id,
+                    'item_id' => (int) $requestItem->item_id,
+                    'message' => $exception->getMessage(),
                 ]);
             }
         }
 
-        return $delivery->fresh(['purchaseOrder', 'supplier', 'receiver', 'items']) ?? $delivery;
+        $supplyRequest->forceFill([
+            'status' => 'COMPLETED',
+            'review_notes' => $releaseNotes,
+            'approved_by' => (int) $gsoUser->id,
+            'approved_at' => now(),
+        ])->save();
+    }
+
+    private function seedClaimForDelivery(
+        Delivery $delivery,
+        User $officeUser,
+        User $gsoUser,
+        string $claimType,
+        string $claimLocation,
+        string $createRemarks,
+        ?string $resolveRemarks,
+    ): void {
+        $distributionRecord = DistributionRecord::query()->where('delivery_id', (int) $delivery->delivery_id)->first();
+        if (! $distributionRecord instanceof DistributionRecord) {
+            return;
+        }
+
+        $claimService = app(ClaimService::class);
+        $claim = Claim::query()->where('distribution_record_id', (int) $distributionRecord->distribution_record_id)->latest('claims_id')->first();
+        if (! $claim instanceof Claim) {
+            $claim = $claimService->createClaim($officeUser, [
+                'distribution_record_id' => (int) $distributionRecord->distribution_record_id,
+                'office_id' => (int) $officeUser->office_id,
+                'claim_type' => $claimType,
+                'claim_date' => now()->toDateString(),
+                'claim_location' => $claimLocation,
+                'remarks' => $createRemarks,
+                'distribution_record' => $distributionRecord,
+            ]);
+        }
+
+        if ($resolveRemarks === null) {
+            return;
+        }
+
+        if (in_array((string) $claim->status, ['RESOLVED', 'REJECTED'], true)) {
+            return;
+        }
+
+        try {
+            $claimService->updateClaimStatus($claim, $gsoUser, [
+                'status' => 'RESOLVED',
+                'remarks' => $resolveRemarks,
+            ]);
+        } catch (Throwable $exception) {
+            Log::warning('LongitudinalDemoWorkflowSeeder selective claim resolution skipped.', [
+                'claims_id' => (int) $claim->claims_id,
+                'message' => $exception->getMessage(),
+            ]);
+        }
     }
 
     private function seedAlerts(User $gsoUser, PurchaseOrder $purchaseOrder, Delivery $delivery): void
@@ -1131,35 +1276,6 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                 'office_id' => (int) $gsoUser->office_id,
                 'alert_message' => 'Delivery was received after the expected date and was partially verified.',
                 'detected_at' => now(),
-            ]);
-        }
-    }
-
-    private function resolveClaimForDelivery(Delivery $delivery, User $gsoUser, string $remarks): void
-    {
-        $distributionRecord = DistributionRecord::query()->where('delivery_id', (int) $delivery->delivery_id)->first();
-        if (! $distributionRecord instanceof DistributionRecord) {
-            return;
-        }
-
-        $claim = Claim::query()->where('distribution_record_id', (int) $distributionRecord->distribution_record_id)->latest('claims_id')->first();
-        if (! $claim instanceof Claim) {
-            return;
-        }
-
-        if (in_array((string) $claim->status, ['RESOLVED', 'REJECTED'], true)) {
-            return;
-        }
-
-        try {
-            app(ClaimService::class)->updateClaimStatus($claim, $gsoUser, [
-                'status' => 'RESOLVED',
-                'remarks' => $remarks,
-            ]);
-        } catch (Throwable $exception) {
-            Log::warning('LongitudinalDemoWorkflowSeeder claim resolution skipped.', [
-                'claims_id' => (int) $claim->claims_id,
-                'message' => $exception->getMessage(),
             ]);
         }
     }
@@ -1231,7 +1347,6 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
     private function normalizeGsoLinkedDemoData(User $gsoUser): void
     {
         $distributionService = app(DistributionRecordService::class);
-        $claimService = app(ClaimService::class);
 
         $records = DistributionRecord::query()
             ->with(['supplyRequest.items', 'items', 'claims'])
@@ -1279,42 +1394,5 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
             }
         }
 
-        $claimTarget = DistributionRecord::query()
-            ->with(['items'])
-            ->whereIn('status', ['RELEASED', 'RECEIVED'])
-            ->whereHas('items')
-            ->whereDoesntHave('claims')
-            ->orderByDesc('distribution_record_id')
-            ->first();
-
-        if (! $claimTarget instanceof DistributionRecord) {
-            return;
-        }
-
-        $officeUser = User::query()
-            ->where('office_id', (int) $claimTarget->office_id)
-            ->whereHas('role', fn ($query) => $query->where('role_code', 'OFFICE_USER'))
-            ->first();
-
-        if (! $officeUser instanceof User) {
-            return;
-        }
-
-        try {
-            $claimService->createClaim($officeUser, [
-                'distribution_record_id' => (int) $claimTarget->distribution_record_id,
-                'office_id' => (int) $claimTarget->office_id,
-                'claim_type' => 'QUANTITY_MISMATCH',
-                'claim_date' => now()->toDateString(),
-                'claim_location' => 'Office receiving point',
-                'remarks' => 'Seeder normalization: quantity mismatch issue linked to a released record.',
-                'distribution_record' => $claimTarget,
-            ]);
-        } catch (Throwable $exception) {
-            Log::warning('LongitudinalDemoWorkflowSeeder claim normalization skipped.', [
-                'distribution_record_id' => (int) $claimTarget->distribution_record_id,
-                'message' => $exception->getMessage(),
-            ]);
-        }
     }
 }
