@@ -9,6 +9,7 @@ use App\Models\Delivery;
 use App\Models\SupplyRequest;
 use App\Services\Inventory\DistributionRecordService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redirect;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -35,9 +36,11 @@ class DistributionRecordController
         ]);
     }
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
         abort_unless(auth()->user()->can('distribution.manage'), 403);
+
+        $focusSupplyRequestId = (int) $request->query('supply_request_id', 0);
 
         $eligibleRows = Delivery::query()
             ->verified()
@@ -66,8 +69,15 @@ class DistributionRecordController
             ->filter()
             ->values();
 
+        if ($focusSupplyRequestId > 0) {
+            $eligibleRows = $eligibleRows
+                ->sortByDesc(fn (array $row): int => (int) $row['supply_request_id'] === $focusSupplyRequestId ? 1 : 0)
+                ->values();
+        }
+
         return Inertia::render('Inventory/Distribution/Create', [
             'eligibleRows' => $eligibleRows,
+            'focusSupplyRequestId' => $focusSupplyRequestId > 0 ? $focusSupplyRequestId : null,
         ]);
     }
 

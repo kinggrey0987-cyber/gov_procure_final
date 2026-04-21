@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import useSmartRefresh from '@/hooks/useSmartRefresh';
+import { humanizeEnum } from '@/lib/displayLabels';
 import { Head, Link } from '@inertiajs/react';
 
 type PaginationLink = {
@@ -42,14 +43,20 @@ type Props = {
     };
     shortageCandidates: ShortageCandidate[];
     lowStockItems: LowStockItem[];
+    atReorderItems: Array<{
+        inventory_id: number;
+        item_name: string;
+        available_stock: number;
+        low_stock_threshold: number;
+    }>;
+    focusInventoryId?: number | null;
 };
 
-export default function ProcurementRequestsIndex({ purchaseRequests, shortageCandidates, lowStockItems }: Props) {
+export default function ProcurementRequestsIndex({ purchaseRequests, shortageCandidates, lowStockItems, atReorderItems, focusInventoryId = null }: Props) {
     const { isRefreshing, lastRefreshedAt } = useSmartRefresh({
-        only: ['purchaseRequests', 'shortageCandidates', 'lowStockItems'],
+        only: ['purchaseRequests', 'shortageCandidates', 'lowStockItems', 'atReorderItems', 'focusInventoryId'],
         refreshOnFocus: true,
         refreshOnMount: true,
-        pollIntervalMs: 30000,
     });
 
     return (
@@ -71,8 +78,14 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                         ? 'Refreshing procurement queue...'
                         : lastRefreshedAt
                         ? `Updated ${lastRefreshedAt.toLocaleTimeString()}`
-                        : 'Auto-refresh every 30 seconds while this page is open'}
+                        : 'Refreshes when you return to this tab or manually reload the page'}
                 </p>
+
+                {focusInventoryId ? (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 shadow-sm">
+                        Focused inventory signal loaded for record #{focusInventoryId}. Use the shortage queue and initiation actions below to proceed.
+                    </div>
+                ) : null}
 
                 <section className="grid gap-4 lg:grid-cols-2">
                     <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -101,15 +114,39 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                         </p>
                         <div className="mt-4 space-y-3">
                             {lowStockItems.slice(0, 6).map((item) => (
-                                <div key={item.inventory_id} className="rounded-lg border border-amber-100 bg-amber-50/70 p-3">
+                                <div key={item.inventory_id} className={`rounded-lg border border-amber-100 bg-amber-50/70 p-3 ${focusInventoryId === item.inventory_id ? 'ring-2 ring-amber-300' : ''}`}>
                                     <p className="text-sm font-semibold text-slate-800">{item.item_name}</p>
                                     <p className="text-xs text-slate-600">
                                         Available {item.available_stock.toFixed(2)} / Low Stock Threshold {item.low_stock_threshold.toFixed(2)}
                                     </p>
                                     <p className="mt-1 text-xs font-semibold text-amber-700">Deficit: {item.deficit.toFixed(2)}</p>
+                                    <Link
+                                        href={route('inventory.office-supply-requests.index', {
+                                            stock_assessment: 'SHORTAGE_REQUIRES_PROCUREMENT',
+                                            q: item.item_name,
+                                        })}
+                                        className="mt-2 inline-flex rounded-md border border-red-300 bg-white px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-50"
+                                    >
+                                        Initiate Purchase Request
+                                    </Link>
                                 </div>
                             ))}
                             {lowStockItems.length === 0 ? <p className="text-sm text-slate-500">No low-stock items at the moment.</p> : null}
+                        </div>
+
+                        <div className="mt-5 rounded-lg border border-blue-100 bg-blue-50/70 p-3">
+                            <h4 className="text-xs font-semibold uppercase tracking-wide text-blue-700">At Reorder Point (Advisory)</h4>
+                            <p className="mt-1 text-xs text-blue-800">
+                                These are at threshold with zero deficit, so they are not active shortage cases.
+                            </p>
+                            <div className="mt-3 space-y-2">
+                                {atReorderItems.slice(0, 5).map((item) => (
+                                    <p key={item.inventory_id} className="text-xs text-slate-700">
+                                        {item.item_name}: Available {item.available_stock.toFixed(2)} / Reorder Point {item.low_stock_threshold.toFixed(2)}
+                                    </p>
+                                ))}
+                                {atReorderItems.length === 0 ? <p className="text-xs text-slate-500">No items are exactly at reorder point.</p> : null}
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -174,5 +211,5 @@ function displayPurchaseRequestStatus(status: string): string {
         PENDING: 'Pending Review',
     };
 
-    return map[status] ?? status;
+    return map[status] ?? humanizeEnum(status);
 }

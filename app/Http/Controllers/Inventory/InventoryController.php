@@ -6,8 +6,10 @@ use App\Http\Requests\Inventory\SyncInventoryFromDeliveryRequest;
 use App\Http\Requests\Inventory\UpdateInventoryRequest;
 use App\Models\Delivery;
 use App\Models\Inventory;
+use App\Models\ItemCategory;
 use App\Services\Inventory\InventoryService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redirect;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -18,17 +20,61 @@ class InventoryController
     {
     }
 
-    public function index(): Response
+    public function index(Request $request): Response
     {
         abort_unless(auth()->user()->can('inventory.view-any'), 403);
 
-        $inventories = Inventory::query()
-            ->with('item.category')
+        $query = Inventory::query()->with('item.category');
+
+        $search = trim((string) $request->query('q', ''));
+        if ($search !== '') {
+            $query->whereHas('item', function ($builder) use ($search): void {
+                $builder
+                    ->where('item_name', 'like', '%'.$search.'%')
+                    ->orWhere('description', 'like', '%'.$search.'%');
+            });
+        }
+
+        $categoryId = (int) $request->query('category_id', 0);
+        if ($categoryId > 0) {
+            $query->whereHas('item', fn ($builder) => $builder->where('item_category_id', $categoryId));
+        }
+
+        $stockStatus = trim((string) $request->query('stock_status', ''));
+        if ($stockStatus === 'HEALTHY') {
+            $query->whereColumn('available_stock', '>', 'low_stock_threshold');
+        } elseif ($stockStatus === 'LOW') {
+            $query
+                ->whereColumn('available_stock', '<', 'low_stock_threshold')
+                ->where('available_stock', '>', 0);
+        } elseif ($stockStatus === 'CRITICAL') {
+            $query->where('available_stock', '<=', 0);
+        } elseif ($stockStatus === 'AT_REORDER_POINT') {
+            $query->whereColumn('available_stock', '=', 'low_stock_threshold');
+        }
+
+        $inventories = $query
             ->orderByDesc('last_updated')
-            ->paginate(20);
+            ->paginate(20)
+            ->withQueryString();
+
+        $categories = ItemCategory::query()
+            ->orderBy('category_name')
+            ->get(['item_category_id', 'category_name'])
+            ->map(fn (ItemCategory $category): array => [
+                'item_category_id' => (int) $category->item_category_id,
+                'category_name' => (string) $category->category_name,
+            ])
+            ->values();
 
         return Inertia::render('Inventory/Inventory/Index', [
             'inventories' => $inventories,
+            'categories' => $categories,
+            'filters' => [
+                'q' => $search,
+                'category_id' => $categoryId > 0 ? $categoryId : null,
+                'stock_status' => $stockStatus,
+            ],
         ]);
     }
 

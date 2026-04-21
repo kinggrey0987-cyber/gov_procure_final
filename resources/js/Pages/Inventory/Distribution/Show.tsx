@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import { humanizeEnum } from '@/lib/displayLabels';
 import { Head, Link } from '@inertiajs/react';
 
 type Props = {
@@ -38,7 +39,16 @@ type Props = {
 
 export default function DistributionShow({ record }: Props) {
     return (
-        <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Distribution Detail</h2>}>
+        <AuthenticatedLayout
+            header={
+                <div className="flex flex-wrap items-center gap-3">
+                    <Link href={route('inventory.distribution-records.index')} className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                        Back to Distribution Records
+                    </Link>
+                    <h2 className="text-xl font-semibold leading-tight text-gray-800">Distribution Detail</h2>
+                </div>
+            }
+        >
             <Head title="Distribution Detail" />
             <div className="space-y-6 py-8">
                 <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -111,7 +121,7 @@ export default function DistributionShow({ record }: Props) {
                             {record.claims.map((claim) => (
                                 <tr key={claim.claims_id} className="hover:bg-slate-50/60">
                                     <td className="px-4 py-3 font-mono text-xs text-slate-700">{claim.claim_code}</td>
-                                    <td className="px-4 py-3 text-slate-700">{claim.claim_type}</td>
+                                    <td className="px-4 py-3 text-slate-700">{humanizeEnum(claim.claim_type)}</td>
                                     <td className="px-4 py-3 text-slate-700">{displayClaimStatus(claim.status)}</td>
                                     <td className="px-4 py-3 text-slate-600">{claim.claim_date ?? '-'}</td>
                                     <td className="px-4 py-3 text-right">
@@ -152,7 +162,7 @@ function displayDistributionStatus(status: string): string {
         DRAFT: 'Pending Review',
     };
 
-    return map[status] ?? status;
+    return map[status] ?? humanizeEnum(status);
 }
 
 function displayClaimStatus(status: string): string {
@@ -163,5 +173,5 @@ function displayClaimStatus(status: string): string {
         REJECTED: 'Rejected',
     };
 
-    return map[status] ?? status;
+    return map[status] ?? humanizeEnum(status);
 }

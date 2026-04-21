@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import { humanizeEnum } from '@/lib/displayLabels';
 import { Head, Link } from '@inertiajs/react';
 
 type MovementRow = {
@@ -37,7 +38,7 @@ export default function MovementIndex({ movements }: Props) {
                         <tbody className="divide-y divide-slate-100">
                             {movements.data.map((row) => (
                                 <tr key={row.movement_id} className="hover:bg-slate-50/60">
-                                    <td className="px-4 py-3 text-slate-700">{row.movement_type}</td>
+                                    <td className="px-4 py-3 text-slate-700">{humanizeEnum(row.movement_type)}</td>
                                     <td className="px-4 py-3 text-slate-700">
                                         <p>{row.item_name}</p>
                                         <p className="text-xs text-slate-500">Inventory #{row.inventory_id}</p>

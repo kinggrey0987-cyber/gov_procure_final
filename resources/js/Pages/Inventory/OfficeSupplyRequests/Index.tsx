@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import useSmartRefresh from '@/hooks/useSmartRefresh';
+import { humanizeEnum } from '@/lib/displayLabels';
 import { Head, Link, router } from '@inertiajs/react';
 import { FormEvent, useEffect, useState } from 'react';
 
@@ -22,8 +23,9 @@ type RequestRow = {
     shortage_total: number;
     stock_assessment: 'STOCK_READY' | 'SHORTAGE_REQUIRES_PROCUREMENT';
     has_purchase_request: boolean;
+    has_distribution_candidate: boolean;
     distribution_records_count: number;
-    workflow_bucket: 'READY_FOR_DISTRIBUTION' | 'QUEUED_FOR_PROCUREMENT' | 'UNDER_VALIDATION';
+    workflow_bucket: 'READY_FOR_DISTRIBUTION' | 'QUEUED_FOR_PROCUREMENT' | 'UNDER_VALIDATION' | 'STOCK_READY_AWAITING_RELEASE_CONTEXT';
 };
 
 type Props = {
@@ -48,6 +50,7 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
     const [stockAssessment, setStockAssessment] = useState(filters.stock_assessment ?? '');
     const [workflowBucket, setWorkflowBucket] = useState(filters.workflow_bucket ?? '');
     const [queueingRequestId, setQueueingRequestId] = useState<number | null>(null);
+    const [processingRequestId, setProcessingRequestId] = useState<number | null>(null);
 
     useEffect(() => {
         setQ(filters.q ?? '');
@@ -86,6 +89,14 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
         });
     };
 
+    const processDistribution = (requestId: number) => {
+        setProcessingRequestId(requestId);
+        router.post(route('inventory.office-supply-requests.process-distribution', requestId), {}, {
+            preserveScroll: true,
+            onFinish: () => setProcessingRequestId(null),
+        });
+    };
+
     return (
         <AuthenticatedLayout
             header={
@@ -118,6 +129,7 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                     <select value={workflowBucket} onChange={(event) => setWorkflowBucket(event.target.value)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
                         <option value="">All workflow buckets</option>
                         <option value="READY_FOR_DISTRIBUTION">Ready for Distribution</option>
+                        <option value="STOCK_READY_AWAITING_RELEASE_CONTEXT">Stock Ready Awaiting Release Context</option>
                         <option value="QUEUED_FOR_PROCUREMENT">Queued for Procurement</option>
                         <option value="UNDER_VALIDATION">Submitted or Under Validation</option>
                     </select>
@@ -196,12 +208,19 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                                     </td>
                                     <td className="px-4 py-3 text-right">
                                         {request.stock_assessment === 'STOCK_READY' ? (
-                                            <Link
-                                                href={route('inventory.distribution-records.create')}
-                                                className="text-sm font-semibold text-red-700 hover:text-red-900"
-                                            >
-                                                Process Distribution
-                                            </Link>
+                                            <div className="space-y-1">
+                                                <button
+                                                    type="button"
+                                                    disabled={processingRequestId === request.supply_request_id}
+                                                    onClick={() => processDistribution(request.supply_request_id)}
+                                                    className="text-sm font-semibold text-red-700 hover:text-red-900 disabled:cursor-not-allowed disabled:opacity-60"
+                                                >
+                                                    {processingRequestId === request.supply_request_id ? 'Opening Supply Distribution...' : 'Process Distribution'}
+                                                </button>
+                                                {!request.has_distribution_candidate ? (
+                                                    <p className="text-xs text-slate-500">Awaiting release context in Supply Distribution.</p>
+                                                ) : null}
+                                            </div>
                                         ) : request.has_purchase_request ? (
                                             <span className="text-sm font-semibold text-slate-500">Queued for Procurement</span>
                                         ) : (
@@ -211,7 +230,7 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                                                 onClick={() => queueProcurement(request.supply_request_id)}
                                                 className="text-sm font-semibold text-rose-700 hover:text-rose-900"
                                             >
-                                                {queueingRequestId === request.supply_request_id ? 'Queueing...' : 'Queue Procurement'}
+                                                {queueingRequestId === request.supply_request_id ? 'Initiating...' : 'Initiate Purchase Request'}
                                             </button>
                                         )}
                                     </td>
@@ -251,11 +270,12 @@ const shortageClass = 'inline-flex rounded-full bg-rose-100 px-2.5 py-1 text-xs 
 function displayWorkflowBucket(bucket: string): string {
     const map: Record<string, string> = {
         READY_FOR_DISTRIBUTION: 'Ready for Distribution',
+        STOCK_READY_AWAITING_RELEASE_CONTEXT: 'Stock Ready Awaiting Release Context',
         QUEUED_FOR_PROCUREMENT: 'Queued for Procurement',
         UNDER_VALIDATION: 'Submitted or Under Validation',
     };
 
-    return map[bucket] ?? bucket;
+    return map[bucket] ?? humanizeEnum(bucket);
 }
 
 function displaySupplyRequestStatus(status: string): string {
@@ -267,5 +287,5 @@ function displaySupplyRequestStatus(status: string): string {
         READY_FOR_DISTRIBUTION: 'Ready for Distribution',
     };
 
-    return map[status] ?? status;
+    return map[status] ?? humanizeEnum(status);
 }

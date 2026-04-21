@@ -58,7 +58,15 @@ export default function DeliveryShow({ delivery }: Props) {
         <AuthenticatedLayout
             header={
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                    <h2 className="text-xl font-semibold leading-tight text-gray-800">Delivery {delivery.delivery_code}</h2>
+                    <div className="flex flex-wrap items-center gap-3">
+                        <Link
+                            href={route('inventory.deliveries.index')}
+                            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-slate-50"
+                        >
+                            Back to Delivery Monitoring
+                        </Link>
+                        <h2 className="text-xl font-semibold leading-tight text-gray-800">Delivery {delivery.delivery_code}</h2>
+                    </div>
                     <div className="flex flex-wrap gap-2">
                         {canVerify ? (
                             <Link href={route('inventory.delivery-verifications.create', delivery.delivery_id)} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">

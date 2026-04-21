@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Inventory;
 use App\Models\Inventory;
 use App\Models\Office;
 use App\Models\PurchaseRequest;
+use App\Models\Delivery;
 use App\Models\SupplyRequest;
 use App\Services\Procurement\PurchaseRequestService;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -51,7 +52,20 @@ class RequestWorkflowController
 
         $rawRequests = $query->get();
 
-        $rows = $rawRequests->map(function (SupplyRequest $request): array {
+        $distributionReadySupplyRequestIds = Delivery::query()
+            ->verified()
+            ->whereDoesntHave('distributionRecords')
+            ->with('purchaseOrder:supply_request_id,purchase_order_id')
+            ->get()
+            ->map(fn (Delivery $delivery): ?int => $delivery->purchaseOrder?->supply_request_id)
+            ->filter()
+            ->map(fn ($id): int => (int) $id)
+            ->values()
+            ->all();
+
+        $distributionReadyLookup = array_flip($distributionReadySupplyRequestIds);
+
+        $rows = $rawRequests->map(function (SupplyRequest $request) use ($distributionReadyLookup): array {
             $requestedTotal = 0.0;
             $shortageTotal = 0.0;
 
@@ -65,12 +79,15 @@ class RequestWorkflowController
 
             $hasPurchaseRequest = $request->purchaseRequests->isNotEmpty();
             $stockAssessment = $shortageTotal > 0 ? 'SHORTAGE_REQUIRES_PROCUREMENT' : 'STOCK_READY';
+            $hasDistributionCandidate = isset($distributionReadyLookup[(int) $request->supply_request_id]);
 
             $workflowBucket = 'UNDER_VALIDATION';
             if ($hasPurchaseRequest) {
                 $workflowBucket = 'QUEUED_FOR_PROCUREMENT';
-            } elseif ($stockAssessment === 'STOCK_READY' && (string) $request->status === 'SUBMITTED') {
+            } elseif ($stockAssessment === 'STOCK_READY' && $hasDistributionCandidate) {
                 $workflowBucket = 'READY_FOR_DISTRIBUTION';
+            } elseif ($stockAssessment === 'STOCK_READY') {
+                $workflowBucket = 'STOCK_READY_AWAITING_RELEASE_CONTEXT';
             }
 
             return [
@@ -91,6 +108,7 @@ class RequestWorkflowController
                 'shortage_total' => round($shortageTotal, 2),
                 'stock_assessment' => $stockAssessment,
                 'has_purchase_request' => $hasPurchaseRequest,
+                'has_distribution_candidate' => $hasDistributionCandidate,
                 'distribution_records_count' => (int) $request->distribution_records_count,
                 'workflow_bucket' => $workflowBucket,
             ];
@@ -147,6 +165,8 @@ class RequestWorkflowController
     {
         abort_unless(Auth::user()?->can('inventory.view-any'), 403);
 
+        $focusInventoryId = (int) request()->query('focus_inventory_id', 0);
+
         $purchaseRequests = PurchaseRequest::query()
             ->with(['office', 'requester', 'supplyRequest'])
             ->latest('purchase_request_id')
@@ -187,7 +207,7 @@ class RequestWorkflowController
 
         $lowStockItems = Inventory::query()
             ->with('item')
-            ->lowStock()
+            ->whereColumn('available_stock', '<', 'low_stock_threshold')
             ->orderByRaw('(low_stock_threshold - available_stock) DESC')
             ->limit(12)
             ->get()
@@ -198,13 +218,60 @@ class RequestWorkflowController
                 'low_stock_threshold' => (float) $inventory->low_stock_threshold,
                 'deficit' => round(max((float) $inventory->low_stock_threshold - (float) $inventory->available_stock, 0), 2),
             ])
+            ->filter(fn (array $row): bool => $row['deficit'] > 0)
+            ->values();
+
+        $atReorderItems = Inventory::query()
+            ->with('item')
+            ->whereColumn('available_stock', '=', 'low_stock_threshold')
+            ->orderByDesc('last_updated')
+            ->limit(8)
+            ->get()
+            ->map(fn (Inventory $inventory): array => [
+                'inventory_id' => (int) $inventory->inventory_id,
+                'item_name' => (string) ($inventory->item?->item_name ?? 'Unassigned Item'),
+                'available_stock' => (float) $inventory->available_stock,
+                'low_stock_threshold' => (float) $inventory->low_stock_threshold,
+            ])
             ->values();
 
         return Inertia::render('Inventory/ProcurementRequests/Index', [
             'purchaseRequests' => $purchaseRequests,
             'shortageCandidates' => $shortageCandidates,
             'lowStockItems' => $lowStockItems,
+            'atReorderItems' => $atReorderItems,
+            'focusInventoryId' => $focusInventoryId > 0 ? $focusInventoryId : null,
         ]);
+    }
+
+    public function processDistribution(Request $request, SupplyRequest $supplyRequest): RedirectResponse
+    {
+        abort_unless($request->user()?->can('inventory.view-any'), 403);
+
+        $supplyRequest->load(['items.item.inventory', 'purchaseRequests']);
+
+        if ($supplyRequest->purchaseRequests->isNotEmpty()) {
+            return redirect()
+                ->route('inventory.office-supply-requests.index', $request->query())
+                ->with('error', 'This request is already queued for procurement and cannot be processed for direct distribution.');
+        }
+
+        $shortageTotal = 0.0;
+        foreach ($supplyRequest->items as $item) {
+            $requested = (float) $item->quantity_requested;
+            $available = (float) ($item->item?->inventory?->available_stock ?? 0);
+            $shortageTotal += max($requested - $available, 0);
+        }
+
+        if ($shortageTotal > 0) {
+            return redirect()
+                ->route('inventory.office-supply-requests.index', $request->query())
+                ->with('error', 'Stock shortage detected. Queue this request for procurement initiation instead of distribution release.');
+        }
+
+        return redirect()
+            ->route('inventory.distribution-records.create', ['supply_request_id' => (int) $supplyRequest->supply_request_id])
+            ->with('success', 'Supply request opened in Supply Distribution workflow.');
     }
 
     public function queueProcurement(Request $request, SupplyRequest $supplyRequest): RedirectResponse

@@ -14,9 +14,10 @@ type EligibleRow = {
 
 type Props = {
     eligibleRows: EligibleRow[];
+    focusSupplyRequestId?: number | null;
 };
 
-export default function DistributionCreate({ eligibleRows }: Props) {
+export default function DistributionCreate({ eligibleRows, focusSupplyRequestId = null }: Props) {
     const form = useForm({
         supply_request_id: 0,
         delivery_id: 0,
@@ -27,20 +28,34 @@ export default function DistributionCreate({ eligibleRows }: Props) {
     });
 
     const rows = useMemo(() => eligibleRows, [eligibleRows]);
+    const focusedRowExists = focusSupplyRequestId ? rows.some((row) => row.supply_request_id === focusSupplyRequestId) : false;
 
     return (
         <AuthenticatedLayout
             header={
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <h2 className="text-xl font-semibold leading-tight text-gray-800">Supply Distribution</h2>
-                    <Link href={route('inventory.distribution-records.index')} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                        Distribution Records
-                    </Link>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Link href={route('inventory.office-supply-requests.index')} className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                            Back to Office Supply Requests
+                        </Link>
+                        <Link href={route('inventory.distribution-records.index')} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                            Distribution Records
+                        </Link>
+                    </div>
                 </div>
             }
         >
             <Head title="Supply Distribution" />
             <div className="space-y-6 py-8">
+                {focusSupplyRequestId ? (
+                    <div className={`rounded-xl border p-4 text-sm shadow-sm ${focusedRowExists ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
+                        {focusedRowExists
+                            ? `Focused release context loaded for request #${focusSupplyRequestId}. Continue with Process Release below.`
+                            : `Request #${focusSupplyRequestId} is stock-ready but has no verified delivery release context yet. It will appear here once delivery verification is available.`}
+                    </div>
+                ) : null}
+
                 <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="border-b border-slate-200 px-6 py-5">
                         <h3 className="text-2xl font-semibold text-slate-900">Supply Distribution</h3>
@@ -62,7 +77,7 @@ export default function DistributionCreate({ eligibleRows }: Props) {
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {rows.map((row) => (
-                                    <tr key={`${row.supply_request_id}-${row.delivery_id}`} className="hover:bg-slate-50/60">
+                                    <tr key={`${row.supply_request_id}-${row.delivery_id}`} className={`hover:bg-slate-50/60 ${focusSupplyRequestId === row.supply_request_id ? 'bg-emerald-50/60' : ''}`}>
                                         <td className="px-4 py-3 font-semibold text-red-700">{row.request_code}</td>
                                         <td className="px-4 py-3 text-slate-700">{row.office_name}</td>
                                         <td className="px-4 py-3 text-slate-700">{row.delivery_code}</td>

@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import { humanizeEnum } from '@/lib/displayLabels';
 import { Link } from '@inertiajs/react';
 import { Head } from '@inertiajs/react';
 
@@ -27,10 +28,19 @@ type Props = {
 };
 
 export default function InventoryShow({ inventory, recentMovements }: Props) {
-    const isLowStock = Number(inventory.available_stock) <= Number(inventory.low_stock_threshold);
+    const isLowStock = Number(inventory.available_stock) < Number(inventory.low_stock_threshold);
 
     return (
-        <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Inventory Detail</h2>}>
+        <AuthenticatedLayout
+            header={
+                <div className="flex flex-wrap items-center gap-3">
+                    <Link href={route('inventory.inventory.index')} className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                        Back to Inventory Monitoring
+                    </Link>
+                    <h2 className="text-xl font-semibold leading-tight text-gray-800">Inventory Detail</h2>
+                </div>
+            }
+        >
             <Head title="Inventory Detail" />
 
             <div className="space-y-6 py-8">
@@ -49,7 +59,7 @@ export default function InventoryShow({ inventory, recentMovements }: Props) {
                     <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
                         <p>
                             <span className="font-semibold text-slate-800">Threshold meaning:</span> Low Stock Threshold is the safety level used to signal reorder risk.
-                            Values at or below this level appear as low-stock signals and can trigger shortage-based procurement endorsement.
+                            Values below this level appear as active low-stock shortage signals. Values equal to threshold are advisory reorder-point warnings.
                         </p>
                     </div>
                 </div>
@@ -70,7 +80,7 @@ export default function InventoryShow({ inventory, recentMovements }: Props) {
                         <tbody className="divide-y divide-slate-100">
                             {recentMovements.map((movement) => (
                                 <tr key={movement.movement_id} className="hover:bg-slate-50/60">
-                                    <td className="px-4 py-2 text-slate-700">{movement.movement_type}</td>
+                                    <td className="px-4 py-2 text-slate-700">{humanizeEnum(movement.movement_type)}</td>
                                     <td className="px-4 py-2 text-right text-slate-700">{movement.quantity}</td>
                                     <td className="px-4 py-2 text-slate-600">{movement.movement_date}</td>
                                     <td className="px-4 py-2 text-right">

@@ -27,6 +27,7 @@ use App\Models\SupplyRequestItem;
 use App\Models\User;
 use App\Services\Inventory\DistributionRecordService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
@@ -433,6 +434,71 @@ class InventoryDistributionFoundationTest extends TestCase
         $this->assertDatabaseMissing('purchase_requests', [
             'supply_request_id' => $context['supplyRequest']->supply_request_id,
         ]);
+    }
+
+    public function test_process_distribution_routes_to_supply_distribution_with_request_context(): void
+    {
+        $context = $this->createSubmittedSupplyRequestForQueue($this->officeA, $this->officeUserA, 9015, 4, 10);
+
+        $this->actingAs($this->gsoOfficer)
+            ->post(route('inventory.office-supply-requests.process-distribution', $context['supplyRequest']->supply_request_id))
+            ->assertRedirect(route('inventory.distribution-records.create', [
+                'supply_request_id' => $context['supplyRequest']->supply_request_id,
+            ]));
+    }
+
+    public function test_procurement_requests_page_only_lists_active_low_stock_deficit_items(): void
+    {
+        $category = ItemCategory::query()->create([
+            'category_name' => 'Signal Category '.uniqid(),
+            'standard_delivery_days' => 7,
+            'description' => 'Signal checks',
+            'status' => 'ACTIVE',
+        ]);
+
+        $atThresholdItem = Item::query()->create([
+            'item_category_id' => $category->item_category_id,
+            'item_name' => 'At Threshold Item',
+            'description' => 'At threshold',
+            'default_unit' => 'PCS',
+            'status' => 'ACTIVE',
+        ]);
+
+        $deficitItem = Item::query()->create([
+            'item_category_id' => $category->item_category_id,
+            'item_name' => 'Deficit Item',
+            'description' => 'Below threshold',
+            'default_unit' => 'PCS',
+            'status' => 'ACTIVE',
+        ]);
+
+        Inventory::query()->create([
+            'item_id' => $atThresholdItem->item_id,
+            'available_stock' => 5,
+            'stock_on_hand' => 5,
+            'reserved_quantity' => 0,
+            'released_quantity' => 0,
+            'low_stock_threshold' => 5,
+            'last_updated' => now(),
+        ]);
+
+        Inventory::query()->create([
+            'item_id' => $deficitItem->item_id,
+            'available_stock' => 2,
+            'stock_on_hand' => 2,
+            'reserved_quantity' => 0,
+            'released_quantity' => 0,
+            'low_stock_threshold' => 5,
+            'last_updated' => now(),
+        ]);
+
+        $this->actingAs($this->gsoOfficer)
+            ->get(route('inventory.procurement-requests.index'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('lowStockItems.0.item_name', 'Deficit Item')
+                ->where('lowStockItems.0.deficit', 3)
+                ->where('atReorderItems.0.item_name', 'At Threshold Item')
+            );
     }
 
     private function createReleasedDistributionRecordForOffice(Office $office, int $itemId): DistributionRecord
