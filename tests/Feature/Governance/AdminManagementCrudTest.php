@@ -129,6 +129,7 @@ class AdminManagementCrudTest extends TestCase
             ->post(route('admin-tech.users.store'), [
                 'name' => 'Internal Staff',
                 'email' => 'staff@gsc.local',
+                'emp_id' => 'EMP-STAFF-0001',
                 'password' => 'TempPass#12345',
                 'password_confirmation' => 'TempPass#12345',
                 'role_id' => $roleOfficeUser->id,
@@ -145,6 +146,7 @@ class AdminManagementCrudTest extends TestCase
             ->put(route('admin-tech.users.update', $user->id), [
                 'name' => 'Internal Staff Updated',
                 'email' => 'staff.updated@gsc.local',
+                'emp_id' => 'EMP-STAFF-0002',
                 'role_id' => $roleProc->id,
                 'office_id' => $otherOffice->id,
             ])
@@ -153,6 +155,7 @@ class AdminManagementCrudTest extends TestCase
         $user->refresh();
         $this->assertSame('Internal Staff Updated', $user->name);
         $this->assertSame('staff.updated@gsc.local', $user->email);
+        $this->assertSame('EMP-STAFF-0002', $user->emp_id);
         $this->assertSame($roleProc->id, $user->role_id);
         $this->assertSame($otherOffice->id, $user->office_id);
 
@@ -241,6 +244,7 @@ class AdminManagementCrudTest extends TestCase
             ->post(route('admin-tech.users.store'), [
                 'name' => 'Admin Attempt',
                 'email' => 'admin.attempt@gsc.local',
+                'emp_id' => 'EMP-ADMIN-0001',
                 'password' => 'TempPass#12345',
                 'password_confirmation' => 'TempPass#12345',
                 'role_id' => $adminRole->id,
@@ -252,6 +256,7 @@ class AdminManagementCrudTest extends TestCase
             ->post(route('admin-tech.users.store'), [
                 'name' => 'Admin Technical User',
                 'email' => 'admin.tech@gsc.local',
+                'emp_id' => 'EMP-ADMIN-0002',
                 'password' => 'TempPass#12345',
                 'password_confirmation' => 'TempPass#12345',
                 'role_id' => $adminRole->id,
@@ -302,6 +307,7 @@ class AdminManagementCrudTest extends TestCase
             ->put(route('admin-tech.users.update', $staff->id), [
                 'name' => 'Role Switch User',
                 'email' => 'role.switch@gsc.local',
+                'emp_id' => 'EMP-ROLE-0001',
                 'role_id' => $roleAdmin->id,
                 'office_id' => $this->office->id,
             ])
@@ -311,6 +317,7 @@ class AdminManagementCrudTest extends TestCase
             ->put(route('admin-tech.users.update', $staff->id), [
                 'name' => 'Role Switch User',
                 'email' => 'role.switch@gsc.local',
+                'emp_id' => 'EMP-ROLE-0001',
                 'role_id' => $roleAdmin->id,
             ])
             ->assertRedirect(route('admin-tech.users.index'));
@@ -322,6 +329,7 @@ class AdminManagementCrudTest extends TestCase
             ->put(route('admin-tech.users.update', $staff->id), [
                 'name' => 'Role Switch User',
                 'email' => 'role.switch@gsc.local',
+                'emp_id' => 'EMP-ROLE-0001',
                 'role_id' => $roleProcurement->id,
             ])
             ->assertSessionHasErrors('office_id');
@@ -330,6 +338,7 @@ class AdminManagementCrudTest extends TestCase
             ->put(route('admin-tech.users.update', $staff->id), [
                 'name' => 'Role Switch User Updated',
                 'email' => 'role.switch.updated@gsc.local',
+                'emp_id' => 'EMP-ROLE-0002',
                 'role_id' => $roleOfficeUser->id,
                 'office_id' => $this->office->id,
             ])
@@ -488,79 +497,75 @@ class AdminManagementCrudTest extends TestCase
                 ->assertSessionHasErrors('emp_id');
         }
 
-        public function test_existing_user_without_emp_id_still_works(): void
-        {
-            // Create user without emp_id
-            $user = $this->createUser(UserRole::OFFICE_USER, $this->office, 'no.emp.id@gsc.local');
-            $this->assertNull($user->emp_id);
+    public function test_existing_user_without_emp_id_is_rejected_in_phase_2(): void
+    {
+        $user = $this->createUser(UserRole::OFFICE_USER, $this->office, 'no.emp.id@gsc.local');
 
-            // Can update the user (other fields) without specifying emp_id
-            $this->actingAs($this->admin)
-                ->put(route('admin-tech.users.update', $user->id), [
-                    'name' => 'Updated Without Emp ID',
-                    'email' => 'no.emp.id@gsc.local',
-                    'role_id' => $user->role_id,
-                    'office_id' => $user->office_id,
-                ])
-                ->assertRedirect(route('admin-tech.users.index'));
+        $this->actingAs($this->admin)
+            ->put(route('admin-tech.users.update', $user->id), [
+                'name' => 'Updated Without Emp ID',
+                'email' => 'no.emp.id@gsc.local',
+                'emp_id' => '',
+                'role_id' => $user->role_id,
+                'office_id' => $user->office_id,
+            ])
+            ->assertSessionHasErrors('emp_id');
 
-            $user->refresh();
-            $this->assertSame('Updated Without Emp ID', $user->name);
-            $this->assertNull($user->emp_id);
-        }
+        $user->refresh();
+        $this->assertNotNull($user->emp_id);
+    }
 
-        public function test_multiple_null_emp_id_values_are_allowed(): void
-        {
-            $roleOfficeUser = $this->roleByCode(UserRole::OFFICE_USER->value);
+    public function test_multiple_blank_emp_id_values_are_rejected_in_phase_2(): void
+    {
+        $roleOfficeUser = $this->roleByCode(UserRole::OFFICE_USER->value);
 
-            // Create two users without emp_id (both will have null)
-            $user1 = User::factory()
-                ->withRole(UserRole::OFFICE_USER)
-                ->forOffice($this->office)
-                ->create([
-                    'email' => 'null.emp.one@gsc.local',
-                    'emp_id' => null,
-                    'role_id' => $roleOfficeUser->id,
-                    'office_id' => $this->office->id,
-                ]);
+        $this->actingAs($this->admin)
+            ->post(route('admin-tech.users.store'), [
+                'name' => 'Blank Emp One',
+                'email' => 'blank.emp.one@gsc.local',
+                'emp_id' => '',
+                'password' => 'TempPass#12345',
+                'password_confirmation' => 'TempPass#12345',
+                'role_id' => $roleOfficeUser->id,
+                'office_id' => $this->office->id,
+            ])
+            ->assertSessionHasErrors('emp_id');
 
-            $user2 = User::factory()
-                ->withRole(UserRole::OFFICE_USER)
-                ->forOffice($this->office)
-                ->create([
-                    'email' => 'null.emp.two@gsc.local',
-                    'emp_id' => null,
-                    'role_id' => $roleOfficeUser->id,
-                    'office_id' => $this->office->id,
-                ]);
+        $this->actingAs($this->admin)
+            ->post(route('admin-tech.users.store'), [
+                'name' => 'Blank Emp Two',
+                'email' => 'blank.emp.two@gsc.local',
+                'emp_id' => '',
+                'password' => 'TempPass#12345',
+                'password_confirmation' => 'TempPass#12345',
+                'role_id' => $roleOfficeUser->id,
+                'office_id' => $this->office->id,
+            ])
+            ->assertSessionHasErrors('emp_id');
+    }
 
-            // Both should exist and be queryable
-            $this->assertDatabaseHas('users', ['id' => $user1->id, 'emp_id' => null]);
-            $this->assertDatabaseHas('users', ['id' => $user2->id, 'emp_id' => null]);
-        }
-
-        public function test_emp_id_can_be_cleared_after_being_set(): void
-        {
-            $user = $this->createUser(UserRole::OFFICE_USER, $this->office, 'clear.emp@gsc.local');
+    public function test_emp_id_cannot_be_cleared_after_being_set_in_phase_2(): void
+    {
+        $user = $this->createUser(UserRole::OFFICE_USER, $this->office, 'clear.emp@gsc.local');
 
             // Assign emp_id
             $user->update(['emp_id' => 'EMP2026005']);
             $this->assertSame('EMP2026005', $user->emp_id);
 
             // Clear emp_id via update
-            $this->actingAs($this->admin)
-                ->put(route('admin-tech.users.update', $user->id), [
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'emp_id' => '',
-                    'role_id' => $user->role_id,
-                    'office_id' => $user->office_id,
-                ])
-                ->assertRedirect(route('admin-tech.users.index'));
+        $this->actingAs($this->admin)
+            ->put(route('admin-tech.users.update', $user->id), [
+                'name' => $user->name,
+                'email' => $user->email,
+                'emp_id' => '',
+                'role_id' => $user->role_id,
+                'office_id' => $user->office_id,
+            ])
+            ->assertSessionHasErrors('emp_id');
 
-            $user->refresh();
-            $this->assertNull($user->emp_id);
-        }
+        $user->refresh();
+        $this->assertSame('EMP2026005', $user->emp_id);
+    }
 
         public function test_emp_id_migration_is_safe_for_populated_users_table(): void
         {

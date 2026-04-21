@@ -7,6 +7,7 @@ use App\Models\Office;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
@@ -45,16 +46,21 @@ class UserFactory extends Factory
             ],
         );
 
-        return [
+        $attributes = [
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
-            'emp_id' => sprintf('TST-%08d', fake()->unique()->numberBetween(1, 99999999)),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'role_id' => $defaultRole->id,
             'office_id' => $defaultOffice->id,
             'remember_token' => Str::random(10),
         ];
+
+        if (Schema::hasColumn('users', 'emp_id')) {
+            $attributes['emp_id'] = sprintf('TST-%08d', fake()->unique()->numberBetween(1, 99999999));
+        }
+
+        return $attributes;
     }
 
     /**

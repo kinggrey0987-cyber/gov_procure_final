@@ -18,6 +18,10 @@ return new class extends Migration
     {
         $driver = DB::getDriverName();
 
+        if (! Schema::hasColumn('users', 'emp_id')) {
+            return;
+        }
+
         if ($driver === 'sqlite') {
             DB::statement("UPDATE users SET emp_id = 'LEGACY-' || id WHERE emp_id IS NULL OR TRIM(emp_id) = ''");
         } else {
@@ -39,6 +43,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (! Schema::hasColumn('users', 'emp_id')) {
+            return;
+        }
+
         Schema::table('users', function (Blueprint $table) {
             // Drop the unique constraint
             $table->dropUnique(['emp_id']);

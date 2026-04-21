@@ -16,10 +16,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            // Add emp_id after email (logical placement near top of table)
-            $table->string('emp_id')->nullable()->after('email');
-        });
+        if (! Schema::hasColumn('users', 'emp_id')) {
+            Schema::table('users', function (Blueprint $table) {
+                // Add emp_id after email (logical placement near top of table)
+                $table->string('emp_id')->nullable()->after('email');
+            });
+        }
 
         // Add partial unique index (PostgreSQL: UNIQUE WHERE emp_id IS NOT NULL)
         // This allows multiple NULL values while enforcing uniqueness on non-NULL values
@@ -34,10 +36,13 @@ return new class extends Migration
     public function down(): void
     {
         DB::statement('DROP INDEX IF EXISTS idx_users_emp_id_not_null');
+        DB::statement('DROP INDEX IF EXISTS users_emp_id_unique');
 
-        Schema::table('users', function (Blueprint $table) {
-            // Drop the column
-            $table->dropColumn('emp_id');
-        });
+        if (Schema::hasColumn('users', 'emp_id')) {
+            Schema::table('users', function (Blueprint $table) {
+                // Drop the column
+                $table->dropColumn('emp_id');
+            });
+        }
     }
 };

@@ -334,6 +334,7 @@ class ExecutivePpmpApprovalTest extends TestCase
         return User::query()->create([
             'name' => strtolower($role->value).' user',
             'email' => strtolower($role->value).'.'.uniqid().'@example.com',
+            'emp_id' => strtoupper(substr($role->value, 0, 4)).'-'.strtoupper(substr(uniqid('', true), -8)),
             'password' => Hash::make('password'),
             'role_id' => $roleModel->id,
             'office_id' => $office->id,

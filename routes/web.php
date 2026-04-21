@@ -693,7 +693,7 @@ Route::middleware(['auth', 'twofactor', 'must-change-password'])->group(function
 Route::prefix('public')
     ->name('public.')
     ->group(function () {
-        Route::get('/', static fn () => redirect()->route('public.disclosures.index'))
+        Route::get('/', [PublicDisclosurePortalController::class, 'index'])
             ->middleware('can:public.disclosures.view')
             ->name('dashboard');
         Route::get('/disclosures', [PublicDisclosurePortalController::class, 'index'])

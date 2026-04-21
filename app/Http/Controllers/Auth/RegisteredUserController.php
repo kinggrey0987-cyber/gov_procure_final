@@ -19,6 +19,8 @@ use Inertia\Response;
 
 class RegisteredUserController extends Controller
 {
+    private const PUBLIC_EMP_ID_PREFIX = 'PUB-';
+
     /**
      * Display the registration view.
      */
@@ -61,6 +63,7 @@ class RegisteredUserController extends Controller
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
+            'emp_id' => $this->generatePublicEmpId(),
             'password' => Hash::make($request->password),
             'role_id' => $publicRole->id,
             'office_id' => $defaultOffice->id,
@@ -71,5 +74,14 @@ class RegisteredUserController extends Controller
         Auth::login($user);
 
         return redirect(route('dashboard', absolute: false));
+    }
+
+    private function generatePublicEmpId(): string
+    {
+        do {
+            $candidate = self::PUBLIC_EMP_ID_PREFIX.strtoupper((string) str()->random(10));
+        } while (User::query()->where('emp_id', $candidate)->exists());
+
+        return $candidate;
     }
 }
