@@ -12,12 +12,19 @@ php artisan migrate --force
 
 php-fpm -D
 
-if [ "${RUN_DEMO_SEED:-false}" = "true" ]; then
+if [ "${FORCE_DEMO_RESEED_ON_START:-false}" = "true" ]; then
   (
     sleep 10
-    echo "[seed] starting demo seed..."
+    echo "[seed] starting full demo reseed..."
+    php artisan demo:reseed --force
+    echo "[seed] full demo reseed finished."
+  ) &
+elif [ "${RUN_DEMO_SEED:-false}" = "true" ]; then
+  (
+    sleep 10
+    echo "[seed] starting normal demo seed..."
     php artisan db:seed --force
-    echo "[seed] demo seed finished."
+    echo "[seed] normal demo seed finished."
   ) &
 fi
 
