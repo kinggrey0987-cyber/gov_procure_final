@@ -1,5 +1,6 @@
 type PrintSectionOptions = {
     title?: string;
+    printDelayMs?: number;
 };
 
 export function printSectionById(sectionId: string, options: PrintSectionOptions = {}): void {
@@ -9,7 +10,7 @@ export function printSectionById(sectionId: string, options: PrintSectionOptions
         return;
     }
 
-    const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=1200,height=900');
+    const printWindow = window.open('', '_blank', 'width=1200,height=900');
 
     if (!printWindow) {
         return;
@@ -38,7 +39,7 @@ export function printSectionById(sectionId: string, options: PrintSectionOptions
         }
     </style>
 </head>
-<body>
+<body style="margin: 0; padding: 16px; background: #fff;">
     ${source.outerHTML}
 </body>
 </html>`;
@@ -47,9 +48,29 @@ export function printSectionById(sectionId: string, options: PrintSectionOptions
     printWindow.document.write(html);
     printWindow.document.close();
 
-    printWindow.onload = () => {
+    const printDelayMs = options.printDelayMs ?? 500;
+    let didPrint = false;
+
+    const triggerPrint = () => {
+        if (didPrint || printWindow.closed) {
+            return;
+        }
+
+        didPrint = true;
         printWindow.focus();
         printWindow.print();
         printWindow.close();
     };
+
+    // Primary path: wait for the new window to fully load rendered content.
+    printWindow.addEventListener(
+        'load',
+        () => {
+            window.setTimeout(triggerPrint, printDelayMs);
+        },
+        { once: true },
+    );
+
+    // Fallback path: some browsers may miss/skip the load event for about:blank writes.
+    window.setTimeout(triggerPrint, 1500);
 }
