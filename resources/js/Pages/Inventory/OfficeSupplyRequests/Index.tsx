@@ -21,6 +21,11 @@ type RequestRow = {
     item_count: number;
     requested_total: number;
     shortage_total: number;
+    requested_items: Array<{
+        item_name: string;
+        quantity_requested: number;
+        unit: string;
+    }>;
     stock_assessment: 'STOCK_READY' | 'SHORTAGE_REQUIRES_PROCUREMENT';
     has_purchase_request: boolean;
     has_distribution_candidate: boolean;
@@ -207,8 +212,15 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                                         <p className="text-xs text-slate-500">Distribution records: {request.distribution_records_count}</p>
                                     </td>
                                     <td className="px-4 py-3 text-right">
-                                        {request.stock_assessment === 'STOCK_READY' ? (
-                                            <div className="space-y-1">
+                                        <div className="space-y-1">
+                                            <Link
+                                                href={route('inventory.office-supply-requests.show', request.supply_request_id)}
+                                                className="inline-block text-xs font-semibold text-slate-600 hover:text-slate-800"
+                                            >
+                                                View Full Request
+                                            </Link>
+
+                                            {request.stock_assessment === 'STOCK_READY' ? (
                                                 <button
                                                     type="button"
                                                     disabled={processingRequestId === request.supply_request_id}
@@ -217,22 +229,19 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                                                 >
                                                     {processingRequestId === request.supply_request_id ? 'Opening Supply Distribution...' : 'Process Distribution'}
                                                 </button>
-                                                {!request.has_distribution_candidate ? (
-                                                    <p className="text-xs text-slate-500">Awaiting release context in Supply Distribution.</p>
-                                                ) : null}
-                                            </div>
-                                        ) : request.has_purchase_request ? (
-                                            <span className="text-sm font-semibold text-slate-500">Queued for Procurement</span>
-                                        ) : (
-                                            <button
-                                                type="button"
-                                                disabled={queueingRequestId === request.supply_request_id}
-                                                onClick={() => queueProcurement(request.supply_request_id)}
-                                                className="text-sm font-semibold text-rose-700 hover:text-rose-900"
-                                            >
-                                                {queueingRequestId === request.supply_request_id ? 'Initiating...' : 'Initiate Purchase Request'}
-                                            </button>
-                                        )}
+                                            ) : request.has_purchase_request ? (
+                                                <span className="text-sm font-semibold text-slate-500">Queued for Procurement</span>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    disabled={queueingRequestId === request.supply_request_id}
+                                                    onClick={() => queueProcurement(request.supply_request_id)}
+                                                    className="text-sm font-semibold text-rose-700 hover:text-rose-900"
+                                                >
+                                                    {queueingRequestId === request.supply_request_id ? 'Initiating...' : 'Initiate Purchase Request'}
+                                                </button>
+                                            )}
+                                        </div>
                                     </td>
                                 </tr>
                             ))}

@@ -1,7 +1,8 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import useSmartRefresh from '@/hooks/useSmartRefresh';
 import { humanizeEnum } from '@/lib/displayLabels';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
+import { useState } from 'react';
 
 type PaginationLink = {
     url: string | null;
@@ -53,11 +54,21 @@ type Props = {
 };
 
 export default function ProcurementRequestsIndex({ purchaseRequests, shortageCandidates, lowStockItems, atReorderItems, focusInventoryId = null }: Props) {
+    const [initiatingInventoryId, setInitiatingInventoryId] = useState<number | null>(null);
+
     const { isRefreshing, lastRefreshedAt } = useSmartRefresh({
         only: ['purchaseRequests', 'shortageCandidates', 'lowStockItems', 'atReorderItems', 'focusInventoryId'],
         refreshOnFocus: true,
         refreshOnMount: true,
     });
+
+    const initiateLowStockProcurement = (inventoryId: number) => {
+        setInitiatingInventoryId(inventoryId);
+        router.post(route('inventory.procurement-requests.initiate-low-stock', inventoryId), {}, {
+            preserveScroll: true,
+            onFinish: () => setInitiatingInventoryId(null),
+        });
+    };
 
     return (
         <AuthenticatedLayout
@@ -120,15 +131,14 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                                         Available {item.available_stock.toFixed(2)} / Low Stock Threshold {item.low_stock_threshold.toFixed(2)}
                                     </p>
                                     <p className="mt-1 text-xs font-semibold text-amber-700">Deficit: {item.deficit.toFixed(2)}</p>
-                                    <Link
-                                        href={route('inventory.office-supply-requests.index', {
-                                            stock_assessment: 'SHORTAGE_REQUIRES_PROCUREMENT',
-                                            q: item.item_name,
-                                        })}
+                                    <button
+                                        type="button"
+                                        disabled={initiatingInventoryId === item.inventory_id}
+                                        onClick={() => initiateLowStockProcurement(item.inventory_id)}
                                         className="mt-2 inline-flex rounded-md border border-red-300 bg-white px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-50"
                                     >
-                                        Initiate Purchase Request
-                                    </Link>
+                                        {initiatingInventoryId === item.inventory_id ? 'Initiating...' : 'Initiate Purchase Request'}
+                                    </button>
                                 </div>
                             ))}
                             {lowStockItems.length === 0 ? <p className="text-sm text-slate-500">No low-stock items at the moment.</p> : null}

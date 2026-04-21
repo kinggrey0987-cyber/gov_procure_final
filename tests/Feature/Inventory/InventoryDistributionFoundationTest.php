@@ -556,6 +556,58 @@ class InventoryDistributionFoundationTest extends TestCase
             );
     }
 
+    public function test_low_stock_signal_initiation_queues_matching_shortage_request_and_redirects_to_procurement_requests(): void
+    {
+        $context = $this->createSubmittedSupplyRequestForQueue($this->officeA, $this->officeUserA, 9020, 10, 2);
+
+        $inventoryId = (int) Inventory::query()
+            ->where('item_id', (int) $context['item']->item_id)
+            ->value('inventory_id');
+
+        $this->actingAs($this->gsoOfficer)
+            ->post(route('inventory.procurement-requests.initiate-low-stock', $inventoryId))
+            ->assertRedirect(route('inventory.procurement-requests.index', [
+                'focus_inventory_id' => $inventoryId,
+            ]));
+
+        $this->assertDatabaseHas('purchase_requests', [
+            'supply_request_id' => $context['supplyRequest']->supply_request_id,
+            'status' => 'OPEN',
+        ]);
+    }
+
+    public function test_inventory_office_supply_request_show_exposes_real_items_without_hardcoded_data(): void
+    {
+        $context = $this->createSubmittedSupplyRequestForQueue($this->officeA, $this->officeUserA, 9021, 9, 4);
+
+        $this->actingAs($this->gsoOfficer)
+            ->get(route('inventory.office-supply-requests.show', $context['supplyRequest']->supply_request_id))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('request.request_code', $context['supplyRequest']->request_code)
+                ->where('request.item_count', 1)
+                ->where('request.items.0.item_name', $context['item']->item_name)
+                ->where('request.items.0.quantity_requested', 9)
+                ->where('request.items.0.available_stock', 4)
+                ->where('request.items.0.shortage', 5)
+            );
+    }
+
+    public function test_stock_ready_request_without_distribution_record_is_marked_ready_for_distribution(): void
+    {
+        $context = $this->createSubmittedSupplyRequestForQueue($this->officeA, $this->officeUserA, 9022, 2, 10);
+
+        $this->actingAs($this->gsoOfficer)
+            ->get(route('inventory.office-supply-requests.index', [
+                'q' => $context['supplyRequest']->request_code,
+            ]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('requests.data.0.request_code', $context['supplyRequest']->request_code)
+                ->where('requests.data.0.stock_assessment', 'STOCK_READY')
+                ->where('requests.data.0.workflow_bucket', 'READY_FOR_DISTRIBUTION')
+                ->where('requests.data.0.has_distribution_candidate', true)
+            );
+    }
+
     private function createReleasedDistributionRecordForOffice(Office $office, int $itemId): DistributionRecord
     {
         $officeUser = ((int) $office->id === (int) $this->officeA->id) ? $this->officeUserA : $this->officeUserB;

@@ -535,6 +535,9 @@ Route::middleware(['auth', 'twofactor', 'must-change-password'])->group(function
                 Route::get('/', [RequestWorkflowController::class, 'officeSupplyRequests'])
                     ->middleware('can:inventory.view-any')
                     ->name('index');
+                Route::get('/{supply_request}', [RequestWorkflowController::class, 'officeSupplyRequestShow'])
+                    ->middleware('can:inventory.view-any')
+                    ->name('show');
                 Route::post('/{supply_request}/process-distribution', [RequestWorkflowController::class, 'processDistribution'])
                     ->middleware('can:inventory.view-any')
                     ->name('process-distribution');
@@ -547,6 +550,9 @@ Route::middleware(['auth', 'twofactor', 'must-change-password'])->group(function
                 Route::get('/', [RequestWorkflowController::class, 'procurementRequests'])
                     ->middleware('can:inventory.view-any')
                     ->name('index');
+                Route::post('/low-stock/{inventory}/initiate', [RequestWorkflowController::class, 'initiateLowStockProcurement'])
+                    ->middleware('can:inventory.view-any')
+                    ->name('initiate-low-stock');
             });
 
             Route::prefix('deliveries')->name('deliveries.')->group(function () {
