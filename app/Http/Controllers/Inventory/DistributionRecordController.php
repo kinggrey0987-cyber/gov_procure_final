@@ -7,6 +7,7 @@ use App\Http\Requests\DistributionRecord\UpdateDistributionRecordRequest;
 use App\Models\DistributionRecord;
 use App\Models\Delivery;
 use App\Models\SupplyRequest;
+use Illuminate\Support\Collection;
 use App\Services\Inventory\DistributionRecordService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -42,7 +43,7 @@ class DistributionRecordController
 
         $focusSupplyRequestId = (int) $request->query('supply_request_id', 0);
 
-        $eligibleRows = Delivery::query()
+        $procurementBackedRows = Delivery::query()
             ->verified()
             ->whereHas('purchaseOrder', fn ($query) => $query->whereNotNull('supply_request_id'))
             ->whereDoesntHave('distributionRecords')
@@ -61,13 +62,68 @@ class DistributionRecordController
                     'request_code' => (string) $supplyRequest->request_code,
                     'office_id' => (int) $supplyRequest->office_id,
                     'office_name' => (string) ($supplyRequest->office?->name ?? 'Unknown Office'),
+                    'release_basis' => 'VERIFIED_DELIVERY',
+                    'release_basis_label' => 'From Verified Delivery',
                     'delivery_id' => (int) $delivery->delivery_id,
                     'delivery_code' => (string) $delivery->delivery_code,
                     'receipt_status' => (string) $delivery->receipt_status,
+                    'releasable_reason' => null,
                 ];
             })
             ->filter()
             ->values();
+
+        $inventoryBackedRows = SupplyRequest::query()
+            ->submitted()
+            ->whereDoesntHave('distributionRecords')
+            ->whereDoesntHave('purchaseRequests')
+            ->with(['office', 'items.item.inventory'])
+            ->latest('supply_request_id')
+            ->get()
+            ->map(function (SupplyRequest $request): ?array {
+                $shortageTotal = 0.0;
+
+                foreach ($request->items as $item) {
+                    $requested = (float) $item->quantity_requested;
+                    $available = (float) ($item->item?->inventory?->available_stock ?? 0);
+                    $shortageTotal += max($requested - $available, 0);
+                }
+
+                if ($shortageTotal > 0) {
+                    return null;
+                }
+
+                return [
+                    'supply_request_id' => (int) $request->supply_request_id,
+                    'request_code' => (string) $request->request_code,
+                    'office_id' => (int) $request->office_id,
+                    'office_name' => (string) ($request->office?->name ?? 'Unknown Office'),
+                    'release_basis' => 'AVAILABLE_INVENTORY',
+                    'release_basis_label' => 'From Available Inventory',
+                    'delivery_id' => null,
+                    'delivery_code' => null,
+                    'receipt_status' => null,
+                    'releasable_reason' => null,
+                ];
+            })
+            ->filter()
+            ->values();
+
+        /** @var Collection<int, array<string, mixed>> $eligibleRows */
+        $eligibleRows = $inventoryBackedRows
+            ->concat($procurementBackedRows)
+            ->unique('supply_request_id')
+            ->values();
+
+        $focusedReason = null;
+        if ($focusSupplyRequestId > 0) {
+            $focusedRequest = SupplyRequest::query()
+                ->with(['items.item.inventory', 'purchaseRequests', 'distributionRecords'])
+                ->where('supply_request_id', $focusSupplyRequestId)
+                ->first();
+
+            $focusedReason = $this->resolveFocusReason($focusedRequest);
+        }
 
         if ($focusSupplyRequestId > 0) {
             $eligibleRows = $eligibleRows
@@ -78,7 +134,50 @@ class DistributionRecordController
         return Inertia::render('Inventory/Distribution/Create', [
             'eligibleRows' => $eligibleRows,
             'focusSupplyRequestId' => $focusSupplyRequestId > 0 ? $focusSupplyRequestId : null,
+            'focusReleasableReason' => $focusedReason,
         ]);
+    }
+
+    private function resolveFocusReason(?SupplyRequest $request): ?string
+    {
+        if (! $request instanceof SupplyRequest) {
+            return 'Supply request context was not found.';
+        }
+
+        if ($request->distributionRecords->isNotEmpty()) {
+            return 'This request already has a distribution record and is no longer pending release.';
+        }
+
+        $hasPurchaseRequest = $request->purchaseRequests->isNotEmpty();
+
+        if ($hasPurchaseRequest) {
+            $hasVerifiedDelivery = Delivery::query()
+                ->verified()
+                ->whereHas('purchaseOrder', function ($query) use ($request): void {
+                    $query->where('supply_request_id', (int) $request->supply_request_id);
+                })
+                ->whereDoesntHave('distributionRecords')
+                ->exists();
+
+            if (! $hasVerifiedDelivery) {
+                return 'This request is procurement-backed and awaits verified delivery before distribution release.';
+            }
+
+            return null;
+        }
+
+        $shortageTotal = 0.0;
+        foreach ($request->items as $item) {
+            $requested = (float) $item->quantity_requested;
+            $available = (float) ($item->item?->inventory?->available_stock ?? 0);
+            $shortageTotal += max($requested - $available, 0);
+        }
+
+        if ($shortageTotal > 0) {
+            return 'This request has stock shortages and must be queued for procurement instead of direct inventory release.';
+        }
+
+        return null;
     }
 
     public function store(StoreDistributionRecordRequest $request): RedirectResponse

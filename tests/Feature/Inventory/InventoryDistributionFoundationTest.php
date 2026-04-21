@@ -447,6 +447,61 @@ class InventoryDistributionFoundationTest extends TestCase
             ]));
     }
 
+    public function test_distribution_create_lists_stock_ready_inventory_backed_request_without_delivery_context(): void
+    {
+        $context = $this->createSubmittedSupplyRequestForQueue($this->officeA, $this->officeUserA, 9016, 4, 10);
+
+        $this->actingAs($this->gsoOfficer)
+            ->get(route('inventory.distribution-records.create', [
+                'supply_request_id' => $context['supplyRequest']->supply_request_id,
+            ]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('focusSupplyRequestId', $context['supplyRequest']->supply_request_id)
+                ->where('focusReleasableReason', null)
+                ->where('eligibleRows.0.supply_request_id', $context['supplyRequest']->supply_request_id)
+                ->where('eligibleRows.0.release_basis', 'AVAILABLE_INVENTORY')
+                ->where('eligibleRows.0.release_basis_label', 'From Available Inventory')
+                ->where('eligibleRows.0.delivery_id', null)
+            );
+    }
+
+    public function test_distribution_create_shows_procurement_backed_reason_when_verified_delivery_is_missing(): void
+    {
+        $context = $this->createVerifiedDeliveryContext($this->officeA, $this->officeUserA, $this->procurementOfficer, $this->gsoOfficer, 9017);
+        $context['delivery']->forceFill(['receipt_status' => 'PENDING'])->save();
+
+        $focusId = (int) $context['supplyRequest']->supply_request_id;
+
+        $this->actingAs($this->gsoOfficer)
+            ->get(route('inventory.distribution-records.create', [
+                'supply_request_id' => $focusId,
+            ]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('focusSupplyRequestId', $focusId)
+                ->where('focusReleasableReason', 'This request is procurement-backed and awaits verified delivery before distribution release.')
+                ->where('eligibleRows', fn ($rows): bool => collect($rows)->firstWhere('supply_request_id', $focusId) === null)
+            );
+    }
+
+    public function test_gso_can_create_distribution_record_for_stock_ready_request_without_delivery_context(): void
+    {
+        $context = $this->createSubmittedSupplyRequestForQueue($this->officeA, $this->officeUserA, 9018, 2, 10);
+
+        $this->actingAs($this->gsoOfficer)
+            ->post(route('inventory.distribution-records.store'), [
+                'supply_request_id' => $context['supplyRequest']->supply_request_id,
+                'office_id' => $this->officeA->id,
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('distribution_records', [
+            'supply_request_id' => $context['supplyRequest']->supply_request_id,
+            'office_id' => $this->officeA->id,
+            'delivery_id' => null,
+            'status' => 'DRAFT',
+        ]);
+    }
+
     public function test_procurement_requests_page_only_lists_active_low_stock_deficit_items(): void
     {
         $category = ItemCategory::query()->create([

@@ -34,7 +34,7 @@ class DistributionRecordService
             $record = DistributionRecord::query()->create([
                 'distribution_code' => $distributionCode,
                 'supply_request_id' => (int) $payload['supply_request_id'],
-                'delivery_id' => (int) $payload['delivery_id'],
+                'delivery_id' => isset($payload['delivery_id']) ? (int) $payload['delivery_id'] : null,
                 'office_id' => (int) $payload['office_id'],
                 'prepared_by' => (int) $actor->id,
                 'received_by' => $payload['received_by'] ?? null,
@@ -236,9 +236,28 @@ class DistributionRecordService
 
     private function assertContextConsistency(DistributionRecord $record): void
     {
-        $record->loadMissing('delivery.purchaseOrder', 'supplyRequest');
+        $record->loadMissing('supplyRequest.purchaseRequests', 'delivery.purchaseOrder');
 
-        $deliverySupplyRequestId = (int) ($record->delivery->purchaseOrder->supply_request_id ?? 0);
+        $isProcurementBacked = $record->supplyRequest->purchaseRequests->isNotEmpty();
+        $hasDeliveryContext = $record->delivery_id !== null;
+
+        if ($isProcurementBacked && ! $hasDeliveryContext) {
+            throw ValidationException::withMessages([
+                'delivery_id' => 'Procurement-backed requests require a verified delivery context before distribution release.',
+            ]);
+        }
+
+        if (! $isProcurementBacked && ! $hasDeliveryContext) {
+            if ((int) $record->supplyRequest->office_id !== (int) $record->office_id) {
+                throw ValidationException::withMessages([
+                    'office_id' => 'Distribution office must match the linked supply request office.',
+                ]);
+            }
+
+            return;
+        }
+
+        $deliverySupplyRequestId = (int) ($record->delivery?->purchaseOrder?->supply_request_id ?? 0);
         if ($deliverySupplyRequestId !== (int) $record->supply_request_id) {
             throw ValidationException::withMessages([
                 'supply_request_id' => 'Distribution record supply request must match the delivery purchase order context.',

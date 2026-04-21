@@ -7,20 +7,24 @@ type EligibleRow = {
     request_code: string;
     office_id: number;
     office_name: string;
-    delivery_id: number;
-    delivery_code: string;
-    receipt_status: string;
+    release_basis: 'AVAILABLE_INVENTORY' | 'VERIFIED_DELIVERY';
+    release_basis_label: string;
+    delivery_id: number | null;
+    delivery_code: string | null;
+    receipt_status: string | null;
+    releasable_reason?: string | null;
 };
 
 type Props = {
     eligibleRows: EligibleRow[];
     focusSupplyRequestId?: number | null;
+    focusReleasableReason?: string | null;
 };
 
-export default function DistributionCreate({ eligibleRows, focusSupplyRequestId = null }: Props) {
+export default function DistributionCreate({ eligibleRows, focusSupplyRequestId = null, focusReleasableReason = null }: Props) {
     const form = useForm({
         supply_request_id: 0,
-        delivery_id: 0,
+        delivery_id: null as number | null,
         office_id: 0,
         release_date: '',
         storage_location: '',
@@ -52,7 +56,9 @@ export default function DistributionCreate({ eligibleRows, focusSupplyRequestId 
                     <div className={`rounded-xl border p-4 text-sm shadow-sm ${focusedRowExists ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
                         {focusedRowExists
                             ? `Focused release context loaded for request #${focusSupplyRequestId}. Continue with Process Release below.`
-                            : `Request #${focusSupplyRequestId} is stock-ready but has no verified delivery release context yet. It will appear here once delivery verification is available.`}
+                            : focusReleasableReason
+                                ? `Request #${focusSupplyRequestId} is not releasable yet: ${focusReleasableReason}`
+                                : `Request #${focusSupplyRequestId} is not currently releasable in Supply Distribution.`}
                     </div>
                 ) : null}
 
@@ -70,7 +76,8 @@ export default function DistributionCreate({ eligibleRows, focusSupplyRequestId 
                                 <tr>
                                     <th className="px-4 py-3 text-left font-semibold text-slate-700">Request ID</th>
                                     <th className="px-4 py-3 text-left font-semibold text-slate-700">Office</th>
-                                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Delivery</th>
+                                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Release Basis</th>
+                                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Source Context</th>
                                     <th className="px-4 py-3 text-left font-semibold text-slate-700">Status</th>
                                     <th className="px-4 py-3 text-right font-semibold text-slate-700">Actions</th>
                                 </tr>
@@ -80,7 +87,12 @@ export default function DistributionCreate({ eligibleRows, focusSupplyRequestId 
                                     <tr key={`${row.supply_request_id}-${row.delivery_id}`} className={`hover:bg-slate-50/60 ${focusSupplyRequestId === row.supply_request_id ? 'bg-emerald-50/60' : ''}`}>
                                         <td className="px-4 py-3 font-semibold text-red-700">{row.request_code}</td>
                                         <td className="px-4 py-3 text-slate-700">{row.office_name}</td>
-                                        <td className="px-4 py-3 text-slate-700">{row.delivery_code}</td>
+                                        <td className="px-4 py-3 text-slate-700">{row.release_basis_label}</td>
+                                        <td className="px-4 py-3 text-slate-700">
+                                            {row.release_basis === 'VERIFIED_DELIVERY'
+                                                ? row.delivery_code ?? 'Verified delivery'
+                                                : 'Current inventory balance'}
+                                        </td>
                                         <td className="px-4 py-3">
                                             <span className="inline-flex rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold uppercase text-red-700">
                                                 READY FOR RELEASE
@@ -108,8 +120,8 @@ export default function DistributionCreate({ eligibleRows, focusSupplyRequestId 
                                 ))}
                                 {rows.length === 0 ? (
                                     <tr>
-                                        <td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-500">
-                                            No submitted supply requests with verified deliveries are ready for distribution.
+                                        <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-500">
+                                            No submitted supply requests are releasable right now. Stock-ready requests appear as From Available Inventory, while procurement-backed requests appear once delivery is verified.
                                         </td>
                                     </tr>
                                 ) : null}

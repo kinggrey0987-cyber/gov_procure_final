@@ -19,7 +19,7 @@ class StoreDistributionRecordRequest extends FormRequest
         return [
             'distribution_code' => ['nullable', 'string', 'max:80', 'unique:distribution_records,distribution_code'],
             'supply_request_id' => ['required', 'integer', 'exists:supply_requests,supply_request_id'],
-            'delivery_id' => ['required', 'integer', 'exists:deliveries,delivery_id'],
+            'delivery_id' => ['nullable', 'integer', 'exists:deliveries,delivery_id'],
             'office_id' => ['required', 'integer', 'exists:offices,id'],
             'received_by' => ['nullable', 'integer', 'exists:users,id'],
             'release_date' => ['nullable', 'date'],
