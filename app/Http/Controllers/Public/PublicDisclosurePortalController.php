@@ -6,6 +6,7 @@ use App\Models\PublicDisclosure;
 use App\Services\Documents\DocumentService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -52,8 +53,8 @@ class PublicDisclosurePortalController
         abort_unless($this->isPublished($public_disclosure), 404);
         abort_unless(is_string($public_disclosure->file_path) && $public_disclosure->file_path !== '', 404);
 
-        $path = ltrim((string) $public_disclosure->file_path, '/');
-        abort_unless(Storage::disk('public')->exists($path), 404);
+        $path = $this->resolveExistingPublicDiskPath((string) $public_disclosure->file_path);
+        abort_unless($path !== null, 404);
 
         return response()->download(Storage::disk('public')->path($path), basename($path));
     }
@@ -61,5 +62,38 @@ class PublicDisclosurePortalController
     private function isPublished(PublicDisclosure $disclosure): bool
     {
         return (string) $disclosure->status === 'PUBLISHED' && (bool) $disclosure->published_at;
+    }
+
+    private function normalizePublicDiskPath(string $path): string
+    {
+        return ltrim(str_replace('\\', '/', trim($path)), '/');
+    }
+
+    private function resolveExistingPublicDiskPath(string $rawPath): ?string
+    {
+        $normalized = $this->normalizePublicDiskPath($rawPath);
+        if ($normalized === '') {
+            return null;
+        }
+
+        $candidates = [
+            $normalized,
+        ];
+
+        if (Str::startsWith($normalized, 'storage/')) {
+            $candidates[] = Str::after($normalized, 'storage/');
+        }
+
+        if (Str::startsWith($normalized, 'public/')) {
+            $candidates[] = Str::after($normalized, 'public/');
+        }
+
+        foreach (array_values(array_unique($candidates)) as $candidate) {
+            if ($candidate !== '' && Storage::disk('public')->exists($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 }
