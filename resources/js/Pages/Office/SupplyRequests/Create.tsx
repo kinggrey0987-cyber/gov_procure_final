@@ -154,8 +154,9 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
     const { isRefreshing, lastRefreshedAt, refreshNow } = useSmartRefresh({
         only: ['ppmpOptions', 'requestDate'],
         onRefresh: handleReferenceRefresh,
-        refreshOnFocus: true,
-        refreshOnMount: true,
+        enabled: !form.processing,
+        refreshOnFocus: false,
+        refreshOnMount: false,
     });
 
     const optionById = useMemo(() => {
@@ -190,7 +191,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                     ? 'Refreshing PPMP references...'
                                     : lastRefreshedAt
                                     ? `Updated ${lastRefreshedAt.toLocaleTimeString()}`
-                                    : 'Auto-refreshes on tab focus'}
+                                    : 'Use "Refresh Options" to sync approved PPMP references.'}
                             </p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -422,6 +423,11 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                             Save Request
                         </button>
                     </div>
+                    {!hasPpmp ? (
+                        <p className="mt-3 text-right text-xs font-medium text-amber-700">
+                            Save is disabled until you select an approved PPMP.
+                        </p>
+                    ) : null}
                 </section>
             </form>
         </AuthenticatedLayout>
