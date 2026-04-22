@@ -74,13 +74,23 @@ class DocumentController extends Controller
 
     public function downloadPublicDisclosureDocument(PublicDisclosure $public_disclosure, Document $document): BinaryFileResponse
     {
-        abort_unless($document->isRelatedTo('public_disclosures', (int) $public_disclosure->disclosure_id), 404);
+        abort_unless($this->belongsToPublicDisclosure($document, $public_disclosure), 404);
 
         $isPublished = strtoupper((string) ($public_disclosure->status ?? '')) === 'PUBLISHED'
             && (bool) $public_disclosure->published_at;
         abort_unless($isPublished, 404);
 
-        $path = $this->resolveExistingPublicDiskPath((string) $document->file_path);
+        $path = $this->resolveExistingPublicDiskPath((string) $document->file_path, [
+            sprintf(
+                'documents/public_disclosures/%d/%s',
+                (int) $public_disclosure->disclosure_id,
+                (string) $document->file_name,
+            ),
+            sprintf(
+                'public_disclosures/%s',
+                (string) $document->file_name,
+            ),
+        ]);
         abort_unless($path !== null, 404);
 
         return response()->download(Storage::disk('public')->path($path), (string) $document->file_name);
@@ -91,16 +101,17 @@ class DocumentController extends Controller
         return ltrim(str_replace('\\', '/', trim($path)), '/');
     }
 
-    private function resolveExistingPublicDiskPath(string $rawPath): ?string
+    /**
+     * @param  array<int, string>  $extraCandidates
+     */
+    private function resolveExistingPublicDiskPath(string $rawPath, array $extraCandidates = []): ?string
     {
         $normalized = $this->normalizePublicDiskPath($rawPath);
-        if ($normalized === '') {
-            return null;
-        }
+        $candidates = [];
 
-        $candidates = [
-            $normalized,
-        ];
+        if ($normalized !== '') {
+            $candidates[] = $normalized;
+        }
 
         if (Str::startsWith($normalized, 'storage/')) {
             $candidates[] = Str::after($normalized, 'storage/');
@@ -110,6 +121,13 @@ class DocumentController extends Controller
             $candidates[] = Str::after($normalized, 'public/');
         }
 
+        foreach ($extraCandidates as $extraCandidate) {
+            $clean = $this->normalizePublicDiskPath($extraCandidate);
+            if ($clean !== '') {
+                $candidates[] = $clean;
+            }
+        }
+
         foreach (array_values(array_unique($candidates)) as $candidate) {
             if ($candidate !== '' && Storage::disk('public')->exists($candidate)) {
                 return $candidate;
@@ -117,6 +135,20 @@ class DocumentController extends Controller
         }
 
         return null;
+    }
+
+    private function belongsToPublicDisclosure(Document $document, PublicDisclosure $publicDisclosure): bool
+    {
+        $module = strtolower(trim((string) $document->related_module));
+        $allowedModules = [
+            'public_disclosures',
+            'public_disclosure',
+            'disclosures',
+            'disclosure',
+        ];
+
+        return in_array($module, $allowedModules, true)
+            && (int) $document->related_reference_id === (int) $publicDisclosure->disclosure_id;
     }
 
     private function transformDocument(Document $document): array

@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { humanizeEnum } from '@/lib/displayLabels';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 
 type Props = {
     record: {
@@ -11,7 +11,21 @@ type Props = {
         storage_location?: string | null;
         notes?: string | null;
         office?: { name: string } | null;
-        supply_request?: { request_code: string; status: string } | null;
+        supply_request?: {
+            request_code: string;
+            status: string;
+            items: Array<{
+                supply_request_item_id: number;
+                item_id: number;
+                item_name: string;
+                category_name: string;
+                quantity_requested: number;
+                quantity_released: number;
+                quantity_remaining: number;
+                unit: string;
+                available_stock: number;
+            }>;
+        } | null;
         delivery?: { delivery_code: string } | null;
         preparer?: { name: string } | null;
         receiver?: { name: string } | null;
@@ -38,6 +52,16 @@ type Props = {
 };
 
 export default function DistributionShow({ record }: Props) {
+    const page = usePage().props as {
+        auth?: {
+            can?: {
+                inventory?: boolean;
+            };
+        };
+    };
+
+    const canManageDistribution = page.auth?.can?.inventory === true;
+
     return (
         <AuthenticatedLayout
             header={
@@ -67,6 +91,73 @@ export default function DistributionShow({ record }: Props) {
                         <p className="mt-1"><span className="font-semibold text-slate-700">Remarks:</span> {record.notes ?? 'No additional notes.'}</p>
                     </div>
                 </div>
+
+                <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                    <div className="border-b border-slate-200 px-4 py-3">
+                        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Requested Office Items</h3>
+                    </div>
+                    <table className="min-w-full divide-y divide-slate-200 text-sm">
+                        <thead className="bg-slate-50">
+                            <tr>
+                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Item</th>
+                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Category</th>
+                                <th className="px-4 py-3 text-right font-semibold text-slate-700">Requested</th>
+                                <th className="px-4 py-3 text-right font-semibold text-slate-700">Released</th>
+                                <th className="px-4 py-3 text-right font-semibold text-slate-700">Remaining</th>
+                                <th className="px-4 py-3 text-right font-semibold text-slate-700">Available Stock</th>
+                                <th className="px-4 py-3 text-right font-semibold text-slate-700">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {(record.supply_request?.items ?? []).map((requestItem) => {
+                                const maxReleasable = Math.min(requestItem.quantity_remaining, requestItem.available_stock);
+                                const canAdd = canManageDistribution && maxReleasable > 0;
+
+                                return (
+                                    <tr key={requestItem.supply_request_item_id} className="hover:bg-slate-50/60">
+                                        <td className="px-4 py-3 text-slate-700">{requestItem.item_name}</td>
+                                        <td className="px-4 py-3 text-slate-600">{requestItem.category_name || '-'}</td>
+                                        <td className="px-4 py-3 text-right font-semibold text-slate-700">{requestItem.quantity_requested.toFixed(2)} {requestItem.unit}</td>
+                                        <td className="px-4 py-3 text-right text-slate-700">{requestItem.quantity_released.toFixed(2)} {requestItem.unit}</td>
+                                        <td className="px-4 py-3 text-right text-slate-700">{requestItem.quantity_remaining.toFixed(2)} {requestItem.unit}</td>
+                                        <td className="px-4 py-3 text-right text-slate-700">{requestItem.available_stock.toFixed(2)} {requestItem.unit}</td>
+                                        <td className="px-4 py-3 text-right">
+                                            {canManageDistribution ? (
+                                                <button
+                                                    type="button"
+                                                    disabled={!canAdd}
+                                                    onClick={() => {
+                                                        router.post(route('inventory.distribution-records.items.store', record.distribution_record_id), {
+                                                            item_id: requestItem.item_id,
+                                                            item_name_snapshot: requestItem.item_name,
+                                                            quantity_released: Number(maxReleasable.toFixed(2)),
+                                                            unit: requestItem.unit,
+                                                            remarks: `Released against ${record.supply_request?.request_code ?? 'linked supply request'}`,
+                                                        }, {
+                                                            preserveScroll: true,
+                                                        });
+                                                    }}
+                                                    className="rounded-md border border-emerald-600 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:border-slate-300 disabled:text-slate-400 disabled:hover:bg-transparent"
+                                                >
+                                                    {canAdd ? 'Add to Release' : 'No Releasable Qty'}
+                                                </button>
+                                            ) : (
+                                                <span className="text-xs text-slate-400">View only</span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                            {(record.supply_request?.items?.length ?? 0) === 0 ? (
+                                <tr>
+                                    <td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-500">
+                                        No requested item lines are available for this linked office request.
+                                    </td>
+                                </tr>
+                            ) : null}
+                        </tbody>
+                    </table>
+                </section>
 
                 <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                     <div className="border-b border-slate-200 px-4 py-3">

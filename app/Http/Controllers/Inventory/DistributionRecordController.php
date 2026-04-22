@@ -205,11 +205,16 @@ class DistributionRecordController
             'items.item.category',
             'claims.claimant',
             'supplyRequest.office',
+            'supplyRequest.items.item.category',
             'delivery',
             'office',
             'preparer',
             'receiver',
         ]);
+
+        $releasedByItemId = $distribution_record->items
+            ->groupBy(fn ($item) => (int) $item->item_id)
+            ->map(fn ($group) => (float) $group->sum('quantity_released'));
 
         return Inertia::render('Inventory/Distribution/Show', [
             'record' => [
@@ -227,6 +232,23 @@ class DistributionRecordController
                     'supply_request_id' => (int) $distribution_record->supplyRequest->supply_request_id,
                     'request_code' => (string) $distribution_record->supplyRequest->request_code,
                     'status' => (string) $distribution_record->supplyRequest->status,
+                    'items' => $distribution_record->supplyRequest->items->map(function ($item) use ($releasedByItemId): array {
+                        $itemId = (int) $item->item_id;
+                        $requestedQuantity = (float) $item->quantity_requested;
+                        $releasedQuantity = (float) ($releasedByItemId->get($itemId) ?? 0.0);
+
+                        return [
+                            'supply_request_item_id' => (int) $item->supply_request_item_id,
+                            'item_id' => $itemId,
+                            'item_name' => (string) ($item->item?->item_name ?? $item->item_name_snapshot),
+                            'category_name' => (string) ($item->item?->category?->category_name ?? '-'),
+                            'quantity_requested' => $requestedQuantity,
+                            'quantity_released' => $releasedQuantity,
+                            'quantity_remaining' => max($requestedQuantity - $releasedQuantity, 0),
+                            'unit' => (string) ($item->item?->default_unit ?? 'UNIT'),
+                            'available_stock' => (float) ($item->item?->inventory?->available_stock ?? 0),
+                        ];
+                    })->values(),
                 ] : null,
                 'delivery' => $distribution_record->delivery ? [
                     'delivery_id' => (int) $distribution_record->delivery->delivery_id,
