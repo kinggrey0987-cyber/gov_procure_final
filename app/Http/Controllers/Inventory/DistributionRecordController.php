@@ -28,7 +28,7 @@ class DistributionRecordController
         $records = DistributionRecord::query()
             ->with(['supplyRequest', 'delivery', 'office', 'preparer', 'receiver'])
             ->withCount(['items', 'claims'])
-            ->whereIn('status', ['RELEASED', 'RECEIVED'])
+            ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
             ->orderByDesc('created_at')
             ->paginate(20);
 
@@ -45,7 +45,10 @@ class DistributionRecordController
 
         $procurementBackedRows = Delivery::query()
             ->verified()
-            ->whereHas('purchaseOrder', fn ($query) => $query->whereNotNull('supply_request_id'))
+            ->whereHas('purchaseOrder', function ($query): void {
+                $query->whereNotNull('supply_request_id')
+                    ->whereHas('supplyRequest.office', fn ($officeQuery) => $officeQuery->where('code', '!=', 'GSO'));
+            })
             ->whereDoesntHave('distributionRecords')
             ->with(['purchaseOrder.supplyRequest.office'])
             ->latest('delivery_id')
@@ -75,6 +78,7 @@ class DistributionRecordController
 
         $inventoryBackedRows = SupplyRequest::query()
             ->submitted()
+            ->whereHas('office', fn ($officeQuery) => $officeQuery->where('code', '!=', 'GSO'))
             ->whereDoesntHave('distributionRecords')
             ->with(['office', 'items.item.inventory'])
             ->latest('supply_request_id')
@@ -141,6 +145,10 @@ class DistributionRecordController
     {
         if (! $request instanceof SupplyRequest) {
             return 'Supply request context was not found.';
+        }
+
+        if ((string) ($request->office?->code ?? '') === 'GSO') {
+            return 'GSO-origin supply requests are internal logistics records and are not eligible for office distribution release.';
         }
 
         if ($request->distributionRecords->isNotEmpty()) {

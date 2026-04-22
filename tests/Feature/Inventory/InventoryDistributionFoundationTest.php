@@ -659,6 +659,40 @@ class InventoryDistributionFoundationTest extends TestCase
             );
     }
 
+    public function test_gso_origin_supply_request_is_excluded_from_inventory_office_supply_request_listing(): void
+    {
+        $gsoOffice = $this->createOffice('General Services Office', 'GSO');
+        $gsoOfficeUser = $this->createUser(UserRole::OFFICE_USER, $gsoOffice);
+        $context = $this->createSubmittedSupplyRequestForQueue($gsoOffice, $gsoOfficeUser, 9023, 2, 10);
+
+        $this->actingAs($this->gsoOfficer)
+            ->get(route('inventory.office-supply-requests.index', [
+                'q' => $context['supplyRequest']->request_code,
+            ]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('requests.total', 0)
+            );
+    }
+
+    public function test_gso_origin_supply_request_is_not_eligible_in_distribution_create_context(): void
+    {
+        $gsoOffice = $this->createOffice('General Services Office', 'GSO');
+        $gsoOfficeUser = $this->createUser(UserRole::OFFICE_USER, $gsoOffice);
+        $context = $this->createSubmittedSupplyRequestForQueue($gsoOffice, $gsoOfficeUser, 9024, 2, 10);
+
+        $focusId = (int) $context['supplyRequest']->supply_request_id;
+
+        $this->actingAs($this->gsoOfficer)
+            ->get(route('inventory.distribution-records.create', [
+                'supply_request_id' => $focusId,
+            ]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('focusSupplyRequestId', $focusId)
+                ->where('focusReleasableReason', 'GSO-origin supply requests are internal logistics records and are not eligible for office distribution release.')
+                ->where('eligibleRows', fn ($rows): bool => collect($rows)->firstWhere('supply_request_id', $focusId) === null)
+            );
+    }
+
     private function createReleasedDistributionRecordForOffice(Office $office, int $itemId): DistributionRecord
     {
         $officeUser = ((int) $office->id === (int) $this->officeA->id) ? $this->officeUserA : $this->officeUserB;

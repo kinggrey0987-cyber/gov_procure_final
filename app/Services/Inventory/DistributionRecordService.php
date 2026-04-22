@@ -236,7 +236,13 @@ class DistributionRecordService
 
     private function assertContextConsistency(DistributionRecord $record): void
     {
-        $record->loadMissing('supplyRequest.purchaseRequests', 'delivery.purchaseOrder');
+        $record->loadMissing('supplyRequest.office', 'supplyRequest.purchaseRequests', 'delivery.purchaseOrder');
+
+        if ((string) ($record->supplyRequest->office?->code ?? '') === 'GSO') {
+            throw ValidationException::withMessages([
+                'supply_request_id' => 'GSO-origin supply requests are internal logistics records and are not eligible for office distribution release.',
+            ]);
+        }
 
         $isProcurementBacked = $record->supplyRequest->purchaseRequests->isNotEmpty();
         $hasDeliveryContext = $record->delivery_id !== null;

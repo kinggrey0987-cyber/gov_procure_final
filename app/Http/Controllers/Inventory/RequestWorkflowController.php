@@ -28,6 +28,7 @@ class RequestWorkflowController
 
         $query = SupplyRequest::query()
             ->with(['office', 'requester', 'items.item.inventory', 'purchaseRequests'])
+            ->whereHas('office', fn ($officeQuery) => $officeQuery->where('code', '!=', 'GSO'))
             ->withCount('distributionRecords')
             ->latest('supply_request_id');
 
@@ -180,6 +181,10 @@ class RequestWorkflowController
             'purchaseRequests',
             'distributionRecords',
         ]);
+
+        if ((string) ($supplyRequest->office?->code ?? '') === 'GSO') {
+            abort(404);
+        }
 
         $requestedTotal = 0.0;
         $shortageTotal = 0.0;
@@ -350,10 +355,25 @@ class RequestWorkflowController
 
         $supplyRequest->load(['items.item.inventory', 'purchaseRequests', 'distributionRecords']);
 
+        if ((string) ($supplyRequest->office?->code ?? '') === 'GSO') {
+            return redirect()
+                ->route('inventory.office-supply-requests.index', $request->query())
+                ->with('error', 'GSO-origin supply requests are internal logistics records and are not eligible for office distribution release.');
+        }
+
+        $existingDraftRecord = $supplyRequest->distributionRecords
+            ->firstWhere('status', 'DRAFT');
+
+        if ($existingDraftRecord instanceof \App\Models\DistributionRecord) {
+            return redirect()
+                ->route('inventory.distribution-records.show', (int) $existingDraftRecord->distribution_record_id)
+                ->with('success', 'An existing draft distribution record was found. Continue releasing items in that draft.');
+        }
+
         if ($supplyRequest->distributionRecords->isNotEmpty()) {
             return redirect()
                 ->route('inventory.office-supply-requests.index', $request->query())
-                ->with('error', 'This request already has a distribution record and cannot be re-processed for release.');
+                ->with('error', 'This request already has a finalized distribution record and cannot be re-processed for release.');
         }
 
         if ($supplyRequest->purchaseRequests->isNotEmpty()) {
@@ -383,6 +403,13 @@ class RequestWorkflowController
     public function queueProcurement(Request $request, SupplyRequest $supplyRequest): RedirectResponse
     {
         abort_unless($request->user()?->can('inventory.view-any'), 403);
+
+        $supplyRequest->loadMissing('office');
+        if ((string) ($supplyRequest->office?->code ?? '') === 'GSO') {
+            return redirect()
+                ->route('inventory.office-supply-requests.index', $request->query())
+                ->with('error', 'GSO-origin supply requests are internal logistics records and cannot be queued through office procurement routing.');
+        }
 
         $this->purchaseRequestService->queueFromSupplyRequest($request->user(), [
             'supply_request_id' => (int) $supplyRequest->supply_request_id,

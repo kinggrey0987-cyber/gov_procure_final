@@ -109,9 +109,15 @@ class PurchaseRequestService
         $this->assertGsoActor($actor);
 
         $supplyRequest = SupplyRequest::query()
-            ->with(['items.item.inventory'])
+            ->with(['office', 'items.item.inventory'])
             ->where('supply_request_id', (int) $payload['supply_request_id'])
             ->firstOrFail();
+
+        if ((string) ($supplyRequest->office?->code ?? '') === 'GSO') {
+            throw ValidationException::withMessages([
+                'supply_request_id' => 'GSO-origin supply requests are internal logistics records and cannot be queued through office procurement routing.',
+            ]);
+        }
 
         if ((string) $supplyRequest->status !== 'SUBMITTED') {
             throw ValidationException::withMessages([
