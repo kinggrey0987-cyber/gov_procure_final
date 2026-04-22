@@ -8,6 +8,7 @@ type ExportSectionPdfOptions = {
     fileName?: string;
     scale?: number;
     marginMm?: number;
+    paperWidthPx?: number;
 };
 
 export function printSectionById(sectionId: string, options: PrintSectionOptions = {}): void {
@@ -91,16 +92,25 @@ export async function downloadSectionAsPdfById(sectionId: string, options: Expor
 
     const title = options.title ?? document.title ?? 'report';
     const fileName = options.fileName ?? `${slugify(title)}.pdf`;
-    const scale = options.scale ?? Math.min(window.devicePixelRatio || 1, 2);
-    const marginMm = options.marginMm ?? 8;
+    const scale = options.scale ?? 2;
+    const marginMm = options.marginMm ?? 10;
+    const paperWidthPx = options.paperWidthPx ?? 1120;
+
+    const captureRoot = createPdfCaptureRoot(source, {
+        title,
+        paperWidthPx,
+    });
 
     const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')]);
 
-    const canvas = await html2canvas(source, {
+    const canvas = await html2canvas(captureRoot, {
         backgroundColor: '#ffffff',
         scale,
         useCORS: true,
+        windowWidth: paperWidthPx,
     });
+
+    captureRoot.remove();
 
     const orientation = canvas.width > canvas.height ? 'landscape' : 'portrait';
     const pdf = new jsPDF({
@@ -128,6 +138,68 @@ export async function downloadSectionAsPdfById(sectionId: string, options: Expor
     }
 
     pdf.save(fileName);
+}
+
+function createPdfCaptureRoot(source: HTMLElement, options: { title: string; paperWidthPx: number }): HTMLDivElement {
+    const root = document.createElement('div');
+    root.setAttribute('data-pdf-capture-root', 'true');
+    root.style.position = 'fixed';
+    root.style.left = '-100000px';
+    root.style.top = '0';
+    root.style.width = `${options.paperWidthPx}px`;
+    root.style.padding = '20px';
+    root.style.background = '#ffffff';
+    root.style.boxSizing = 'border-box';
+    root.style.zIndex = '-1';
+
+    const clonedSection = source.cloneNode(true) as HTMLElement;
+    clonedSection.style.width = '100%';
+    clonedSection.style.maxWidth = '100%';
+    clonedSection.style.boxSizing = 'border-box';
+
+    clonedSection.querySelectorAll<HTMLElement>('.print-hide').forEach((element) => element.remove());
+
+    const heading = document.createElement('div');
+    heading.style.marginBottom = '12px';
+    heading.innerHTML = `
+        <h1 style="margin: 0; font-size: 20px; font-weight: 700; color: #0f172a;">${escapeHtml(options.title)}</h1>
+        <p style="margin: 4px 0 0; font-size: 12px; color: #64748b;">Generated ${new Date().toLocaleString()}</p>
+    `;
+
+    const style = document.createElement('style');
+    style.textContent = `
+        [data-pdf-capture-root], [data-pdf-capture-root] * { box-sizing: border-box; }
+        [data-pdf-capture-root] [class*="overflow-x-auto"],
+        [data-pdf-capture-root] [class*="overflow-auto"] {
+            overflow: visible !important;
+        }
+        [data-pdf-capture-root] table {
+            width: 100% !important;
+            table-layout: fixed;
+            border-collapse: collapse;
+        }
+        [data-pdf-capture-root] th,
+        [data-pdf-capture-root] td {
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+    `;
+
+    root.appendChild(style);
+    root.appendChild(heading);
+    root.appendChild(clonedSection);
+    document.body.appendChild(root);
+
+    return root;
+}
+
+function escapeHtml(value: string): string {
+    return value
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
 }
 
 function slugify(value: string): string {

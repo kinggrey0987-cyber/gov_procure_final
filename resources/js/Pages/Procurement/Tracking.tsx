@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link } from '@inertiajs/react';
+import { useMemo, useState } from 'react';
 
 type Props = {
     summary: {
@@ -25,6 +26,76 @@ type Props = {
 };
 
 export default function ProcurementTracking({ summary, recentPurchaseRequests, recentPurchaseOrders }: Props) {
+    const [requestSearch, setRequestSearch] = useState('');
+    const [requestStatus, setRequestStatus] = useState('ALL');
+    const [orderSearch, setOrderSearch] = useState('');
+    const [orderStatus, setOrderStatus] = useState('ALL');
+
+    const requestStatuses = useMemo(
+        () => ['ALL', ...Array.from(new Set(recentPurchaseRequests.map((request) => request.status.toUpperCase())))],
+        [recentPurchaseRequests],
+    );
+
+    const orderStatuses = useMemo(
+        () => ['ALL', ...Array.from(new Set(recentPurchaseOrders.map((order) => order.status.toUpperCase())))],
+        [recentPurchaseOrders],
+    );
+
+    const filteredPurchaseRequests = useMemo(() => {
+        const keyword = requestSearch.trim().toLowerCase();
+
+        return recentPurchaseRequests.filter((request) => {
+            const normalizedStatus = request.status.toUpperCase();
+            const matchesStatus = requestStatus === 'ALL' || normalizedStatus === requestStatus;
+
+            if (!matchesStatus) {
+                return false;
+            }
+
+            if (keyword.length === 0) {
+                return true;
+            }
+
+            return [
+                `PR-${String(request.purchase_request_id).padStart(6, '0')}`,
+                request.office_name,
+                request.status,
+                formatDate(request.created_at),
+            ]
+                .join(' ')
+                .toLowerCase()
+                .includes(keyword);
+        });
+    }, [recentPurchaseRequests, requestSearch, requestStatus]);
+
+    const filteredPurchaseOrders = useMemo(() => {
+        const keyword = orderSearch.trim().toLowerCase();
+
+        return recentPurchaseOrders.filter((order) => {
+            const normalizedStatus = order.status.toUpperCase();
+            const matchesStatus = orderStatus === 'ALL' || normalizedStatus === orderStatus;
+
+            if (!matchesStatus) {
+                return false;
+            }
+
+            if (keyword.length === 0) {
+                return true;
+            }
+
+            return [
+                order.po_number,
+                order.supplier_name,
+                order.status,
+                formatMoney(order.total_amount),
+                formatDate(order.created_at),
+            ]
+                .join(' ')
+                .toLowerCase()
+                .includes(keyword);
+        });
+    }, [recentPurchaseOrders, orderSearch, orderStatus]);
+
     return (
         <AuthenticatedLayout
             header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Procurement Dashboard</h2>}
@@ -61,11 +132,58 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
                         <div className="border-b border-slate-200 px-6 py-4">
                             <h3 className="text-lg font-semibold text-slate-900">Recent Purchase Requests</h3>
                         </div>
+                        <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
+                            <div className="grid gap-3 md:grid-cols-5">
+                                <div className="md:col-span-3">
+                                    <label htmlFor="procurement-request-search" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                        Search
+                                    </label>
+                                    <input
+                                        id="procurement-request-search"
+                                        type="text"
+                                        value={requestSearch}
+                                        onChange={(event) => setRequestSearch(event.target.value)}
+                                        placeholder="Search PR ID, office, date"
+                                        className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                                    />
+                                </div>
+                                <div>
+                                    <label htmlFor="procurement-request-status" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                        Status
+                                    </label>
+                                    <select
+                                        id="procurement-request-status"
+                                        value={requestStatus}
+                                        onChange={(event) => setRequestStatus(event.target.value)}
+                                        className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                                    >
+                                        {requestStatuses.map((status) => (
+                                            <option key={status} value={status}>
+                                                {status === 'ALL' ? 'All statuses' : status.replaceAll('_', ' ')}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="flex items-end">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setRequestSearch('');
+                                            setRequestStatus('ALL');
+                                        }}
+                                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                                    >
+                                        Clear
+                                    </button>
+                                </div>
+                            </div>
+                            <p className="mt-3 text-xs text-slate-500">Showing {filteredPurchaseRequests.length} of {recentPurchaseRequests.length} request(s).</p>
+                        </div>
                         <div className="divide-y divide-slate-100">
-                            {recentPurchaseRequests.length === 0 ? (
+                            {filteredPurchaseRequests.length === 0 ? (
                                 <p className="px-6 py-8 text-sm text-slate-500">No purchase requests yet.</p>
                             ) : (
-                                recentPurchaseRequests.map((request) => (
+                                filteredPurchaseRequests.map((request) => (
                                     <div key={request.purchase_request_id} className="flex items-center justify-between gap-3 px-6 py-4">
                                         <div>
                                             <p className="font-semibold text-slate-800">PR-{String(request.purchase_request_id).padStart(6, '0')}</p>
@@ -85,11 +203,58 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
                         <div className="border-b border-slate-200 px-6 py-4">
                             <h3 className="text-lg font-semibold text-slate-900">Recent Purchase Orders</h3>
                         </div>
+                        <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
+                            <div className="grid gap-3 md:grid-cols-5">
+                                <div className="md:col-span-3">
+                                    <label htmlFor="procurement-order-search" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                        Search
+                                    </label>
+                                    <input
+                                        id="procurement-order-search"
+                                        type="text"
+                                        value={orderSearch}
+                                        onChange={(event) => setOrderSearch(event.target.value)}
+                                        placeholder="Search PO number, supplier, amount"
+                                        className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                                    />
+                                </div>
+                                <div>
+                                    <label htmlFor="procurement-order-status" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                        Status
+                                    </label>
+                                    <select
+                                        id="procurement-order-status"
+                                        value={orderStatus}
+                                        onChange={(event) => setOrderStatus(event.target.value)}
+                                        className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                                    >
+                                        {orderStatuses.map((status) => (
+                                            <option key={status} value={status}>
+                                                {status === 'ALL' ? 'All statuses' : status.replaceAll('_', ' ')}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="flex items-end">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setOrderSearch('');
+                                            setOrderStatus('ALL');
+                                        }}
+                                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                                    >
+                                        Clear
+                                    </button>
+                                </div>
+                            </div>
+                            <p className="mt-3 text-xs text-slate-500">Showing {filteredPurchaseOrders.length} of {recentPurchaseOrders.length} order(s).</p>
+                        </div>
                         <div className="divide-y divide-slate-100">
-                            {recentPurchaseOrders.length === 0 ? (
+                            {filteredPurchaseOrders.length === 0 ? (
                                 <p className="px-6 py-8 text-sm text-slate-500">No purchase orders yet.</p>
                             ) : (
-                                recentPurchaseOrders.map((order) => (
+                                filteredPurchaseOrders.map((order) => (
                                     <div key={order.purchase_order_id} className="flex items-center justify-between gap-3 px-6 py-4">
                                         <div>
                                             <p className="font-semibold text-slate-800">{order.po_number}</p>

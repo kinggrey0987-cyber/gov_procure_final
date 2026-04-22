@@ -2,6 +2,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { ExecutiveChartCard, HorizontalBarChart, TrendGroupedBarChart, TrendLineChart } from '@/Components/Executive/Charts';
 import { downloadSectionAsPdfById } from '@/lib/printSection';
 import { Head } from '@inertiajs/react';
+import { useMemo, useState } from 'react';
 
 type OfficeBreakdown = {
     id: number;
@@ -76,6 +77,12 @@ export default function ExecutiveDashboardIndex({
     recent_alerts,
 }: Props) {
     const printSectionId = 'executive-dashboard-print-section';
+    const [anomalySearch, setAnomalySearch] = useState('');
+    const [anomalySeverity, setAnomalySeverity] = useState('ALL');
+    const [anomalyStatus, setAnomalyStatus] = useState('ALL');
+    const [alertSearch, setAlertSearch] = useState('');
+    const [alertSeverity, setAlertSeverity] = useState('ALL');
+    const [alertStatus, setAlertStatus] = useState('ALL');
 
     const activeAnomalies = summary.open_anomaly_count + summary.in_review_anomaly_count;
     const activeAlerts = summary.open_alert_count + summary.in_review_alert_count;
@@ -139,6 +146,75 @@ export default function ExecutiveDashboardIndex({
         .reduce((total, row) => total + row.total, 0);
 
     const recentAnomalyGroups = buildDashboardAnomalyGroups(recent_anomalies).slice(0, 5);
+
+    const anomalySeverityOptions = useMemo(
+        () => ['ALL', ...Array.from(new Set(recentAnomalyGroups.map((group) => group.representative.severity.toUpperCase())))],
+        [recentAnomalyGroups],
+    );
+
+    const anomalyStatusOptions = useMemo(
+        () => ['ALL', ...Array.from(new Set(recentAnomalyGroups.map((group) => group.representative.status.toUpperCase())))],
+        [recentAnomalyGroups],
+    );
+
+    const alertSeverityOptions = useMemo(
+        () => ['ALL', ...Array.from(new Set(recent_alerts.map((alert) => alert.severity.toUpperCase())))],
+        [recent_alerts],
+    );
+
+    const alertStatusOptions = useMemo(
+        () => ['ALL', ...Array.from(new Set(recent_alerts.map((alert) => alert.status.toUpperCase())))],
+        [recent_alerts],
+    );
+
+    const filteredAnomalyGroups = useMemo(() => {
+        const keyword = anomalySearch.trim().toLowerCase();
+
+        return recentAnomalyGroups.filter((group) => {
+            const severityMatch = anomalySeverity === 'ALL' || group.representative.severity.toUpperCase() === anomalySeverity;
+            const statusMatch = anomalyStatus === 'ALL' || group.representative.status.toUpperCase() === anomalyStatus;
+
+            if (!severityMatch || !statusMatch) {
+                return false;
+            }
+
+            if (keyword.length === 0) {
+                return true;
+            }
+
+            return [
+                group.label,
+                group.office,
+                group.representative.severity,
+                group.representative.status,
+                String(group.count),
+            ].join(' ').toLowerCase().includes(keyword);
+        });
+    }, [anomalySearch, anomalySeverity, anomalyStatus, recentAnomalyGroups]);
+
+    const filteredAlerts = useMemo(() => {
+        const keyword = alertSearch.trim().toLowerCase();
+
+        return recent_alerts.slice(0, 5).filter((alert) => {
+            const severityMatch = alertSeverity === 'ALL' || alert.severity.toUpperCase() === alertSeverity;
+            const statusMatch = alertStatus === 'ALL' || alert.status.toUpperCase() === alertStatus;
+
+            if (!severityMatch || !statusMatch) {
+                return false;
+            }
+
+            if (keyword.length === 0) {
+                return true;
+            }
+
+            return [
+                alert.alert_type,
+                alert.severity,
+                alert.status,
+                alert.office?.name ?? 'N/A',
+            ].join(' ').toLowerCase().includes(keyword);
+        });
+    }, [alertSearch, alertSeverity, alertStatus, recent_alerts]);
 
     const exportCsv = () => {
         const lines = [
@@ -352,7 +428,48 @@ export default function ExecutiveDashboardIndex({
                         <div className="border-b border-slate-200 px-5 py-4">
                             <h3 className="text-lg font-semibold text-slate-900">Recent Anomalies</h3>
                         </div>
-                        {recent_anomalies.length === 0 ? (
+                        <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
+                            <div className="grid gap-2 md:grid-cols-8">
+                                <input
+                                    type="text"
+                                    value={anomalySearch}
+                                    onChange={(event) => setAnomalySearch(event.target.value)}
+                                    placeholder="Search anomaly, office, status"
+                                    className="md:col-span-4 rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                                />
+                                <select
+                                    value={anomalySeverity}
+                                    onChange={(event) => setAnomalySeverity(event.target.value)}
+                                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                                >
+                                    {anomalySeverityOptions.map((value) => (
+                                        <option key={value} value={value}>{value === 'ALL' ? 'All severities' : formatStatusLabel(value)}</option>
+                                    ))}
+                                </select>
+                                <select
+                                    value={anomalyStatus}
+                                    onChange={(event) => setAnomalyStatus(event.target.value)}
+                                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                                >
+                                    {anomalyStatusOptions.map((value) => (
+                                        <option key={value} value={value}>{value === 'ALL' ? 'All statuses' : formatStatusLabel(value)}</option>
+                                    ))}
+                                </select>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setAnomalySearch('');
+                                        setAnomalySeverity('ALL');
+                                        setAnomalyStatus('ALL');
+                                    }}
+                                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                                >
+                                    Clear
+                                </button>
+                            </div>
+                            <p className="mt-2 text-xs text-slate-500">Showing {filteredAnomalyGroups.length} of {recentAnomalyGroups.length} anomaly group(s).</p>
+                        </div>
+                        {filteredAnomalyGroups.length === 0 ? (
                             <p className="px-5 py-6 text-sm text-slate-500">No data in current filter scope</p>
                         ) : (
                             <div className="overflow-x-auto">
@@ -367,7 +484,7 @@ export default function ExecutiveDashboardIndex({
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {recentAnomalyGroups.map((group) => (
+                                        {filteredAnomalyGroups.map((group) => (
                                             <tr key={group.key}>
                                                 <td className="px-4 py-2 text-slate-700">{group.label}</td>
                                                 <td className="px-4 py-2 text-slate-700">{group.count}</td>
@@ -386,7 +503,48 @@ export default function ExecutiveDashboardIndex({
                         <div className="border-b border-slate-200 px-5 py-4">
                             <h3 className="text-lg font-semibold text-slate-900">Recent Alerts</h3>
                         </div>
-                        {recent_alerts.length === 0 ? (
+                        <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
+                            <div className="grid gap-2 md:grid-cols-8">
+                                <input
+                                    type="text"
+                                    value={alertSearch}
+                                    onChange={(event) => setAlertSearch(event.target.value)}
+                                    placeholder="Search alert, office, status"
+                                    className="md:col-span-4 rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                                />
+                                <select
+                                    value={alertSeverity}
+                                    onChange={(event) => setAlertSeverity(event.target.value)}
+                                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                                >
+                                    {alertSeverityOptions.map((value) => (
+                                        <option key={value} value={value}>{value === 'ALL' ? 'All severities' : formatStatusLabel(value)}</option>
+                                    ))}
+                                </select>
+                                <select
+                                    value={alertStatus}
+                                    onChange={(event) => setAlertStatus(event.target.value)}
+                                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                                >
+                                    {alertStatusOptions.map((value) => (
+                                        <option key={value} value={value}>{value === 'ALL' ? 'All statuses' : formatStatusLabel(value)}</option>
+                                    ))}
+                                </select>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setAlertSearch('');
+                                        setAlertSeverity('ALL');
+                                        setAlertStatus('ALL');
+                                    }}
+                                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                                >
+                                    Clear
+                                </button>
+                            </div>
+                            <p className="mt-2 text-xs text-slate-500">Showing {filteredAlerts.length} of {Math.min(recent_alerts.length, 5)} alert(s).</p>
+                        </div>
+                        {filteredAlerts.length === 0 ? (
                             <p className="px-5 py-6 text-sm text-slate-500">No data in current filter scope</p>
                         ) : (
                             <div className="overflow-x-auto">
@@ -400,7 +558,7 @@ export default function ExecutiveDashboardIndex({
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {recent_alerts.slice(0, 5).map((row) => (
+                                        {filteredAlerts.map((row) => (
                                             <tr key={row.alerts_id}>
                                                 <td className="px-4 py-2 text-slate-700">{formatStatusLabel(row.alert_type)}</td>
                                                 <td className="px-4 py-2">{SeverityBadge(row.severity)}</td>

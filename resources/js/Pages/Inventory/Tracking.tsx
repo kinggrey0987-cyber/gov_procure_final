@@ -1,6 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link } from '@inertiajs/react';
 import type { ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 
 type Props = {
     summary: {
@@ -14,6 +15,38 @@ type Props = {
 };
 
 export default function InventoryTracking({ summary }: Props) {
+    const [actionSearch, setActionSearch] = useState('');
+    const [actionCategory, setActionCategory] = useState<'ALL' | 'DELIVERY' | 'DISTRIBUTION' | 'CLAIMS' | 'INVENTORY'>('ALL');
+
+    const quickActions = useMemo(
+        () => [
+            { href: route('inventory.deliveries.index'), label: 'Delivery Monitoring', category: 'DELIVERY' as const },
+            { href: route('inventory.deliveries.create'), label: 'Receive Deliveries', category: 'DELIVERY' as const },
+            { href: route('inventory.distribution-records.index'), label: 'Distribution Records', category: 'DISTRIBUTION' as const },
+            { href: route('inventory.distribution-records.create'), label: 'Supply Distribution', category: 'DISTRIBUTION' as const },
+            { href: route('inventory.claims.index'), label: 'Office Supply Claims', category: 'CLAIMS' as const },
+            { href: route('inventory.inventory.index'), label: 'Inventory Monitoring', category: 'INVENTORY' as const },
+        ],
+        [],
+    );
+
+    const filteredQuickActions = useMemo(() => {
+        const keyword = actionSearch.trim().toLowerCase();
+
+        return quickActions.filter((action) => {
+            const matchesCategory = actionCategory === 'ALL' || action.category === actionCategory;
+            if (!matchesCategory) {
+                return false;
+            }
+
+            if (keyword.length === 0) {
+                return true;
+            }
+
+            return `${action.label} ${action.category}`.toLowerCase().includes(keyword);
+        });
+    }, [quickActions, actionCategory, actionSearch]);
+
     return (
         <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Dashboard Overview</h2>}>
             <Head title="Inventory Dashboard" />
@@ -31,13 +64,57 @@ export default function InventoryTracking({ summary }: Props) {
                 <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                     <h3 className="text-base font-semibold text-slate-900">Quick Actions</h3>
                     <p className="mt-1 text-sm text-slate-500">Direct access to active GSO operations.</p>
+                    <div className="mt-4 grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 md:grid-cols-5">
+                        <div className="md:col-span-3">
+                            <label htmlFor="inventory-dashboard-action-search" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                Search actions
+                            </label>
+                            <input
+                                id="inventory-dashboard-action-search"
+                                type="text"
+                                value={actionSearch}
+                                onChange={(event) => setActionSearch(event.target.value)}
+                                placeholder="Search delivery, distribution, claims"
+                                className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="inventory-dashboard-action-category" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                Category
+                            </label>
+                            <select
+                                id="inventory-dashboard-action-category"
+                                value={actionCategory}
+                                onChange={(event) => setActionCategory(event.target.value as 'ALL' | 'DELIVERY' | 'DISTRIBUTION' | 'CLAIMS' | 'INVENTORY')}
+                                className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                            >
+                                <option value="ALL">All categories</option>
+                                <option value="DELIVERY">Delivery</option>
+                                <option value="DISTRIBUTION">Distribution</option>
+                                <option value="CLAIMS">Claims</option>
+                                <option value="INVENTORY">Inventory</option>
+                            </select>
+                        </div>
+                        <div className="flex items-end">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setActionSearch('');
+                                    setActionCategory('ALL');
+                                }}
+                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                            >
+                                Clear
+                            </button>
+                        </div>
+                    </div>
+                    <p className="mt-3 text-xs text-slate-500">
+                        Showing {filteredQuickActions.length} of {quickActions.length} quick action(s).
+                    </p>
                     <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                        <ActionLink href={route('inventory.deliveries.index')} label="Delivery Monitoring" />
-                        <ActionLink href={route('inventory.deliveries.create')} label="Receive Deliveries" />
-                        <ActionLink href={route('inventory.distribution-records.index')} label="Distribution Records" />
-                        <ActionLink href={route('inventory.distribution-records.create')} label="Supply Distribution" />
-                        <ActionLink href={route('inventory.claims.index')} label="Office Supply Claims" />
-                        <ActionLink href={route('inventory.inventory.index')} label="Inventory Monitoring" />
+                        {filteredQuickActions.map((action) => (
+                            <ActionLink key={`${action.category}-${action.href}`} href={action.href} label={action.label} />
+                        ))}
                     </div>
                 </div>
 
