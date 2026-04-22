@@ -143,8 +143,8 @@ class PurchaseOrderController extends Controller
 
         $purchaseOrder = $this->service->create($request->user(), $request->validated());
 
-        return redirect()->route('procurement.purchase-orders.show', $purchaseOrder->purchase_order_id)
-            ->with('success', 'Purchase order created successfully.');
+        return redirect()->route('procurement.purchase-orders.items.index', $purchaseOrder->purchase_order_id)
+            ->with('success', 'Purchase order created successfully. Add item prices and quantities next.');
     }
 
     public function show(Request $request, PurchaseOrder $purchaseOrder): Response
@@ -178,8 +178,6 @@ class PurchaseOrderController extends Controller
                 'delete' => $request->user()?->can('procurement.purchase-order.view', $purchaseOrder) ?? false,
             ],
             'permissions' => [
-                'edit' => $request->user()?->can('procurement.purchase-order.update', $purchaseOrder) ?? false,
-                'manageItems' => $request->user()?->can('procurement.purchase-order.update', $purchaseOrder) ?? false,
                 'place' => $request->user()?->can('procurement.purchase-order.place', $purchaseOrder) ?? false,
             ],
             'statusHistory' => $history['status']->map(fn ($entry): array => [
@@ -224,8 +222,8 @@ class PurchaseOrderController extends Controller
 
         $this->service->update($purchaseOrder, $request->user(), $request->validated());
 
-        return redirect()->route('procurement.purchase-orders.show', $purchaseOrder->purchase_order_id)
-            ->with('success', 'Purchase order updated successfully.');
+        return redirect()->route('procurement.purchase-orders.items.index', $purchaseOrder->purchase_order_id)
+            ->with('success', 'Purchase order updated. Continue encoding item prices and quantities.');
     }
 
     public function place(PlacePurchaseOrderRequest $request, PurchaseOrder $purchaseOrder): RedirectResponse

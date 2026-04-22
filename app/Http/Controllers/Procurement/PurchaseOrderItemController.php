@@ -23,9 +23,25 @@ class PurchaseOrderItemController extends Controller
     {
         abort_unless($request->user()?->can('procurement.purchase-order.view', $purchaseOrder), 403);
 
+        $purchaseOrder->load([
+            'items.item.category',
+            'supplyRequest.items.item',
+        ]);
+
+        $sourceItems = collect($purchaseOrder->supplyRequest?->items ?? [])
+            ->map(fn ($row): array => [
+                'supply_request_item_id' => (int) $row->supply_request_item_id,
+                'item_id' => (int) $row->item_id,
+                'item_name_snapshot' => (string) ($row->item_name_snapshot ?: ($row->item?->item_name ?? 'Unknown item')),
+                'default_unit' => (string) ($row->item?->default_unit ?? ''),
+                'quantity_requested' => (float) ($row->quantity_requested ?? 0),
+            ])
+            ->values();
+
         return Inertia::render('Procurement/PurchaseOrderItems/Index', [
             'purchaseOrder' => $purchaseOrder,
             'items' => $purchaseOrder->items()->latest('purchase_order_item_id')->paginate(20),
+            'sourceItems' => $sourceItems,
         ]);
     }
 

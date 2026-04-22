@@ -73,8 +73,6 @@ class PurchaseRequestController extends Controller
                 'search' => trim((string) $request->input('search', '')),
             ],
             'permissions' => [
-                'update' => $request->user()?->can('procurement.purchase-request.update', $purchaseRequest) ?? false,
-                'manageItems' => $request->user()?->can('procurement.purchase-request.update', $purchaseRequest) ?? false,
                 'process' => $request->user()?->can('procurement.purchase-request.process', $purchaseRequest) ?? false,
             ],
         ]);

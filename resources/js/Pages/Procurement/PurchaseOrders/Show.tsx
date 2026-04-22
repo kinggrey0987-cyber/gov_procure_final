@@ -73,8 +73,6 @@ type Props = {
         approver?: { id: number; name: string } | null;
     }>;
     permissions?: {
-        edit?: boolean;
-        manageItems?: boolean;
         place?: boolean;
     };
 };
@@ -156,16 +154,6 @@ export default function PurchaseOrdersShow({ purchaseOrder, attachments, attachm
                     </section>
 
                     <div className="flex flex-wrap gap-3">
-                        {permissions?.edit && purchaseOrder.status === 'DRAFT' ? (
-                            <Link href={route('procurement.purchase-orders.edit', purchaseOrder.purchase_order_id)} className="rounded bg-indigo-600 px-4 py-2 text-sm text-white">
-                                Edit
-                            </Link>
-                        ) : null}
-                        {permissions?.manageItems && purchaseOrder.status === 'DRAFT' ? (
-                            <Link href={route('procurement.purchase-orders.items.index', purchaseOrder.purchase_order_id)} className="rounded bg-emerald-600 px-4 py-2 text-sm text-white">
-                                Manage Items
-                            </Link>
-                        ) : null}
                         <Link href={route('procurement.purchase-orders.index')} className="rounded border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                             Back to Purchase Orders
                         </Link>

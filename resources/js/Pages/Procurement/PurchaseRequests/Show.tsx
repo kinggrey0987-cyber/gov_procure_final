@@ -43,8 +43,6 @@ type Props = {
         search?: string;
     };
     permissions?: {
-        update?: boolean;
-        manageItems?: boolean;
         process?: boolean;
     };
 };
@@ -130,22 +128,6 @@ export default function PurchaseRequestsShow({ purchaseRequest, reviewMode = fal
                     </section>
 
                     <div className="flex flex-wrap gap-3">
-                        {permissions?.update && purchaseRequest.status === 'OPEN' && !reviewMode ? (
-                            <Link
-                                href={route('procurement.purchase-requests.edit', purchaseRequest.purchase_request_id)}
-                                className="rounded bg-indigo-600 px-4 py-2 text-sm text-white"
-                            >
-                                Edit
-                            </Link>
-                        ) : null}
-                        {permissions?.manageItems && purchaseRequest.status === 'OPEN' && !reviewMode ? (
-                            <Link
-                                href={route('procurement.purchase-requests.items.index', purchaseRequest.purchase_request_id)}
-                                className="rounded bg-emerald-600 px-4 py-2 text-sm text-white"
-                            >
-                                Manage Items
-                            </Link>
-                        ) : null}
                         <Link
                             href={route('procurement.purchase-requests.index', {
                                 status: backFilters?.status || undefined,
