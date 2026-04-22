@@ -96,7 +96,9 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
 
     const processDistribution = (requestId: number) => {
         setProcessingRequestId(requestId);
-        router.post(route('inventory.office-supply-requests.process-distribution', requestId), {}, {
+        router.get(route('inventory.distribution-records.create'), {
+            supply_request_id: requestId,
+        }, {
             preserveScroll: true,
             onFinish: () => setProcessingRequestId(null),
         });

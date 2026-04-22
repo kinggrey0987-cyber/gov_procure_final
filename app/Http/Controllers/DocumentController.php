@@ -10,6 +10,7 @@ use App\Services\Documents\DocumentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -54,8 +55,8 @@ class DocumentController extends Controller
             abort(403);
         }
 
-        $path = $this->normalizePublicDiskPath((string) $document->file_path);
-        abort_unless($path !== '' && Storage::disk('public')->exists($path), 404);
+        $path = $this->resolveExistingPublicDiskPath((string) $document->file_path);
+        abort_unless($path !== null, 404);
 
         return response()->download(Storage::disk('public')->path($path), (string) $document->file_name);
     }
@@ -79,15 +80,43 @@ class DocumentController extends Controller
             && (bool) $public_disclosure->published_at;
         abort_unless($isPublished, 404);
 
-        $path = $this->normalizePublicDiskPath((string) $document->file_path);
-        abort_unless($path !== '' && Storage::disk('public')->exists($path), 404);
+        $path = $this->resolveExistingPublicDiskPath((string) $document->file_path);
+        abort_unless($path !== null, 404);
 
         return response()->download(Storage::disk('public')->path($path), (string) $document->file_name);
     }
 
     private function normalizePublicDiskPath(string $path): string
     {
-        return ltrim(trim($path), '/\\');
+        return ltrim(str_replace('\\', '/', trim($path)), '/');
+    }
+
+    private function resolveExistingPublicDiskPath(string $rawPath): ?string
+    {
+        $normalized = $this->normalizePublicDiskPath($rawPath);
+        if ($normalized === '') {
+            return null;
+        }
+
+        $candidates = [
+            $normalized,
+        ];
+
+        if (Str::startsWith($normalized, 'storage/')) {
+            $candidates[] = Str::after($normalized, 'storage/');
+        }
+
+        if (Str::startsWith($normalized, 'public/')) {
+            $candidates[] = Str::after($normalized, 'public/');
+        }
+
+        foreach (array_values(array_unique($candidates)) as $candidate) {
+            if ($candidate !== '' && Storage::disk('public')->exists($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 
     private function transformDocument(Document $document): array
