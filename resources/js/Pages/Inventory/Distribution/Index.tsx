@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link } from '@inertiajs/react';
+import { useMemo, useState } from 'react';
 
 type RecordRow = {
     distribution_record_id: number;
@@ -20,6 +21,36 @@ type Props = {
 };
 
 export default function DistributionIndex({ records }: Props) {
+    const [search, setSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState<'ALL' | 'DRAFT' | 'RELEASED' | 'RECEIVED'>('ALL');
+
+    const filteredRecords = useMemo(() => {
+        const keyword = search.trim().toLowerCase();
+
+        return records.data.filter((row) => {
+            const matchesStatus = statusFilter === 'ALL' || row.status === statusFilter;
+
+            if (!matchesStatus) {
+                return false;
+            }
+
+            if (!keyword) {
+                return true;
+            }
+
+            const haystack = [
+                row.distribution_code,
+                row.supply_request?.request_code ?? '',
+                row.office?.name ?? String(row.office_id ?? ''),
+                displayDistributionStatus(row.status),
+            ]
+                .join(' ')
+                .toLowerCase();
+
+            return haystack.includes(keyword);
+        });
+    }, [records.data, search, statusFilter]);
+
     return (
         <AuthenticatedLayout
             header={
@@ -39,6 +70,56 @@ export default function DistributionIndex({ records }: Props) {
                     </p>
                 </div>
 
+                <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="grid gap-3 md:grid-cols-[1fr_220px_auto] md:items-end">
+                        <div>
+                            <label htmlFor="distribution-search" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Search
+                            </label>
+                            <input
+                                id="distribution-search"
+                                type="text"
+                                value={search}
+                                onChange={(event) => setSearch(event.target.value)}
+                                placeholder="Code, office request, office, status"
+                                className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                            />
+                        </div>
+
+                        <div>
+                            <label htmlFor="distribution-status" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Status
+                            </label>
+                            <select
+                                id="distribution-status"
+                                value={statusFilter}
+                                onChange={(event) => setStatusFilter(event.target.value as 'ALL' | 'DRAFT' | 'RELEASED' | 'RECEIVED')}
+                                className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                            >
+                                <option value="ALL">All statuses</option>
+                                <option value="DRAFT">Draft</option>
+                                <option value="RELEASED">Released</option>
+                                <option value="RECEIVED">Received</option>
+                            </select>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setSearch('');
+                                setStatusFilter('ALL');
+                            }}
+                            className="inline-flex h-[42px] items-center justify-center rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                            Reset Filters
+                        </button>
+                    </div>
+
+                    <p className="mt-3 text-xs text-slate-500">
+                        Showing {filteredRecords.length} of {records.data.length} record(s) on this page.
+                    </p>
+                </div>
+
                 <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                     <table className="min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-slate-50">
@@ -53,7 +134,7 @@ export default function DistributionIndex({ records }: Props) {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {records.data.map((row) => (
+                            {filteredRecords.map((row) => (
                                 <tr key={row.distribution_record_id} className="hover:bg-slate-50/60">
                                     <td className="px-4 py-3 font-mono text-xs text-slate-700">{row.distribution_code}</td>
                                     <td className="px-4 py-3 font-mono text-xs text-slate-700">{row.supply_request?.request_code ?? '-'}</td>
@@ -73,6 +154,13 @@ export default function DistributionIndex({ records }: Props) {
                                     </td>
                                 </tr>
                             ))}
+                            {filteredRecords.length === 0 && (
+                                <tr>
+                                    <td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-500">
+                                        No records matched the selected filters.
+                                    </td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
                 </div>
