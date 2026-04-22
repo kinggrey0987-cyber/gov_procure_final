@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { HorizontalBarChart } from '@/Components/Executive/Charts';
-import { printSectionById } from '@/lib/printSection';
+import { downloadSectionAsPdfById } from '@/lib/printSection';
 import { Head, router } from '@inertiajs/react';
 import { FormEvent, useState } from 'react';
 
@@ -113,8 +113,11 @@ export default function BusinessAudit({ auditLogs, filters, analytics, filter_op
         window.URL.revokeObjectURL(url);
     };
 
-    const exportPdf = () => {
-        printSectionById(printSectionId, { title: 'Governance Logs' });
+    const exportPdf = async () => {
+        await downloadSectionAsPdfById(printSectionId, {
+            title: 'Governance Logs',
+            fileName: 'governance-logs.pdf',
+        });
     };
 
     return (

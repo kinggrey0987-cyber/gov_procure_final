@@ -1,6 +1,6 @@
 import { DonutChart, ExecutiveChartCard, HorizontalBarChart, TrendGroupedBarChart } from '@/Components/Executive/Charts';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { printSectionById } from '@/lib/printSection';
+import { downloadSectionAsPdfById } from '@/lib/printSection';
 import { Head, router } from '@inertiajs/react';
 import { FormEvent, useState } from 'react';
 
@@ -124,8 +124,11 @@ export default function ProcurementAnalyticsIndex({
         downloadCsv(lines, 'procurement-insights.csv');
     };
 
-    const exportPdf = () => {
-        printSectionById(printSectionId, { title: 'Procurement Insights' });
+    const exportPdf = async () => {
+        await downloadSectionAsPdfById(printSectionId, {
+            title: 'Procurement Insights',
+            fileName: 'procurement-insights.pdf',
+        });
     };
 
     return (

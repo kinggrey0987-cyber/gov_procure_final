@@ -1,6 +1,6 @@
 import { ExecutiveChartCard, HorizontalBarChart } from '@/Components/Executive/Charts';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { printSectionById } from '@/lib/printSection';
+import { downloadSectionAsPdfById } from '@/lib/printSection';
 import { Head, Link, router } from '@inertiajs/react';
 import { FormEvent, useState } from 'react';
 
@@ -125,8 +125,11 @@ export default function TransparencyMonitoringIndex({
         window.URL.revokeObjectURL(url);
     };
 
-    const exportPdf = () => {
-        printSectionById(printSectionId, { title: 'Transparency & Disclosures' });
+    const exportPdf = async () => {
+        await downloadSectionAsPdfById(printSectionId, {
+            title: 'Transparency & Disclosures',
+            fileName: 'transparency-and-disclosures.pdf',
+        });
     };
 
     return (

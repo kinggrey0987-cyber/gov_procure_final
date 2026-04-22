@@ -705,9 +705,12 @@ Route::prefix('public')
         Route::get('/disclosures/{public_disclosure}/download', [PublicDisclosurePortalController::class, 'download'])
             ->middleware('can:public.disclosures.view')
             ->name('disclosures.download');
-        Route::get('/disclosures/{public_disclosure}/documents/{document}', [DocumentController::class, 'downloadPublicDisclosureDocument'])
+        Route::get('/disclosures/{public_disclosure}/documents/{document}/download', [DocumentController::class, 'downloadPublicDisclosureDocument'])
             ->middleware('can:public.disclosures.view')
             ->name('disclosures.documents.download');
+        Route::get('/disclosures/{public_disclosure}/documents/{document}', [DocumentController::class, 'downloadPublicDisclosureDocument'])
+            ->middleware('can:public.disclosures.view')
+            ->name('disclosures.documents.legacy');
     });
 
 require __DIR__.'/auth.php';

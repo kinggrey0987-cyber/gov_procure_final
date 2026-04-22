@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import Modal from '@/Components/Modal';
 import useSmartRefresh from '@/hooks/useSmartRefresh';
 import { humanizeEnum } from '@/lib/displayLabels';
 import { Head, Link, router } from '@inertiajs/react';
@@ -59,6 +60,8 @@ type Props = {
 export default function ProcurementRequestsIndex({ purchaseRequests, shortageCandidates, lowStockItems, atReorderItems, focusInventoryId = null }: Props) {
     const [initiatingInventoryId, setInitiatingInventoryId] = useState<number | null>(null);
     const [quantityByInventoryId, setQuantityByInventoryId] = useState<Record<number, string>>({});
+    const [selectedLowStockItem, setSelectedLowStockItem] = useState<LowStockItem | null>(null);
+    const [modalQuantity, setModalQuantity] = useState('');
 
     const { isRefreshing, lastRefreshedAt } = useSmartRefresh({
         only: ['purchaseRequests', 'shortageCandidates', 'lowStockItems', 'atReorderItems', 'focusInventoryId'],
@@ -66,8 +69,8 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
         refreshOnMount: true,
     });
 
-    const initiateLowStockProcurement = (item: LowStockItem) => {
-        const rawQuantity = quantityByInventoryId[item.inventory_id] ?? String(item.suggested_quantity);
+    const initiateLowStockProcurement = (item: LowStockItem, quantityOverride?: string) => {
+        const rawQuantity = quantityOverride ?? quantityByInventoryId[item.inventory_id] ?? String(item.suggested_quantity);
         const parsedQuantity = Number(rawQuantity);
         const quantityRequested = Number.isFinite(parsedQuantity) && parsedQuantity > 0
             ? parsedQuantity
@@ -78,8 +81,41 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
             quantity_requested: quantityRequested,
         }, {
             preserveScroll: true,
-            onFinish: () => setInitiatingInventoryId(null),
+            onFinish: () => {
+                setInitiatingInventoryId(null);
+                setSelectedLowStockItem((current) => (current?.inventory_id === item.inventory_id ? null : current));
+            },
         });
+    };
+
+    const openLowStockModal = (item: LowStockItem) => {
+        if (item.is_already_queued) {
+            return;
+        }
+
+        setSelectedLowStockItem(item);
+        setModalQuantity(quantityByInventoryId[item.inventory_id] ?? item.suggested_quantity.toFixed(2));
+    };
+
+    const closeLowStockModal = () => {
+        if (selectedLowStockItem && initiatingInventoryId === selectedLowStockItem.inventory_id) {
+            return;
+        }
+
+        setSelectedLowStockItem(null);
+    };
+
+    const confirmLowStockProcurement = () => {
+        if (!selectedLowStockItem) {
+            return;
+        }
+
+        setQuantityByInventoryId((prev) => ({
+            ...prev,
+            [selectedLowStockItem.inventory_id]: modalQuantity,
+        }));
+
+        initiateLowStockProcurement(selectedLowStockItem, modalQuantity);
     };
 
     return (
@@ -143,35 +179,17 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                                         Available {item.available_stock.toFixed(2)} / Low Stock Threshold {item.low_stock_threshold.toFixed(2)}
                                     </p>
                                     <p className="mt-1 text-xs font-semibold text-amber-700">Deficit: {item.deficit.toFixed(2)}</p>
-                                    <div className="mt-2">
-                                        <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-600">Requested Quantity</label>
-                                        <input
-                                            type="number"
-                                            min="0.01"
-                                            step="0.01"
-                                            value={quantityByInventoryId[item.inventory_id] ?? item.suggested_quantity.toFixed(2)}
-                                            disabled={item.is_already_queued}
-                                            onChange={(event) => {
-                                                const nextValue = event.target.value;
-                                                setQuantityByInventoryId((prev) => ({
-                                                    ...prev,
-                                                    [item.inventory_id]: nextValue,
-                                                }));
-                                            }}
-                                            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 disabled:cursor-not-allowed disabled:bg-slate-100"
-                                        />
-                                    </div>
                                     <button
                                         type="button"
                                         disabled={initiatingInventoryId === item.inventory_id || item.is_already_queued}
-                                        onClick={() => initiateLowStockProcurement(item)}
+                                        onClick={() => openLowStockModal(item)}
                                         className="mt-2 inline-flex rounded-md border border-red-300 bg-white px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-500"
                                     >
                                         {item.is_already_queued
                                             ? 'Already Queued for Procurement'
                                             : initiatingInventoryId === item.inventory_id
                                             ? 'Initiating...'
-                                            : 'Initiate Purchase Request'}
+                                            : 'Review & Initiate PR'}
                                     </button>
                                     {item.is_already_queued && item.active_purchase_request_id ? (
                                         <p className="mt-1 text-[11px] font-semibold text-slate-500">Active PR: PR-{String(item.active_purchase_request_id).padStart(6, '0')}</p>
@@ -197,6 +215,60 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                         </div>
                     </div>
                 </section>
+
+                <Modal show={selectedLowStockItem !== null} maxWidth="lg" onClose={closeLowStockModal}>
+                    <div className="space-y-4 p-6">
+                        <div>
+                            <h4 className="text-base font-semibold text-slate-900">Initiate Purchase Request</h4>
+                            <p className="mt-1 text-sm text-slate-600">Review low-stock details and adjust requested quantity before queuing.</p>
+                        </div>
+
+                        {selectedLowStockItem ? (
+                            <div className="space-y-2 rounded-lg border border-amber-100 bg-amber-50/70 p-3">
+                                <p className="text-sm font-semibold text-slate-800">{selectedLowStockItem.item_name}</p>
+                                <p className="text-xs text-slate-600">
+                                    Available {selectedLowStockItem.available_stock.toFixed(2)} / Low Stock Threshold {selectedLowStockItem.low_stock_threshold.toFixed(2)}
+                                </p>
+                                <p className="text-xs font-semibold text-amber-700">Deficit: {selectedLowStockItem.deficit.toFixed(2)}</p>
+
+                                <div>
+                                    <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-600">Requested Quantity</label>
+                                    <input
+                                        type="number"
+                                        min="0.01"
+                                        step="0.01"
+                                        value={modalQuantity}
+                                        disabled={initiatingInventoryId === selectedLowStockItem.inventory_id}
+                                        onChange={(event) => setModalQuantity(event.target.value)}
+                                        className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-700 disabled:cursor-not-allowed disabled:bg-slate-100"
+                                    />
+                                    <p className="mt-1 text-[11px] text-slate-500">Suggested quantity: {selectedLowStockItem.suggested_quantity.toFixed(2)}</p>
+                                </div>
+                            </div>
+                        ) : null}
+
+                        <div className="flex items-center justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={closeLowStockModal}
+                                disabled={selectedLowStockItem ? initiatingInventoryId === selectedLowStockItem.inventory_id : false}
+                                className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={confirmLowStockProcurement}
+                                disabled={selectedLowStockItem ? initiatingInventoryId === selectedLowStockItem.inventory_id : true}
+                                className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-500"
+                            >
+                                {selectedLowStockItem && initiatingInventoryId === selectedLowStockItem.inventory_id
+                                    ? 'Initiating...'
+                                    : 'Confirm Initiation'}
+                            </button>
+                        </div>
+                    </div>
+                </Modal>
 
                 <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                     <div className="border-b border-slate-200 px-4 py-3">

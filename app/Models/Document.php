@@ -56,7 +56,7 @@ class Document extends Model
 
     public function isRelatedTo(string $module, int $referenceId): bool
     {
-        return (string) $this->related_module === strtolower($module)
+        return strtolower((string) $this->related_module) === strtolower($module)
             && (int) $this->related_reference_id === $referenceId;
     }
 }

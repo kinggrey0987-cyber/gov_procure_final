@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { ExecutiveChartCard, HorizontalBarChart, TrendGroupedBarChart, TrendLineChart } from '@/Components/Executive/Charts';
-import { printSectionById } from '@/lib/printSection';
+import { downloadSectionAsPdfById } from '@/lib/printSection';
 import { Head } from '@inertiajs/react';
 
 type OfficeBreakdown = {
@@ -155,8 +155,11 @@ export default function ExecutiveDashboardIndex({
         downloadFile(csv, 'executive-dashboard.csv', 'text/csv;charset=utf-8;');
     };
 
-    const exportPdf = () => {
-        printSectionById(printSectionId, { title: 'Executive Dashboard' });
+    const exportPdf = async () => {
+        await downloadSectionAsPdfById(printSectionId, {
+            title: 'Executive Dashboard',
+            fileName: 'executive-dashboard.pdf',
+        });
     };
 
     return (
