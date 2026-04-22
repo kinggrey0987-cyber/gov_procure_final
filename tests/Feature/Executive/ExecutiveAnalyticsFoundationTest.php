@@ -314,7 +314,7 @@ class ExecutiveAnalyticsFoundationTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_gso_visibility_is_limited_to_operational_alert_types_only(): void
+    public function test_gso_cannot_open_alert_detail_pages_under_executive_owned_review(): void
     {
         $alertService = app(AlertService::class);
         $allowed = $alertService->create($this->executive, [
@@ -337,14 +337,14 @@ class ExecutiveAnalyticsFoundationTest extends TestCase
 
         $this->actingAs($this->gsoUser)
             ->get(route('inventory.alerts.show', $allowed->alerts_id))
-            ->assertOk();
+            ->assertForbidden();
 
         $this->actingAs($this->gsoUser)
             ->get(route('inventory.alerts.show', $blocked->alerts_id))
             ->assertForbidden();
     }
 
-    public function test_proc_visibility_is_limited_to_procurement_alert_types_only(): void
+    public function test_procurement_cannot_open_alert_detail_pages_under_executive_owned_review(): void
     {
         $alertService = app(AlertService::class);
         $allowed = $alertService->create($this->executive, [
@@ -367,11 +367,78 @@ class ExecutiveAnalyticsFoundationTest extends TestCase
 
         $this->actingAs($this->procurementUser)
             ->get(route('procurement.alerts.show', $allowed->alerts_id))
-            ->assertOk();
+            ->assertForbidden();
 
         $this->actingAs($this->procurementUser)
             ->get(route('procurement.alerts.show', $blocked->alerts_id))
             ->assertForbidden();
+    }
+
+    public function test_anomaly_detail_exposes_evidence_payload_for_price_z_score(): void
+    {
+        $context = $this->createSupplyAndOrderContext($this->officeA, $this->procurementUser, $this->officeUser, 9310);
+
+        $anomaly = app(AnomalyService::class)->create($this->executive, [
+            'anomaly_type' => 'PRICE_Z_SCORE',
+            'reference_type' => PurchaseOrderItem::class,
+            'reference_id' => $context['purchaseOrderItem']->purchase_order_item_id,
+            'item_id' => 9310,
+            'office_id' => $this->officeA->id,
+            'detected_value' => 250,
+            'expected_value' => 100,
+            'threshold_value' => 2,
+            'z_score' => 3.25,
+            'detection_method' => 'Z_SCORE',
+            'severity' => 'HIGH',
+        ]);
+
+        $this->actingAs($this->executive)
+            ->get(route('executive.anomalies.show', $anomaly->anomaly_id))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('evidence.type', 'PRICE_Z_SCORE')
+                ->where('evidence.metrics.z_score', 3.25)
+                ->has('evidence.comparison', 1)
+            );
+    }
+
+    public function test_alert_detail_exposes_linked_anomaly_evidence_payload(): void
+    {
+        $context = $this->createSupplyAndOrderContext($this->officeA, $this->procurementUser, $this->officeUser, 9311);
+
+        $anomaly = app(AnomalyService::class)->create($this->executive, [
+            'anomaly_type' => 'PRICE_Z_SCORE',
+            'reference_type' => PurchaseOrderItem::class,
+            'reference_id' => $context['purchaseOrderItem']->purchase_order_item_id,
+            'item_id' => 9311,
+            'office_id' => $this->officeA->id,
+            'detected_value' => 220,
+            'expected_value' => 100,
+            'threshold_value' => 2,
+            'z_score' => 2.9,
+            'detection_method' => 'Z_SCORE',
+            'severity' => 'HIGH',
+        ]);
+
+        $alert = app(AlertService::class)->create($this->executive, [
+            'alert_type' => 'ANOMALY_DETECTED',
+            'severity' => 'HIGH',
+            'anomaly_id' => $anomaly->anomaly_id,
+            'supply_request_id' => $context['supplyRequest']->supply_request_id,
+            'purchase_order_id' => $context['purchaseOrder']->purchase_order_id,
+            'supplier_id' => $context['supplier']->supplier_id,
+            'office_id' => $this->officeA->id,
+            'alert_message' => 'Linked anomaly evidence should be visible.',
+        ]);
+
+        $this->actingAs($this->executive)
+            ->get(route('executive.alerts.show', $alert->alerts_id))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('alert.anomaly_id', $anomaly->anomaly_id)
+                ->where('anomaly_evidence.type', 'PRICE_Z_SCORE')
+                ->has('anomaly_evidence.comparison', 1)
+            );
     }
 
     public function test_alerts_cannot_be_reviewed_by_unauthorized_roles_and_status_writes_audit(): void

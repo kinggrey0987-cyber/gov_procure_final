@@ -177,21 +177,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('anomaly.review', fn (User $user, Anomaly $anomaly): bool => $user->isExecutive());
 
         Gate::define('alert.view-any', fn (User $user): bool => $user->isExecutive() || $user->isGsoOfficer() || $user->isProcurement());
-        Gate::define('alert.view', function (User $user, Alert $alert): bool {
-            if ($user->isExecutive()) {
-                return true;
-            }
-
-            if ($user->isGsoOfficer()) {
-                return in_array((string) $alert->alert_type, ['LOW_STOCK', 'STOCK_RISK', 'DELAYED_DELIVERY'], true);
-            }
-
-            if ($user->isProcurement()) {
-                return in_array((string) $alert->alert_type, ['PROCUREMENT_DELAY', 'SUPPLIER_RISK', 'WORKFLOW_BLOCKER'], true);
-            }
-
-            return false;
-        });
+        Gate::define('alert.view', fn (User $user, Alert $alert): bool => $user->isExecutive());
         Gate::define('alert.review', fn (User $user, Alert $alert): bool => $user->isExecutive());
 
         Gate::define('public-disclosure.view', fn (User $user): bool => $user->isExecutive());

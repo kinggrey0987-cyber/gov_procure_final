@@ -7,6 +7,7 @@ use App\Models\Alert;
 use App\Models\Anomaly;
 use App\Services\Analytics\AlertService;
 use App\Services\Analytics\AnomalyDetectionService;
+use App\Services\Analytics\AnomalyEvidenceService;
 use App\Services\Analytics\AnomalyService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,6 +21,7 @@ class AnomalyController
         private readonly AnomalyService $anomalyService,
         private readonly AnomalyDetectionService $detectionService,
         private readonly AlertService $alertService,
+        private readonly AnomalyEvidenceService $anomalyEvidenceService,
     ) {
     }
 
@@ -80,6 +82,7 @@ class AnomalyController
 
         return Inertia::render('Executive/Anomalies/Show', [
             'anomaly' => $anomaly,
+            'evidence' => $this->anomalyEvidenceService->build($anomaly),
         ]);
     }
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Executive;
 
 use App\Http\Requests\Alert\UpdateAlertStatusRequest;
 use App\Models\Alert;
+use App\Services\Analytics\AnomalyEvidenceService;
 use App\Services\Analytics\AlertService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -13,8 +14,10 @@ use Inertia\Response;
 
 class AlertController
 {
-    public function __construct(private readonly AlertService $alertService)
-    {
+    public function __construct(
+        private readonly AlertService $alertService,
+        private readonly AnomalyEvidenceService $anomalyEvidenceService,
+    ) {
     }
 
     public function index(Request $request): Response
@@ -50,8 +53,14 @@ class AlertController
 
         $alert->load(['anomaly', 'supplyRequest', 'purchaseOrder', 'supplier', 'office', 'reviewer']);
 
+        $anomalyEvidence = null;
+        if ($alert->anomaly) {
+            $anomalyEvidence = $this->anomalyEvidenceService->build($alert->anomaly);
+        }
+
         return Inertia::render('Executive/Alerts/Show', [
             'alert' => $alert,
+            'anomaly_evidence' => $anomalyEvidence,
         ]);
     }
 

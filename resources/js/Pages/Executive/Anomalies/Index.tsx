@@ -62,7 +62,7 @@ export default function ExecutiveAnomalyIndex({ anomalies, filters }: Props) {
                                         <td className="px-4 py-2">{row.detected_at}</td>
                                         <td className="px-4 py-2">
                                             <Link href={route('executive.anomalies.show', row.anomaly_id)} className="rounded bg-indigo-600 px-3 py-1 text-xs text-white">
-                                                View
+                                                Open Executive Review
                                             </Link>
                                         </td>
                                     </tr>
