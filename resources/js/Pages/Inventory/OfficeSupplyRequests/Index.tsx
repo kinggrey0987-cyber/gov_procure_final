@@ -42,7 +42,6 @@ type Props = {
     filters: {
         q?: string;
         office_id?: number | null;
-        status?: string;
         stock_assessment?: string;
         workflow_bucket?: string;
     };
@@ -51,7 +50,6 @@ type Props = {
 export default function OfficeSupplyRequestsIndex({ requests, offices, filters }: Props) {
     const [q, setQ] = useState(filters.q ?? '');
     const [officeId, setOfficeId] = useState(String(filters.office_id ?? ''));
-    const [status, setStatus] = useState(filters.status ?? '');
     const [stockAssessment, setStockAssessment] = useState(filters.stock_assessment ?? '');
     const [workflowBucket, setWorkflowBucket] = useState(filters.workflow_bucket ?? '');
     const [queueingRequestId, setQueueingRequestId] = useState<number | null>(null);
@@ -60,10 +58,9 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
     useEffect(() => {
         setQ(filters.q ?? '');
         setOfficeId(String(filters.office_id ?? ''));
-        setStatus(filters.status ?? '');
         setStockAssessment(filters.stock_assessment ?? '');
         setWorkflowBucket(filters.workflow_bucket ?? '');
-    }, [filters.office_id, filters.q, filters.status, filters.stock_assessment, filters.workflow_bucket]);
+    }, [filters.office_id, filters.q, filters.stock_assessment, filters.workflow_bucket]);
 
     const { isRefreshing, lastRefreshedAt } = useSmartRefresh({
         only: ['requests', 'filters'],
@@ -78,7 +75,6 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
             {
                 q,
                 office_id: officeId,
-                status,
                 stock_assessment: stockAssessment,
                 workflow_bucket: workflowBucket,
             },
@@ -144,13 +140,6 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                         <option value="">All stock assessments</option>
                         <option value="STOCK_READY">Stock Ready</option>
                         <option value="SHORTAGE_REQUIRES_PROCUREMENT">Needs Procurement</option>
-                    </select>
-                    <select value={status} onChange={(event) => setStatus(event.target.value)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
-                        <option value="">All statuses</option>
-                        <option value="SUBMITTED">Submitted</option>
-                        <option value="VALIDATING">Validating</option>
-                        <option value="READY_FOR_DISTRIBUTION">Ready for Distribution</option>
-                        <option value="FOR_PROCUREMENT">For Procurement</option>
                     </select>
                     <button type="submit" className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
                         Apply

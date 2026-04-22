@@ -46,11 +46,6 @@ class RequestWorkflowController
             $query->where('office_id', $officeId);
         }
 
-        $status = trim((string) $request->query('status', ''));
-        if ($status !== '') {
-            $query->where('status', $status);
-        }
-
         $rawRequests = $query->get();
 
         $distributionReadySupplyRequestIds = Delivery::query()
@@ -168,7 +163,6 @@ class RequestWorkflowController
             'filters' => [
                 'q' => $search,
                 'office_id' => $officeId > 0 ? $officeId : null,
-                'status' => $status,
                 'stock_assessment' => $stockAssessmentFilter,
                 'workflow_bucket' => $workflowBucketFilter,
             ],
