@@ -11,6 +11,7 @@ use App\Models\SupplyRequest;
 use App\Services\Procurement\PurchaseRequestService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -67,6 +68,10 @@ class PurchaseRequestController extends Controller
                 'supplyRequest.requester',
             ]),
             'reviewMode' => $isReviewMode,
+            'backFilters' => [
+                'status' => trim((string) $request->input('status', '')),
+                'search' => trim((string) $request->input('search', '')),
+            ],
             'permissions' => [
                 'update' => $request->user()?->can('procurement.purchase-request.update', $purchaseRequest) ?? false,
                 'manageItems' => $request->user()?->can('procurement.purchase-request.update', $purchaseRequest) ?? false,
@@ -123,9 +128,45 @@ class PurchaseRequestController extends Controller
     {
         abort_unless($request->user()?->can('procurement.purchase-request.process', $purchaseRequest), 403);
 
-        $this->service->process($purchaseRequest, $request->user(), $request->input('remarks'));
+        $action = (string) $request->input('action', 'process');
+        $remarks = $request->input('remarks');
 
-        return redirect()->route('procurement.purchase-requests.show', $purchaseRequest->purchase_request_id)
+        if ($action === 'return') {
+            if (! is_string($remarks)) {
+                throw ValidationException::withMessages([
+                    'remarks' => 'Remarks are required when returning for revision.',
+                ]);
+            }
+
+            $this->service->returnForRevision($purchaseRequest, $request->user(), $remarks);
+
+            return redirect()->route('procurement.purchase-requests.show', [
+                'purchase_request' => $purchaseRequest->purchase_request_id,
+                'mode' => 'review',
+            ])->with('success', 'Purchase request returned for revision successfully.');
+        }
+
+        if ($action === 'reject') {
+            if (! is_string($remarks)) {
+                throw ValidationException::withMessages([
+                    'remarks' => 'Remarks are required when rejecting a request.',
+                ]);
+            }
+
+            $this->service->reject($purchaseRequest, $request->user(), $remarks);
+
+            return redirect()->route('procurement.purchase-requests.show', [
+                'purchase_request' => $purchaseRequest->purchase_request_id,
+                'mode' => 'review',
+            ])->with('success', 'Purchase request rejected successfully.');
+        }
+
+        $this->service->process($purchaseRequest, $request->user(), $remarks);
+
+        return redirect()->route('procurement.purchase-requests.show', [
+            'purchase_request' => $purchaseRequest->purchase_request_id,
+            'mode' => 'review',
+        ])
             ->with('success', 'Purchase request moved to processing successfully.');
     }
 }

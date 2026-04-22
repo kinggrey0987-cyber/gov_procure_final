@@ -1,7 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import useSmartRefresh from '@/hooks/useSmartRefresh';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { FormEvent } from 'react';
+import { FormEvent, useCallback } from 'react';
 
 type PurchaseRequestRow = {
     purchase_request_id: number;
@@ -38,16 +38,32 @@ type Props = {
 };
 
 export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Props) {
-    const { isRefreshing, lastRefreshedAt } = useSmartRefresh({
-        only: ['purchaseRequests'],
-        refreshOnFocus: true,
-        refreshOnMount: true,
-        pollIntervalMs: 30000,
-    });
-
     const filterForm = useForm({
         status: filters?.status ?? '',
         search: filters?.search ?? '',
+    });
+
+    const refreshWithActiveFilters = useCallback(() => {
+        router.get(
+            route('procurement.purchase-requests.index'),
+            {
+                status: filterForm.data.status,
+                search: filterForm.data.search,
+            },
+            {
+                preserveState: true,
+                replace: true,
+                only: ['purchaseRequests', 'filters'],
+            },
+        );
+    }, [filterForm.data.search, filterForm.data.status]);
+
+    const { isRefreshing, lastRefreshedAt } = useSmartRefresh({
+        only: ['purchaseRequests', 'filters'],
+        refreshOnFocus: true,
+        refreshOnMount: false,
+        pollIntervalMs: 30000,
+        onRefresh: refreshWithActiveFilters,
     });
 
     const submitFilters = (event: FormEvent) => {
@@ -89,6 +105,7 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                             <option value="">All Statuses</option>
                             <option value="OPEN">Open</option>
                             <option value="PROCESSING">Processing</option>
+                            <option value="RETURNED_FOR_REVISION">Returned for Revision</option>
                             <option value="APPROVED">Approved</option>
                             <option value="REJECTED">Rejected</option>
                         </select>
@@ -149,11 +166,23 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                                         <td className="px-4 py-3 text-slate-600">{formatDate(row.created_at)}</td>
                                         <td className="px-4 py-3 text-right">
                                             <div className="flex justify-end gap-3">
-                                                <Link href={route('procurement.purchase-requests.show', row.purchase_request_id)} className="text-sm font-semibold text-red-700 hover:text-red-900">
+                                                <Link
+                                                    href={route('procurement.purchase-requests.show', {
+                                                        purchase_request: row.purchase_request_id,
+                                                        status: filterForm.data.status || undefined,
+                                                        search: filterForm.data.search || undefined,
+                                                    })}
+                                                    className="text-sm font-semibold text-red-700 hover:text-red-900"
+                                                >
                                                     View
                                                 </Link>
                                                 <Link
-                                                    href={route('procurement.purchase-requests.show', { purchase_request: row.purchase_request_id, mode: 'review' })}
+                                                    href={route('procurement.purchase-requests.show', {
+                                                        purchase_request: row.purchase_request_id,
+                                                        mode: 'review',
+                                                        status: filterForm.data.status || undefined,
+                                                        search: filterForm.data.search || undefined,
+                                                    })}
                                                     className="text-sm font-semibold text-slate-700 hover:text-slate-900"
                                                 >
                                                     Review
@@ -194,6 +223,7 @@ function statusClass(status: string) {
     const map: Record<string, string> = {
         OPEN: `${base} bg-amber-100 text-amber-700`,
         PROCESSING: `${base} bg-blue-100 text-blue-700`,
+        RETURNED_FOR_REVISION: `${base} bg-violet-100 text-violet-700`,
         APPROVED: `${base} bg-emerald-100 text-emerald-700`,
         REJECTED: `${base} bg-rose-100 text-rose-700`,
     };

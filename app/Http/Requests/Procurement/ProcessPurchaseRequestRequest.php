@@ -16,7 +16,18 @@ class ProcessPurchaseRequestRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'remarks' => ['nullable', 'string'],
+            'action' => ['required', 'string', 'in:process,return,reject'],
+            'remarks' => ['nullable', 'string', 'required_if:action,return,reject'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'remarks.required_if' => 'Remarks are required when returning for revision or rejecting a request.',
         ];
     }
 }

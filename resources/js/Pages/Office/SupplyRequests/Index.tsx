@@ -26,10 +26,16 @@ export default function SupplyRequestsIndex({ supplyRequests }: Props) {
 
             <div className="space-y-5 py-4">
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                             <h3 className="text-2xl font-semibold text-slate-800">Track Your Requests</h3>
                             <p className="text-sm text-slate-600">Single tracking view for all office supply requests.</p>
+                            <Link
+                                href={route('office.tracking')}
+                                className="mt-3 inline-flex items-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                            >
+                                Back to Dashboard
+                            </Link>
                         </div>
                         <div className="flex items-center gap-2">
                             <Link
@@ -37,12 +43,6 @@ export default function SupplyRequestsIndex({ supplyRequests }: Props) {
                                 className="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
                             >
                                 Create New Request
-                            </Link>
-                            <Link
-                                href={route('office.tracking')}
-                                className="inline-flex items-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                            >
-                                Back to Dashboard
                             </Link>
                         </div>
                     </div>
@@ -110,9 +110,9 @@ function StatusBadge({ status }: { status: string }) {
     const style =
         normalized === 'APPROVED' || normalized === 'COMPLETED'
             ? 'bg-emerald-100 text-emerald-700'
-            : normalized === 'IN_REVIEW' || normalized === 'PROCESSING'
+            : normalized === 'IN_REVIEW' || normalized === 'PROCESSING' || normalized === 'RELEASED' || normalized === 'PROCUREMENT_PO_DRAFT' || normalized === 'PROCUREMENT_PLACED'
                 ? 'bg-blue-100 text-blue-700'
-                : normalized === 'REJECTED'
+                : normalized === 'REJECTED' || normalized === 'RETURNED_FOR_REVISION'
                     ? 'bg-rose-100 text-rose-700'
                     : 'bg-amber-100 text-amber-700';
 

@@ -38,6 +38,10 @@ type PurchaseRequest = {
 type Props = {
     purchaseRequest: PurchaseRequest;
     reviewMode?: boolean;
+    backFilters?: {
+        status?: string;
+        search?: string;
+    };
     permissions?: {
         update?: boolean;
         manageItems?: boolean;
@@ -45,13 +49,21 @@ type Props = {
     };
 };
 
-export default function PurchaseRequestsShow({ purchaseRequest, reviewMode = false, permissions }: Props) {
-    const processForm = useForm({ remarks: '' });
+export default function PurchaseRequestsShow({ purchaseRequest, reviewMode = false, backFilters, permissions }: Props) {
+    const processForm = useForm({ action: 'process', remarks: '' });
     const totalQuantity = (purchaseRequest.items ?? []).reduce((sum, row) => sum + Number(row.quantity_requested ?? 0), 0);
+    const normalizedRequestRemarks = formatRequestRemarks(purchaseRequest.remarks);
 
     const processRequest = (event: FormEvent) => {
         event.preventDefault();
         processForm.post(route('procurement.purchase-requests.process', purchaseRequest.purchase_request_id));
+    };
+
+    const submitReviewAction = (action: 'process' | 'return' | 'reject') => {
+        processForm.setData('action', action);
+        processForm.post(route('procurement.purchase-requests.process', purchaseRequest.purchase_request_id), {
+            preserveScroll: true,
+        });
     };
 
     return (
@@ -81,7 +93,7 @@ export default function PurchaseRequestsShow({ purchaseRequest, reviewMode = fal
                         </dl>
 
                         <p className="mt-4 text-sm text-slate-600">
-                            <span className="font-semibold text-slate-700">Remarks:</span> {purchaseRequest.remarks ?? 'No remarks provided.'}
+                            <span className="font-semibold text-slate-700">Remarks:</span> {normalizedRequestRemarks}
                         </p>
                     </section>
 
@@ -118,7 +130,7 @@ export default function PurchaseRequestsShow({ purchaseRequest, reviewMode = fal
                     </section>
 
                     <div className="flex flex-wrap gap-3">
-                        {permissions?.update && purchaseRequest.status === 'OPEN' ? (
+                        {permissions?.update && purchaseRequest.status === 'OPEN' && !reviewMode ? (
                             <Link
                                 href={route('procurement.purchase-requests.edit', purchaseRequest.purchase_request_id)}
                                 className="rounded bg-indigo-600 px-4 py-2 text-sm text-white"
@@ -126,7 +138,7 @@ export default function PurchaseRequestsShow({ purchaseRequest, reviewMode = fal
                                 Edit
                             </Link>
                         ) : null}
-                        {permissions?.manageItems && purchaseRequest.status === 'OPEN' ? (
+                        {permissions?.manageItems && purchaseRequest.status === 'OPEN' && !reviewMode ? (
                             <Link
                                 href={route('procurement.purchase-requests.items.index', purchaseRequest.purchase_request_id)}
                                 className="rounded bg-emerald-600 px-4 py-2 text-sm text-white"
@@ -134,23 +146,39 @@ export default function PurchaseRequestsShow({ purchaseRequest, reviewMode = fal
                                 Manage Items
                             </Link>
                         ) : null}
-                        <Link href={route('procurement.purchase-requests.index')} className="rounded border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                        <Link
+                            href={route('procurement.purchase-requests.index', {
+                                status: backFilters?.status || undefined,
+                                search: backFilters?.search || undefined,
+                            })}
+                            className="rounded border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                        >
                             Back to Request Review
                         </Link>
                     </div>
 
-                    {purchaseRequest.status === 'OPEN' && permissions?.process ? (
+                    {(purchaseRequest.status === 'OPEN' || purchaseRequest.status === 'RETURNED_FOR_REVISION') && permissions?.process && reviewMode ? (
                         <form onSubmit={processRequest} className="space-y-3 rounded-lg border bg-white p-6">
-                            <label className="mb-1 block text-sm text-gray-700">Review Remarks</label>
+                            <label className="mb-1 block text-sm text-gray-700">Review Decision Remarks</label>
                             <textarea
                                 value={processForm.data.remarks}
                                 onChange={(event) => processForm.setData('remarks', event.target.value)}
+                                placeholder="Provide remarks. Required for Return for Revision and Reject."
                                 className="w-full rounded border-gray-300 text-sm"
                                 rows={3}
                             />
-                            <button type="submit" className="rounded bg-amber-600 px-4 py-2 text-sm text-white">
-                                Move To Processing
-                            </button>
+                            {processForm.errors.remarks ? <p className="text-xs text-rose-600">{processForm.errors.remarks}</p> : null}
+                            <div className="flex flex-wrap gap-2">
+                                <button type="button" onClick={() => submitReviewAction('process')} className="rounded bg-amber-600 px-4 py-2 text-sm text-white">
+                                    Move to Processing
+                                </button>
+                                <button type="button" onClick={() => submitReviewAction('return')} className="rounded bg-violet-600 px-4 py-2 text-sm text-white">
+                                    Return for Revision
+                                </button>
+                                <button type="button" onClick={() => submitReviewAction('reject')} className="rounded bg-rose-600 px-4 py-2 text-sm text-white">
+                                    Reject Request
+                                </button>
+                            </div>
                         </form>
                     ) : null}
                 </div>
@@ -173,6 +201,7 @@ function statusClass(status: string) {
     const map: Record<string, string> = {
         OPEN: `${base} bg-amber-100 text-amber-700`,
         PROCESSING: `${base} bg-blue-100 text-blue-700`,
+        RETURNED_FOR_REVISION: `${base} bg-violet-100 text-violet-700`,
         APPROVED: `${base} bg-emerald-100 text-emerald-700`,
         REJECTED: `${base} bg-rose-100 text-rose-700`,
     };
@@ -186,4 +215,21 @@ function formatDate(value?: string | null) {
     }
 
     return new Date(value).toLocaleDateString();
+}
+
+function formatRequestRemarks(remarks?: string | null) {
+    const source = (remarks ?? '').trim();
+
+    if (source === '') {
+        return 'No remarks provided.';
+    }
+
+    const lowStockMarkerRegex = /^LOW_STOCK_SIGNAL:inventory:\d+\s*\|\s*/i;
+    const cleaned = source.replace(lowStockMarkerRegex, '').trim();
+
+    if (cleaned.toLowerCase().startsWith('auto-generated from low-stock signal')) {
+        return 'Auto-generated due to low stock signal. Procurement review is required before processing.';
+    }
+
+    return cleaned;
 }

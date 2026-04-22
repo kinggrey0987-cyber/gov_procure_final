@@ -47,7 +47,16 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
     const totalBudget = ppmp.items.reduce((total, item) => total + item.quantity * item.unit_cost, 0);
 
     return (
-        <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">PPMP Details</h2>}>
+        <AuthenticatedLayout
+            header={
+                <div className="space-y-2">
+                    <h2 className="text-xl font-semibold leading-tight text-gray-800">PPMP Details</h2>
+                    <Link href={route('office.ppmp.index')} className="inline-flex rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                        Back to PPMP List
+                    </Link>
+                </div>
+            }
+        >
             <Head title="PPMP Details" />
 
             <div className="space-y-6 py-4">

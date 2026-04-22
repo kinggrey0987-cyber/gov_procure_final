@@ -11,6 +11,7 @@ type Props = {
         ppmp_id?: number | null;
         request_code: string;
         status: string;
+        raw_status?: string;
         request_date?: string | null;
         needed_by_date?: string | null;
         request_category: string;
@@ -28,6 +29,18 @@ type Props = {
             over_requested_quantity?: number | null;
             exceeds_ppmp_allocation: boolean;
         }>;
+        processing_timeline: {
+            mode: 'PROCUREMENT' | 'DIRECT_STOCK';
+            current_status: string;
+            is_rejected: boolean;
+            stages: Array<{
+                key: string;
+                label: string;
+                owner: string;
+                reached: boolean;
+                is_current: boolean;
+            }>;
+        };
     };
     distributionRecords: Array<{
         distribution_record_id: number;
@@ -53,16 +66,6 @@ type Props = {
         approver?: { id: number; name: string } | null;
     }>;
 };
-
-const PROCESS_STAGES = [
-    { key: 'DRAFT', label: 'Stage 1: Draft Request', owner: 'Office User' },
-    { key: 'SUBMITTED', label: 'Stage 2: Submitted to GSO', owner: 'GSO Officer' },
-    { key: 'IN_REVIEW', label: 'Stage 3: GSO Validation', owner: 'GSO Officer' },
-    { key: 'PROCESSING', label: 'Stage 4: BAC / Procurement', owner: 'BAC Officer' },
-    { key: 'APPROVED', label: 'Stage 5: Executive Approval', owner: 'Executive' },
-    { key: 'RELEASED', label: 'Stage 6: Released for Office', owner: 'GSO Officer' },
-    { key: 'COMPLETED', label: 'Stage 7: Completed', owner: 'Office User' },
-];
 
 export default function SupplyRequestShow({
     supplyRequest,
@@ -95,8 +98,6 @@ export default function SupplyRequestShow({
         return status === 'RELEASED' || status === 'COMPLETED';
     }, [supplyRequest.status]);
 
-    const stageIndex = PROCESS_STAGES.findIndex((stage) => stage.key === supplyRequest.status.toUpperCase());
-
     const handleSubmit = () => {
         submitForm.post(route('office.supply-requests.submit', supplyRequest.supply_request_id));
     };
@@ -113,7 +114,19 @@ export default function SupplyRequestShow({
     };
 
     return (
-        <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Request Details</h2>}>
+        <AuthenticatedLayout
+            header={
+                <div className="space-y-2">
+                    <h2 className="text-xl font-semibold leading-tight text-gray-800">Request Details</h2>
+                    <Link
+                        href={route('office.supply-requests.index')}
+                        className="inline-flex rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                        Back to Tracking
+                    </Link>
+                </div>
+            }
+        >
             <Head title="Request Details" />
 
             <div className="space-y-6 py-4">
@@ -139,15 +152,16 @@ export default function SupplyRequestShow({
 
                 <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                     <h4 className="text-xl font-semibold text-slate-800">Processing Timeline</h4>
-                    <p className="mt-1 text-sm text-slate-600">Track each stage and responsible office.</p>
+                    <p className="mt-1 text-sm text-slate-600">
+                        Track each stage and responsible office. Route: {supplyRequest.processing_timeline.mode === 'PROCUREMENT' ? 'Procurement Required' : 'Direct Stock Release'}
+                    </p>
 
                     <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                        {PROCESS_STAGES.map((stage, index) => {
-                            const reached = stageIndex >= index;
+                        {supplyRequest.processing_timeline.stages.map((stage) => {
                             return (
                                 <div
                                     key={stage.key}
-                                    className={`rounded-xl border px-4 py-3 ${reached ? 'border-emerald-300 bg-emerald-50/70' : 'border-slate-200 bg-slate-50'}`}
+                                    className={`rounded-xl border px-4 py-3 ${stage.reached ? 'border-emerald-300 bg-emerald-50/70' : 'border-slate-200 bg-slate-50'} ${stage.is_current ? 'ring-1 ring-emerald-400' : ''}`}
                                 >
                                     <p className="text-sm font-semibold text-slate-800">{stage.label}</p>
                                     <p className="text-xs text-slate-600">Responsible: {stage.owner}</p>
@@ -155,6 +169,12 @@ export default function SupplyRequestShow({
                             );
                         })}
                     </div>
+
+                    {supplyRequest.processing_timeline.is_rejected ? (
+                        <div className="mt-3 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs text-rose-900">
+                            Request was rejected in validation/procurement. Please review remarks in status history.
+                        </div>
+                    ) : null}
                 </section>
 
                 <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -384,9 +404,9 @@ function StatusBadge({ status }: { status: string }) {
     const style =
         normalized === 'APPROVED' || normalized === 'COMPLETED'
             ? 'bg-emerald-100 text-emerald-700'
-            : normalized === 'IN_REVIEW' || normalized === 'PROCESSING' || normalized === 'RELEASED'
+            : normalized === 'IN_REVIEW' || normalized === 'PROCESSING' || normalized === 'RELEASED' || normalized === 'PROCUREMENT_PO_DRAFT' || normalized === 'PROCUREMENT_PLACED'
                 ? 'bg-blue-100 text-blue-700'
-                : normalized === 'REJECTED'
+                : normalized === 'REJECTED' || normalized === 'RETURNED_FOR_REVISION'
                     ? 'bg-rose-100 text-rose-700'
                     : 'bg-amber-100 text-amber-700';
 

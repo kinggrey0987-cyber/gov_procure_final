@@ -21,10 +21,13 @@ export default function PpmpIndex({ ppmps }: Props) {
 
             <div className="space-y-5 py-4">
                 <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                             <h3 className="text-2xl font-semibold text-slate-800">Project Procurement Management Plan</h3>
                             <p className="text-sm text-slate-600">Prepare and submit annual PPMP plans for your office.</p>
+                            <Link href={route('office.tracking')} className="mt-3 inline-flex rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                                Back to Dashboard
+                            </Link>
                         </div>
                         <Link href={route('office.ppmp.create')} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">
                             Create PPMP

@@ -76,7 +76,7 @@ class PurchaseRequest extends Model
 
     public function scopeOpen(Builder $query): Builder
     {
-        return $query->where('status', 'OPEN');
+        return $query->whereIn('status', ['OPEN', 'RETURNED_FOR_REVISION']);
     }
 
     public function scopeProcessing(Builder $query): Builder

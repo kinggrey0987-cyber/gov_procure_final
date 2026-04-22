@@ -365,9 +365,9 @@ class PurchaseRequestService
     {
         $this->assertProcurementActor($actor);
 
-        if ((string) $purchaseRequest->status !== 'OPEN') {
+        if (! in_array((string) $purchaseRequest->status, ['OPEN', 'RETURNED_FOR_REVISION'], true)) {
             throw ValidationException::withMessages([
-                'status' => 'Only OPEN purchase requests can be moved to PROCESSING.',
+                'status' => 'Only OPEN or RETURNED_FOR_REVISION purchase requests can be moved to PROCESSING.',
             ]);
         }
 
@@ -391,6 +391,90 @@ class PurchaseRequestService
             ]);
 
             $this->recordAudit($actor, 'PROCESS', $purchaseRequest);
+
+            return $purchaseRequest->fresh(['items', 'office', 'requester', 'supplyRequest']) ?? $purchaseRequest;
+        });
+    }
+
+    public function returnForRevision(PurchaseRequest $purchaseRequest, User $actor, string $remarks): PurchaseRequest
+    {
+        $this->assertProcurementActor($actor);
+
+        if (! in_array((string) $purchaseRequest->status, ['OPEN', 'RETURNED_FOR_REVISION'], true)) {
+            throw ValidationException::withMessages([
+                'status' => 'Only OPEN or RETURNED_FOR_REVISION purchase requests can be returned for revision.',
+            ]);
+        }
+
+        $finalRemarks = trim($remarks);
+        if ($finalRemarks === '') {
+            throw ValidationException::withMessages([
+                'remarks' => 'Remarks are required when returning for revision.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($purchaseRequest, $actor, $finalRemarks): PurchaseRequest {
+            $oldStatus = (string) $purchaseRequest->status;
+
+            $purchaseRequest->forceFill([
+                'status' => 'RETURNED_FOR_REVISION',
+                'remarks' => $finalRemarks,
+            ])->save();
+
+            $this->recordStatus($purchaseRequest, $oldStatus, 'RETURNED_FOR_REVISION', $actor, 'Purchase request returned for revision by procurement.');
+
+            ApprovalHistory::query()->create([
+                'reference_type' => PurchaseRequest::class,
+                'reference_id' => (int) $purchaseRequest->purchase_request_id,
+                'approved_by' => null,
+                'status' => 'RETURNED_FOR_REVISION',
+                'remarks' => $finalRemarks,
+                'approved_at' => null,
+            ]);
+
+            $this->recordAudit($actor, 'RETURN_FOR_REVISION', $purchaseRequest);
+
+            return $purchaseRequest->fresh(['items', 'office', 'requester', 'supplyRequest']) ?? $purchaseRequest;
+        });
+    }
+
+    public function reject(PurchaseRequest $purchaseRequest, User $actor, string $remarks): PurchaseRequest
+    {
+        $this->assertProcurementActor($actor);
+
+        if (! in_array((string) $purchaseRequest->status, ['OPEN', 'RETURNED_FOR_REVISION'], true)) {
+            throw ValidationException::withMessages([
+                'status' => 'Only OPEN or RETURNED_FOR_REVISION purchase requests can be rejected.',
+            ]);
+        }
+
+        $finalRemarks = trim($remarks);
+        if ($finalRemarks === '') {
+            throw ValidationException::withMessages([
+                'remarks' => 'Remarks are required when rejecting a request.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($purchaseRequest, $actor, $finalRemarks): PurchaseRequest {
+            $oldStatus = (string) $purchaseRequest->status;
+
+            $purchaseRequest->forceFill([
+                'status' => 'REJECTED',
+                'remarks' => $finalRemarks,
+            ])->save();
+
+            $this->recordStatus($purchaseRequest, $oldStatus, 'REJECTED', $actor, 'Purchase request rejected by procurement.');
+
+            ApprovalHistory::query()->create([
+                'reference_type' => PurchaseRequest::class,
+                'reference_id' => (int) $purchaseRequest->purchase_request_id,
+                'approved_by' => null,
+                'status' => 'REJECTED',
+                'remarks' => $finalRemarks,
+                'approved_at' => null,
+            ]);
+
+            $this->recordAudit($actor, 'REJECT', $purchaseRequest);
 
             return $purchaseRequest->fresh(['items', 'office', 'requester', 'supplyRequest']) ?? $purchaseRequest;
         });
@@ -466,7 +550,7 @@ class PurchaseRequestService
 
     private function assertRequestIsMutable(PurchaseRequest $purchaseRequest): void
     {
-        if (! in_array((string) $purchaseRequest->status, ['OPEN', 'PROCESSING'], true)) {
+        if (! in_array((string) $purchaseRequest->status, ['OPEN', 'PROCESSING', 'RETURNED_FOR_REVISION'], true)) {
             throw ValidationException::withMessages([
                 'status' => 'This purchase request can no longer be modified.',
             ]);

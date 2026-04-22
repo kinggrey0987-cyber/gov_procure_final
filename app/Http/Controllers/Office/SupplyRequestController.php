@@ -30,18 +30,24 @@ class SupplyRequestController extends Controller
         abort_unless($request->user()?->can('office.supply-request.view-any'), 403);
 
         $supplyRequests = SupplyRequest::query()
-            ->with('items')
+            ->with(['items.item.inventory', 'purchaseRequests', 'purchaseOrders', 'distributionRecords'])
             ->forOffice((int) $request->user()?->office_id)
             ->latest('supply_request_id')
             ->paginate(15)
-            ->through(fn (SupplyRequest $supplyRequest): array => [
-                'supply_request_id' => (int) $supplyRequest->supply_request_id,
-                'request_code' => (string) $supplyRequest->request_code,
-                'status' => (string) $supplyRequest->status,
-                'request_date' => optional($supplyRequest->request_date)?->toDateString(),
-                'items_count' => (int) $supplyRequest->items->count(),
-                'items_summary' => $supplyRequest->items->take(2)->pluck('item_name_snapshot')->implode(', '),
-            ]);
+            ->through(function (SupplyRequest $supplyRequest): array {
+                $requiresProcurement = $this->requiresProcurement($supplyRequest);
+                $trackingStatus = $this->resolveTrackingStatus($supplyRequest, $requiresProcurement);
+
+                return [
+                    'supply_request_id' => (int) $supplyRequest->supply_request_id,
+                    'request_code' => (string) $supplyRequest->request_code,
+                    'status' => $trackingStatus,
+                    'raw_status' => (string) $supplyRequest->status,
+                    'request_date' => optional($supplyRequest->request_date)?->toDateString(),
+                    'items_count' => (int) $supplyRequest->items->count(),
+                    'items_summary' => $supplyRequest->items->take(2)->pluck('item_name_snapshot')->implode(', '),
+                ];
+            });
 
         return Inertia::render('Office/SupplyRequests/Index', [
             'supplyRequests' => $supplyRequests,
@@ -88,7 +94,18 @@ class SupplyRequestController extends Controller
     {
         abort_unless($request->user()?->can('office.supply-request.view', $supplyRequest), 403);
 
-        $supplyRequest->load(['items.ppmpItem.item', 'office', 'requester', 'approver']);
+        $supplyRequest->load([
+            'items.ppmpItem.item.inventory',
+            'office',
+            'requester',
+            'approver',
+            'purchaseRequests',
+            'purchaseOrders',
+            'distributionRecords',
+        ]);
+
+        $requiresProcurement = $this->requiresProcurement($supplyRequest);
+        $trackingStatus = $this->resolveTrackingStatus($supplyRequest, $requiresProcurement);
 
         $ppmpItemContext = (int) $supplyRequest->ppmp_id > 0
             ? collect($this->service->ppmpItemOptionsForRequestContext((int) $supplyRequest->office_id, (int) $supplyRequest->ppmp_id))
@@ -100,7 +117,8 @@ class SupplyRequestController extends Controller
             'office_id' => (int) $supplyRequest->office_id,
             'ppmp_id' => $supplyRequest->ppmp_id ? (int) $supplyRequest->ppmp_id : null,
             'request_code' => (string) $supplyRequest->request_code,
-            'status' => (string) $supplyRequest->status,
+            'status' => $trackingStatus,
+            'raw_status' => (string) $supplyRequest->status,
             'request_date' => optional($supplyRequest->request_date)?->toDateString(),
             'needed_by_date' => optional($supplyRequest->needed_by_date)?->toDateString(),
             'request_category' => (string) $supplyRequest->request_category,
@@ -124,6 +142,7 @@ class SupplyRequestController extends Controller
                         : false,
                 ];
             })->values()->all(),
+            'processing_timeline' => $this->buildProcessingTimeline($trackingStatus, $requiresProcurement),
         ];
 
         $history = $this->historyTimelineService->forRecord($request->user(), $supplyRequest);
@@ -171,6 +190,149 @@ class SupplyRequestController extends Controller
                 ] : null,
             ])->values(),
         ]);
+    }
+
+    private function requiresProcurement(SupplyRequest $supplyRequest): bool
+    {
+        if ($supplyRequest->purchaseRequests->isNotEmpty() || $supplyRequest->purchaseOrders->isNotEmpty()) {
+            return true;
+        }
+
+        foreach ($supplyRequest->items as $item) {
+            $requested = (float) $item->quantity_requested;
+            $available = (float) ($item->item?->inventory?->available_stock ?? 0);
+
+            if ($requested > $available) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function resolveTrackingStatus(SupplyRequest $supplyRequest, bool $requiresProcurement): string
+    {
+        $distributionStatuses = $supplyRequest->distributionRecords
+            ->pluck('status')
+            ->map(fn ($status): string => strtoupper((string) $status));
+
+        if ($distributionStatuses->contains('RECEIVED')) {
+            return 'COMPLETED';
+        }
+
+        if ($distributionStatuses->contains('RELEASED')) {
+            return 'RELEASED';
+        }
+
+        $purchaseOrderStatuses = $supplyRequest->purchaseOrders
+            ->pluck('status')
+            ->map(fn ($status): string => strtoupper((string) $status));
+
+        if ($purchaseOrderStatuses->contains('PLACED')) {
+            return 'PROCUREMENT_PLACED';
+        }
+
+        if ($purchaseOrderStatuses->contains('DRAFT')) {
+            return 'PROCUREMENT_PO_DRAFT';
+        }
+
+        $purchaseRequestStatuses = $supplyRequest->purchaseRequests
+            ->pluck('status')
+            ->map(fn ($status): string => strtoupper((string) $status));
+
+        if ($purchaseRequestStatuses->contains('REJECTED')) {
+            return 'REJECTED';
+        }
+
+        if ($purchaseRequestStatuses->contains('RETURNED_FOR_REVISION')) {
+            return 'RETURNED_FOR_REVISION';
+        }
+
+        if ($purchaseRequestStatuses->contains('PROCESSING')) {
+            return 'PROCESSING';
+        }
+
+        if ($purchaseRequestStatuses->contains('OPEN')) {
+            return 'IN_REVIEW';
+        }
+
+        $baseStatus = strtoupper((string) $supplyRequest->status);
+
+        if ($baseStatus === 'SUBMITTED' && ! $requiresProcurement) {
+            return 'IN_REVIEW';
+        }
+
+        return $baseStatus;
+    }
+
+    /**
+     * @return array{mode: string, current_status: string, is_rejected: bool, stages: array<int, array<string, mixed>>}
+     */
+    private function buildProcessingTimeline(string $trackingStatus, bool $requiresProcurement): array
+    {
+        $mode = $requiresProcurement ? 'PROCUREMENT' : 'DIRECT_STOCK';
+        $status = strtoupper($trackingStatus);
+
+        $stages = $requiresProcurement
+            ? [
+                ['order' => 1, 'key' => 'DRAFT', 'label' => 'Stage 1: Draft Request', 'owner' => 'Office User'],
+                ['order' => 2, 'key' => 'SUBMITTED', 'label' => 'Stage 2: Submitted to GSO', 'owner' => 'GSO Officer'],
+                ['order' => 3, 'key' => 'IN_REVIEW', 'label' => 'Stage 3: GSO Validation', 'owner' => 'GSO Officer'],
+                ['order' => 4, 'key' => 'PROCESSING', 'label' => 'Stage 4: BAC / Procurement', 'owner' => 'BAC Officer'],
+                ['order' => 5, 'key' => 'RELEASED', 'label' => 'Stage 5: Released for Office', 'owner' => 'GSO Officer'],
+                ['order' => 6, 'key' => 'COMPLETED', 'label' => 'Stage 6: Completed', 'owner' => 'Office User'],
+            ]
+            : [
+                ['order' => 1, 'key' => 'DRAFT', 'label' => 'Stage 1: Draft Request', 'owner' => 'Office User'],
+                ['order' => 2, 'key' => 'SUBMITTED', 'label' => 'Stage 2: Submitted to GSO', 'owner' => 'GSO Officer'],
+                ['order' => 3, 'key' => 'IN_REVIEW', 'label' => 'Stage 3: GSO Validation', 'owner' => 'GSO Officer'],
+                ['order' => 4, 'key' => 'RELEASED', 'label' => 'Stage 4: Released for Office', 'owner' => 'GSO Officer'],
+                ['order' => 5, 'key' => 'COMPLETED', 'label' => 'Stage 5: Completed', 'owner' => 'Office User'],
+            ];
+
+        $orderMap = $requiresProcurement
+            ? [
+                'DRAFT' => 1,
+                'SUBMITTED' => 2,
+                'IN_REVIEW' => 3,
+                'OPEN' => 3,
+                'RETURNED_FOR_REVISION' => 3,
+                'PROCESSING' => 4,
+                'PROCUREMENT_PO_DRAFT' => 4,
+                'PROCUREMENT_PLACED' => 4,
+                'RELEASED' => 5,
+                'RECEIVED' => 6,
+                'COMPLETED' => 6,
+                'REJECTED' => 3,
+            ]
+            : [
+                'DRAFT' => 1,
+                'SUBMITTED' => 2,
+                'IN_REVIEW' => 3,
+                'RETURNED_FOR_REVISION' => 3,
+                'REJECTED' => 3,
+                'RELEASED' => 4,
+                'RECEIVED' => 5,
+                'COMPLETED' => 5,
+            ];
+
+        $currentOrder = $orderMap[$status] ?? 1;
+
+        return [
+            'mode' => $mode,
+            'current_status' => $status,
+            'is_rejected' => $status === 'REJECTED',
+            'stages' => collect($stages)
+                ->map(fn (array $stage): array => [
+                    'key' => $stage['key'],
+                    'label' => $stage['label'],
+                    'owner' => $stage['owner'],
+                    'reached' => (int) $stage['order'] <= $currentOrder,
+                    'is_current' => (int) $stage['order'] === $currentOrder,
+                ])
+                ->values()
+                ->all(),
+        ];
     }
 
     public function edit(Request $request, SupplyRequest $supplyRequest): Response

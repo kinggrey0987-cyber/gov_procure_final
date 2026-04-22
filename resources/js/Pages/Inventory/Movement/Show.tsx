@@ -25,10 +25,10 @@ export default function MovementShow({ movement }: Props) {
         <AuthenticatedLayout
             header={
                 <div className="space-y-3">
+                    <h2 className="text-xl font-semibold leading-tight text-gray-800">Movement Detail</h2>
                     <Link href={route('inventory.inventory-movements.index')} className="inline-flex rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
                         Back to Movement Logs
                     </Link>
-                    <h2 className="text-xl font-semibold leading-tight text-gray-800">Movement Detail</h2>
                 </div>
             }
         >

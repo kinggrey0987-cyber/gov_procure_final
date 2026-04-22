@@ -98,7 +98,14 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
 
     return (
         <AuthenticatedLayout
-            header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Procurement Dashboard</h2>}
+            header={
+                <div className="space-y-2">
+                    <h2 className="text-xl font-semibold leading-tight text-gray-800">Procurement Dashboard</h2>
+                    <Link href={route('dashboard')} className="inline-flex rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                        Back to Main Dashboard
+                    </Link>
+                </div>
+            }
         >
             <Head title="Procurement Dashboard" />
 

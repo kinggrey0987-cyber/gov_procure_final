@@ -104,10 +104,10 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('procurement.purchase-request.create', fn (User $user): bool => $user->isProcurement());
         Gate::define('procurement.purchase-request.view', fn (User $user, PurchaseRequest $purchaseRequest): bool => $user->isProcurement());
         Gate::define('procurement.purchase-request.update', function (User $user, PurchaseRequest $purchaseRequest): bool {
-            return $user->isProcurement() && in_array((string) $purchaseRequest->status, ['OPEN', 'PROCESSING'], true);
+            return $user->isProcurement() && in_array((string) $purchaseRequest->status, ['OPEN', 'PROCESSING', 'RETURNED_FOR_REVISION'], true);
         });
         Gate::define('procurement.purchase-request.process', function (User $user, PurchaseRequest $purchaseRequest): bool {
-            return $user->isProcurement() && (string) $purchaseRequest->status === 'OPEN';
+            return $user->isProcurement() && in_array((string) $purchaseRequest->status, ['OPEN', 'RETURNED_FOR_REVISION'], true);
         });
 
         Gate::define('procurement.supplier.view-any', fn (User $user): bool => $user->isProcurement());
