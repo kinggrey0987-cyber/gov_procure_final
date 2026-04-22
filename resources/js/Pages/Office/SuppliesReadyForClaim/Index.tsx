@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 
 type ReadyRecord = {
     distribution_record_id: number;
@@ -77,6 +77,19 @@ export default function SuppliesReadyForClaimIndex({ records }: Props) {
                                             </td>
                                             <td className="px-4 py-3 text-right">
                                                 <div className="flex items-center justify-end gap-2">
+                                                    {record.status.toUpperCase() === 'RELEASED' ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                router.post(route('office.distribution-records.receive', record.distribution_record_id), {}, {
+                                                                    preserveScroll: true,
+                                                                });
+                                                            }}
+                                                            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                                                        >
+                                                            Confirm Received
+                                                        </button>
+                                                    ) : null}
                                                     <Link
                                                         href={route('office.distribution-records.show', record.distribution_record_id)}
                                                         className="rounded-lg border border-emerald-300 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
