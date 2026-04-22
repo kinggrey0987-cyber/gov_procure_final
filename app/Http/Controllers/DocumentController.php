@@ -54,9 +54,10 @@ class DocumentController extends Controller
             abort(403);
         }
 
-        abort_unless(Storage::disk('public')->exists((string) $document->file_path), 404);
+        $path = $this->normalizePublicDiskPath((string) $document->file_path);
+        abort_unless($path !== '' && Storage::disk('public')->exists($path), 404);
 
-        return response()->download(Storage::disk('public')->path((string) $document->file_path), (string) $document->file_name);
+        return response()->download(Storage::disk('public')->path($path), (string) $document->file_name);
     }
 
     public function destroy(DeleteDocumentRequest $request, Document $document): RedirectResponse
@@ -74,13 +75,19 @@ class DocumentController extends Controller
     {
         abort_unless($document->isRelatedTo('public_disclosures', (int) $public_disclosure->disclosure_id), 404);
 
-        $isPublished = (string) ($public_disclosure->status ?? '') === 'PUBLISHED'
+        $isPublished = strtoupper((string) ($public_disclosure->status ?? '')) === 'PUBLISHED'
             && (bool) $public_disclosure->published_at;
         abort_unless($isPublished, 404);
 
-        abort_unless(Storage::disk('public')->exists((string) $document->file_path), 404);
+        $path = $this->normalizePublicDiskPath((string) $document->file_path);
+        abort_unless($path !== '' && Storage::disk('public')->exists($path), 404);
 
-        return response()->download(Storage::disk('public')->path((string) $document->file_path), (string) $document->file_name);
+        return response()->download(Storage::disk('public')->path($path), (string) $document->file_name);
+    }
+
+    private function normalizePublicDiskPath(string $path): string
+    {
+        return ltrim(trim($path), '/\\');
     }
 
     private function transformDocument(Document $document): array
