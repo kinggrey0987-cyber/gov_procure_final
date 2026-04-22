@@ -156,8 +156,20 @@ class PurchaseOrderService
         $this->assertProcurementActor($actor);
         $this->assertOrderIsMutable($purchaseOrder);
 
+        $incomingSupplyRequestItemId = (int) $payload['supply_request_item_id'];
+
+        $alreadyExists = $purchaseOrder->items()
+            ->where('supply_request_item_id', $incomingSupplyRequestItemId)
+            ->exists();
+
+        if ($alreadyExists) {
+            throw ValidationException::withMessages([
+                'supply_request_item_id' => 'This source request item is already encoded in the purchase order. Update the existing line instead of adding a duplicate.',
+            ]);
+        }
+
         $supplyRequestItem = SupplyRequestItem::query()
-            ->where('supply_request_item_id', (int) $payload['supply_request_item_id'])
+            ->where('supply_request_item_id', $incomingSupplyRequestItemId)
             ->firstOrFail();
 
         $this->assertItemMatchesOrderContext($purchaseOrder, $supplyRequestItem, (int) $payload['item_id']);
