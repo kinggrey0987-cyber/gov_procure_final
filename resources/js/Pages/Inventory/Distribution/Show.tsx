@@ -56,11 +56,15 @@ export default function DistributionShow({ record }: Props) {
         auth?: {
             can?: {
                 inventory?: boolean;
+                office?: boolean;
             };
         };
     };
 
     const canManageDistribution = page.auth?.can?.inventory === true;
+    const isOfficeUser = page.auth?.can?.office === true;
+    const canConfirmReceipt = isOfficeUser && record.status === 'RELEASED';
+    const canFileClaim = isOfficeUser && (record.status === 'RELEASED' || record.status === 'RECEIVED');
 
     return (
         <AuthenticatedLayout
@@ -90,6 +94,34 @@ export default function DistributionShow({ record }: Props) {
                         <p><span className="font-semibold text-slate-700">Storage / Release Notes:</span> {record.storage_location ?? 'No storage location recorded.'}</p>
                         <p className="mt-1"><span className="font-semibold text-slate-700">Remarks:</span> {record.notes ?? 'No additional notes.'}</p>
                     </div>
+                    {isOfficeUser ? (
+                        <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 pt-4">
+                            {canFileClaim ? (
+                                <Link
+                                    href={route('office.claims.create', {
+                                        distribution_record_id: record.distribution_record_id,
+                                    })}
+                                    className="rounded-md border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
+                                >
+                                    Claims and Adjustments
+                                </Link>
+                            ) : null}
+
+                            {canConfirmReceipt ? (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        router.post(route('office.distribution-records.receive', record.distribution_record_id), {}, {
+                                            preserveScroll: true,
+                                        });
+                                    }}
+                                    className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                                >
+                                    Confirm Received
+                                </button>
+                            ) : null}
+                        </div>
+                    ) : null}
                 </div>
 
                 <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">

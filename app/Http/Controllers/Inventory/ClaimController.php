@@ -9,6 +9,7 @@ use App\Models\DistributionRecord;
 use App\Services\Documents\DocumentService;
 use App\Services\History\HistoryTimelineService;
 use App\Services\Inventory\ClaimService;
+use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Redirect;
 use Inertia\Inertia;
@@ -40,7 +41,7 @@ class ClaimController
         ]);
     }
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
         abort_unless(auth()->user()->can('claim.create'), 403);
 
@@ -52,6 +53,12 @@ class ClaimController
             ->orderByDesc('distribution_record_id')
             ->get();
 
+        $requestedDistributionRecordId = (int) $request->query('distribution_record_id', 0);
+        $preselectedDistributionRecordId = $requestedDistributionRecordId > 0
+            && $distributionRecords->contains(fn (DistributionRecord $record): bool => (int) $record->distribution_record_id === $requestedDistributionRecordId)
+                ? $requestedDistributionRecordId
+                : null;
+
         return Inertia::render('Inventory/Claim/Create', [
             'distributionRecords' => $distributionRecords->map(fn (DistributionRecord $record): array => [
                 'distribution_record_id' => (int) $record->distribution_record_id,
@@ -62,6 +69,7 @@ class ClaimController
                 'status' => (string) $record->status,
                 'request_code' => (string) ($record->supplyRequest?->request_code ?? '-'),
             ])->values(),
+            'preselectedDistributionRecordId' => $preselectedDistributionRecordId,
         ]);
     }
 

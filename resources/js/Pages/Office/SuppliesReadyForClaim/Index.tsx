@@ -29,7 +29,7 @@ export default function SuppliesReadyForClaimIndex({ records }: Props) {
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
                             <h3 className="text-2xl font-semibold text-slate-800">Released Supplies</h3>
-                            <p className="text-sm text-slate-600">View-only status list of records already released by GSO.</p>
+                            <p className="text-sm text-slate-600">Confirm receipt and file claims for missing or damaged items.</p>
                         </div>
                         <Link
                             href={route('office.supply-requests.index')}
@@ -76,12 +76,22 @@ export default function SuppliesReadyForClaimIndex({ records }: Props) {
                                                 <StatusBadge status={record.status} />
                                             </td>
                                             <td className="px-4 py-3 text-right">
-                                                <Link
-                                                    href={route('office.supply-requests.show', record.supply_request_id)}
-                                                    className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
-                                                >
-                                                    View Request
-                                                </Link>
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <Link
+                                                        href={route('office.distribution-records.show', record.distribution_record_id)}
+                                                        className="rounded-lg border border-emerald-300 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+                                                    >
+                                                        Open Distribution
+                                                    </Link>
+                                                    <Link
+                                                        href={route('office.claims.create', {
+                                                            distribution_record_id: record.distribution_record_id,
+                                                        })}
+                                                        className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
+                                                    >
+                                                        File Claim
+                                                    </Link>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}

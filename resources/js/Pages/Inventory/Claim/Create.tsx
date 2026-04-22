@@ -14,10 +14,14 @@ type DistributionRecordOption = {
 
 type Props = {
     distributionRecords: DistributionRecordOption[];
+    preselectedDistributionRecordId?: number | null;
 };
 
-export default function ClaimCreate({ distributionRecords }: Props) {
-    const first = distributionRecords[0];
+export default function ClaimCreate({ distributionRecords, preselectedDistributionRecordId = null }: Props) {
+    const preselectedRecord = preselectedDistributionRecordId
+        ? distributionRecords.find((record) => record.distribution_record_id === preselectedDistributionRecordId)
+        : null;
+    const first = preselectedRecord ?? distributionRecords[0];
     const form = useForm({
         distribution_record_id: first?.distribution_record_id ?? '',
         office_id: first?.office_id ?? 0,
