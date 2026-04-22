@@ -240,6 +240,26 @@ class PurchaseOrderService
         });
     }
 
+    public function removeItem(PurchaseOrder $purchaseOrder, PurchaseOrderItem $item, User $actor): void
+    {
+        $this->assertProcurementActor($actor);
+        $this->assertOrderIsMutable($purchaseOrder);
+
+        if ((int) $item->purchase_order_id !== (int) $purchaseOrder->purchase_order_id) {
+            throw ValidationException::withMessages([
+                'purchase_order_item_id' => 'Item does not belong to this purchase order.',
+            ]);
+        }
+
+        DB::transaction(function () use ($purchaseOrder, $item, $actor): void {
+            $item->delete();
+
+            $this->recomputeTotalAmount($purchaseOrder);
+            $this->recordStatus($purchaseOrder, (string) $purchaseOrder->status, (string) $purchaseOrder->status, $actor, 'Purchase order item removed.');
+            $this->recordAudit($actor, 'REMOVE_ITEM', $purchaseOrder);
+        });
+    }
+
     private function recomputeTotalAmount(PurchaseOrder $purchaseOrder): void
     {
         $total = (float) $purchaseOrder->items()->sum('total_price');

@@ -379,6 +379,9 @@ Route::middleware(['auth', 'twofactor', 'must-change-password'])->group(function
                 Route::put('/{purchase_order}/items/{purchaseOrderItem}', [ProcurementPurchaseOrderItemController::class, 'update'])
                     ->middleware('can:procurement.purchase-order.update,purchase_order')
                     ->name('items.update');
+                Route::delete('/{purchase_order}/items/{purchaseOrderItem}', [ProcurementPurchaseOrderItemController::class, 'destroy'])
+                    ->middleware('can:procurement.purchase-order.update,purchase_order')
+                    ->name('items.destroy');
             });
 
             Route::prefix('alerts')->name('alerts.')->group(function () {

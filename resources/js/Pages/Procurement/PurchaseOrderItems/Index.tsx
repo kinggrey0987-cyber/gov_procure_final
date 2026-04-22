@@ -10,6 +10,7 @@ type PurchaseOrder = {
 
 type PurchaseOrderItem = {
     purchase_order_item_id: number;
+    supply_request_item_id: number;
     item_id: number;
     item_name_snapshot: string;
     quantity_ordered: string;
@@ -46,6 +47,8 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
     });
 
     const selectedSource = sourceItems.find((row) => row.supply_request_item_id === form.data.supply_request_item_id) ?? null;
+    const encodedSourceIds = new Set(items.data.map((row) => Number(row.supply_request_item_id)));
+    const isDuplicateSelection = form.data.supply_request_item_id > 0 && encodedSourceIds.has(Number(form.data.supply_request_item_id));
 
     const applySourceItem = (supplyRequestItemId: number) => {
         const row = sourceItems.find((item) => item.supply_request_item_id === supplyRequestItemId);
@@ -164,13 +167,24 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                             className="rounded border-gray-300 text-sm"
                             required
                         />
-                        <button type="submit" className="rounded bg-indigo-600 px-4 py-2 text-sm text-white">
+                        <button type="submit" disabled={isDuplicateSelection || form.processing} className="rounded bg-indigo-600 px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60">
                             Add Item
                         </button>
+                        {isDuplicateSelection ? (
+                            <button type="button" className="rounded border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700">
+                                Duplicate Not Allowed
+                            </button>
+                        ) : null}
                         {selectedSource ? (
                             <p className="text-xs text-slate-500 md:col-span-4">
                                 Selected source item #{selectedSource.supply_request_item_id} · default unit: {selectedSource.default_unit || '-'}
                             </p>
+                        ) : null}
+                        {form.errors.supply_request_item_id ? (
+                            <p className="text-xs font-semibold text-rose-600 md:col-span-4">{form.errors.supply_request_item_id}</p>
+                        ) : null}
+                        {isDuplicateSelection ? (
+                            <p className="text-xs font-semibold text-amber-700 md:col-span-4">This source request line is already encoded below. Remove the old line first or update it instead of adding again.</p>
                         ) : null}
                     </form>
 
@@ -184,6 +198,7 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                                     <th className="px-3 py-2 text-left">Unit</th>
                                     <th className="px-3 py-2 text-left">Unit Price</th>
                                     <th className="px-3 py-2 text-left">Total Price</th>
+                                    <th className="px-3 py-2 text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -195,11 +210,26 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                                         <td className="px-3 py-2">{row.unit}</td>
                                         <td className="px-3 py-2">{row.unit_price}</td>
                                         <td className="px-3 py-2">{row.total_price}</td>
+                                        <td className="px-3 py-2 text-right">
+                                            <Link
+                                                href={route('procurement.purchase-orders.items.destroy', [purchaseOrder.purchase_order_id, row.purchase_order_item_id])}
+                                                method="delete"
+                                                as="button"
+                                                onClick={(event) => {
+                                                    if (!window.confirm('Remove this item line from the purchase order?')) {
+                                                        event.preventDefault();
+                                                    }
+                                                }}
+                                                className="rounded border border-rose-300 px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50"
+                                            >
+                                                Remove
+                                            </Link>
+                                        </td>
                                     </tr>
                                 ))}
                                 {items.data.length === 0 ? (
                                     <tr className="border-t">
-                                        <td colSpan={6} className="px-3 py-8 text-center text-slate-500">No purchase order items recorded yet.</td>
+                                        <td colSpan={7} className="px-3 py-8 text-center text-slate-500">No purchase order items recorded yet.</td>
                                     </tr>
                                 ) : null}
                             </tbody>

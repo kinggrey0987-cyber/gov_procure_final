@@ -67,4 +67,14 @@ class PurchaseOrderItemController extends Controller
         return redirect()->route('procurement.purchase-orders.items.index', $purchaseOrder->purchase_order_id)
             ->with('success', 'Purchase order item updated successfully.');
     }
+
+    public function destroy(Request $request, PurchaseOrder $purchaseOrder, PurchaseOrderItem $purchaseOrderItem): RedirectResponse
+    {
+        abort_unless($request->user()?->can('procurement.purchase-order.update', $purchaseOrder), 403);
+
+        $this->service->removeItem($purchaseOrder, $purchaseOrderItem, $request->user());
+
+        return redirect()->route('procurement.purchase-orders.items.index', $purchaseOrder->purchase_order_id)
+            ->with('success', 'Purchase order item removed successfully.');
+    }
 }
