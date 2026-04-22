@@ -76,7 +76,6 @@ class DistributionRecordController
         $inventoryBackedRows = SupplyRequest::query()
             ->submitted()
             ->whereDoesntHave('distributionRecords')
-            ->whereDoesntHave('purchaseRequests')
             ->with(['office', 'items.item.inventory'])
             ->latest('supply_request_id')
             ->get()
@@ -150,7 +149,14 @@ class DistributionRecordController
 
         $hasPurchaseRequest = $request->purchaseRequests->isNotEmpty();
 
-        if ($hasPurchaseRequest) {
+        $shortageTotal = 0.0;
+        foreach ($request->items as $item) {
+            $requested = (float) $item->quantity_requested;
+            $available = (float) ($item->item?->inventory?->available_stock ?? 0);
+            $shortageTotal += max($requested - $available, 0);
+        }
+
+        if ($hasPurchaseRequest && $shortageTotal > 0) {
             $hasVerifiedDelivery = Delivery::query()
                 ->verified()
                 ->whereHas('purchaseOrder', function ($query) use ($request): void {
@@ -164,13 +170,6 @@ class DistributionRecordController
             }
 
             return null;
-        }
-
-        $shortageTotal = 0.0;
-        foreach ($request->items as $item) {
-            $requested = (float) $item->quantity_requested;
-            $available = (float) ($item->item?->inventory?->available_stock ?? 0);
-            $shortageTotal += max($requested - $available, 0);
         }
 
         if ($shortageTotal > 0) {

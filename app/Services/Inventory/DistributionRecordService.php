@@ -240,14 +240,27 @@ class DistributionRecordService
 
         $isProcurementBacked = $record->supplyRequest->purchaseRequests->isNotEmpty();
         $hasDeliveryContext = $record->delivery_id !== null;
+        $shortageTotal = 0.0;
 
-        if ($isProcurementBacked && ! $hasDeliveryContext) {
+        foreach ($record->supplyRequest->items as $item) {
+            $requested = (float) $item->quantity_requested;
+            $available = (float) ($item->item?->inventory?->available_stock ?? 0);
+            $shortageTotal += max($requested - $available, 0);
+        }
+
+        if (! $hasDeliveryContext && $isProcurementBacked && $shortageTotal > 0) {
             throw ValidationException::withMessages([
                 'delivery_id' => 'Procurement-backed requests require a verified delivery context before distribution release.',
             ]);
         }
 
-        if (! $isProcurementBacked && ! $hasDeliveryContext) {
+        if (! $hasDeliveryContext) {
+            if ($shortageTotal > 0) {
+                throw ValidationException::withMessages([
+                    'supply_request_id' => 'This request has stock shortages and must be queued for procurement instead of direct inventory release.',
+                ]);
+            }
+
             if ((int) $record->supplyRequest->office_id !== (int) $record->office_id) {
                 throw ValidationException::withMessages([
                     'office_id' => 'Distribution office must match the linked supply request office.',
