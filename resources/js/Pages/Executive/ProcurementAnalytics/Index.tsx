@@ -2,7 +2,7 @@ import { DonutChart, ExecutiveChartCard, HorizontalBarChart, TrendGroupedBarChar
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { downloadSectionAsPdfById } from '@/lib/printSection';
 import { Head, router } from '@inertiajs/react';
-import { FormEvent, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 type OfficeOption = { id: number; name: string };
 type BreakdownRow = { status: string; total: number };
@@ -84,10 +84,34 @@ export default function ProcurementAnalyticsIndex({
         to_date: filters.to_date ?? '',
     });
 
-    const onSubmit = (event: FormEvent) => {
-        event.preventDefault();
-        router.get(route('executive.procurement-analytics'), form, { preserveState: true, replace: true });
-    };
+    useEffect(() => {
+        setForm({
+            office_id: filters.office_id ? String(filters.office_id) : '',
+            pr_status: filters.pr_status ?? '',
+            po_status: filters.po_status ?? '',
+            from_date: filters.from_date ?? '',
+            to_date: filters.to_date ?? '',
+        });
+    }, [filters.from_date, filters.office_id, filters.po_status, filters.pr_status, filters.to_date]);
+
+    const activeFilters = useMemo(
+        () => ({
+            office_id: form.office_id,
+            pr_status: form.pr_status,
+            po_status: form.po_status,
+            from_date: form.from_date,
+            to_date: form.to_date,
+        }),
+        [form.from_date, form.office_id, form.po_status, form.pr_status, form.to_date],
+    );
+
+    useEffect(() => {
+        router.get(route('executive.procurement-analytics'), activeFilters, {
+            preserveState: true,
+            replace: true,
+            only: ['filters', 'filter_options', 'totals', 'status_breakdown', 'monthly_trends', 'office_comparison', 'recent'],
+        });
+    }, [activeFilters]);
 
     const monthlyMerged = mergeTrend(monthly_trends.purchase_requests, monthly_trends.purchase_orders);
     const officeValueBreakdown = office_comparison
@@ -152,7 +176,7 @@ export default function ProcurementAnalyticsIndex({
                 </section>
 
                 <section className="rounded-2xl border border-red-200 bg-white p-5 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
-                    <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3">
+                    <div className="flex flex-wrap items-end gap-3">
                         <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
                             <select
                                 className="h-10 rounded-lg border-slate-300 text-sm"
@@ -215,11 +239,8 @@ export default function ProcurementAnalyticsIndex({
                             >
                                 Reset
                             </button>
-                            <button type="submit" className="h-10 rounded-lg bg-red-700 px-4 text-sm font-semibold text-white shadow-[0_8px_18px_rgba(185,28,28,0.2)] hover:bg-red-800">
-                                Apply
-                            </button>
                         </div>
-                    </form>
+                    </div>
                 </section>
 
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

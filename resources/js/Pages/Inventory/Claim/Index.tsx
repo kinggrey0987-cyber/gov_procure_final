@@ -1,5 +1,8 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link } from '@inertiajs/react';
+import PaginationNav from '@/Components/PaginationNav';
+import useDebouncedValue from '@/hooks/useDebouncedValue';
+import { Head, Link, router } from '@inertiajs/react';
+import { useEffect, useMemo, useState } from 'react';
 
 type ClaimRow = {
     claims_id: number;
@@ -13,10 +16,40 @@ type ClaimRow = {
 type Props = {
     claims: {
         data: ClaimRow[];
+        links: Array<{ url: string | null; label: string; active: boolean }>;
+    };
+    filters?: {
+        status?: string;
+        search?: string;
     };
 };
 
-export default function ClaimIndex({ claims }: Props) {
+export default function ClaimIndex({ claims, filters }: Props) {
+    const [status, setStatus] = useState(filters?.status ?? '');
+    const [search, setSearch] = useState(filters?.search ?? '');
+    const debouncedSearch = useDebouncedValue(search, 450);
+
+    useEffect(() => {
+        setStatus(filters?.status ?? '');
+        setSearch(filters?.search ?? '');
+    }, [filters?.search, filters?.status]);
+
+    const activeFilters = useMemo(
+        () => ({
+            status,
+            search: debouncedSearch,
+        }),
+        [status, debouncedSearch],
+    );
+
+    useEffect(() => {
+        router.get(route('inventory.claims.index'), activeFilters, {
+            preserveState: true,
+            replace: true,
+            only: ['claims', 'filters'],
+        });
+    }, [activeFilters]);
+
     return (
         <AuthenticatedLayout
             header={
@@ -30,6 +63,28 @@ export default function ClaimIndex({ claims }: Props) {
         >
             <Head title="Claims" />
             <div className="py-8">
+                <div className="mb-4 grid gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm md:grid-cols-3">
+                    <input
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                        value={search}
+                        placeholder="Search claim code, type, office"
+                        onChange={(event) => setSearch(event.target.value)}
+                    />
+                    <input
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                        value={status}
+                        placeholder="Status"
+                        onChange={(event) => setStatus(event.target.value)}
+                    />
+                    <button
+                        type="button"
+                        onClick={() => router.get(route('inventory.claims.index'))}
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                        Reset
+                    </button>
+                </div>
+
                 <div className="mb-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                     <p className="text-sm text-slate-600">
                         Use this page only for exception handling after release: damaged, missing, or disputed distributed supplies.
@@ -65,6 +120,10 @@ export default function ClaimIndex({ claims }: Props) {
                             ))}
                         </tbody>
                     </table>
+                </div>
+
+                <div className="mt-4">
+                    <PaginationNav links={claims.links} />
                 </div>
             </div>
         </AuthenticatedLayout>

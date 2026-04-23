@@ -1,6 +1,8 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import { FormEvent } from 'react';
+import PaginationNav from '@/Components/PaginationNav';
+import useDebouncedValue from '@/hooks/useDebouncedValue';
+import { Head, Link, router } from '@inertiajs/react';
+import { useEffect, useMemo, useState } from 'react';
 
 type PurchaseOrderRow = {
     purchase_order_id: number;
@@ -36,19 +38,30 @@ type Props = {
 };
 
 export default function PurchaseOrdersIndex({ purchaseOrders, filters }: Props) {
-    const filterForm = useForm({
-        status: filters?.status ?? '',
-        search: filters?.search ?? '',
-    });
+    const [status, setStatus] = useState(filters?.status ?? '');
+    const [search, setSearch] = useState(filters?.search ?? '');
+    const debouncedSearch = useDebouncedValue(search, 450);
 
-    const submitFilters = (event: FormEvent) => {
-        event.preventDefault();
+    useEffect(() => {
+        setStatus(filters?.status ?? '');
+        setSearch(filters?.search ?? '');
+    }, [filters?.search, filters?.status]);
 
-        router.get(route('procurement.purchase-orders.index'), filterForm.data, {
+    const activeFilters = useMemo(
+        () => ({
+            status,
+            search: debouncedSearch,
+        }),
+        [status, debouncedSearch],
+    );
+
+    useEffect(() => {
+        router.get(route('procurement.purchase-orders.index'), activeFilters, {
             preserveState: true,
             replace: true,
+            only: ['purchaseOrders', 'filters'],
         });
-    };
+    }, [activeFilters]);
 
     const resetFilters = () => {
         router.get(route('procurement.purchase-orders.index'));
@@ -67,10 +80,10 @@ export default function PurchaseOrdersIndex({ purchaseOrders, filters }: Props) 
                 </section>
 
                 <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <form onSubmit={submitFilters} className="grid gap-3 md:grid-cols-5">
+                    <div className="grid gap-3 md:grid-cols-5">
                         <select
-                            value={filterForm.data.status}
-                            onChange={(event) => filterForm.setData('status', event.target.value)}
+                            value={status}
+                            onChange={(event) => setStatus(event.target.value)}
                             className="rounded-lg border-slate-300 text-sm"
                         >
                             <option value="">All Statuses</option>
@@ -81,23 +94,20 @@ export default function PurchaseOrdersIndex({ purchaseOrders, filters }: Props) 
 
                         <input
                             type="text"
-                            value={filterForm.data.search}
-                            onChange={(event) => filterForm.setData('search', event.target.value)}
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
                             placeholder="Search PO number, supplier, office"
                             className="md:col-span-2 rounded-lg border-slate-300 text-sm"
                         />
 
-                        <button type="submit" className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
-                            Apply
-                        </button>
                         <button
                             type="button"
                             onClick={resetFilters}
-                            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 md:col-start-5"
                         >
                             Reset
                         </button>
-                    </form>
+                    </div>
                 </section>
 
                 <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -165,16 +175,7 @@ export default function PurchaseOrdersIndex({ purchaseOrders, filters }: Props) 
                     </table>
                 </section>
 
-                <div className="flex flex-wrap gap-2">
-                    {purchaseOrders.links.map((link, index) => (
-                        <Link
-                            key={`${link.label}-${index}`}
-                            href={link.url || '#'}
-                            className={`rounded-md px-3 py-2 text-sm ${link.active ? 'bg-red-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'} ${!link.url ? 'pointer-events-none opacity-50' : ''}`}
-                            dangerouslySetInnerHTML={{ __html: link.label }}
-                        />
-                    ))}
-                </div>
+                <PaginationNav links={purchaseOrders.links} />
             </div>
         </AuthenticatedLayout>
     );

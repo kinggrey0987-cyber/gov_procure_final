@@ -24,9 +24,12 @@ class ClaimController
     ) {
     }
 
-    public function index(): Response
+    public function index(Request $request): Response
     {
         abort_unless(auth()->user()->can('claim.view-any'), 403);
+
+        $status = strtoupper(trim((string) $request->input('status', '')));
+        $search = trim((string) $request->input('search', ''));
 
         $query = Claim::query()->with(['distributionRecord', 'claimant', 'office']);
 
@@ -34,10 +37,25 @@ class ClaimController
             $query->where('office_id', (int) auth()->user()->office_id);
         }
 
-        $claims = $query->orderByDesc('created_at')->paginate(20);
+        $claims = $query
+            ->when($status !== '', fn ($builder) => $builder->where('status', $status))
+            ->when($search !== '', function ($builder) use ($search): void {
+                $builder->where(function ($nested) use ($search): void {
+                    $nested->where('claim_code', 'like', '%'.$search.'%')
+                        ->orWhere('claim_type', 'like', '%'.$search.'%')
+                        ->orWhereHas('office', fn ($officeQuery) => $officeQuery->where('name', 'like', '%'.$search.'%'));
+                });
+            })
+            ->orderByDesc('created_at')
+            ->paginate(20)
+            ->withQueryString();
 
         return Inertia::render('Inventory/Claim/Index', [
             'claims' => $claims,
+            'filters' => [
+                'status' => $status,
+                'search' => $search,
+            ],
         ]);
     }
 

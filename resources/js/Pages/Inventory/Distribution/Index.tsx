@@ -1,6 +1,8 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
+import PaginationNav from '@/Components/PaginationNav';
+import useDebouncedValue from '@/hooks/useDebouncedValue';
+import { Head, Link, router } from '@inertiajs/react';
+import { useEffect, useMemo, useState } from 'react';
 
 type RecordRow = {
     distribution_record_id: number;
@@ -17,18 +19,45 @@ type RecordRow = {
 type Props = {
     records: {
         data: RecordRow[];
+        links: Array<{ url: string | null; label: string; active: boolean }>;
+    };
+    filters?: {
+        status?: string;
+        search?: string;
     };
 };
 
-export default function DistributionIndex({ records }: Props) {
-    const [search, setSearch] = useState('');
-    const [statusFilter, setStatusFilter] = useState<'ALL' | 'DRAFT' | 'RELEASED' | 'RECEIVED'>('ALL');
+export default function DistributionIndex({ records, filters }: Props) {
+    const [search, setSearch] = useState(filters?.search ?? '');
+    const [statusFilter, setStatusFilter] = useState(filters?.status ?? '');
+    const debouncedSearch = useDebouncedValue(search, 450);
+
+    useEffect(() => {
+        setSearch(filters?.search ?? '');
+        setStatusFilter(filters?.status ?? '');
+    }, [filters?.search, filters?.status]);
+
+    const activeFilters = useMemo(
+        () => ({
+            status: statusFilter,
+            search: debouncedSearch,
+        }),
+        [statusFilter, debouncedSearch],
+    );
+
+    useEffect(() => {
+        router.get(route('inventory.distribution-records.index'), activeFilters, {
+            preserveState: true,
+            replace: true,
+            only: ['records', 'filters'],
+        });
+    }, [activeFilters]);
 
     const filteredRecords = useMemo(() => {
-        const keyword = search.trim().toLowerCase();
+        const keyword = debouncedSearch.trim().toLowerCase();
 
         return records.data.filter((row) => {
-            const matchesStatus = statusFilter === 'ALL' || row.status === statusFilter;
+            const matchesStatus = statusFilter === '' || row.status === statusFilter;
 
             if (!matchesStatus) {
                 return false;
@@ -49,7 +78,7 @@ export default function DistributionIndex({ records }: Props) {
 
             return haystack.includes(keyword);
         });
-    }, [records.data, search, statusFilter]);
+    }, [records.data, debouncedSearch, statusFilter]);
 
     return (
         <AuthenticatedLayout
@@ -76,10 +105,10 @@ export default function DistributionIndex({ records }: Props) {
                             <label htmlFor="distribution-search" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 Search
                             </label>
-                            <input
-                                id="distribution-search"
-                                type="text"
-                                value={search}
+                                <input
+                                    id="distribution-search"
+                                    type="text"
+                                    value={search}
                                 onChange={(event) => setSearch(event.target.value)}
                                 placeholder="Code, office request, office, status"
                                 className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
@@ -93,10 +122,10 @@ export default function DistributionIndex({ records }: Props) {
                             <select
                                 id="distribution-status"
                                 value={statusFilter}
-                                onChange={(event) => setStatusFilter(event.target.value as 'ALL' | 'DRAFT' | 'RELEASED' | 'RECEIVED')}
+                                onChange={(event) => setStatusFilter(event.target.value)}
                                 className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                             >
-                                <option value="ALL">All statuses</option>
+                                <option value="">All statuses</option>
                                 <option value="DRAFT">Draft</option>
                                 <option value="RELEASED">Released</option>
                                 <option value="RECEIVED">Received</option>
@@ -107,7 +136,7 @@ export default function DistributionIndex({ records }: Props) {
                             type="button"
                             onClick={() => {
                                 setSearch('');
-                                setStatusFilter('ALL');
+                                setStatusFilter('');
                             }}
                             className="inline-flex h-[42px] items-center justify-center rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                         >
@@ -164,6 +193,8 @@ export default function DistributionIndex({ records }: Props) {
                         </tbody>
                     </table>
                 </div>
+
+                <PaginationNav links={records.links} />
             </div>
         </AuthenticatedLayout>
     );

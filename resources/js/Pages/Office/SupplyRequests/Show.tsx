@@ -76,6 +76,7 @@ export default function SupplyRequestShow({
     approvalHistory,
 }: Props) {
     const [reportIssueOpen, setReportIssueOpen] = useState(false);
+    const [activeTab, setActiveTab] = useState<'overview' | 'items' | 'status' | 'related' | 'notes'>('overview');
 
     const overAllocationCount = useMemo(() => {
         return supplyRequest.items.filter((item) => item.exceeds_ppmp_allocation).length;
@@ -130,7 +131,30 @@ export default function SupplyRequestShow({
             <Head title="Request Details" />
 
             <div className="space-y-6 py-4">
-                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <section className="rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
+                    <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+                        {[
+                            { key: 'overview', label: 'Overview' },
+                            { key: 'items', label: 'Items' },
+                            { key: 'status', label: 'Status History' },
+                            { key: 'related', label: 'Related Records' },
+                            { key: 'notes', label: 'Notes/Attachments' },
+                        ].map((tab) => (
+                            <button
+                                key={tab.key}
+                                type="button"
+                                onClick={() => setActiveTab(tab.key as 'overview' | 'items' | 'status' | 'related' | 'notes')}
+                                className={`rounded-lg px-3 py-2 text-xs font-semibold md:text-sm ${activeTab === tab.key ? 'bg-red-700 text-white' : 'bg-red-50 text-red-700 hover:bg-red-100'}`}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+                </section>
+
+                {activeTab === 'overview' ? (
+                    <>
+                        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                         <div>
                             <p className="text-sm font-medium text-slate-500">Request ID</p>
@@ -150,7 +174,39 @@ export default function SupplyRequestShow({
                     </div>
                 </section>
 
-                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                            <div className="flex flex-wrap gap-3">
+                                <Link
+                                    href={route('office.supply-requests.index')}
+                                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                                >
+                                    Back to Tracking
+                                </Link>
+
+                                {canEdit ? (
+                                    <Link
+                                        href={route('office.supply-requests.edit', supplyRequest.supply_request_id)}
+                                        className="rounded-lg border border-blue-300 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+                                    >
+                                        Edit Request
+                                    </Link>
+                                ) : null}
+
+                                {canSubmit ? (
+                                    <button
+                                        onClick={handleSubmit}
+                                        className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+                                    >
+                                        Submit Request
+                                    </button>
+                                ) : null}
+                            </div>
+                        </section>
+                    </>
+                ) : null}
+
+                {activeTab === 'status' ? (
+                    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                     <h4 className="text-xl font-semibold text-slate-800">Processing Timeline</h4>
                     <p className="mt-1 text-sm text-slate-600">
                         Track each stage and responsible office. Route: {supplyRequest.processing_timeline.mode === 'PROCUREMENT' ? 'Procurement Required' : 'Direct Stock Release'}
@@ -175,9 +231,11 @@ export default function SupplyRequestShow({
                             Request was rejected in validation/procurement. Please review remarks in status history.
                         </div>
                     ) : null}
-                </section>
+                    </section>
+                ) : null}
 
-                <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                {activeTab === 'items' ? (
+                    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="border-b border-slate-200 px-6 py-4">
                         <h4 className="text-xl font-semibold text-slate-800">Requested Items</h4>
                         <p className="mt-1 text-sm text-slate-600">Pricing here is planning context only via PPMP allocation. Actual procurement prices are recorded on purchase orders.</p>
@@ -229,48 +287,51 @@ export default function SupplyRequestShow({
                             </table>
                         </div>
                     )}
-                </section>
+                    </section>
+                ) : null}
 
-                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <div className="flex flex-wrap gap-3">
-                        <Link
-                            href={route('office.supply-requests.index')}
-                            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                        >
-                            Back to Tracking
-                        </Link>
+                {activeTab === 'related' ? (
+                    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <h4 className="text-xl font-semibold text-slate-800">Related Records</h4>
+                        {distributionRecords.length === 0 ? (
+                            <p className="mt-2 text-sm text-slate-600">No related distribution records yet.</p>
+                        ) : (
+                            <div className="mt-3 space-y-2">
+                                {distributionRecords.map((record) => (
+                                    <div key={record.distribution_record_id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2">
+                                        <p className="text-sm font-medium text-slate-800">Distribution #{record.distribution_record_id}</p>
+                                        <p className="text-xs text-slate-600">{record.status.replaceAll('_', ' ')}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </section>
+                ) : null}
 
-                        {canEdit ? (
-                            <Link
-                                href={route('office.supply-requests.edit', supplyRequest.supply_request_id)}
-                                className="rounded-lg border border-blue-300 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
-                            >
-                                Edit Request
-                            </Link>
-                        ) : null}
-
-                        {canSubmit ? (
-                            <button
-                                onClick={handleSubmit}
-                                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
-                            >
-                                Submit Request
-                            </button>
-                        ) : null}
-
+                {activeTab === 'notes' ? (
+                    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <h4 className="text-xl font-semibold text-slate-800">Notes / Attachments</h4>
+                        <p className="mt-2 text-sm text-slate-600">Review notes and issue reporting are available here for released/completed requests.</p>
+                        <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                            <p><span className="font-semibold">Review Notes:</span> {supplyRequest.review_notes ?? '-'}</p>
+                        </div>
                         {isReleasedOrCompleted ? (
                             <button
                                 onClick={() => setReportIssueOpen(true)}
-                                className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600"
+                                className="mt-4 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600"
                             >
                                 Report Issue
                             </button>
                         ) : null}
-                    </div>
-                </section>
+                    </section>
+                ) : null}
 
-                <StatusHistoryTimeline entries={statusHistory} />
-                <ApprovalHistoryTimeline entries={approvalHistory} />
+                {activeTab === 'status' ? (
+                    <>
+                        <StatusHistoryTimeline entries={statusHistory} />
+                        <ApprovalHistoryTimeline entries={approvalHistory} />
+                    </>
+                ) : null}
             </div>
 
             {reportIssueOpen ? (

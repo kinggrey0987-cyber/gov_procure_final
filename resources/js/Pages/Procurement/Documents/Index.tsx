@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import PaginationNav from '@/Components/PaginationNav';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { FormEvent, useMemo, useState } from 'react';
 
@@ -357,23 +358,8 @@ export default function ProcurementDocumentsIndex({
                         )}
 
                         {documents.links?.length > 3 && (
-                            <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 px-6 py-4">
-                                {documents.links.map((link, index) => (
-                                    <Link
-                                        key={`${link.label}-${index}`}
-                                        href={link.url ?? '#'}
-                                        preserveState
-                                        preserveScroll
-                                        className={`rounded px-3 py-1 text-xs font-semibold ${
-                                            link.active
-                                                ? 'bg-red-700 text-white'
-                                                : link.url
-                                                    ? 'border border-slate-300 text-slate-700 hover:bg-slate-50'
-                                                    : 'cursor-not-allowed border border-slate-200 text-slate-400'
-                                        }`}
-                                        dangerouslySetInnerHTML={{ __html: link.label }}
-                                    />
-                                ))}
+                            <div className="border-t border-slate-200 px-6 py-4">
+                                <PaginationNav links={documents.links} />
                             </div>
                         )}
                     </section>

@@ -21,19 +21,36 @@ class DistributionRecordController
     {
     }
 
-    public function index(): Response
+    public function index(Request $request): Response
     {
         abort_unless(auth()->user()->can('distribution.view-any'), 403);
+
+        $status = strtoupper(trim((string) $request->input('status', '')));
+        $search = trim((string) $request->input('search', ''));
 
         $records = DistributionRecord::query()
             ->with(['supplyRequest', 'delivery', 'office', 'preparer', 'receiver'])
             ->withCount(['items', 'claims'])
             ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
+            ->when($status !== '', fn ($query) => $query->where('status', $status))
+            ->when($search !== '', function ($query) use ($search): void {
+                $query->where(function ($nested) use ($search): void {
+                    $nested->where('distribution_code', 'like', '%'.$search.'%')
+                        ->orWhere('status', 'like', '%'.$search.'%')
+                        ->orWhereHas('supplyRequest', fn ($supplyRequestQuery) => $supplyRequestQuery->where('request_code', 'like', '%'.$search.'%'))
+                        ->orWhereHas('office', fn ($officeQuery) => $officeQuery->where('name', 'like', '%'.$search.'%'));
+                });
+            })
             ->orderByDesc('created_at')
-            ->paginate(20);
+            ->paginate(20)
+            ->withQueryString();
 
         return Inertia::render('Inventory/Distribution/Index', [
             'records' => $records,
+            'filters' => [
+                'status' => $status,
+                'search' => $search,
+            ],
         ]);
     }
 

@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import PaginationNav from '@/Components/PaginationNav';
 import useSmartRefresh from '@/hooks/useSmartRefresh';
 import { Head, Link, router } from '@inertiajs/react';
 import { FormEvent, useEffect, useState } from 'react';
@@ -139,7 +140,7 @@ export default function ItemCatalogIndex({ items, categories, filters, canManage
                                     <td className="px-4 py-3 text-slate-700">{item.default_unit || '-'}</td>
                                     <td className="px-4 py-3">
                                         <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${item.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700'}`}>
-                                            {item.status}
+                                            {item.status === 'active' ? 'Active' : 'Inactive'}
                                         </span>
                                     </td>
                                     <td className="px-4 py-3 text-right">
@@ -176,15 +177,8 @@ export default function ItemCatalogIndex({ items, categories, filters, canManage
                     </table>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                    {items.links.map((link, index) => (
-                        <Link
-                            key={`${link.label}-${index}`}
-                            href={link.url || '#'}
-                            className={`rounded-md px-3 py-2 text-sm ${link.active ? 'bg-red-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'} ${!link.url ? 'pointer-events-none opacity-50' : ''}`}
-                            dangerouslySetInnerHTML={{ __html: link.label }}
-                        />
-                    ))}
+                <div>
+                    <PaginationNav links={items.links} />
                 </div>
             </div>
         </AuthenticatedLayout>

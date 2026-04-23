@@ -2,7 +2,7 @@ import { ExecutiveChartCard, HorizontalBarChart } from '@/Components/Executive/C
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { downloadSectionAsPdfById } from '@/lib/printSection';
 import { Head, Link, router } from '@inertiajs/react';
-import { FormEvent, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 type DisclosureRow = {
     disclosure_id: number;
@@ -78,17 +78,44 @@ export default function TransparencyMonitoringIndex({
         .sort((a, b) => b.value - a.value)
         .slice(0, 6);
 
-    const onSubmit = (event: FormEvent) => {
-        event.preventDefault();
-        router.get(
-            route('executive.transparency-monitoring'),
-            {
-                ...form,
-                tab: activeTab,
-            },
-            { preserveState: true, replace: true },
-        );
-    };
+    useEffect(() => {
+        setForm({
+            status: filters.status ?? '',
+            type: filters.type ?? '',
+            from_date: filters.from_date ?? '',
+            to_date: filters.to_date ?? '',
+        });
+    }, [filters.from_date, filters.status, filters.to_date, filters.type]);
+
+    const activeFilters = useMemo(
+        () => ({
+            status: form.status,
+            type: form.type,
+            from_date: form.from_date,
+            to_date: form.to_date,
+            tab: activeTab,
+        }),
+        [activeTab, form.from_date, form.status, form.to_date, form.type],
+    );
+
+    useEffect(() => {
+        router.get(route('executive.transparency-monitoring'), activeFilters, {
+            preserveState: true,
+            replace: true,
+            only: [
+                'filters',
+                'filter_options',
+                'totals',
+                'status_breakdown',
+                'type_breakdown',
+                'office_publication_mix',
+                'monthly_publication_trend',
+                'recent_disclosures',
+                'published_disclosures',
+                'draft_disclosures',
+            ],
+        });
+    }, [activeFilters]);
 
     const switchTab = (tab: 'overview' | 'published' | 'drafts') => {
         router.get(
@@ -153,7 +180,7 @@ export default function TransparencyMonitoringIndex({
                 </section>
 
                 <section className="rounded-2xl border border-red-200 bg-white p-5 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
-                    <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3">
+                    <div className="flex flex-wrap items-end gap-3">
                         <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                             <select
                                 className="h-10 rounded-lg border-slate-300 text-sm"
@@ -204,11 +231,8 @@ export default function TransparencyMonitoringIndex({
                             >
                                 Reset
                             </button>
-                            <button type="submit" className="h-10 rounded-lg bg-red-700 px-4 text-sm font-semibold text-white hover:bg-red-800">
-                                Apply
-                            </button>
                         </div>
-                    </form>
+                    </div>
                 </section>
 
                 <div className="grid gap-4 sm:grid-cols-3">

@@ -1,5 +1,8 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import PaginationNav from '@/Components/PaginationNav';
+import useDebouncedValue from '@/hooks/useDebouncedValue';
 import { Head, Link, router } from '@inertiajs/react';
+import { useEffect, useMemo, useState } from 'react';
 
 type AnomalyRow = {
     anomaly_id: number;
@@ -10,32 +13,79 @@ type AnomalyRow = {
 };
 
 type Props = {
-    anomalies: { data: AnomalyRow[] };
-    filters: { status?: string; severity?: string; anomaly_type?: string };
+    anomalies: {
+        data: AnomalyRow[];
+        links: Array<{ url: string | null; label: string; active: boolean }>;
+    };
+    filters: { status?: string; severity?: string; anomaly_type?: string; search?: string };
 };
 
 export default function ExecutiveAnomalyIndex({ anomalies, filters }: Props) {
+    const [status, setStatus] = useState(filters.status ?? '');
+    const [severity, setSeverity] = useState(filters.severity ?? '');
+    const [anomalyType, setAnomalyType] = useState(filters.anomaly_type ?? '');
+    const [search, setSearch] = useState(filters.search ?? '');
+
+    const debouncedSearch = useDebouncedValue(search, 450);
+
+    useEffect(() => {
+        setStatus(filters.status ?? '');
+        setSeverity(filters.severity ?? '');
+        setAnomalyType(filters.anomaly_type ?? '');
+        setSearch(filters.search ?? '');
+    }, [filters.anomaly_type, filters.search, filters.severity, filters.status]);
+
+    const activeFilters = useMemo(
+        () => ({
+            status,
+            severity,
+            anomaly_type: anomalyType,
+            search: debouncedSearch,
+        }),
+        [status, severity, anomalyType, debouncedSearch],
+    );
+
+    useEffect(() => {
+        router.get(route('executive.anomalies.index'), activeFilters, {
+            preserveState: true,
+            replace: true,
+            only: ['anomalies', 'filters'],
+        });
+    }, [activeFilters]);
+
     return (
         <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Executive Anomalies</h2>}>
             <Head title="Executive Anomalies" />
 
             <div className="py-10">
                 <div className="mx-auto max-w-6xl space-y-4 px-4 sm:px-6 lg:px-8">
-                    <div className="flex flex-wrap gap-2">
+                    <div className="grid gap-2 rounded-xl border bg-white p-3 md:grid-cols-4">
                         <input
                             className="rounded border px-3 py-2 text-sm"
-                            defaultValue={filters.status ?? ''}
+                            value={status}
                             placeholder="Status"
-                            onBlur={(e) => router.get(route('executive.anomalies.index'), { ...filters, status: e.target.value }, { preserveState: true })}
+                            onChange={(e) => setStatus(e.target.value)}
                         />
                         <input
                             className="rounded border px-3 py-2 text-sm"
-                            defaultValue={filters.severity ?? ''}
+                            value={severity}
                             placeholder="Severity"
-                            onBlur={(e) => router.get(route('executive.anomalies.index'), { ...filters, severity: e.target.value }, { preserveState: true })}
+                            onChange={(e) => setSeverity(e.target.value)}
+                        />
+                        <input
+                            className="rounded border px-3 py-2 text-sm"
+                            value={anomalyType}
+                            placeholder="Anomaly type"
+                            onChange={(e) => setAnomalyType(e.target.value)}
+                        />
+                        <input
+                            className="rounded border px-3 py-2 text-sm"
+                            value={search}
+                            placeholder="Search office/type/status"
+                            onChange={(e) => setSearch(e.target.value)}
                         />
                         <button
-                            className="rounded bg-indigo-600 px-4 py-2 text-sm text-white"
+                            className="rounded bg-indigo-600 px-4 py-2 text-sm text-white md:col-span-4 md:justify-self-start"
                             onClick={() => router.post(route('executive.anomalies.detect'))}
                         >
                             Run Detection
@@ -70,6 +120,8 @@ export default function ExecutiveAnomalyIndex({ anomalies, filters }: Props) {
                             </tbody>
                         </table>
                     </div>
+
+                    <PaginationNav links={anomalies.links} />
                 </div>
             </div>
         </AuthenticatedLayout>

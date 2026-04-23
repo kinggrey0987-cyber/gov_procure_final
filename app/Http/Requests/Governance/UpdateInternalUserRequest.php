@@ -13,7 +13,6 @@ use Illuminate\Validation\Validator;
 class UpdateInternalUserRequest extends FormRequest
 {
     private const TECHNICAL_OFFICE_CODE = 'TECH_ADMIN';
-    private const GMAIL_LIKE_PATTERN = '/^[a-z0-9._%+-]+@gmail\.com$/i';
 
     public function authorize(): bool
     {
@@ -32,7 +31,6 @@ class UpdateInternalUserRequest extends FormRequest
                 'string',
                 'email',
                 'max:255',
-                'regex:'.self::GMAIL_LIKE_PATTERN,
                 Rule::unique('users', 'email')->ignore($user->id),
             ],
             'emp_id' => ['required', 'string', 'max:255', Rule::unique('users', 'emp_id')->ignore($user->id)],
@@ -49,13 +47,6 @@ class UpdateInternalUserRequest extends FormRequest
                 'integer',
                 Rule::exists('offices', 'id')->where(fn ($query) => $query->where('is_active', true)),
             ],
-        ];
-    }
-
-    public function messages(): array
-    {
-        return [
-            'email.regex' => 'Email must be a valid Gmail address ending with @gmail.com.',
         ];
     }
 

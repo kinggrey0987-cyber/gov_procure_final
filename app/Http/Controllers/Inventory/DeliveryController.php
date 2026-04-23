@@ -8,6 +8,7 @@ use App\Models\Delivery;
 use App\Models\PurchaseOrder;
 use App\Services\Delivery\DeliveryService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redirect;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -18,17 +19,33 @@ class DeliveryController
     {
     }
 
-    public function index(): Response
+    public function index(Request $request): Response
     {
         abort_unless(auth()->user()->can('delivery.view-any'), 403);
 
+        $status = strtoupper(trim((string) $request->input('status', '')));
+        $search = trim((string) $request->input('search', ''));
+
         $deliveries = Delivery::query()
             ->with(['purchaseOrder', 'supplier', 'receiver'])
+            ->when($status !== '', fn ($query) => $query->where('receipt_status', $status))
+            ->when($search !== '', function ($query) use ($search): void {
+                $query->where(function ($nested) use ($search): void {
+                    $nested->where('delivery_code', 'like', '%'.$search.'%')
+                        ->orWhereHas('purchaseOrder', fn ($purchaseOrderQuery) => $purchaseOrderQuery->where('po_number', 'like', '%'.$search.'%'))
+                        ->orWhereHas('supplier', fn ($supplierQuery) => $supplierQuery->where('supplier_name', 'like', '%'.$search.'%'));
+                });
+            })
             ->orderByDesc('created_at')
-            ->paginate(15);
+            ->paginate(15)
+            ->withQueryString();
 
         return Inertia::render('Inventory/Delivery/Index', [
             'deliveries' => $deliveries,
+            'filters' => [
+                'status' => $status,
+                'search' => $search,
+            ],
         ]);
     }
 

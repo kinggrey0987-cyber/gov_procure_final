@@ -1,7 +1,9 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import PaginationNav from '@/Components/PaginationNav';
 import useSmartRefresh from '@/hooks/useSmartRefresh';
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import { FormEvent, useCallback } from 'react';
+import useDebouncedValue from '@/hooks/useDebouncedValue';
+import { Head, Link, router } from '@inertiajs/react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 type PurchaseRequestRow = {
     purchase_request_id: number;
@@ -38,17 +40,29 @@ type Props = {
 };
 
 export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Props) {
-    const filterForm = useForm({
-        status: filters?.status ?? '',
-        search: filters?.search ?? '',
-    });
+    const [status, setStatus] = useState(filters?.status ?? '');
+    const [search, setSearch] = useState(filters?.search ?? '');
+    const debouncedSearch = useDebouncedValue(search, 450);
+
+    useEffect(() => {
+        setStatus(filters?.status ?? '');
+        setSearch(filters?.search ?? '');
+    }, [filters?.search, filters?.status]);
+
+    const activeFilters = useMemo(
+        () => ({
+            status,
+            search: debouncedSearch,
+        }),
+        [status, debouncedSearch],
+    );
 
     const refreshWithActiveFilters = useCallback(() => {
         router.get(
             route('procurement.purchase-requests.index'),
             {
-                status: filterForm.data.status,
-                search: filterForm.data.search,
+                status,
+                search: debouncedSearch,
             },
             {
                 preserveState: true,
@@ -56,7 +70,7 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                 only: ['purchaseRequests', 'filters'],
             },
         );
-    }, [filterForm.data.search, filterForm.data.status]);
+    }, [debouncedSearch, status]);
 
     const { isRefreshing, lastRefreshedAt } = useSmartRefresh({
         only: ['purchaseRequests', 'filters'],
@@ -66,14 +80,13 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
         onRefresh: refreshWithActiveFilters,
     });
 
-    const submitFilters = (event: FormEvent) => {
-        event.preventDefault();
-
-        router.get(route('procurement.purchase-requests.index'), filterForm.data, {
+    useEffect(() => {
+        router.get(route('procurement.purchase-requests.index'), activeFilters, {
             preserveState: true,
             replace: true,
+            only: ['purchaseRequests', 'filters'],
         });
-    };
+    }, [activeFilters]);
 
     const resetFilters = () => {
         router.get(route('procurement.purchase-requests.index'));
@@ -96,10 +109,10 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                 </section>
 
                 <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <form onSubmit={submitFilters} className="grid gap-3 md:grid-cols-5">
+                    <div className="grid gap-3 md:grid-cols-5">
                         <select
-                            value={filterForm.data.status}
-                            onChange={(event) => filterForm.setData('status', event.target.value)}
+                            value={status}
+                            onChange={(event) => setStatus(event.target.value)}
                             className="rounded-lg border-slate-300 text-sm"
                         >
                             <option value="">All Statuses</option>
@@ -112,23 +125,20 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
 
                         <input
                             type="text"
-                            value={filterForm.data.search}
-                            onChange={(event) => filterForm.setData('search', event.target.value)}
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
                             placeholder="Search request code, office, or PR ID"
                             className="md:col-span-2 rounded-lg border-slate-300 text-sm"
                         />
 
-                        <button type="submit" className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
-                            Apply
-                        </button>
                         <button
                             type="button"
                             onClick={resetFilters}
-                            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 md:col-start-5"
                         >
                             Reset
                         </button>
-                    </form>
+                    </div>
                 </section>
 
                 <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -169,8 +179,8 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                                                 <Link
                                                     href={route('procurement.purchase-requests.show', {
                                                         purchase_request: row.purchase_request_id,
-                                                        status: filterForm.data.status || undefined,
-                                                        search: filterForm.data.search || undefined,
+                                                        status: status || undefined,
+                                                        search: search || undefined,
                                                     })}
                                                     className="text-sm font-semibold text-red-700 hover:text-red-900"
                                                 >
@@ -180,8 +190,8 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                                                     href={route('procurement.purchase-requests.show', {
                                                         purchase_request: row.purchase_request_id,
                                                         mode: 'review',
-                                                        status: filterForm.data.status || undefined,
-                                                        search: filterForm.data.search || undefined,
+                                                        status: status || undefined,
+                                                        search: search || undefined,
                                                     })}
                                                     className="text-sm font-semibold text-slate-700 hover:text-slate-900"
                                                 >
@@ -203,16 +213,7 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                     </table>
                 </section>
 
-                <div className="flex flex-wrap gap-2">
-                    {purchaseRequests.links.map((link, index) => (
-                        <Link
-                            key={`${link.label}-${index}`}
-                            href={link.url || '#'}
-                            className={`rounded-md px-3 py-2 text-sm ${link.active ? 'bg-red-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'} ${!link.url ? 'pointer-events-none opacity-50' : ''}`}
-                            dangerouslySetInnerHTML={{ __html: link.label }}
-                        />
-                    ))}
-                </div>
+                <PaginationNav links={purchaseRequests.links} />
             </div>
         </AuthenticatedLayout>
     );

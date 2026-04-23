@@ -24,6 +24,8 @@ class AlertController
     {
         abort_unless(auth()->user()->can('alert.view-any'), 403);
 
+        $search = trim((string) $request->input('search', ''));
+
         $query = Alert::query()->with(['anomaly', 'office', 'reviewer']);
 
         if (auth()->user()->isGsoOfficer()) {
@@ -37,13 +39,24 @@ class AlertController
         $alerts = $query
             ->when($request->string('status')->toString(), fn ($q, $status) => $q->where('status', strtoupper((string) $status)))
             ->when($request->string('severity')->toString(), fn ($q, $severity) => $q->where('severity', strtoupper((string) $severity)))
+            ->when($search !== '', function ($q) use ($search): void {
+                $q->where(function ($nested) use ($search): void {
+                    $nested->where('alert_type', 'like', '%'.$search.'%')
+                        ->orWhere('severity', 'like', '%'.$search.'%')
+                        ->orWhere('status', 'like', '%'.$search.'%')
+                        ->orWhereHas('office', fn ($officeQuery) => $officeQuery->where('name', 'like', '%'.$search.'%'));
+                });
+            })
             ->orderByDesc('detected_at')
             ->paginate(20)
             ->withQueryString();
 
         return Inertia::render('Executive/Alerts/Index', [
             'alerts' => $alerts,
-            'filters' => $request->only(['status', 'severity']),
+            'filters' => [
+                ...$request->only(['status', 'severity']),
+                'search' => $search,
+            ],
         ]);
     }
 

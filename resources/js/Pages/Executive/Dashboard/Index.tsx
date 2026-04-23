@@ -1,7 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { ExecutiveChartCard, HorizontalBarChart, TrendGroupedBarChart, TrendLineChart } from '@/Components/Executive/Charts';
 import { downloadSectionAsPdfById } from '@/lib/printSection';
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
 type OfficeBreakdown = {
@@ -216,6 +216,9 @@ export default function ExecutiveDashboardIndex({
         });
     }, [alertSearch, alertSeverity, alertStatus, recent_alerts]);
 
+    const anomalyPreviewRows = useMemo(() => filteredAnomalyGroups.slice(0, 5), [filteredAnomalyGroups]);
+    const alertPreviewRows = useMemo(() => filteredAlerts.slice(0, 5), [filteredAlerts]);
+
     const exportCsv = () => {
         const lines = [
             ['metric', 'value'],
@@ -425,8 +428,11 @@ export default function ExecutiveDashboardIndex({
 
                 <div className="grid gap-6 xl:grid-cols-2">
                     <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-                        <div className="border-b border-slate-200 px-5 py-4">
+                        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
                             <h3 className="text-lg font-semibold text-slate-900">Recent Anomalies</h3>
+                            <Link href={route('executive.anomalies.index')} className="text-sm font-semibold text-red-700 hover:text-red-800 hover:underline">
+                                View All
+                            </Link>
                         </div>
                         <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
                             <div className="grid gap-2 md:grid-cols-8">
@@ -467,9 +473,9 @@ export default function ExecutiveDashboardIndex({
                                     Clear
                                 </button>
                             </div>
-                            <p className="mt-2 text-xs text-slate-500">Showing {filteredAnomalyGroups.length} of {recentAnomalyGroups.length} anomaly group(s).</p>
+                            <p className="mt-2 text-xs text-slate-500">Showing {anomalyPreviewRows.length} of {filteredAnomalyGroups.length} filtered anomaly group(s).</p>
                         </div>
-                        {filteredAnomalyGroups.length === 0 ? (
+                        {anomalyPreviewRows.length === 0 ? (
                             <p className="px-5 py-6 text-sm text-slate-500">No data in current filter scope</p>
                         ) : (
                             <div className="overflow-x-auto">
@@ -484,7 +490,7 @@ export default function ExecutiveDashboardIndex({
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {filteredAnomalyGroups.map((group) => (
+                                        {anomalyPreviewRows.map((group) => (
                                             <tr key={group.key}>
                                                 <td className="px-4 py-2 text-slate-700">{group.label}</td>
                                                 <td className="px-4 py-2 text-slate-700">{group.count}</td>
@@ -500,8 +506,11 @@ export default function ExecutiveDashboardIndex({
                     </section>
 
                     <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-                        <div className="border-b border-slate-200 px-5 py-4">
+                        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
                             <h3 className="text-lg font-semibold text-slate-900">Recent Alerts</h3>
+                            <Link href={route('executive.alerts.index')} className="text-sm font-semibold text-red-700 hover:text-red-800 hover:underline">
+                                View All
+                            </Link>
                         </div>
                         <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
                             <div className="grid gap-2 md:grid-cols-8">
@@ -542,9 +551,9 @@ export default function ExecutiveDashboardIndex({
                                     Clear
                                 </button>
                             </div>
-                            <p className="mt-2 text-xs text-slate-500">Showing {filteredAlerts.length} of {Math.min(recent_alerts.length, 5)} alert(s).</p>
+                            <p className="mt-2 text-xs text-slate-500">Showing {alertPreviewRows.length} of {filteredAlerts.length} filtered alert(s).</p>
                         </div>
-                        {filteredAlerts.length === 0 ? (
+                        {alertPreviewRows.length === 0 ? (
                             <p className="px-5 py-6 text-sm text-slate-500">No data in current filter scope</p>
                         ) : (
                             <div className="overflow-x-auto">
@@ -558,7 +567,7 @@ export default function ExecutiveDashboardIndex({
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {filteredAlerts.map((row) => (
+                                        {alertPreviewRows.map((row) => (
                                             <tr key={row.alerts_id}>
                                                 <td className="px-4 py-2 text-slate-700">{formatStatusLabel(row.alert_type)}</td>
                                                 <td className="px-4 py-2">{SeverityBadge(row.severity)}</td>

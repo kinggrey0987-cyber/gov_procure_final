@@ -1,6 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { humanizeEnum } from '@/lib/displayLabels';
 import { Head, Link, router, usePage } from '@inertiajs/react';
+import { useState } from 'react';
 
 type Props = {
     record: {
@@ -65,6 +66,7 @@ export default function DistributionShow({ record }: Props) {
     const isOfficeUser = page.auth?.can?.office === true;
     const canConfirmReceipt = isOfficeUser && record.status === 'RELEASED';
     const canFileClaim = isOfficeUser && (record.status === 'RELEASED' || record.status === 'RECEIVED');
+    const [activeTab, setActiveTab] = useState<'overview' | 'items' | 'status' | 'related' | 'notes'>('overview');
 
     return (
         <AuthenticatedLayout
@@ -79,7 +81,29 @@ export default function DistributionShow({ record }: Props) {
         >
             <Head title="Distribution Detail" />
             <div className="space-y-6 py-8">
-                <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                <section className="rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
+                    <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+                        {[
+                            { key: 'overview', label: 'Overview' },
+                            { key: 'items', label: 'Items' },
+                            { key: 'status', label: 'Status History' },
+                            { key: 'related', label: 'Related Records' },
+                            { key: 'notes', label: 'Notes/Attachments' },
+                        ].map((tab) => (
+                            <button
+                                key={tab.key}
+                                type="button"
+                                onClick={() => setActiveTab(tab.key as 'overview' | 'items' | 'status' | 'related' | 'notes')}
+                                className={`rounded-lg px-3 py-2 text-xs font-semibold md:text-sm ${activeTab === tab.key ? 'bg-red-700 text-white' : 'bg-red-50 text-red-700 hover:bg-red-100'}`}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+                </section>
+
+                {activeTab === 'overview' ? (
+                    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
                     <div className="grid gap-4 md:grid-cols-2">
                         <Info label="Distribution Code" value={record.distribution_code} mono />
                         <Info label="Status" value={displayDistributionStatus(record.status)} />
@@ -122,9 +146,11 @@ export default function DistributionShow({ record }: Props) {
                             ) : null}
                         </div>
                     ) : null}
-                </div>
+                    </div>
+                ) : null}
 
-                <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                {activeTab === 'items' ? (
+                    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                     <div className="border-b border-slate-200 px-4 py-3">
                         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Requested Office Items</h3>
                     </div>
@@ -190,8 +216,10 @@ export default function DistributionShow({ record }: Props) {
                         </tbody>
                     </table>
                 </section>
+                ) : null}
 
-                <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                {activeTab === 'items' ? (
+                    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                     <div className="border-b border-slate-200 px-4 py-3">
                         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Released Items</h3>
                     </div>
@@ -225,8 +253,10 @@ export default function DistributionShow({ record }: Props) {
                         </tbody>
                     </table>
                 </section>
+                ) : null}
 
-                <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                {activeTab === 'related' ? (
+                    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                     <div className="border-b border-slate-200 px-4 py-3">
                         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Related Claims and Issues</h3>
                     </div>
@@ -264,6 +294,22 @@ export default function DistributionShow({ record }: Props) {
                         </tbody>
                     </table>
                 </section>
+                ) : null}
+
+                {activeTab === 'status' ? (
+                    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Status History</h3>
+                        <p className="mt-2 text-sm text-slate-600">Current status: {displayDistributionStatus(record.status)}</p>
+                    </section>
+                ) : null}
+
+                {activeTab === 'notes' ? (
+                    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Notes / Attachments</h3>
+                        <p className="mt-2 text-sm text-slate-600"><span className="font-semibold">Storage / Release Notes:</span> {record.storage_location ?? 'No storage location recorded.'}</p>
+                        <p className="mt-1 text-sm text-slate-600"><span className="font-semibold">Remarks:</span> {record.notes ?? 'No additional notes.'}</p>
+                    </section>
+                ) : null}
             </div>
         </AuthenticatedLayout>
     );

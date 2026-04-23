@@ -1,5 +1,8 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link } from '@inertiajs/react';
+import PaginationNav from '@/Components/PaginationNav';
+import useDebouncedValue from '@/hooks/useDebouncedValue';
+import { Head, Link, router } from '@inertiajs/react';
+import { useEffect, useMemo, useState } from 'react';
 
 type AlertRow = {
     alerts_id: number;
@@ -10,15 +13,72 @@ type AlertRow = {
 };
 
 type Props = {
-    alerts: { data: AlertRow[] };
+    alerts: {
+        data: AlertRow[];
+        links: Array<{ url: string | null; label: string; active: boolean }>;
+    };
+    filters: {
+        status?: string;
+        severity?: string;
+        search?: string;
+    };
 };
 
-export default function ExecutiveAlertIndex({ alerts }: Props) {
+export default function ExecutiveAlertIndex({ alerts, filters }: Props) {
+    const [status, setStatus] = useState(filters.status ?? '');
+    const [severity, setSeverity] = useState(filters.severity ?? '');
+    const [search, setSearch] = useState(filters.search ?? '');
+    const debouncedSearch = useDebouncedValue(search, 450);
+
+    useEffect(() => {
+        setStatus(filters.status ?? '');
+        setSeverity(filters.severity ?? '');
+        setSearch(filters.search ?? '');
+    }, [filters.search, filters.severity, filters.status]);
+
+    const activeFilters = useMemo(
+        () => ({
+            status,
+            severity,
+            search: debouncedSearch,
+        }),
+        [status, severity, debouncedSearch],
+    );
+
+    useEffect(() => {
+        router.get(route('executive.alerts.index'), activeFilters, {
+            preserveState: true,
+            replace: true,
+            only: ['alerts', 'filters'],
+        });
+    }, [activeFilters]);
+
     return (
         <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Alerts</h2>}>
             <Head title="Alerts" />
             <div className="py-10">
-                <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+                <div className="mx-auto max-w-6xl space-y-4 px-4 sm:px-6 lg:px-8">
+                    <div className="grid gap-2 rounded-xl border bg-white p-3 md:grid-cols-3">
+                        <input
+                            className="rounded border px-3 py-2 text-sm"
+                            value={severity}
+                            placeholder="Severity"
+                            onChange={(event) => setSeverity(event.target.value)}
+                        />
+                        <input
+                            className="rounded border px-3 py-2 text-sm"
+                            value={status}
+                            placeholder="Status"
+                            onChange={(event) => setStatus(event.target.value)}
+                        />
+                        <input
+                            className="rounded border px-3 py-2 text-sm"
+                            value={search}
+                            placeholder="Search alert type or office"
+                            onChange={(event) => setSearch(event.target.value)}
+                        />
+                    </div>
+
                     <div className="overflow-hidden rounded border bg-white">
                         <table className="min-w-full divide-y divide-gray-200 text-sm">
                             <thead className="bg-gray-50">
@@ -47,6 +107,8 @@ export default function ExecutiveAlertIndex({ alerts }: Props) {
                             </tbody>
                         </table>
                     </div>
+
+                    <PaginationNav links={alerts.links} />
                 </div>
             </div>
         </AuthenticatedLayout>

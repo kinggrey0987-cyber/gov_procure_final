@@ -1,5 +1,8 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link } from '@inertiajs/react';
+import PaginationNav from '@/Components/PaginationNav';
+import useDebouncedValue from '@/hooks/useDebouncedValue';
+import { Head, Link, router } from '@inertiajs/react';
+import { useEffect, useMemo, useState } from 'react';
 
 type RequestRow = {
     supply_request_id: number;
@@ -12,11 +15,39 @@ type RequestRow = {
 type Props = {
     supplyRequests: {
         data: RequestRow[];
-    } | RequestRow[];
+        links: Array<{ url: string | null; label: string; active: boolean }>;
+    };
+    filters?: {
+        status?: string;
+        search?: string;
+    };
 };
 
-export default function SupplyRequestsIndex({ supplyRequests }: Props) {
-    const rows = Array.isArray(supplyRequests) ? supplyRequests : supplyRequests.data;
+export default function SupplyRequestsIndex({ supplyRequests, filters }: Props) {
+    const [status, setStatus] = useState(filters?.status ?? '');
+    const [search, setSearch] = useState(filters?.search ?? '');
+    const debouncedSearch = useDebouncedValue(search, 450);
+
+    useEffect(() => {
+        setStatus(filters?.status ?? '');
+        setSearch(filters?.search ?? '');
+    }, [filters?.search, filters?.status]);
+
+    const activeFilters = useMemo(
+        () => ({
+            status,
+            search: debouncedSearch,
+        }),
+        [status, debouncedSearch],
+    );
+
+    useEffect(() => {
+        router.get(route('office.supply-requests.index'), activeFilters, {
+            preserveState: true,
+            replace: true,
+            only: ['supplyRequests', 'filters'],
+        });
+    }, [activeFilters]);
 
     return (
         <AuthenticatedLayout
@@ -51,9 +82,30 @@ export default function SupplyRequestsIndex({ supplyRequests }: Props) {
                 <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="border-b border-slate-200 px-6 py-4">
                         <h4 className="text-lg font-semibold text-slate-800">Request List</h4>
+                        <div className="mt-3 grid gap-2 md:grid-cols-3">
+                            <input
+                                value={search}
+                                onChange={(event) => setSearch(event.target.value)}
+                                placeholder="Search request code, purpose, status"
+                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                            />
+                            <input
+                                value={status}
+                                onChange={(event) => setStatus(event.target.value)}
+                                placeholder="Status"
+                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => router.get(route('office.supply-requests.index'))}
+                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                            >
+                                Reset
+                            </button>
+                        </div>
                     </div>
 
-                    {rows.length === 0 ? (
+                    {supplyRequests.data.length === 0 ? (
                         <div className="px-6 py-10 text-sm text-slate-600">No requests found. Create your first supply request.</div>
                     ) : (
                         <div className="overflow-x-auto">
@@ -68,7 +120,7 @@ export default function SupplyRequestsIndex({ supplyRequests }: Props) {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 bg-white">
-                                    {rows.map((row) => (
+                                    {supplyRequests.data.map((row) => (
                                         <tr key={row.supply_request_id}>
                                             <td className="px-4 py-3 font-semibold text-red-700">{row.request_code}</td>
                                             <td className="px-4 py-3 text-slate-700">{formatDate(row.request_date)}</td>
@@ -91,6 +143,8 @@ export default function SupplyRequestsIndex({ supplyRequests }: Props) {
                         </div>
                     )}
                 </div>
+
+                <PaginationNav links={supplyRequests.links} />
             </div>
         </AuthenticatedLayout>
     );

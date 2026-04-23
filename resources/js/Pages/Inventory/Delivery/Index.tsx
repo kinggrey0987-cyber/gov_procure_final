@@ -1,5 +1,8 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link } from '@inertiajs/react';
+import PaginationNav from '@/Components/PaginationNav';
+import useDebouncedValue from '@/hooks/useDebouncedValue';
+import { Head, Link, router } from '@inertiajs/react';
+import { useEffect, useMemo, useState } from 'react';
 
 type DeliveryRow = {
     delivery_id: number;
@@ -28,14 +31,70 @@ type Props = {
         data: DeliveryRow[];
         links: PaginationLink[];
     };
+    filters?: {
+        status?: string;
+        search?: string;
+    };
 };
 
-export default function DeliveryIndex({ deliveries }: Props) {
+export default function DeliveryIndex({ deliveries, filters }: Props) {
+    const [status, setStatus] = useState(filters?.status ?? '');
+    const [search, setSearch] = useState(filters?.search ?? '');
+    const debouncedSearch = useDebouncedValue(search, 450);
+
+    useEffect(() => {
+        setStatus(filters?.status ?? '');
+        setSearch(filters?.search ?? '');
+    }, [filters?.search, filters?.status]);
+
+    const activeFilters = useMemo(
+        () => ({
+            status,
+            search: debouncedSearch,
+        }),
+        [status, debouncedSearch],
+    );
+
+    useEffect(() => {
+        router.get(route('inventory.deliveries.index'), activeFilters, {
+            preserveState: true,
+            replace: true,
+            only: ['deliveries', 'filters'],
+        });
+    }, [activeFilters]);
+
     return (
         <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Delivery Monitoring</h2>}>
             <Head title="Deliveries" />
 
             <div className="space-y-4 py-8">
+                <div className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm md:grid-cols-3">
+                    <input
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                        value={search}
+                        placeholder="Search delivery code, PO, supplier"
+                        onChange={(event) => setSearch(event.target.value)}
+                    />
+                    <select
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                        value={status}
+                        onChange={(event) => setStatus(event.target.value)}
+                    >
+                        <option value="">All statuses</option>
+                        <option value="PENDING">PENDING</option>
+                        <option value="RECEIVED">RECEIVED</option>
+                        <option value="PARTIALLY_RECEIVED">PARTIALLY_RECEIVED</option>
+                        <option value="VERIFIED">VERIFIED</option>
+                    </select>
+                    <button
+                        type="button"
+                        onClick={() => router.get(route('inventory.deliveries.index'))}
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                        Reset
+                    </button>
+                </div>
+
                 <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                     <p className="text-sm text-slate-600">
                         Delivery Monitoring is the main intake and status page. Verification remains a contextual action per delivery record.
@@ -92,18 +151,7 @@ export default function DeliveryIndex({ deliveries }: Props) {
                     </table>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                    {deliveries.links.map((link, index) => (
-                        <Link
-                            key={`${link.label}-${index}`}
-                            href={link.url || '#'}
-                            className={`rounded-md px-3 py-2 text-sm ${
-                                link.active ? 'bg-red-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                            } ${!link.url ? 'pointer-events-none opacity-50' : ''}`}
-                            dangerouslySetInnerHTML={{ __html: link.label }}
-                        />
-                    ))}
-                </div>
+                <PaginationNav links={deliveries.links} />
             </div>
         </AuthenticatedLayout>
     );

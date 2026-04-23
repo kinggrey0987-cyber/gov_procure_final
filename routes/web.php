@@ -55,7 +55,19 @@ Route::get('/', function () {
         'typeBreakdown' => $landingData['typeBreakdown'],
         'publicReports' => $landingData['publicReports'],
     ]);
-});
+})->name('landing');
+
+Route::get('/about', function () {
+    return Inertia::render('Public/About', [
+        'canLogin' => Route::has('login'),
+    ]);
+})->name('public.about');
+
+Route::get('/how-it-works', function () {
+    return Inertia::render('Public/HowItWorks', [
+        'canLogin' => Route::has('login'),
+    ]);
+})->name('public.how-it-works');
 
 Route::get('/dashboard', DashboardController::class)
     ->middleware(['auth', 'verified', 'twofactor', 'must-change-password'])

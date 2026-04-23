@@ -136,8 +136,11 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
 
                 <section className="grid gap-4 lg:grid-cols-2">
                     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                        <div className="border-b border-slate-200 px-6 py-4">
+                        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
                             <h3 className="text-lg font-semibold text-slate-900">Recent Purchase Requests</h3>
+                            <Link href={route('procurement.purchase-requests.index')} className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50">
+                                View All
+                            </Link>
                         </div>
                         <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
                             <div className="grid gap-3 md:grid-cols-5">
@@ -184,20 +187,20 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
                                     </button>
                                 </div>
                             </div>
-                            <p className="mt-3 text-xs text-slate-500">Showing {filteredPurchaseRequests.length} of {recentPurchaseRequests.length} request(s).</p>
+                            <p className="mt-3 text-xs text-slate-500">Showing {Math.min(filteredPurchaseRequests.length, 5)} of {Math.min(recentPurchaseRequests.length, 5)} request(s).</p>
                         </div>
                         <div className="divide-y divide-slate-100">
                             {filteredPurchaseRequests.length === 0 ? (
                                 <p className="px-6 py-8 text-sm text-slate-500">No purchase requests yet.</p>
                             ) : (
-                                filteredPurchaseRequests.map((request) => (
+                                filteredPurchaseRequests.slice(0, 5).map((request) => (
                                     <div key={request.purchase_request_id} className="flex items-center justify-between gap-3 px-6 py-4">
                                         <div>
                                             <p className="font-semibold text-slate-800">PR-{String(request.purchase_request_id).padStart(6, '0')}</p>
                                             <p className="text-sm text-slate-600">{request.office_name}</p>
                                         </div>
                                         <div className="text-right">
-                                            <span className={statusClass(request.status)}>{request.status}</span>
+                                            <span className={statusClass(request.status)}>{request.status.replaceAll('_', ' ')}</span>
                                             <p className="mt-1 text-xs text-slate-500">{formatDate(request.created_at)}</p>
                                         </div>
                                     </div>
@@ -207,8 +210,11 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
                     </div>
 
                     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                        <div className="border-b border-slate-200 px-6 py-4">
+                        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
                             <h3 className="text-lg font-semibold text-slate-900">Recent Purchase Orders</h3>
+                            <Link href={route('procurement.purchase-orders.index')} className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50">
+                                View All
+                            </Link>
                         </div>
                         <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
                             <div className="grid gap-3 md:grid-cols-5">
@@ -255,13 +261,13 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
                                     </button>
                                 </div>
                             </div>
-                            <p className="mt-3 text-xs text-slate-500">Showing {filteredPurchaseOrders.length} of {recentPurchaseOrders.length} order(s).</p>
+                            <p className="mt-3 text-xs text-slate-500">Showing {Math.min(filteredPurchaseOrders.length, 5)} of {Math.min(recentPurchaseOrders.length, 5)} order(s).</p>
                         </div>
                         <div className="divide-y divide-slate-100">
                             {filteredPurchaseOrders.length === 0 ? (
                                 <p className="px-6 py-8 text-sm text-slate-500">No purchase orders yet.</p>
                             ) : (
-                                filteredPurchaseOrders.map((order) => (
+                                filteredPurchaseOrders.slice(0, 5).map((order) => (
                                     <div key={order.purchase_order_id} className="flex items-center justify-between gap-3 px-6 py-4">
                                         <div>
                                             <p className="font-semibold text-slate-800">{order.po_number}</p>

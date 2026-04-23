@@ -29,18 +29,31 @@ class AnomalyController
     {
         abort_unless(auth()->user()->can('anomaly.view-any'), 403);
 
+        $search = trim((string) $request->input('search', ''));
+
         $anomalies = Anomaly::query()
             ->with(['office', 'item'])
             ->when($request->string('status')->toString(), fn ($query, $status) => $query->where('status', strtoupper((string) $status)))
             ->when($request->string('severity')->toString(), fn ($query, $severity) => $query->where('severity', strtoupper((string) $severity)))
             ->when($request->string('anomaly_type')->toString(), fn ($query, $type) => $query->where('anomaly_type', strtoupper((string) $type)))
+            ->when($search !== '', function ($query) use ($search): void {
+                $query->where(function ($nested) use ($search): void {
+                    $nested->where('anomaly_type', 'like', '%'.$search.'%')
+                        ->orWhere('severity', 'like', '%'.$search.'%')
+                        ->orWhere('status', 'like', '%'.$search.'%')
+                        ->orWhereHas('office', fn ($officeQuery) => $officeQuery->where('name', 'like', '%'.$search.'%'));
+                });
+            })
             ->orderByDesc('detected_at')
             ->paginate(20)
             ->withQueryString();
 
         return Inertia::render('Executive/Anomalies/Index', [
             'anomalies' => $anomalies,
-            'filters' => $request->only(['status', 'severity', 'anomaly_type']),
+            'filters' => [
+                ...$request->only(['status', 'severity', 'anomaly_type']),
+                'search' => $search,
+            ],
         ]);
     }
 

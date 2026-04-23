@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import PaginationNav from '@/Components/PaginationNav';
 import useSmartRefresh from '@/hooks/useSmartRefresh';
 import { Head, Link, router } from '@inertiajs/react';
 import { FormEvent, useEffect, useState } from 'react';
@@ -119,7 +120,7 @@ export default function ItemCategoryIndex({ categories, filters, canManage }: Pr
                                     <td className="px-4 py-3 text-slate-600">{category.description || '-'}</td>
                                     <td className="px-4 py-3">
                                         <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${category.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700'}`}>
-                                            {category.status}
+                                            {category.status === 'active' ? 'Active' : 'Inactive'}
                                         </span>
                                     </td>
                                     <td className="px-4 py-3 text-right">
@@ -156,15 +157,8 @@ export default function ItemCategoryIndex({ categories, filters, canManage }: Pr
                     </table>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                    {categories.links.map((link, index) => (
-                        <Link
-                            key={`${link.label}-${index}`}
-                            href={link.url || '#'}
-                            className={`rounded-md px-3 py-2 text-sm ${link.active ? 'bg-red-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'} ${!link.url ? 'pointer-events-none opacity-50' : ''}`}
-                            dangerouslySetInnerHTML={{ __html: link.label }}
-                        />
-                    ))}
+                <div>
+                    <PaginationNav links={categories.links} />
                 </div>
             </div>
         </AuthenticatedLayout>

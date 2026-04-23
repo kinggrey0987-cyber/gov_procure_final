@@ -1,6 +1,8 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import PaginationNav from '@/Components/PaginationNav';
+import useDebouncedValue from '@/hooks/useDebouncedValue';
 import { Head, Link, router } from '@inertiajs/react';
-import { FormEvent, useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 type InventoryRow = {
     inventory_id: number;
@@ -44,6 +46,7 @@ export default function InventoryIndex({ inventories, categories, filters }: Pro
     const [q, setQ] = useState(filters.q ?? '');
     const [categoryId, setCategoryId] = useState(String(filters.category_id ?? ''));
     const [stockStatus, setStockStatus] = useState(filters.stock_status ?? '');
+    const debouncedQ = useDebouncedValue(q, 450);
 
     useEffect(() => {
         setQ(filters.q ?? '');
@@ -51,19 +54,22 @@ export default function InventoryIndex({ inventories, categories, filters }: Pro
         setStockStatus(filters.stock_status ?? '');
     }, [filters.category_id, filters.q, filters.stock_status]);
 
-    const applyFilters = (event: FormEvent) => {
-        event.preventDefault();
+    const activeFilters = useMemo(
+        () => ({
+            q: debouncedQ,
+            category_id: categoryId,
+            stock_status: stockStatus,
+        }),
+        [debouncedQ, categoryId, stockStatus],
+    );
 
-        router.get(
-            route('inventory.inventory.index'),
-            {
-                q,
-                category_id: categoryId,
-                stock_status: stockStatus,
-            },
-            { preserveState: true, replace: true },
-        );
-    };
+    useEffect(() => {
+        router.get(route('inventory.inventory.index'), activeFilters, {
+            preserveState: true,
+            replace: true,
+            only: ['inventories', 'filters', 'categories'],
+        });
+    }, [activeFilters]);
 
     return (
         <AuthenticatedLayout
@@ -79,7 +85,7 @@ export default function InventoryIndex({ inventories, categories, filters }: Pro
             <Head title="Inventory" />
 
             <div className="space-y-4 py-8">
-                <form onSubmit={applyFilters} className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-5">
+                <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-5">
                     <input
                         value={q}
                         onChange={(event) => setQ(event.target.value)}
@@ -101,13 +107,10 @@ export default function InventoryIndex({ inventories, categories, filters }: Pro
                         <option value="LOW">Low Stock</option>
                         <option value="CRITICAL">Critical Stock</option>
                     </select>
-                    <button type="submit" className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
-                        Apply
-                    </button>
                     <Link href={route('inventory.inventory.index')} className="rounded-lg border border-slate-300 px-4 py-2 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50">
                         Reset
                     </Link>
-                </form>
+                </div>
 
                 <div className="rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-600 shadow-sm">
                     Low Stock Threshold is the reorder point. Items strictly below this level are active low-stock cases for procurement initiation; items equal to threshold are advisory only.
@@ -190,18 +193,7 @@ export default function InventoryIndex({ inventories, categories, filters }: Pro
                     </table>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                    {inventories.links.map((link, index) => (
-                        <Link
-                            key={`${link.label}-${index}`}
-                            href={link.url || '#'}
-                            className={`rounded-md px-3 py-2 text-sm ${
-                                link.active ? 'bg-red-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                            } ${!link.url ? 'pointer-events-none opacity-50' : ''}`}
-                            dangerouslySetInnerHTML={{ __html: link.label }}
-                        />
-                    ))}
-                </div>
+                <PaginationNav links={inventories.links} />
             </div>
         </AuthenticatedLayout>
     );

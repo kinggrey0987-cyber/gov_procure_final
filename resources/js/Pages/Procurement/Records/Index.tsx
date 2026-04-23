@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import PaginationNav from '@/Components/PaginationNav';
 import { Head, Link, router } from '@inertiajs/react';
 
 type RecordRow = {
@@ -59,7 +60,7 @@ export default function ProcurementRecordsIndex({ records, filters }: Props) {
                             <option value="">All</option>
                             {statuses.map((status) => (
                                 <option key={status} value={status}>
-                                    {status}
+                                    {status.replaceAll('_', ' ')}
                                 </option>
                             ))}
                         </select>
@@ -85,7 +86,7 @@ export default function ProcurementRecordsIndex({ records, filters }: Props) {
                                     <td className="px-4 py-3 text-slate-700">{record.supplier?.supplier_name ?? '-'}</td>
                                     <td className="px-4 py-3 text-slate-700">{record.purchase_request?.office?.name ?? '-'}</td>
                                     <td className="px-4 py-3">
-                                        <span className={statusClass(record.status)}>{record.status}</span>
+                                        <span className={statusClass(record.status)}>{record.status.replaceAll('_', ' ')}</span>
                                     </td>
                                     <td className="px-4 py-3 text-slate-600">{formatDate(record.created_at)}</td>
                                     <td className="px-4 py-3 text-right">
@@ -111,15 +112,8 @@ export default function ProcurementRecordsIndex({ records, filters }: Props) {
                     </table>
                 </section>
 
-                <div className="flex flex-wrap gap-2">
-                    {records.links.map((link, index) => (
-                        <Link
-                            key={`${link.label}-${index}`}
-                            href={link.url || '#'}
-                            className={`rounded-md px-3 py-2 text-sm ${link.active ? 'bg-red-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'} ${!link.url ? 'pointer-events-none opacity-50' : ''}`}
-                            dangerouslySetInnerHTML={{ __html: link.label }}
-                        />
-                    ))}
+                <div>
+                    <PaginationNav links={records.links} />
                 </div>
             </div>
         </AuthenticatedLayout>

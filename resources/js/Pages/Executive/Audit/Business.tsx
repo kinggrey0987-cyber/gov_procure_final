@@ -2,7 +2,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { HorizontalBarChart } from '@/Components/Executive/Charts';
 import { downloadSectionAsPdfById } from '@/lib/printSection';
 import { Head, router } from '@inertiajs/react';
-import { FormEvent, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 type Props = {
     auditLogs: {
@@ -50,23 +50,37 @@ export default function BusinessAudit({ auditLogs, filters, analytics, filter_op
         to_date: filters.to_date ?? '',
     });
 
-    const onSubmit = (event: FormEvent) => {
-        event.preventDefault();
+    useEffect(() => {
+        const incomingSelectedUser = filter_options.users.find((user) => String(user.id) === String(filters.user_id ?? ''));
 
+        setForm({
+            module_name: filters.module_name ?? '',
+            action_type: filters.action_type ?? '',
+            user_query: incomingSelectedUser ? `${incomingSelectedUser.name} (#${incomingSelectedUser.id})` : '',
+            from_date: filters.from_date ?? '',
+            to_date: filters.to_date ?? '',
+        });
+    }, [filter_options.users, filters.action_type, filters.from_date, filters.module_name, filters.to_date, filters.user_id]);
+
+    const activeFilters = useMemo(() => {
         const matchedUser = filter_options.users.find((user) => `${user.name} (#${user.id})` === form.user_query);
 
-        router.get(
-            route('executive.audit.business'),
-            {
-                module_name: form.module_name,
-                action_type: form.action_type,
-                user_id: matchedUser ? matchedUser.id : '',
-                from_date: form.from_date,
-                to_date: form.to_date,
-            },
-            { preserveState: true, replace: true },
-        );
-    };
+        return {
+            module_name: form.module_name,
+            action_type: form.action_type,
+            user_id: matchedUser ? matchedUser.id : '',
+            from_date: form.from_date,
+            to_date: form.to_date,
+        };
+    }, [filter_options.users, form.action_type, form.from_date, form.module_name, form.to_date, form.user_query]);
+
+    useEffect(() => {
+        router.get(route('executive.audit.business'), activeFilters, {
+            preserveState: true,
+            replace: true,
+            only: ['auditLogs', 'filters', 'analytics', 'filter_options'],
+        });
+    }, [activeFilters]);
 
     const moduleSummary = analytics.module_summary
         .map((row) => ({
@@ -140,7 +154,7 @@ export default function BusinessAudit({ auditLogs, filters, analytics, filter_op
                 </section>
 
                 <section className="rounded-2xl border border-red-200 bg-white p-5 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
-                    <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3">
+                    <div className="flex flex-wrap items-end gap-3">
                         <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
                             <select className="h-10 rounded-lg border-slate-300 text-sm" value={form.module_name} onChange={(e) => setForm((v) => ({ ...v, module_name: e.target.value }))}>
                                 <option value="">All modules</option>
@@ -181,11 +195,8 @@ export default function BusinessAudit({ auditLogs, filters, analytics, filter_op
                             >
                                 Reset
                             </button>
-                            <button className="h-10 rounded-lg bg-red-700 px-4 text-sm font-semibold text-white hover:bg-red-800" type="submit">
-                                Apply
-                            </button>
                         </div>
-                    </form>
+                    </div>
                 </section>
 
                 <div className="grid gap-4 sm:grid-cols-3">

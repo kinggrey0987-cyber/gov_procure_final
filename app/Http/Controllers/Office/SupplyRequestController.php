@@ -29,9 +29,20 @@ class SupplyRequestController extends Controller
     {
         abort_unless($request->user()?->can('office.supply-request.view-any'), 403);
 
+        $status = strtoupper(trim((string) $request->input('status', '')));
+        $search = trim((string) $request->input('search', ''));
+
         $supplyRequests = SupplyRequest::query()
             ->with(['items.item.inventory', 'purchaseRequests', 'purchaseOrders', 'distributionRecords'])
             ->forOffice((int) $request->user()?->office_id)
+            ->when($status !== '', fn ($query) => $query->where('status', $status))
+            ->when($search !== '', function ($query) use ($search): void {
+                $query->where(function ($nested) use ($search): void {
+                    $nested->where('request_code', 'like', '%'.$search.'%')
+                        ->orWhere('status', 'like', '%'.$search.'%')
+                        ->orWhere('purpose', 'like', '%'.$search.'%');
+                });
+            })
             ->latest('supply_request_id')
             ->paginate(15)
             ->through(function (SupplyRequest $supplyRequest): array {
@@ -47,10 +58,15 @@ class SupplyRequestController extends Controller
                     'items_count' => (int) $supplyRequest->items->count(),
                     'items_summary' => $supplyRequest->items->take(2)->pluck('item_name_snapshot')->implode(', '),
                 ];
-            });
+            })
+            ->withQueryString();
 
         return Inertia::render('Office/SupplyRequests/Index', [
             'supplyRequests' => $supplyRequests,
+            'filters' => [
+                'status' => $status,
+                'search' => $search,
+            ],
         ]);
     }
 

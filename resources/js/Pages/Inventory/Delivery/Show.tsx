@@ -1,6 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import { humanizeEnum } from '@/lib/displayLabels';
 import { Head, Link } from '@inertiajs/react';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 
 type DeliveryItem = {
     delivery_item_id: number;
@@ -53,6 +54,7 @@ type Props = {
 export default function DeliveryShow({ delivery }: Props) {
     const canVerify = delivery.receipt_status === 'RECEIVED';
     const canEdit = delivery.receipt_status !== 'VERIFIED';
+    const [activeTab, setActiveTab] = useState<'overview' | 'items' | 'status' | 'related' | 'notes'>('overview');
 
     return (
         <AuthenticatedLayout
@@ -85,35 +87,61 @@ export default function DeliveryShow({ delivery }: Props) {
             <Head title={`Delivery ${delivery.delivery_code}`} />
 
             <div className="space-y-6 py-8">
-                <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:grid-cols-2 xl:grid-cols-4">
-                    <InfoCell label="Delivery Code" value={delivery.delivery_code} mono />
-                    <InfoCell label="Status" value={<span className={statusClass(delivery.receipt_status)}>{delivery.receipt_status}</span>} />
-                    <InfoCell label="Received By" value={delivery.receiver?.name ?? '-'} />
-                    <InfoCell label="Created" value={new Date(delivery.created_at).toLocaleDateString()} />
-                </div>
+                <section className="rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
+                    <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+                        {[
+                            { key: 'overview', label: 'Overview' },
+                            { key: 'items', label: 'Items' },
+                            { key: 'status', label: 'Status History' },
+                            { key: 'related', label: 'Related Records' },
+                            { key: 'notes', label: 'Notes/Attachments' },
+                        ].map((tab) => (
+                            <button
+                                key={tab.key}
+                                type="button"
+                                onClick={() => setActiveTab(tab.key as 'overview' | 'items' | 'status' | 'related' | 'notes')}
+                                className={`rounded-lg px-3 py-2 text-xs font-semibold md:text-sm ${activeTab === tab.key ? 'bg-red-700 text-white' : 'bg-red-50 text-red-700 hover:bg-red-100'}`}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+                </section>
 
-                <div className="grid gap-4 lg:grid-cols-2">
+                {activeTab === 'overview' ? (
+                    <>
+                        <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:grid-cols-2 xl:grid-cols-4">
+                            <InfoCell label="Delivery Code" value={delivery.delivery_code} mono />
+                            <InfoCell label="Status" value={<span className={statusClass(delivery.receipt_status)}>{humanizeEnum(delivery.receipt_status)}</span>} />
+                            <InfoCell label="Received By" value={delivery.receiver?.name ?? '-'} />
+                            <InfoCell label="Created" value={new Date(delivery.created_at).toLocaleDateString()} />
+                        </div>
+
+                        <div className="grid gap-4 lg:grid-cols-2">
+                            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                                <h3 className="text-sm font-semibold text-slate-900">Purchase Order</h3>
+                                <dl className="mt-3 space-y-2 text-sm">
+                                    <MetaRow
+                                        label="PO Number"
+                                        value={delivery.purchase_order?.po_number ?? '-'}
+                                    />
+                                    <MetaRow label="Status" value={delivery.purchase_order?.status ? humanizeEnum(delivery.purchase_order.status) : '-'} />
+                                </dl>
+                            </section>
+
+                            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                                <h3 className="text-sm font-semibold text-slate-900">Supplier</h3>
+                                <dl className="mt-3 space-y-2 text-sm">
+                                    <MetaRow label="Name" value={delivery.supplier?.supplier_name ?? '-'} />
+                                    <MetaRow label="Contact" value={delivery.supplier?.contact_person ?? 'N/A'} />
+                                </dl>
+                            </section>
+                        </div>
+                    </>
+                ) : null}
+
+                {activeTab === 'items' ? (
                     <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <h3 className="text-sm font-semibold text-slate-900">Purchase Order</h3>
-                        <dl className="mt-3 space-y-2 text-sm">
-                            <MetaRow
-                                label="PO Number"
-                                value={delivery.purchase_order?.po_number ?? '-'}
-                            />
-                            <MetaRow label="Status" value={delivery.purchase_order?.status ?? '-'} />
-                        </dl>
-                    </section>
-
-                    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <h3 className="text-sm font-semibold text-slate-900">Supplier</h3>
-                        <dl className="mt-3 space-y-2 text-sm">
-                            <MetaRow label="Name" value={delivery.supplier?.supplier_name ?? '-'} />
-                            <MetaRow label="Contact" value={delivery.supplier?.contact_person ?? 'N/A'} />
-                        </dl>
-                    </section>
-                </div>
-
-                <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                     <h3 className="mb-3 text-sm font-semibold text-slate-900">Delivery Items</h3>
                     <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-slate-200 text-sm">
@@ -148,23 +176,47 @@ export default function DeliveryShow({ delivery }: Props) {
                             </tbody>
                         </table>
                     </div>
-                </section>
+                    </section>
+                ) : null}
 
-                {delivery.verifications.length > 0 ? (
+                {activeTab === 'status' ? (
                     <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                         <h3 className="mb-3 text-sm font-semibold text-slate-900">Verifications</h3>
-                        <div className="space-y-3">
-                            {delivery.verifications.map((verification) => (
-                                <article key={verification.delivery_verification_id} className="rounded-lg border border-slate-200 p-4">
-                                    <div className="mb-1 flex items-center justify-between gap-3">
-                                        <p className="text-sm font-semibold text-slate-800">{verification.verifier?.full_name ?? verification.verifier?.name ?? '-'}</p>
-                                        <span className={verificationClass(verification.verification_status)}>{verification.verification_status}</span>
-                                    </div>
-                                    <p className="text-xs text-slate-500">{new Date(verification.verification_date).toLocaleDateString()}</p>
-                                    {verification.discrepancy_notes ? <p className="mt-2 text-sm text-slate-700">{verification.discrepancy_notes}</p> : null}
-                                </article>
-                            ))}
-                        </div>
+                        {delivery.verifications.length === 0 ? (
+                            <p className="text-sm text-slate-500">No verification records yet for this delivery.</p>
+                        ) : (
+                            <div className="space-y-3">
+                                {delivery.verifications.map((verification) => (
+                                    <article key={verification.delivery_verification_id} className="rounded-lg border border-slate-200 p-4">
+                                        <div className="mb-1 flex items-center justify-between gap-3">
+                                            <p className="text-sm font-semibold text-slate-800">{verification.verifier?.full_name ?? verification.verifier?.name ?? '-'}</p>
+                                            <span className={verificationClass(verification.verification_status)}>{humanizeEnum(verification.verification_status)}</span>
+                                        </div>
+                                        <p className="text-xs text-slate-500">{new Date(verification.verification_date).toLocaleDateString()}</p>
+                                        {verification.discrepancy_notes ? <p className="mt-2 text-sm text-slate-700">{verification.discrepancy_notes}</p> : null}
+                                    </article>
+                                ))}
+                            </div>
+                        )}
+                    </section>
+                ) : null}
+
+                {activeTab === 'related' ? (
+                    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <h3 className="text-sm font-semibold text-slate-900">Related Records</h3>
+                        <dl className="mt-3 space-y-2 text-sm">
+                            <MetaRow label="Linked Purchase Order" value={delivery.purchase_order?.po_number ?? '-'} />
+                            <MetaRow label="Supplier" value={delivery.supplier?.supplier_name ?? '-'} />
+                        </dl>
+                    </section>
+                ) : null}
+
+                {activeTab === 'notes' ? (
+                    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <h3 className="text-sm font-semibold text-slate-900">Notes / Attachments</h3>
+                        <p className="mt-2 text-sm text-slate-600">
+                            Delivery attachments and discrepancy notes are recorded through verification and supporting document modules.
+                        </p>
                     </section>
                 ) : null}
             </div>

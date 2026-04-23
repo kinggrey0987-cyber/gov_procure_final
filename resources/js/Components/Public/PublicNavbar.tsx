@@ -6,7 +6,7 @@ export default function PublicNavbar({ canLogin }: Props) {
     return (
         <header className="border-b border-slate-200 bg-white">
             <div className="mx-auto flex min-h-24 w-full max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
-                <a href="#home" className="flex items-center gap-3">
+                <a href={route('landing')} className="flex items-center gap-3">
                     <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 border-red-700 bg-white">
                         <img
                             src="/logo.jpg"
@@ -21,12 +21,12 @@ export default function PublicNavbar({ canLogin }: Props) {
                 </a>
 
                 <nav className="hidden items-center gap-6 text-sm font-semibold text-slate-700 xl:flex">
-                    <a href="#home" className="text-red-600">Home</a>
-                    <a href="#summary" className="hover:text-red-600">Transparency Summary</a>
-                    <a href="#disclosures" className="hover:text-red-600">Disclosures</a>
-                    <a href="#reports" className="hover:text-red-600">Reports</a>
-                    <a href="#transparency" className="hover:text-red-600">How It Works</a>
-                    <a href="#about" className="hover:text-red-600">About</a>
+                    <a href={route('landing')} className="text-red-600">Home</a>
+                    <a href={`${route('landing')}#summary`} className="hover:text-red-600">Transparency Summary</a>
+                    <a href={`${route('landing')}#disclosures`} className="hover:text-red-600">Disclosures</a>
+                    <a href={`${route('landing')}#reports`} className="hover:text-red-600">Reports</a>
+                    <a href={route('public.how-it-works')} className="hover:text-red-600">How It Works</a>
+                    <a href={route('public.about')} className="hover:text-red-600">About</a>
                     {canLogin && (
                         <a
                             href={route('login')}

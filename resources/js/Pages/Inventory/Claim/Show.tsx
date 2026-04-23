@@ -4,6 +4,7 @@ import ApprovalHistoryTimeline from '@/Components/ApprovalHistoryTimeline';
 import StatusHistoryTimeline from '@/Components/StatusHistoryTimeline';
 import { humanizeEnum } from '@/lib/displayLabels';
 import { Head, Link } from '@inertiajs/react';
+import { useState } from 'react';
 
 type Props = {
     claim: {
@@ -59,6 +60,8 @@ type Props = {
 };
 
 export default function ClaimShow({ claim, linkedDistribution, attachments, attachmentPermissions, statusHistory, approvalHistory }: Props) {
+    const [activeTab, setActiveTab] = useState<'overview' | 'items' | 'status' | 'related' | 'notes'>('overview');
+
     return (
         <AuthenticatedLayout
             header={
@@ -72,7 +75,29 @@ export default function ClaimShow({ claim, linkedDistribution, attachments, atta
         >
             <Head title="Claim Detail" />
             <div className="space-y-4 py-8">
-                <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                <section className="rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
+                    <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+                        {[
+                            { key: 'overview', label: 'Overview' },
+                            { key: 'items', label: 'Items' },
+                            { key: 'status', label: 'Status History' },
+                            { key: 'related', label: 'Related Records' },
+                            { key: 'notes', label: 'Notes/Attachments' },
+                        ].map((tab) => (
+                            <button
+                                key={tab.key}
+                                type="button"
+                                onClick={() => setActiveTab(tab.key as 'overview' | 'items' | 'status' | 'related' | 'notes')}
+                                className={`rounded-lg px-3 py-2 text-xs font-semibold md:text-sm ${activeTab === tab.key ? 'bg-red-700 text-white' : 'bg-red-50 text-red-700 hover:bg-red-100'}`}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+                </section>
+
+                {activeTab === 'overview' ? (
+                    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
                     <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Claim Summary</h3>
                     <div className="mt-3 grid gap-4 md:grid-cols-2">
                         <Info label="Claim Code" value={claim.claim_code} mono />
@@ -82,9 +107,10 @@ export default function ClaimShow({ claim, linkedDistribution, attachments, atta
                         <Info label="Issue Location" value={claim.claim_location} />
                         <Info label="Remarks" value={claim.remarks ?? 'No remarks provided.'} />
                     </div>
-                </div>
+                    </div>
+                ) : null}
 
-                {linkedDistribution ? (
+                {activeTab === 'related' && linkedDistribution ? (
                     <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
                         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Linked Distribution Record</h3>
                         <div className="mt-3 grid gap-4 md:grid-cols-2">
@@ -128,22 +154,31 @@ export default function ClaimShow({ claim, linkedDistribution, attachments, atta
                     </div>
                 ) : null}
 
-                <AttachmentsPanel
-                    title="Claim Attachments"
-                    attachments={attachments}
-                    uploadRoute={route('documents.store', {
-                        related_module: 'claims',
-                        related_reference_id: claim.claims_id,
-                    })}
-                    canUpload={attachmentPermissions.upload}
-                    canDelete={attachmentPermissions.delete}
-                    downloadRouteFor={(documentId: number) => route('documents.show', documentId)}
-                    deleteRouteFor={(documentId: number) => route('documents.destroy', documentId)}
-                />
+                {activeTab === 'notes' ? (
+                    <AttachmentsPanel
+                        title="Claim Attachments"
+                        attachments={attachments}
+                        uploadRoute={route('documents.store', {
+                            related_module: 'claims',
+                            related_reference_id: claim.claims_id,
+                        })}
+                        canUpload={attachmentPermissions.upload}
+                        canDelete={attachmentPermissions.delete}
+                        downloadRouteFor={(documentId: number) => route('documents.show', documentId)}
+                        deleteRouteFor={(documentId: number) => route('documents.destroy', documentId)}
+                    />
+                ) : null}
 
-                <StatusHistoryTimeline entries={statusHistory} />
+                {activeTab === 'status' ? <StatusHistoryTimeline entries={statusHistory} /> : null}
 
-                <ApprovalHistoryTimeline entries={approvalHistory} />
+                {activeTab === 'status' ? <ApprovalHistoryTimeline entries={approvalHistory} /> : null}
+
+                {activeTab === 'items' ? (
+                    <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Claimed Item Scope</h3>
+                        <p className="mt-2 text-sm text-slate-600">Item-level breakdown is available through linked distribution records and claim evidence attachments.</p>
+                    </section>
+                ) : null}
             </div>
         </AuthenticatedLayout>
     );
