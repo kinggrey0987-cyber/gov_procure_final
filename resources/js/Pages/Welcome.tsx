@@ -1,4 +1,5 @@
 import PublicHero from '@/Components/Public/PublicHero';
+import PublicInfoCards from '@/Components/Public/PublicInfoCards';
 import PublicNavbar from '@/Components/Public/PublicNavbar';
 import PublicStatCards from '@/Components/Public/PublicStatCards';
 import { Head } from '@inertiajs/react';
@@ -19,6 +20,14 @@ type WelcomeProps = {
         type: string;
         published_at: string | null;
         attachment_count: number;
+    }>;
+    monthlyDisclosures: Array<{
+        label: string;
+        count: number;
+    }>;
+    typeBreakdown: Array<{
+        label: string;
+        count: number;
     }>;
     publicReports: Array<{
         document_id: number;
@@ -51,7 +60,7 @@ function formatDateTime(value: string | null): string {
     });
 }
 
-export default function Welcome({ canLogin, summaryStats, latestDisclosures, publicReports }: WelcomeProps) {
+export default function Welcome({ canLogin, summaryStats, latestDisclosures, monthlyDisclosures, typeBreakdown, publicReports }: WelcomeProps) {
     return (
         <>
             <Head title="GovSupply Connect" />
@@ -64,6 +73,11 @@ export default function Welcome({ canLogin, summaryStats, latestDisclosures, pub
                 />
 
                 <main className="mx-auto max-w-7xl space-y-4 px-4 py-4 sm:px-6 lg:px-8">
+                    <section id="summary" className="space-y-3">
+                        <PublicStatCards stats={summaryStats} />
+                        <PublicInfoCards monthlyDisclosures={monthlyDisclosures} typeBreakdown={typeBreakdown} />
+                    </section>
+
                     <section id="disclosures" className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                         <div className="border-b border-slate-200 p-5">
                             <div className="inline-flex items-center rounded-full bg-red-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-red-700">
@@ -144,18 +158,6 @@ export default function Welcome({ canLogin, summaryStats, latestDisclosures, pub
                                     </a>
                                 </article>
                             ))}
-                        </div>
-                    </section>
-
-                    <section id="summary" className="space-y-2">
-                        <PublicStatCards stats={summaryStats} />
-                        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-                            <a href={route('public.how-it-works')} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
-                                How It Works
-                            </a>
-                            <a href={route('public.about')} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
-                                About
-                            </a>
                         </div>
                     </section>
                 </main>

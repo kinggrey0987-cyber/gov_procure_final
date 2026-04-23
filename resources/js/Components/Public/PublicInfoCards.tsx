@@ -46,24 +46,20 @@ export default function PublicInfoCards({ monthlyDisclosures, typeBreakdown }: P
     const conicGradient = segments.length > 0 ? `conic-gradient(${segments.join(',')})` : 'conic-gradient(#cbd5e1 0% 100%)';
 
     return (
-        <section id="summary" className="grid gap-4 lg:grid-cols-2">
+        <section id="summary" className="grid gap-3 lg:grid-cols-2">
             <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div className="border-b border-slate-200 p-6">
-                    <div className="inline-flex items-center rounded-full bg-red-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-red-700">
-                        Public Transparency Summary
-                    </div>
-                    <h3 className="mt-3 text-2xl font-bold text-slate-800">Published Disclosure Trend</h3>
-                    <p className="mt-2 text-lg text-slate-500">Monthly count of approved and published disclosures</p>
+                <div className="border-b border-slate-200 px-4 py-3">
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Disclosure Trend</h3>
                 </div>
-                <div className="p-6">
-                    <svg viewBox="0 0 560 220" className="h-56 w-full">
+                <div className="px-4 py-3">
+                    <svg viewBox="0 0 560 220" className="h-32 w-full">
                         <line x1="40" y1="20" x2="40" y2="190" stroke="#94a3b8" strokeWidth="2" />
                         <line x1="40" y1="190" x2="540" y2="190" stroke="#94a3b8" strokeWidth="2" />
                         {points.map((point, idx) => (
                             <g key={idx}>
                                 <line x1={point.x} y1="20" x2={point.x} y2="190" stroke="#e2e8f0" strokeDasharray="4 4" />
-                                <circle cx={point.x} cy={point.y} r="6" fill="#dc2626" />
-                                <text x={point.x} y="208" textAnchor="middle" className="fill-slate-500 text-[10px]">
+                                <circle cx={point.x} cy={point.y} r="4" fill="#dc2626" />
+                                <text x={point.x} y="208" textAnchor="middle" className="fill-slate-500 text-[9px]">
                                     {point.label}
                                 </text>
                             </g>
@@ -72,36 +68,29 @@ export default function PublicInfoCards({ monthlyDisclosures, typeBreakdown }: P
                             points={points.map((point) => `${point.x},${point.y}`).join(' ')}
                             fill="none"
                             stroke="#dc2626"
-                            strokeWidth="4"
+                            strokeWidth="3"
                         />
                     </svg>
-                    <p className="mt-3 text-sm text-slate-500">
-                        Visual summaries reflect approved and published disclosure records only.
-                    </p>
                 </div>
             </article>
 
             <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div className="border-b border-slate-200 p-6">
-                    <div className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-700">
-                        Category Breakdown
-                    </div>
-                    <h3 className="mt-3 text-2xl font-bold text-slate-800">Most Requested Public Categories</h3>
-                    <p className="mt-2 text-lg text-slate-500">Breakdown of published disclosures by type</p>
+                <div className="border-b border-slate-200 px-4 py-3">
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Disclosure Type Mix</h3>
                 </div>
-                <div className="flex items-center justify-center p-6">
-                    <div className="relative h-56 w-56 rounded-full" style={{ background: conicGradient }}>
-                        <div className="absolute inset-8 rounded-full bg-white" />
+                <div className="flex items-center gap-4 px-4 py-3">
+                    <div className="relative h-24 w-24 shrink-0 rounded-full" style={{ background: conicGradient }}>
+                        <div className="absolute inset-4 rounded-full bg-white" />
                     </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2 px-6 pb-6 text-sm text-slate-600 sm:grid-cols-3">
-                    {breakdown.length === 0 && <p className="col-span-full text-slate-500">No published disclosure type data available yet.</p>}
-                    {breakdown.map((row, index) => (
-                        <p key={row.label}>
-                            <span className="mr-2 inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: chartColors[index % chartColors.length] }} />
-                            {row.label} ({row.count})
-                        </p>
-                    ))}
+                    <div className="grid flex-1 grid-cols-1 gap-1 text-xs text-slate-600 sm:grid-cols-2">
+                        {breakdown.length === 0 && <p className="col-span-full text-slate-500">No published disclosure type data available yet.</p>}
+                        {breakdown.map((row, index) => (
+                            <p key={row.label}>
+                                <span className="mr-2 inline-block h-2 w-2 rounded-full" style={{ backgroundColor: chartColors[index % chartColors.length] }} />
+                                {row.label} ({row.count})
+                            </p>
+                        ))}
+                    </div>
                 </div>
             </article>
         </section>

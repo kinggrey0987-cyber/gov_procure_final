@@ -25,6 +25,15 @@ export default function PublicDisclosureIndex({ disclosures }: Props) {
             <div className="min-h-screen bg-slate-50 py-12">
                 <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
                     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_8px_24px_rgba(15,23,42,0.06)] sm:p-8">
+                        <div className="mb-4 flex items-center justify-between gap-3">
+                            <Link
+                                href={route('home')}
+                                className="inline-flex rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                            >
+                                Back to Homepage
+                            </Link>
+                        </div>
+
                         <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Public Disclosures</h1>
                         <p className="mt-2 text-sm text-slate-600">Published procurement records available for public transparency.</p>
 
