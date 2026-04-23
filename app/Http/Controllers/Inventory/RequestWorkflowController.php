@@ -166,6 +166,7 @@ class RequestWorkflowController
                 'office_id' => $officeId > 0 ? $officeId : null,
                 'stock_assessment' => $stockAssessmentFilter,
                 'workflow_bucket' => $workflowBucketFilter,
+                'page' => $requests->currentPage(),
             ],
         ]);
     }
@@ -233,6 +234,13 @@ class RequestWorkflowController
                 'purchase_request_count' => $supplyRequest->purchaseRequests->count(),
                 'distribution_records_count' => $supplyRequest->distributionRecords->count(),
                 'items' => $items,
+            ],
+            'backFilters' => [
+                'q' => trim((string) $request->query('q', '')),
+                'office_id' => (int) $request->query('office_id', 0) > 0 ? (int) $request->query('office_id') : null,
+                'stock_assessment' => trim((string) $request->query('stock_assessment', '')),
+                'workflow_bucket' => trim((string) $request->query('workflow_bucket', '')),
+                'page' => (int) $request->query('page', 0) > 0 ? (int) $request->query('page') : null,
             ],
         ]);
     }

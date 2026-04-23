@@ -1,5 +1,4 @@
 import PublicHero from '@/Components/Public/PublicHero';
-import PublicInfoCards from '@/Components/Public/PublicInfoCards';
 import PublicNavbar from '@/Components/Public/PublicNavbar';
 import PublicStatCards from '@/Components/Public/PublicStatCards';
 import { Head } from '@inertiajs/react';
@@ -20,14 +19,6 @@ type WelcomeProps = {
         type: string;
         published_at: string | null;
         attachment_count: number;
-    }>;
-    monthlyDisclosures: Array<{
-        label: string;
-        count: number;
-    }>;
-    typeBreakdown: Array<{
-        label: string;
-        count: number;
     }>;
     publicReports: Array<{
         document_id: number;
@@ -60,7 +51,7 @@ function formatDateTime(value: string | null): string {
     });
 }
 
-export default function Welcome({ canLogin, summaryStats, latestDisclosures, monthlyDisclosures, typeBreakdown, publicReports }: WelcomeProps) {
+export default function Welcome({ canLogin, summaryStats, latestDisclosures, publicReports }: WelcomeProps) {
     return (
         <>
             <Head title="GovSupply Connect" />
@@ -72,7 +63,7 @@ export default function Welcome({ canLogin, summaryStats, latestDisclosures, mon
                     subtitle="Promoting transparency and accountability in municipal procurement and supply distribution."
                 />
 
-                <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+                <main className="mx-auto max-w-7xl space-y-4 px-4 py-4 sm:px-6 lg:px-8">
                     <section id="disclosures" className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                         <div className="border-b border-slate-200 p-5">
                             <div className="inline-flex items-center rounded-full bg-red-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-red-700">
@@ -122,11 +113,6 @@ export default function Welcome({ canLogin, summaryStats, latestDisclosures, mon
                         </div>
                     </section>
 
-                    <section id="summary" className="space-y-4">
-                        <PublicStatCards stats={summaryStats} />
-                        <PublicInfoCards monthlyDisclosures={monthlyDisclosures} typeBreakdown={typeBreakdown} />
-                    </section>
-
                     <section id="reports" className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                         <div className="border-b border-slate-200 p-5">
                             <h2 className="text-2xl font-bold text-red-700">Public Reports</h2>
@@ -161,26 +147,16 @@ export default function Welcome({ canLogin, summaryStats, latestDisclosures, mon
                         </div>
                     </section>
 
-                    <section id="transparency" className="grid gap-3 lg:grid-cols-2">
-                        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                            <h2 className="text-xl font-bold text-red-700">How Public Procurement Transparency Works</h2>
-                            <p className="mt-2 text-sm text-slate-600">
-                                Read the process flow, publication checkpoints, and visibility rules in one page.
-                            </p>
-                            <a href={route('public.how-it-works')} className={`mt-4 ${primaryButtonClass}`}>
-                                Open How It Works
+                    <section id="summary" className="space-y-2">
+                        <PublicStatCards stats={summaryStats} />
+                        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                            <a href={route('public.how-it-works')} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                                How It Works
                             </a>
-                        </article>
-
-                        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                            <h2 className="text-xl font-bold text-red-700">About GovSupply Connect</h2>
-                            <p className="mt-2 text-sm text-slate-600">
-                                Learn the mandate, governance context, and contact channels for the municipal team.
-                            </p>
-                            <a href={route('public.about')} className={`mt-4 ${primaryButtonClass}`}>
-                                Open About Page
+                            <a href={route('public.about')} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                                About
                             </a>
-                        </article>
+                        </div>
                     </section>
                 </main>
             </div>

@@ -1,7 +1,8 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PaginationNav from '@/Components/PaginationNav';
+import useDebouncedValue from '@/hooks/useDebouncedValue';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 
 type DocumentRow = {
     document_id: number;
@@ -48,10 +49,29 @@ export default function ProcurementDocumentsIndex({
 }: Props) {
     const [showUpload, setShowUpload] = useState(false);
 
-    const filterForm = useForm({
-        module: filters.module ?? '',
-        search: filters.search ?? '',
-    });
+    const [moduleFilter, setModuleFilter] = useState(filters.module ?? '');
+    const [searchFilter, setSearchFilter] = useState(filters.search ?? '');
+    const debouncedSearch = useDebouncedValue(searchFilter, 450);
+
+    useEffect(() => {
+        setModuleFilter(filters.module ?? '');
+        setSearchFilter(filters.search ?? '');
+    }, [filters.module, filters.search]);
+
+    const activeFilters = useMemo(
+        () => ({
+            module: moduleFilter,
+            search: debouncedSearch,
+        }),
+        [debouncedSearch, moduleFilter],
+    );
+
+    useEffect(() => {
+        router.get(route('procurement.documents.index'), activeFilters, {
+            preserveState: true,
+            replace: true,
+        });
+    }, [activeFilters]);
 
     const uploadForm = useForm<{
         related_module: '' | 'purchase_requests' | 'purchase_orders';
@@ -79,15 +99,6 @@ export default function ProcurementDocumentsIndex({
     const uploadContextOptions = uploadForm.data.related_module
         ? (optionsByModule[uploadForm.data.related_module] ?? [])
         : [];
-
-    const submitFilters = (event: FormEvent) => {
-        event.preventDefault();
-
-        router.get(route('procurement.documents.index'), filterForm.data, {
-            preserveState: true,
-            replace: true,
-        });
-    };
 
     const resetFilters = () => {
         router.get(route('procurement.documents.index'));
@@ -171,11 +182,11 @@ export default function ProcurementDocumentsIndex({
                                 </ul>
                             </div>
 
-                            <form onSubmit={submitFilters} className="grid gap-3 md:grid-cols-5">
+                            <div className="grid gap-3 md:grid-cols-4">
                                 <select
                                     className="rounded-lg border-red-200 text-sm"
-                                    value={filterForm.data.module}
-                                    onChange={(event) => filterForm.setData('module', event.target.value)}
+                                    value={moduleFilter}
+                                    onChange={(event) => setModuleFilter(event.target.value)}
                                 >
                                     <option value="">All Procurement Modules</option>
                                     {scopeModules.map((moduleCode) => (
@@ -189,13 +200,9 @@ export default function ProcurementDocumentsIndex({
                                     type="text"
                                     placeholder="Search title or file name"
                                     className="md:col-span-2 rounded-lg border-red-200 text-sm"
-                                    value={filterForm.data.search}
-                                    onChange={(event) => filterForm.setData('search', event.target.value)}
+                                    value={searchFilter}
+                                    onChange={(event) => setSearchFilter(event.target.value)}
                                 />
-
-                                <button type="submit" className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
-                                    Apply
-                                </button>
                                 <button
                                     type="button"
                                     onClick={resetFilters}
@@ -203,7 +210,7 @@ export default function ProcurementDocumentsIndex({
                                 >
                                     Reset
                                 </button>
-                            </form>
+                            </div>
 
                             {showUpload && (
                                 <form onSubmit={submitUpload} className="grid gap-3 rounded-xl border border-dashed border-red-300 bg-red-50/30 p-4 md:grid-cols-2">

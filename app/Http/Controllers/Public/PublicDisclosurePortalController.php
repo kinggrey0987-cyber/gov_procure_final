@@ -45,6 +45,7 @@ class PublicDisclosurePortalController
         return Inertia::render('Public/Disclosures/Show', [
             'disclosure' => $public_disclosure,
             'attachments' => $documents,
+            'backPage' => (int) request()->query('page', 0) > 0 ? (int) request()->query('page') : null,
         ]);
     }
 

@@ -15,9 +15,10 @@ type Props = {
         file_name: string;
         uploaded_at?: string | null;
     }>;
+    backPage?: number | null;
 };
 
-export default function PublicDisclosureShow({ disclosure, attachments }: Props) {
+export default function PublicDisclosureShow({ disclosure, attachments, backPage }: Props) {
     const hasFile = Boolean(disclosure.file_path);
     const fileName = disclosure.file_path ? disclosure.file_path.split('/').pop() ?? disclosure.file_path : null;
 
@@ -29,10 +30,12 @@ export default function PublicDisclosureShow({ disclosure, attachments }: Props)
                     <section className="rounded-2xl border border-red-200 bg-white px-6 py-6 shadow-[0_10px_24px_rgba(15,23,42,0.08)] sm:px-8">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <Link
-                                href="/"
+                                href={route('public.disclosures.index', {
+                                    page: backPage || undefined,
+                                })}
                                 className="inline-flex items-center rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
                             >
-                                Back to Homepage
+                                Back to Public Disclosures
                             </Link>
                             <div className="flex flex-wrap items-center gap-2">
                                 <Badge tone="red" label="Published" />

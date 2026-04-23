@@ -1,3 +1,4 @@
+import PaginationNav from '@/Components/PaginationNav';
 import { Head, Link } from '@inertiajs/react';
 
 type DisclosureRow = {
@@ -8,7 +9,11 @@ type DisclosureRow = {
 };
 
 type Props = {
-    disclosures: { data: DisclosureRow[] };
+    disclosures: {
+        data: DisclosureRow[];
+        links: Array<{ url: string | null; label: string; active: boolean }>;
+        current_page?: number;
+    };
 };
 
 export default function PublicDisclosureIndex({ disclosures }: Props) {
@@ -47,7 +52,10 @@ export default function PublicDisclosureIndex({ disclosures }: Props) {
                                                     <td className="px-5 py-3.5 text-slate-700">{formatPublishedDate(row.published_at)}</td>
                                                     <td className="px-5 py-3.5">
                                                         <Link
-                                                            href={route('public.disclosures.show', row.disclosure_id)}
+                                                            href={route('public.disclosures.show', {
+                                                                public_disclosure: row.disclosure_id,
+                                                                page: disclosures.current_page || undefined,
+                                                            })}
                                                             className="inline-flex rounded-lg bg-red-700 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-800"
                                                         >
                                                             View Disclosure
@@ -59,6 +67,10 @@ export default function PublicDisclosureIndex({ disclosures }: Props) {
                                     </table>
                                 </div>
                             )}
+                        </div>
+
+                        <div className="mt-5">
+                            <PaginationNav links={disclosures.links} preserveState={false} />
                         </div>
                     </div>
                 </div>

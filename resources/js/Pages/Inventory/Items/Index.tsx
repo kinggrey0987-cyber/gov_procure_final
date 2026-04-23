@@ -1,8 +1,9 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PaginationNav from '@/Components/PaginationNav';
+import useDebouncedValue from '@/hooks/useDebouncedValue';
 import useSmartRefresh from '@/hooks/useSmartRefresh';
 import { Head, Link, router } from '@inertiajs/react';
-import { FormEvent, useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 type ItemRow = {
     item_id: number;
@@ -51,6 +52,7 @@ export default function ItemCatalogIndex({ items, categories, filters, canManage
     const [q, setQ] = useState(filters.q ?? '');
     const [status, setStatus] = useState(filters.status ?? '');
     const [categoryId, setCategoryId] = useState(String(filters.category_id ?? ''));
+    const debouncedQ = useDebouncedValue(q, 450);
 
     useEffect(() => {
         setQ(filters.q ?? '');
@@ -58,10 +60,21 @@ export default function ItemCatalogIndex({ items, categories, filters, canManage
         setCategoryId(String(filters.category_id ?? ''));
     }, [filters.category_id, filters.q, filters.status]);
 
-    const submitFilters = (event: FormEvent) => {
-        event.preventDefault();
-        router.get(route('inventory.items.index'), { q, status, category_id: categoryId }, { preserveState: true, replace: true });
-    };
+    const activeFilters = useMemo(
+        () => ({
+            q: debouncedQ,
+            status,
+            category_id: categoryId,
+        }),
+        [categoryId, debouncedQ, status],
+    );
+
+    useEffect(() => {
+        router.get(route('inventory.items.index'), activeFilters, {
+            preserveState: true,
+            replace: true,
+        });
+    }, [activeFilters]);
 
     const toggleStatus = (itemId: number) => {
         router.patch(route('inventory.items.toggle-status', itemId));
@@ -83,7 +96,7 @@ export default function ItemCatalogIndex({ items, categories, filters, canManage
             <Head title="Item Catalog" />
 
             <div className="space-y-4 py-8">
-                <form onSubmit={submitFilters} className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-5">
+                <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-4">
                     <input
                         value={q}
                         onChange={(event) => setQ(event.target.value)}
@@ -103,13 +116,10 @@ export default function ItemCatalogIndex({ items, categories, filters, canManage
                         <option value="active">Active</option>
                         <option value="inactive">Inactive</option>
                     </select>
-                    <button type="submit" className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
-                        Apply
-                    </button>
                     <Link href={route('inventory.items.index')} className="rounded-lg border border-slate-300 px-4 py-2 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50">
                         Reset
                     </Link>
-                </form>
+                </div>
                 <div className="flex justify-end">
                     <button
                         type="button"

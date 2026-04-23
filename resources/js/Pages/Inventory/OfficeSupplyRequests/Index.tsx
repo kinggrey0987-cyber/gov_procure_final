@@ -1,9 +1,10 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PaginationNav from '@/Components/PaginationNav';
+import useDebouncedValue from '@/hooks/useDebouncedValue';
 import useSmartRefresh from '@/hooks/useSmartRefresh';
 import { humanizeEnum } from '@/lib/displayLabels';
 import { Head, Link, router } from '@inertiajs/react';
-import { FormEvent, useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 type PaginationLink = {
     url: string | null;
@@ -45,6 +46,7 @@ type Props = {
         office_id?: number | null;
         stock_assessment?: string;
         workflow_bucket?: string;
+        page?: number | null;
     };
 };
 
@@ -53,6 +55,7 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
     const [officeId, setOfficeId] = useState(String(filters.office_id ?? ''));
     const [stockAssessment, setStockAssessment] = useState(filters.stock_assessment ?? '');
     const [workflowBucket, setWorkflowBucket] = useState(filters.workflow_bucket ?? '');
+    const debouncedQ = useDebouncedValue(q, 450);
     const [queueingRequestId, setQueueingRequestId] = useState<number | null>(null);
     const [processingRequestId, setProcessingRequestId] = useState<number | null>(null);
 
@@ -69,19 +72,23 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
         refreshOnMount: false,
     });
 
-    const applyFilters = (event: FormEvent) => {
-        event.preventDefault();
+    const activeFilters = useMemo(
+        () => ({
+            q: debouncedQ,
+            office_id: officeId,
+            stock_assessment: stockAssessment,
+            workflow_bucket: workflowBucket,
+        }),
+        [debouncedQ, officeId, stockAssessment, workflowBucket],
+    );
+
+    useEffect(() => {
         router.get(
             route('inventory.office-supply-requests.index'),
-            {
-                q,
-                office_id: officeId,
-                stock_assessment: stockAssessment,
-                workflow_bucket: workflowBucket,
-            },
+            activeFilters,
             { preserveState: true, replace: true },
         );
-    };
+    }, [activeFilters]);
 
     const queueProcurement = (requestId: number) => {
         setQueueingRequestId(requestId);
@@ -115,7 +122,7 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
             <Head title="Office Supply Requests" />
 
             <div className="space-y-4 py-8">
-                <form onSubmit={applyFilters} className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-6">
+                <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-5">
                     <input
                         value={q}
                         onChange={(event) => setQ(event.target.value)}
@@ -142,13 +149,10 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                         <option value="STOCK_READY">Stock Ready</option>
                         <option value="SHORTAGE_REQUIRES_PROCUREMENT">Needs Procurement</option>
                     </select>
-                    <button type="submit" className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
-                        Apply
-                    </button>
                     <Link href={route('inventory.office-supply-requests.index')} className="rounded-lg border border-slate-300 px-4 py-2 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50">
                         Reset
                     </Link>
-                </form>
+                </div>
 
                 <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                     <p className="text-sm text-slate-600">
@@ -206,7 +210,14 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                                     <td className="px-4 py-3 align-top">
                                         <div className="flex min-w-[220px] flex-col items-start gap-2">
                                             <Link
-                                                href={route('inventory.office-supply-requests.show', request.supply_request_id)}
+                                                href={route('inventory.office-supply-requests.show', {
+                                                    supply_request: request.supply_request_id,
+                                                    q: filters.q || undefined,
+                                                    office_id: filters.office_id || undefined,
+                                                    stock_assessment: filters.stock_assessment || undefined,
+                                                    workflow_bucket: filters.workflow_bucket || undefined,
+                                                    page: filters.page || undefined,
+                                                })}
                                                 className="inline-flex rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                                             >
                                                 View Full Request
