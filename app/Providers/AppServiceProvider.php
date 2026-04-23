@@ -15,8 +15,10 @@ use App\Models\Ppmp;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequest;
 use App\Models\PublicDisclosure;
+use App\Models\RecordArchive;
 use App\Models\Supplier;
 use App\Models\SupplyRequest;
+use App\Models\SystemBackup;
 use App\Models\User;
 use App\Policies\AnalyticsVisibilityPolicy;
 use App\Policies\DashboardAccessPolicy;
@@ -166,11 +168,18 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('claim.update', fn (User $user, Claim $claim): bool => $user->isGsoOfficer());
 
         Gate::define('executive.monitoring.view', fn (User $user): bool => $user->isExecutive());
+        Gate::define('executive.record-archive.view-any', fn (User $user): bool => $user->isExecutive());
+        Gate::define('executive.record-archive.manage', fn (User $user): bool => $user->isExecutive());
+        Gate::define('executive.record-archive.download', fn (User $user, RecordArchive $recordArchive): bool => $user->isExecutive());
         Gate::define('executive.ppmp-approval.view-any', fn (User $user): bool => $user->isExecutive());
         Gate::define('executive.ppmp-approval.view', fn (User $user, Ppmp $ppmp): bool => $user->isExecutive());
         Gate::define('executive.ppmp-approval.signoff', function (User $user, Ppmp $ppmp): bool {
             return $user->isExecutive() && (string) $ppmp->status === 'SUBMITTED';
         });
+
+        Gate::define('admin.system-backup.view-any', fn (User $user): bool => $user->isAdmin());
+        Gate::define('admin.system-backup.manage', fn (User $user): bool => $user->isAdmin());
+        Gate::define('admin.system-backup.download', fn (User $user, SystemBackup $systemBackup): bool => $user->isAdmin());
 
         Gate::define('anomaly.view-any', fn (User $user): bool => $user->isExecutive());
         Gate::define('anomaly.view', fn (User $user, Anomaly $anomaly): bool => $user->isExecutive());

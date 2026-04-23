@@ -1,0 +1,79 @@
+<?php
+
+namespace App\Http\Controllers\AdminTech;
+
+use App\Http\Controllers\Controller;
+use App\Http\Requests\AdminTech\StoreSystemBackupRequest;
+use App\Models\SystemBackup;
+use App\Services\AdminTech\SystemBackupService;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Inertia\Inertia;
+use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+
+class SystemBackupController extends Controller
+{
+    public function __construct(private readonly SystemBackupService $systemBackupService)
+    {
+    }
+
+    public function index(Request $request): Response
+    {
+        abort_unless($request->user()?->can('admin.system-backup.view-any'), 403);
+
+        $records = SystemBackup::query()
+            ->with('creator:id,name')
+            ->orderByDesc('created_at')
+            ->orderByDesc('backup_id')
+            ->paginate(15)
+            ->withQueryString();
+
+        $records->through(static fn (SystemBackup $record): array => [
+            'backup_id' => (int) $record->backup_id,
+            'backup_type' => (string) $record->backup_type,
+            'file_name' => (string) $record->file_name,
+            'file_size' => $record->file_size,
+            'backup_status' => (string) $record->backup_status,
+            'created_at' => optional($record->created_at)?->toIso8601String(),
+            'created_by' => $record->creator ? [
+                'id' => (int) $record->creator->id,
+                'name' => (string) $record->creator->name,
+            ] : null,
+            'notes' => $record->notes,
+            'can_download' => Storage::disk('local')->exists((string) $record->file_path),
+        ]);
+
+        return Inertia::render('AdminTech/SystemBackups/Index', [
+            'records' => $records,
+            'backupTypes' => ['database_backup', 'server_backup', 'storage_backup'],
+            'backupStatuses' => ['completed', 'failed', 'pending'],
+        ]);
+    }
+
+    public function store(StoreSystemBackupRequest $request): RedirectResponse
+    {
+        abort_unless($request->user()?->can('admin.system-backup.manage'), 403);
+
+        $backup = $this->systemBackupService->createBackup(
+            actor: $request->user(),
+            payload: $request->validated(),
+        );
+
+        return redirect()
+            ->route('admin-tech.system-backups.index')
+            ->with('success', sprintf('System backup recorded: %s (%s)', (string) $backup->file_name, (string) $backup->backup_status));
+    }
+
+    public function download(Request $request, SystemBackup $system_backup): BinaryFileResponse
+    {
+        abort_unless($request->user()?->can('admin.system-backup.download', $system_backup), 403);
+
+        $path = (string) $system_backup->file_path;
+        abort_unless($path !== '' && Storage::disk('local')->exists($path), 404);
+
+        return response()->download(Storage::disk('local')->path($path), (string) $system_backup->file_name);
+    }
+}
+

@@ -4,6 +4,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Governance\AuditLogController;
 use App\Http\Controllers\AdminTech\OfficeManagementController;
 use App\Http\Controllers\AdminTech\RoleManagementController;
+use App\Http\Controllers\AdminTech\SystemBackupController;
 use App\Http\Controllers\AdminTech\UserManagementController;
 use App\Http\Controllers\DomainDashboardController;
 use App\Http\Controllers\Office\PpmpController as OfficePpmpController;
@@ -32,6 +33,7 @@ use App\Http\Controllers\Executive\AnomalyController;
 use App\Http\Controllers\Executive\ExecutiveMonitoringController;
 use App\Http\Controllers\Executive\PpmpApprovalController;
 use App\Http\Controllers\Executive\PublicDisclosureController;
+use App\Http\Controllers\Executive\RecordArchiveController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\Public\PublicDisclosurePortalController;
@@ -169,6 +171,18 @@ Route::middleware(['auth', 'twofactor', 'must-change-password'])->group(function
             Route::get('/audit/technical', [AuditLogController::class, 'technical'])
                 ->middleware('can:audit.technical.view')
                 ->name('audit.technical');
+
+            Route::prefix('system-backups')->name('system-backups.')->group(function () {
+                Route::get('/', [SystemBackupController::class, 'index'])
+                    ->middleware('can:admin.system-backup.view-any')
+                    ->name('index');
+                Route::post('/', [SystemBackupController::class, 'store'])
+                    ->middleware('can:admin.system-backup.manage')
+                    ->name('store');
+                Route::get('/{system_backup}/download', [SystemBackupController::class, 'download'])
+                    ->middleware('can:admin.system-backup.download,system_backup')
+                    ->name('download');
+            });
         });
 
     Route::prefix('office')
@@ -651,6 +665,18 @@ Route::middleware(['auth', 'twofactor', 'must-change-password'])->group(function
             Route::get('/audit/business', [AuditLogController::class, 'business'])
                 ->middleware('can:audit.business.view')
                 ->name('audit.business');
+
+            Route::prefix('record-archives')->name('record-archives.')->group(function () {
+                Route::get('/', [RecordArchiveController::class, 'index'])
+                    ->middleware('can:executive.record-archive.view-any')
+                    ->name('index');
+                Route::post('/', [RecordArchiveController::class, 'store'])
+                    ->middleware('can:executive.record-archive.manage')
+                    ->name('store');
+                Route::get('/{record_archive}/download', [RecordArchiveController::class, 'download'])
+                    ->middleware('can:executive.record-archive.download,record_archive')
+                    ->name('download');
+            });
 
             Route::prefix('anomalies')->name('anomalies.')->group(function () {
                 Route::get('/', [ExecutiveMonitoringController::class, 'anomaliesMonitoring'])

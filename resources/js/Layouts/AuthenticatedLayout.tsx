@@ -128,6 +128,18 @@ export default function Authenticated({
                 ),
             },
             {
+                label: 'System Backups',
+                href: route('admin-tech.system-backups.index'),
+                active: route().current('admin-tech.system-backups.*'),
+                icon: (
+                    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M4 7h16v10H4z" />
+                        <path d="M9 7V5h6v2" />
+                        <path d="M8 13h8" />
+                    </svg>
+                ),
+            },
+            {
                 label: 'Profile',
                 href: route('profile.edit'),
                 active: route().current('profile.*'),
@@ -589,6 +601,11 @@ export default function Authenticated({
                 label: 'Transparency & Disclosures',
                 href: route('executive.transparency-monitoring'),
                 active: route().current('executive.transparency-monitoring') || route().current('executive.disclosures.*'),
+            },
+            {
+                label: 'Record Archives',
+                href: route('executive.record-archives.index'),
+                active: route().current('executive.record-archives.*'),
             },
             {
                 label: 'Profile',

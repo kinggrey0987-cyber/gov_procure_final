@@ -177,6 +177,16 @@ class User extends Authenticatable
         return $this->hasMany(Document::class, 'uploaded_by', 'id');
     }
 
+    public function generatedRecordArchives(): HasMany
+    {
+        return $this->hasMany(RecordArchive::class, 'generated_by', 'id');
+    }
+
+    public function createdSystemBackups(): HasMany
+    {
+        return $this->hasMany(SystemBackup::class, 'created_by', 'id');
+    }
+
     public function twoFactorChallenges(): HasMany
     {
         return $this->hasMany(TwoFactorChallenge::class, 'user_id', 'id');
