@@ -97,7 +97,7 @@ class PpmpApprovalController extends Controller
             ->limit(10)
             ->get();
 
-        $records = $query->latest('ppmp_id')->paginate(15)->withQueryString();
+        $records = $query->latest('ppmp_id')->paginate(5)->withQueryString();
         $records->through(function (Ppmp $record) use ($request): array {
             return [
                 'ppmp_id' => (int) $record->ppmp_id,

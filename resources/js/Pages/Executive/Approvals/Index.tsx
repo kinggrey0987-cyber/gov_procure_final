@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { DonutChart, ExecutiveChartCard, HorizontalBarChart } from '@/Components/Executive/Charts';
+import PaginationNav from '@/Components/PaginationNav';
 import PpmpDecisionModal from '@/Components/PpmpDecisionModal';
 import useSmartRefresh from '@/hooks/useSmartRefresh';
 import { Head, Link, router, useForm } from '@inertiajs/react';
@@ -23,7 +24,10 @@ type ApprovalRow = {
 };
 
 type Props = {
-    records: { data: ApprovalRow[] };
+    records: {
+        data: ApprovalRow[];
+        links: Array<{ url: string | null; label: string; active: boolean }>;
+    };
     summary: {
         pending_ppmp_approvals: number;
         returned_for_revision: number;
@@ -253,17 +257,17 @@ export default function ExecutiveApprovalsIndex({ records, summary, filters, fil
                     )}
 
                     {records.data.map((row) => (
-                        <article key={row.ppmp_id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <article key={row.ppmp_id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
                             <div className="flex flex-wrap items-start justify-between gap-3">
                                 <div>
                                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">PPMP Reference</p>
-                                    <p className="text-lg font-semibold text-slate-900">PPMP-{row.ppmp_id}</p>
-                                    <p className="text-sm text-slate-600">{row.office?.name ?? 'Unassigned Office'} | Prepared by {row.preparer?.name ?? 'Unknown'}</p>
+                                    <p className="text-base font-semibold text-slate-900">PPMP-{row.ppmp_id}</p>
+                                    <p className="text-xs text-slate-600">{row.office?.name ?? 'Unassigned Office'} | Prepared by {row.preparer?.name ?? 'Unknown'}</p>
                                 </div>
                                 <span className={statusBadgeClass(row.status)}>{row.status}</span>
                             </div>
 
-                            <div className="mt-4 grid gap-2 text-sm text-slate-700 md:grid-cols-4">
+                            <div className="mt-3 grid gap-2 text-xs text-slate-700 md:grid-cols-4">
                                 <p>
                                     <span className="font-semibold">Submission Date:</span> {formatDate(row.submitted_at)}
                                 </p>
@@ -278,10 +282,10 @@ export default function ExecutiveApprovalsIndex({ records, summary, filters, fil
                                 </p>
                             </div>
 
-                            <div className="mt-4 flex flex-wrap items-center gap-2">
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
                                 <Link
                                     href={route('executive.ppmp-approvals.show', row.ppmp_id)}
-                                    className="rounded-lg bg-red-700 px-3 py-2 text-xs font-semibold text-white hover:bg-red-800"
+                                    className="rounded-md bg-red-700 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-red-800"
                                 >
                                     View Summary
                                 </Link>
@@ -291,21 +295,21 @@ export default function ExecutiveApprovalsIndex({ records, summary, filters, fil
                                         <button
                                             type="button"
                                             onClick={() => requestDecisionConfirmation(row.ppmp_id, 'APPROVED')}
-                                            className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                                            className="rounded-md border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
                                         >
                                             Approve
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => requestDecisionConfirmation(row.ppmp_id, 'RETURNED_FOR_REVISION')}
-                                            className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100"
+                                            className="rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100"
                                         >
                                             Return for Revision
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => requestDecisionConfirmation(row.ppmp_id, 'REJECTED')}
-                                            className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+                                            className="rounded-md border border-rose-300 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100"
                                         >
                                             Reject
                                         </button>
@@ -314,13 +318,15 @@ export default function ExecutiveApprovalsIndex({ records, summary, filters, fil
 
                                 <Link
                                     href={`${route('executive.ppmp-approvals.show', row.ppmp_id)}#history`}
-                                    className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                    className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                                 >
                                     View History
                                 </Link>
                             </div>
                         </article>
                     ))}
+
+                    {records.data.length > 0 ? <PaginationNav links={records.links} /> : null}
                 </section>
             </div>
 
