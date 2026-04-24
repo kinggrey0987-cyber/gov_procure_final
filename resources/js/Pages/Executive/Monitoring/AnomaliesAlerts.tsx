@@ -365,26 +365,24 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                             <p className="px-5 py-6 text-sm text-slate-500">No anomalies found for the selected filters.</p>
                         ) : (
                             <>
-                                <div className="overflow-x-auto">
-                                    <table className="min-w-full divide-y divide-slate-200 text-sm">
+                                <div>
+                                    <table className="min-w-full table-fixed divide-y divide-slate-200 text-sm">
                                         <thead className="bg-slate-50">
                                             <tr>
                                                 <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Type</th>
                                                 <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Severity</th>
                                                 <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Office</th>
                                                 <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Detected</th>
-                                                <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Workflow Stage</th>
                                                 <th className="px-4 py-2 text-right text-xs uppercase tracking-wide text-slate-600">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
                                             {visibleAnomalies.map((row) => (
                                                 <tr key={row.anomaly_id}>
-                                                    <td className="px-4 py-2 font-medium text-slate-800">{formatAnomalyType(row.anomaly_type)}</td>
+                                                    <td className="px-4 py-2 font-medium text-slate-800 break-words">{formatAnomalyType(row.anomaly_type)}</td>
                                                     <td className="px-4 py-2">{SeverityBadge(row.severity)}</td>
-                                                    <td className="px-4 py-2 text-slate-700">{row.office?.name ?? 'N/A'}</td>
+                                                    <td className="px-4 py-2 text-slate-700 break-words">{row.office?.name ?? 'N/A'}</td>
                                                     <td className="px-4 py-2 text-slate-700">{formatDate(row.detected_at)}</td>
-                                                    <td className="px-4 py-2">{StatusPill(row.status)}</td>
                                                     <td className="px-4 py-2 text-right">
                                                         <Link href={route('executive.anomalies.show', row.anomaly_id)} className="font-semibold text-red-700 hover:text-red-900">
                                                             View details
@@ -415,26 +413,24 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                             <p className="px-5 py-6 text-sm text-slate-500">No alerts found for the selected filters.</p>
                         ) : (
                             <>
-                                <div className="overflow-x-auto">
-                                    <table className="min-w-full divide-y divide-slate-200 text-sm">
+                                <div>
+                                    <table className="min-w-full table-fixed divide-y divide-slate-200 text-sm">
                                         <thead className="bg-slate-50">
                                             <tr>
                                                 <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Alert Type</th>
                                                 <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Severity</th>
                                                 <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Office</th>
                                                 <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Detected</th>
-                                                <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Workflow Stage</th>
                                                 <th className="px-4 py-2 text-right text-xs uppercase tracking-wide text-slate-600">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
                                             {visibleAlerts.map((row) => (
                                                 <tr key={row.alerts_id}>
-                                                    <td className="px-4 py-2 font-medium text-slate-800">{formatAlertType(row.alert_type)}</td>
+                                                    <td className="px-4 py-2 font-medium text-slate-800 break-words">{formatAlertType(row.alert_type)}</td>
                                                     <td className="px-4 py-2">{SeverityBadge(row.severity)}</td>
-                                                    <td className="px-4 py-2 text-slate-700">{row.office?.name ?? 'N/A'}</td>
+                                                    <td className="px-4 py-2 text-slate-700 break-words">{row.office?.name ?? 'N/A'}</td>
                                                     <td className="px-4 py-2 text-slate-700">{formatDate(row.detected_at)}</td>
-                                                    <td className="px-4 py-2">{StatusPill(row.status)}</td>
                                                     <td className="px-4 py-2 text-right">
                                                         <Link href={route('executive.alerts.show', row.alerts_id)} className="font-semibold text-red-700 hover:text-red-900">
                                                             View details
