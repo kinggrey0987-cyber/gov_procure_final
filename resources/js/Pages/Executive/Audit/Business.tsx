@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { HorizontalBarChart } from '@/Components/Executive/Charts';
+import PaginationNav from '@/Components/PaginationNav';
 import { downloadSectionAsPdfById } from '@/lib/printSection';
 import { Head, router } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
@@ -17,6 +18,7 @@ type Props = {
             user?: { id: number; name: string } | null;
             office?: { id: number; name: string } | null;
         }>;
+        links: Array<{ url: string | null; label: string; active: boolean }>;
     };
     filters: {
         module_name?: string;
@@ -250,7 +252,7 @@ export default function BusinessAudit({ auditLogs, filters, analytics, filter_op
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {auditLogs.data.slice(0, 30).map((log) => (
+                                    {auditLogs.data.map((log) => (
                                         <tr key={log.id} className="align-top">
                                             <td className="px-4 py-3 text-slate-700">{new Date(log.created_at).toLocaleString()}</td>
                                             <td className="px-4 py-3 text-slate-800">{log.user?.name ?? 'System'}</td>
@@ -268,6 +270,9 @@ export default function BusinessAudit({ auditLogs, filters, analytics, filter_op
                             </table>
                         </div>
                     )}
+                    <div className="px-6 py-4">
+                        <PaginationNav links={auditLogs.links} />
+                    </div>
                 </section>
             </div>
         </AuthenticatedLayout>

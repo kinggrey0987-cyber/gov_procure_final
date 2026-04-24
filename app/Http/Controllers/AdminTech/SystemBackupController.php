@@ -11,7 +11,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class SystemBackupController extends Controller
 {
@@ -42,7 +41,9 @@ class SystemBackupController extends Controller
                 'name' => (string) $record->creator->name,
             ] : null,
             'notes' => $record->notes,
-            'can_download' => Storage::disk('local')->exists((string) $record->file_path),
+            'can_download' => Storage::disk('local')->exists((string) $record->file_path)
+                || (is_array($record->payload) && array_key_exists('content', $record->payload)),
+            'can_delete' => $request->user()?->can('admin.system-backup.delete', $record) ?? false,
         ]);
 
         return Inertia::render('AdminTech/SystemBackups/Index', [
@@ -66,14 +67,45 @@ class SystemBackupController extends Controller
             ->with('success', sprintf('System backup recorded: %s (%s)', (string) $backup->file_name, (string) $backup->backup_status));
     }
 
-    public function download(Request $request, SystemBackup $system_backup): BinaryFileResponse
+    public function download(Request $request, SystemBackup $system_backup)
     {
         abort_unless($request->user()?->can('admin.system-backup.download', $system_backup), 403);
 
         $path = (string) $system_backup->file_path;
-        abort_unless($path !== '' && Storage::disk('local')->exists($path), 404);
+        if ($path !== '' && Storage::disk('local')->exists($path)) {
+            return response()->download(Storage::disk('local')->path($path), (string) $system_backup->file_name);
+        }
 
-        return response()->download(Storage::disk('local')->path($path), (string) $system_backup->file_name);
+        $payload = $system_backup->payload;
+
+        if (is_array($payload) && array_key_exists('content', $payload)) {
+            $format = (string) ($payload['format'] ?? 'json');
+            $content = $payload['content'];
+
+            $downloadContent = $format === 'text'
+                ? (string) $content
+                : (json_encode($content, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) ?: '{}');
+
+            return response()->streamDownload(static function () use ($downloadContent): void {
+                echo $downloadContent;
+            }, (string) $system_backup->file_name);
+        }
+
+        abort(404);
+    }
+
+    public function destroy(Request $request, SystemBackup $system_backup): RedirectResponse
+    {
+        abort_unless($request->user()?->can('admin.system-backup.delete', $system_backup), 403);
+
+        $this->systemBackupService->deleteBackup(
+            actor: $request->user(),
+            backup: $system_backup,
+        );
+
+        return redirect()
+            ->route('admin-tech.system-backups.index')
+            ->with('success', 'System backup deleted successfully.');
     }
 }
 

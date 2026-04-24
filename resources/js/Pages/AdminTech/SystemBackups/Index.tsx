@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PaginationNav from '@/Components/PaginationNav';
-import { Head, useForm, usePage } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 
 type BackupRow = {
     backup_id: number;
@@ -15,6 +15,7 @@ type BackupRow = {
     } | null;
     notes?: string | null;
     can_download: boolean;
+    can_delete: boolean;
 };
 
 type Props = {
@@ -41,6 +42,14 @@ export default function AdminSystemBackupsIndex({ records, backupTypes }: Props)
     const submit = (event: React.FormEvent) => {
         event.preventDefault();
         post(route('admin-tech.system-backups.store'));
+    };
+
+    const deleteBackup = (backupId: number) => {
+        if (!window.confirm('Delete this backup record? This action cannot be undone.')) {
+            return;
+        }
+
+        router.delete(route('admin-tech.system-backups.destroy', backupId));
     };
 
     return (
@@ -120,13 +129,24 @@ export default function AdminSystemBackupsIndex({ records, backupTypes }: Props)
                                     <td className="px-4 py-3">{row.created_by?.name ?? 'System'}</td>
                                     <td className="px-4 py-3">{row.notes ?? '-'}</td>
                                     <td className="px-4 py-3 text-right">
-                                        {row.can_download ? (
-                                            <a href={route('admin-tech.system-backups.download', row.backup_id)} className="font-semibold text-red-700 hover:text-red-900">
-                                                Download
-                                            </a>
-                                        ) : (
-                                            <span className="text-slate-400">Unavailable</span>
-                                        )}
+                                        <div className="inline-flex items-center gap-3">
+                                            {row.can_download ? (
+                                                <a href={route('admin-tech.system-backups.download', row.backup_id)} className="font-semibold text-red-700 hover:text-red-900">
+                                                    Download
+                                                </a>
+                                            ) : (
+                                                <span className="text-slate-400">Unavailable</span>
+                                            )}
+                                            {row.can_delete ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => deleteBackup(row.backup_id)}
+                                                    className="font-semibold text-rose-700 hover:text-rose-900"
+                                                >
+                                                    Delete
+                                                </button>
+                                            ) : null}
+                                        </div>
                                     </td>
                                 </tr>
                             ))}

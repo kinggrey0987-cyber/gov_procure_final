@@ -37,6 +37,7 @@ class ExecutiveMonitoringController
             'po_status' => ['nullable', 'string', 'max:60'],
             'from_date' => ['nullable', 'date'],
             'to_date' => ['nullable', 'date', 'after_or_equal:from_date'],
+            'po_page' => ['nullable', 'integer', 'min:1'],
         ]);
 
         return Inertia::render('Executive/ProcurementAnalytics/Index', $this->monitoringService->procurementAnalytics($filters));

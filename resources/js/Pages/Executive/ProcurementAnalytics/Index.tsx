@@ -1,5 +1,6 @@
 import { DonutChart, ExecutiveChartCard, HorizontalBarChart, TrendGroupedBarChart } from '@/Components/Executive/Charts';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import PaginationNav from '@/Components/PaginationNav';
 import { downloadSectionAsPdfById } from '@/lib/printSection';
 import { Head, router } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
@@ -33,6 +34,7 @@ type Props = {
         po_status?: string | null;
         from_date?: string | null;
         to_date?: string | null;
+        po_page?: number | null;
     };
     filter_options: {
         offices: OfficeOption[];
@@ -61,7 +63,10 @@ type Props = {
     }>;
     recent: {
         purchase_requests: PurchaseRequestRow[];
-        purchase_orders: PurchaseOrderRow[];
+        purchase_orders: {
+            data: PurchaseOrderRow[];
+            links: Array<{ url: string | null; label: string; active: boolean }>;
+        };
     };
 };
 
@@ -82,6 +87,7 @@ export default function ProcurementAnalyticsIndex({
         po_status: filters.po_status ?? '',
         from_date: filters.from_date ?? '',
         to_date: filters.to_date ?? '',
+        po_page: filters.po_page ? String(filters.po_page) : '',
     });
 
     useEffect(() => {
@@ -91,8 +97,9 @@ export default function ProcurementAnalyticsIndex({
             po_status: filters.po_status ?? '',
             from_date: filters.from_date ?? '',
             to_date: filters.to_date ?? '',
+            po_page: filters.po_page ? String(filters.po_page) : '',
         });
-    }, [filters.from_date, filters.office_id, filters.po_status, filters.pr_status, filters.to_date]);
+    }, [filters.from_date, filters.office_id, filters.po_page, filters.po_status, filters.pr_status, filters.to_date]);
 
     const activeFilters = useMemo(
         () => ({
@@ -101,8 +108,9 @@ export default function ProcurementAnalyticsIndex({
             po_status: form.po_status,
             from_date: form.from_date,
             to_date: form.to_date,
+            po_page: form.po_page,
         }),
-        [form.from_date, form.office_id, form.po_status, form.pr_status, form.to_date],
+        [form.from_date, form.office_id, form.po_page, form.po_status, form.pr_status, form.to_date],
     );
 
     useEffect(() => {
@@ -181,7 +189,7 @@ export default function ProcurementAnalyticsIndex({
                             <select
                                 className="h-10 rounded-lg border-slate-300 text-sm"
                                 value={form.office_id}
-                                onChange={(event) => setForm((current) => ({ ...current, office_id: event.target.value }))}
+                                onChange={(event) => setForm((current) => ({ ...current, office_id: event.target.value, po_page: '' }))}
                             >
                                 <option value="">All offices</option>
                                 {filter_options.offices.map((office) => (
@@ -194,7 +202,7 @@ export default function ProcurementAnalyticsIndex({
                             <select
                                 className="h-10 rounded-lg border-slate-300 text-sm"
                                 value={form.pr_status}
-                                onChange={(event) => setForm((current) => ({ ...current, pr_status: event.target.value }))}
+                                onChange={(event) => setForm((current) => ({ ...current, pr_status: event.target.value, po_page: '' }))}
                             >
                                 <option value="">All PR statuses</option>
                                 {filter_options.pr_statuses.map((status) => (
@@ -207,7 +215,7 @@ export default function ProcurementAnalyticsIndex({
                             <select
                                 className="h-10 rounded-lg border-slate-300 text-sm"
                                 value={form.po_status}
-                                onChange={(event) => setForm((current) => ({ ...current, po_status: event.target.value }))}
+                                onChange={(event) => setForm((current) => ({ ...current, po_status: event.target.value, po_page: '' }))}
                             >
                                 <option value="">All PO statuses</option>
                                 {filter_options.po_statuses.map((status) => (
@@ -221,13 +229,13 @@ export default function ProcurementAnalyticsIndex({
                                 type="date"
                                 className="h-10 rounded-lg border-slate-300 text-sm"
                                 value={form.from_date}
-                                onChange={(event) => setForm((current) => ({ ...current, from_date: event.target.value }))}
+                                onChange={(event) => setForm((current) => ({ ...current, from_date: event.target.value, po_page: '' }))}
                             />
                             <input
                                 type="date"
                                 className="h-10 rounded-lg border-slate-300 text-sm"
                                 value={form.to_date}
-                                onChange={(event) => setForm((current) => ({ ...current, to_date: event.target.value }))}
+                                onChange={(event) => setForm((current) => ({ ...current, to_date: event.target.value, po_page: '' }))}
                             />
                         </div>
 
@@ -301,7 +309,7 @@ export default function ProcurementAnalyticsIndex({
                     <div className="border-b border-slate-200 px-6 py-5">
                         <h3 className="text-xl font-semibold text-slate-800">Latest Procurement Records</h3>
                     </div>
-                    {recent.purchase_orders.length === 0 ? (
+                    {recent.purchase_orders.data.length === 0 ? (
                         <p className="px-6 py-8 text-sm text-slate-500">No data in current filter scope</p>
                     ) : (
                         <div className="overflow-x-auto">
@@ -315,7 +323,7 @@ export default function ProcurementAnalyticsIndex({
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {recent.purchase_orders.map((row) => (
+                                    {recent.purchase_orders.data.map((row) => (
                                         <tr key={row.purchase_order_id}>
                                             <td className="px-4 py-2">PO-{row.purchase_order_id}</td>
                                             <td className="px-4 py-2">{row.purchase_request?.office?.name ?? 'N/A'}</td>
@@ -325,6 +333,9 @@ export default function ProcurementAnalyticsIndex({
                                     ))}
                                 </tbody>
                             </table>
+                            <div className="px-6 py-4">
+                                <PaginationNav links={recent.purchase_orders.links} />
+                            </div>
                         </div>
                     )}
                 </section>

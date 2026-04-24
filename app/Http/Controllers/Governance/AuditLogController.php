@@ -46,7 +46,7 @@ class AuditLogController extends Controller
             'to_date' => ['nullable', 'date'],
         ]);
 
-        $logs = $this->service->business($request->user(), $filters);
+        $logs = $this->service->business($request->user(), $filters, 5);
         $analytics = $this->service->businessAnalytics($request->user(), $filters);
         $filterOptions = $this->service->businessFilterOptions($request->user());
 

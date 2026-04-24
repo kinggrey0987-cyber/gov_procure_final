@@ -182,6 +182,9 @@ Route::middleware(['auth', 'twofactor', 'must-change-password'])->group(function
                 Route::get('/{system_backup}/download', [SystemBackupController::class, 'download'])
                     ->middleware('can:admin.system-backup.download,system_backup')
                     ->name('download');
+                Route::delete('/{system_backup}', [SystemBackupController::class, 'destroy'])
+                    ->middleware('can:admin.system-backup.delete,system_backup')
+                    ->name('destroy');
             });
         });
 

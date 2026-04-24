@@ -7,6 +7,8 @@ use App\Models\Anomaly;
 use App\Models\ApprovalHistory;
 use App\Models\AuditLog;
 use App\Models\PublicDisclosure;
+use App\Models\PurchaseOrder;
+use App\Models\PurchaseRequest;
 use App\Models\RecordArchive;
 use App\Models\StatusHistory;
 use App\Models\User;
@@ -32,11 +34,35 @@ class RecordArchiveService
 
         $datasets = [
             'audit_logs' => $this->rows(AuditLog::query()->whereYear('created_at', $year)->orderBy('id')->get()->toArray()),
+            'governance_activity_evidence' => $this->rows(
+                AuditLog::query()
+                    ->business()
+                    ->with(['user:id,name', 'office:id,name'])
+                    ->whereYear('created_at', $year)
+                    ->latest('id')
+                    ->get()
+                    ->toArray()
+            ),
             'approval_history' => $this->rows(ApprovalHistory::query()->whereYear('created_at', $year)->orderBy('id')->get()->toArray()),
             'status_history' => $this->rows(StatusHistory::query()->whereYear('changed_at', $year)->orderBy('id')->get()->toArray()),
             'anomalies' => $this->rows(Anomaly::query()->whereYear('detected_at', $year)->orderBy('anomaly_id')->get()->toArray()),
             'alerts' => $this->rows(Alert::query()->whereYear('detected_at', $year)->orderBy('alerts_id')->get()->toArray()),
             'public_disclosures' => $this->rows(PublicDisclosure::query()->whereYear('created_at', $year)->orderBy('disclosure_id')->get()->toArray()),
+            'procurement_insights_latest_records' => $this->rows(
+                PurchaseOrder::query()
+                    ->with(['purchaseRequest.office:id,name'])
+                    ->whereYear('created_at', $year)
+                    ->latest('purchase_order_id')
+                    ->limit(100)
+                    ->get()
+                    ->toArray()
+            ),
+            'procurement_insights_summary' => [[
+                'year' => $year,
+                'purchase_request_count' => PurchaseRequest::query()->whereYear('created_at', $year)->count(),
+                'purchase_order_count' => PurchaseOrder::query()->whereYear('created_at', $year)->count(),
+                'purchase_order_total_amount' => (float) PurchaseOrder::query()->whereYear('created_at', $year)->sum('total_amount'),
+            ]],
         ];
 
         foreach ($datasets as $name => $rows) {

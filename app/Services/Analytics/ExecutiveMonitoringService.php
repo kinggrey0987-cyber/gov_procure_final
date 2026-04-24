@@ -11,6 +11,7 @@ use App\Models\PublicDisclosure;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequest;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -197,6 +198,7 @@ class ExecutiveMonitoringService
     {
         $purchaseRequestQuery = PurchaseRequest::query()->with('office:id,name');
         $purchaseOrderQuery = PurchaseOrder::query()->with('purchaseRequest.office:id,name');
+        $poPage = max(1, (int) ($filters['po_page'] ?? 1));
 
         if (! empty($filters['office_id'])) {
             $officeId = (int) $filters['office_id'];
@@ -221,7 +223,10 @@ class ExecutiveMonitoringService
         $purchaseOrderBase = clone $purchaseOrderQuery;
 
         $purchaseRequests = (clone $purchaseRequestBase)->latest()->limit(10)->get();
-        $purchaseOrders = (clone $purchaseOrderBase)->latest()->limit(10)->get();
+        $purchaseOrders = (clone $purchaseOrderBase)
+            ->latest('purchase_order_id')
+            ->paginate(5, ['*'], 'po_page', $poPage)
+            ->withQueryString();
 
         return [
             'filters' => [
@@ -230,6 +235,7 @@ class ExecutiveMonitoringService
                 'po_status' => $filters['po_status'] ?? null,
                 'from_date' => $filters['from_date'] ?? null,
                 'to_date' => $filters['to_date'] ?? null,
+                'po_page' => $poPage,
             ],
             'filter_options' => [
                 'offices' => Office::query()->select(['id', 'name'])->orderBy('name')->get(),
@@ -260,8 +266,26 @@ class ExecutiveMonitoringService
             'office_comparison' => $this->buildProcurementOfficeComparison($purchaseRequestBase, $purchaseOrderBase),
             'recent' => [
                 'purchase_requests' => $purchaseRequests,
-                'purchase_orders' => $purchaseOrders,
+                'purchase_orders' => $this->toPaginatorPayload($purchaseOrders),
             ],
+        ];
+    }
+
+    /**
+     * @param  LengthAwarePaginator<mixed>  $paginator
+     * @return array<string, mixed>
+     */
+    private function toPaginatorPayload(LengthAwarePaginator $paginator): array
+    {
+        $payload = $paginator->toArray();
+
+        return [
+            'data' => $paginator->items(),
+            'current_page' => $paginator->currentPage(),
+            'last_page' => $paginator->lastPage(),
+            'per_page' => $paginator->perPage(),
+            'total' => $paginator->total(),
+            'links' => $payload['links'] ?? [],
         ];
     }
 

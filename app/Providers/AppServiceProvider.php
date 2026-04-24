@@ -180,6 +180,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('admin.system-backup.view-any', fn (User $user): bool => $user->isAdmin());
         Gate::define('admin.system-backup.manage', fn (User $user): bool => $user->isAdmin());
         Gate::define('admin.system-backup.download', fn (User $user, SystemBackup $systemBackup): bool => $user->isAdmin());
+        Gate::define('admin.system-backup.delete', fn (User $user, SystemBackup $systemBackup): bool => $user->isAdmin());
 
         Gate::define('anomaly.view-any', fn (User $user): bool => $user->isExecutive());
         Gate::define('anomaly.view', fn (User $user, Anomaly $anomaly): bool => $user->isExecutive());
