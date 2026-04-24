@@ -93,6 +93,31 @@ class ArchiveAndBackupAccessTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_exec_can_delete_record_archive_and_underlying_file(): void
+    {
+        Storage::fake('local');
+
+        $this->actingAs($this->executive)
+            ->post(route('executive.record-archives.store'), [
+                'archive_year' => now()->year,
+                'archive_scope' => 'governance_yearly',
+                'notes' => 'Temporary archive for delete test.',
+            ])
+            ->assertRedirect(route('executive.record-archives.index'));
+
+        $archive = RecordArchive::query()->latest('archive_id')->firstOrFail();
+        $this->assertTrue(Storage::disk('local')->exists((string) $archive->file_path));
+
+        $this->actingAs($this->executive)
+            ->delete(route('executive.record-archives.destroy', $archive->archive_id))
+            ->assertRedirect(route('executive.record-archives.index'));
+
+        $this->assertDatabaseMissing('record_archives', [
+            'archive_id' => $archive->archive_id,
+        ]);
+        $this->assertFalse(Storage::disk('local')->exists((string) $archive->file_path));
+    }
+
     public function test_admin_can_create_system_backup_and_download_generated_file(): void
     {
         Storage::fake('local');

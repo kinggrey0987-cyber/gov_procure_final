@@ -171,6 +171,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('executive.record-archive.view-any', fn (User $user): bool => $user->isExecutive());
         Gate::define('executive.record-archive.manage', fn (User $user): bool => $user->isExecutive());
         Gate::define('executive.record-archive.download', fn (User $user, RecordArchive $recordArchive): bool => $user->isExecutive());
+        Gate::define('executive.record-archive.delete', fn (User $user, RecordArchive $recordArchive): bool => $user->isExecutive());
         Gate::define('executive.ppmp-approval.view-any', fn (User $user): bool => $user->isExecutive());
         Gate::define('executive.ppmp-approval.view', fn (User $user, Ppmp $ppmp): bool => $user->isExecutive());
         Gate::define('executive.ppmp-approval.signoff', function (User $user, Ppmp $ppmp): bool {

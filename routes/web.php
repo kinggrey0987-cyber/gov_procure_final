@@ -679,6 +679,9 @@ Route::middleware(['auth', 'twofactor', 'must-change-password'])->group(function
                 Route::get('/{record_archive}/download', [RecordArchiveController::class, 'download'])
                     ->middleware('can:executive.record-archive.download,record_archive')
                     ->name('download');
+                Route::delete('/{record_archive}', [RecordArchiveController::class, 'destroy'])
+                    ->middleware('can:executive.record-archive.delete,record_archive')
+                    ->name('destroy');
             });
 
             Route::prefix('anomalies')->name('anomalies.')->group(function () {

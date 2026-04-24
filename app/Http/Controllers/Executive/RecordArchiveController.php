@@ -43,6 +43,7 @@ class RecordArchiveController extends Controller
             ] : null,
             'notes' => $record->notes,
             'can_download' => Storage::disk('local')->exists((string) $record->file_path),
+            'can_delete' => $request->user()?->can('executive.record-archive.delete', $record) ?? false,
         ]);
 
         return Inertia::render('Executive/RecordArchives/Index', [
@@ -74,6 +75,20 @@ class RecordArchiveController extends Controller
         abort_unless($path !== '' && Storage::disk('local')->exists($path), 404);
 
         return response()->download(Storage::disk('local')->path($path), (string) $record_archive->file_name);
+    }
+
+    public function destroy(Request $request, RecordArchive $record_archive): RedirectResponse
+    {
+        abort_unless($request->user()?->can('executive.record-archive.delete', $record_archive), 403);
+
+        $this->recordArchiveService->deleteArchive(
+            actor: $request->user(),
+            archive: $record_archive,
+        );
+
+        return redirect()
+            ->route('executive.record-archives.index')
+            ->with('success', 'Record archive deleted successfully.');
     }
 }
 

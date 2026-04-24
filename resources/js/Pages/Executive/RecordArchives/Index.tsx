@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PaginationNav from '@/Components/PaginationNav';
-import { Head, useForm, usePage } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 
 type ArchiveRow = {
     archive_id: number;
@@ -15,6 +15,7 @@ type ArchiveRow = {
     } | null;
     notes?: string | null;
     can_download: boolean;
+    can_delete: boolean;
 };
 
 type Props = {
@@ -43,6 +44,14 @@ export default function ExecutiveRecordArchivesIndex({ records, archiveScopes, y
     const submit = (event: React.FormEvent) => {
         event.preventDefault();
         post(route('executive.record-archives.store'));
+    };
+
+    const deleteArchive = (archiveId: number) => {
+        if (!window.confirm('Delete this record archive? This action cannot be undone.')) {
+            return;
+        }
+
+        router.delete(route('executive.record-archives.destroy', archiveId));
     };
 
     return (
@@ -136,13 +145,24 @@ export default function ExecutiveRecordArchivesIndex({ records, archiveScopes, y
                                     <td className="px-4 py-3">{row.generated_by?.name ?? 'System'}</td>
                                     <td className="px-4 py-3">{row.notes ?? '-'}</td>
                                     <td className="px-4 py-3 text-right">
-                                        {row.can_download ? (
-                                            <a href={route('executive.record-archives.download', row.archive_id)} className="font-semibold text-red-700 hover:text-red-900">
-                                                Download
-                                            </a>
-                                        ) : (
-                                            <span className="text-slate-400">Unavailable</span>
-                                        )}
+                                        <div className="inline-flex items-center gap-3">
+                                            {row.can_download ? (
+                                                <a href={route('executive.record-archives.download', row.archive_id)} className="font-semibold text-red-700 hover:text-red-900">
+                                                    Download
+                                                </a>
+                                            ) : (
+                                                <span className="text-slate-400">Unavailable</span>
+                                            )}
+                                            {row.can_delete ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => deleteArchive(row.archive_id)}
+                                                    className="font-semibold text-rose-700 hover:text-rose-900"
+                                                >
+                                                    Delete
+                                                </button>
+                                            ) : null}
+                                        </div>
                                     </td>
                                 </tr>
                             ))}

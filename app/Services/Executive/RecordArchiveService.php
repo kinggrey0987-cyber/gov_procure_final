@@ -140,6 +140,33 @@ class RecordArchiveService
         return $record;
     }
 
+    public function deleteArchive(User $actor, RecordArchive $archive): void
+    {
+        $path = (string) $archive->file_path;
+
+        if ($path !== '' && Storage::disk('local')->exists($path)) {
+            Storage::disk('local')->delete($path);
+        }
+
+        $archiveId = (int) $archive->archive_id;
+        $fileName = (string) $archive->file_name;
+        $scope = (string) $archive->archive_scope;
+        $archive->delete();
+
+        $this->auditLogService->log(
+            actor: $actor,
+            moduleName: 'Executive.RecordArchive',
+            actionType: 'DELETE',
+            referenceType: RecordArchive::class,
+            referenceId: $archiveId,
+            details: [
+                'archive_scope' => $scope,
+                'file_name' => $fileName,
+            ],
+            logDomain: 'BUSINESS',
+        );
+    }
+
     /**
      * @param  array<int, array<string, mixed>>  $rows
      * @return array<int, array<string, mixed>>
