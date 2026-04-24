@@ -9,6 +9,7 @@ type ExportSectionPdfOptions = {
     scale?: number;
     marginMm?: number;
     paperWidthPx?: number;
+    excludeSelectors?: string[];
 };
 
 export function printSectionById(sectionId: string, options: PrintSectionOptions = {}): void {
@@ -95,52 +96,59 @@ export async function downloadSectionAsPdfById(sectionId: string, options: Expor
     const scale = options.scale ?? 2;
     const marginMm = options.marginMm ?? 10;
     const paperWidthPx = options.paperWidthPx ?? 1120;
+    const excludeSelectors = options.excludeSelectors ?? ['.print-hide'];
 
     const captureRoot = createPdfCaptureRoot(source, {
         title,
         paperWidthPx,
+        excludeSelectors,
     });
 
-    const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')]);
+    try {
+        await waitForRenderableAssets(captureRoot);
 
-    const canvas = await html2canvas(captureRoot, {
-        backgroundColor: '#ffffff',
-        scale,
-        useCORS: true,
-        windowWidth: paperWidthPx,
-    });
+        const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')]);
 
-    captureRoot.remove();
+        const canvas = await html2canvas(captureRoot, {
+            backgroundColor: '#ffffff',
+            scale,
+            useCORS: true,
+            windowWidth: paperWidthPx,
+            logging: false,
+        });
 
-    const orientation = canvas.width > canvas.height ? 'landscape' : 'portrait';
-    const pdf = new jsPDF({
-        orientation,
-        unit: 'mm',
-        format: 'a4',
-        compress: true,
-    });
+        const orientation = canvas.width > canvas.height ? 'landscape' : 'portrait';
+        const pdf = new jsPDF({
+            orientation,
+            unit: 'mm',
+            format: 'a4',
+            compress: true,
+        });
 
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const usablePageHeight = pageHeight - marginMm * 2;
-    const contentWidth = pageWidth - marginMm * 2;
-    const contentHeight = (canvas.height * contentWidth) / canvas.width;
-    const image = canvas.toDataURL('image/png');
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const usablePageHeight = pageHeight - marginMm * 2;
+        const contentWidth = pageWidth - marginMm * 2;
+        const contentHeight = (canvas.height * contentWidth) / canvas.width;
+        const image = canvas.toDataURL('image/png');
 
-    pdf.addImage(image, 'PNG', marginMm, marginMm, contentWidth, contentHeight, undefined, 'FAST');
+        pdf.addImage(image, 'PNG', marginMm, marginMm, contentWidth, contentHeight, undefined, 'FAST');
 
-    let renderedHeight = usablePageHeight;
-    while (renderedHeight < contentHeight) {
-        pdf.addPage();
-        const offsetY = marginMm - renderedHeight;
-        pdf.addImage(image, 'PNG', marginMm, offsetY, contentWidth, contentHeight, undefined, 'FAST');
-        renderedHeight += usablePageHeight;
+        let renderedHeight = usablePageHeight;
+        while (renderedHeight < contentHeight) {
+            pdf.addPage();
+            const offsetY = marginMm - renderedHeight;
+            pdf.addImage(image, 'PNG', marginMm, offsetY, contentWidth, contentHeight, undefined, 'FAST');
+            renderedHeight += usablePageHeight;
+        }
+
+        pdf.save(fileName);
+    } finally {
+        captureRoot.remove();
     }
-
-    pdf.save(fileName);
 }
 
-function createPdfCaptureRoot(source: HTMLElement, options: { title: string; paperWidthPx: number }): HTMLDivElement {
+function createPdfCaptureRoot(source: HTMLElement, options: { title: string; paperWidthPx: number; excludeSelectors: string[] }): HTMLDivElement {
     const root = document.createElement('div');
     root.setAttribute('data-pdf-capture-root', 'true');
     root.style.position = 'fixed';
@@ -157,7 +165,9 @@ function createPdfCaptureRoot(source: HTMLElement, options: { title: string; pap
     clonedSection.style.maxWidth = '100%';
     clonedSection.style.boxSizing = 'border-box';
 
-    clonedSection.querySelectorAll<HTMLElement>('.print-hide').forEach((element) => element.remove());
+    options.excludeSelectors.forEach((selector) => {
+        clonedSection.querySelectorAll<HTMLElement>(selector).forEach((element) => element.remove());
+    });
 
     const heading = document.createElement('div');
     heading.style.marginBottom = '12px';
@@ -191,6 +201,30 @@ function createPdfCaptureRoot(source: HTMLElement, options: { title: string; pap
     document.body.appendChild(root);
 
     return root;
+}
+
+async function waitForRenderableAssets(root: HTMLElement): Promise<void> {
+    if ('fonts' in document) {
+        try {
+            await document.fonts.ready;
+        } catch {
+            // no-op
+        }
+    }
+
+    const images = Array.from(root.querySelectorAll('img'));
+    await Promise.all(
+        images.map((image) => {
+            if (image.complete) {
+                return Promise.resolve();
+            }
+
+            return new Promise<void>((resolve) => {
+                image.addEventListener('load', () => resolve(), { once: true });
+                image.addEventListener('error', () => resolve(), { once: true });
+            });
+        }),
+    );
 }
 
 function escapeHtml(value: string): string {

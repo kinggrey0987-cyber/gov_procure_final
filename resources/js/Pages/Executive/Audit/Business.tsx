@@ -133,6 +133,7 @@ export default function BusinessAudit({ auditLogs, filters, analytics, filter_op
         await downloadSectionAsPdfById(printSectionId, {
             title: 'Governance Logs',
             fileName: 'governance-logs.pdf',
+            excludeSelectors: ['.print-hide', 'nav', 'aside', '[role="navigation"]'],
         });
     };
 

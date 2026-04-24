@@ -224,6 +224,7 @@ export default function ExecutiveDashboardIndex({
         await downloadSectionAsPdfById(printSectionId, {
             title: 'Executive Dashboard',
             fileName: 'executive-dashboard.pdf',
+            excludeSelectors: ['.print-hide', 'nav', 'aside', '[role="navigation"]'],
         });
     };
 
@@ -416,8 +417,8 @@ export default function ExecutiveDashboardIndex({
                     <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
                         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
                             <h3 className="text-lg font-semibold text-slate-900">Recent Anomaly Signals</h3>
-                            <Link href={route('executive.anomalies.index')} className="text-sm font-semibold text-red-700 hover:text-red-800 hover:underline">
-                                View all
+                            <Link href={route('executive.anomalies-monitoring')} className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50">
+                                Open Risk & Alerts
                             </Link>
                         </div>
                         <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
@@ -462,7 +463,6 @@ export default function ExecutiveDashboardIndex({
                                             <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Related Records</th>
                                             <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Severity</th>
                                             <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Office</th>
-                                            <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Workflow Stage</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -472,7 +472,6 @@ export default function ExecutiveDashboardIndex({
                                                 <td className="px-4 py-2 text-slate-700">{group.count}</td>
                                                 <td className="px-4 py-2">{SeverityBadge(group.representative.severity)}</td>
                                                 <td className="px-4 py-2 text-slate-700">{group.office}</td>
-                                                <td className="px-4 py-2">{StatusBadge(group.representative.status)}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -484,8 +483,8 @@ export default function ExecutiveDashboardIndex({
                     <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
                         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
                             <h3 className="text-lg font-semibold text-slate-900">Recent Alert Signals</h3>
-                            <Link href={route('executive.alerts.index')} className="text-sm font-semibold text-red-700 hover:text-red-800 hover:underline">
-                                View all
+                            <Link href={route('executive.anomalies-monitoring')} className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50">
+                                Open Risk & Alerts
                             </Link>
                         </div>
                         <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
@@ -529,7 +528,6 @@ export default function ExecutiveDashboardIndex({
                                             <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Type</th>
                                             <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Severity</th>
                                             <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Office</th>
-                                            <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Workflow Stage</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -538,7 +536,6 @@ export default function ExecutiveDashboardIndex({
                                                 <td className="px-4 py-2 text-slate-700">{formatStatusLabel(row.alert_type)}</td>
                                                 <td className="px-4 py-2">{SeverityBadge(row.severity)}</td>
                                                 <td className="px-4 py-2 text-slate-700">{row.office?.name ?? 'N/A'}</td>
-                                                <td className="px-4 py-2">{StatusBadge(row.status)}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -706,17 +703,6 @@ function SeverityBadge(value: string) {
         : normalized === 'MEDIUM'
             ? 'border-amber-200 bg-amber-50 text-amber-700'
             : 'border-slate-200 bg-slate-50 text-slate-700';
-
-    return <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${tone}`}>{formatStatusLabel(value)}</span>;
-}
-
-function StatusBadge(value: string) {
-    const normalized = value.toUpperCase();
-    const tone = normalized.includes('OPEN')
-        ? 'border-rose-200 bg-rose-50 text-rose-700'
-        : normalized.includes('REVIEW')
-            ? 'border-amber-200 bg-amber-50 text-amber-700'
-            : 'border-emerald-200 bg-emerald-50 text-emerald-700';
 
     return <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${tone}`}>{formatStatusLabel(value)}</span>;
 }

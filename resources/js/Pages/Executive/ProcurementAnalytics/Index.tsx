@@ -160,6 +160,7 @@ export default function ProcurementAnalyticsIndex({
         await downloadSectionAsPdfById(printSectionId, {
             title: 'Procurement Insights',
             fileName: 'procurement-insights.pdf',
+            excludeSelectors: ['.print-hide', 'nav', 'aside', '[role="navigation"]'],
         });
     };
 

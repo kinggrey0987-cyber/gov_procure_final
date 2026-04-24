@@ -156,6 +156,7 @@ export default function TransparencyMonitoringIndex({
         await downloadSectionAsPdfById(printSectionId, {
             title: 'Transparency & Disclosures',
             fileName: 'transparency-and-disclosures.pdf',
+            excludeSelectors: ['.print-hide', 'nav', 'aside', '[role="navigation"]'],
         });
     };
 

@@ -193,6 +193,7 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
         await downloadSectionAsPdfById(printSectionId, {
             title: 'Risk & Alerts',
             fileName: 'risk-and-alerts.pdf',
+            excludeSelectors: ['.print-hide', 'nav', 'aside', '[role="navigation"]'],
         });
     };
 
