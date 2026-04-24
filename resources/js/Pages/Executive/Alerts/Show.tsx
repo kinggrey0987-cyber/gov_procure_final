@@ -36,6 +36,15 @@ export default function ExecutiveAlertShow({ alert, anomaly_evidence }: Props) {
             <Head title="Alert Detail" />
             <div className="py-10">
                 <div className="mx-auto max-w-4xl space-y-4 px-4 sm:px-6 lg:px-8">
+                    <div className="flex items-center">
+                        <Link
+                            href={route('executive.anomalies-monitoring')}
+                            className="inline-flex items-center rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                            Return to Risk &amp; Alerts
+                        </Link>
+                    </div>
+
                     <section className="rounded border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
                         Executive review only. Only Executive Officer can open this detail page and update alert status.
                     </section>

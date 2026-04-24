@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PaginationNav from '@/Components/PaginationNav';
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import { Head, useForm, usePage } from '@inertiajs/react';
 
 type BackupRow = {
     backup_id: number;
@@ -121,9 +121,9 @@ export default function AdminSystemBackupsIndex({ records, backupTypes }: Props)
                                     <td className="px-4 py-3">{row.notes ?? '-'}</td>
                                     <td className="px-4 py-3 text-right">
                                         {row.can_download ? (
-                                            <Link href={route('admin-tech.system-backups.download', row.backup_id)} className="font-semibold text-red-700 hover:text-red-900">
+                                            <a href={route('admin-tech.system-backups.download', row.backup_id)} className="font-semibold text-red-700 hover:text-red-900">
                                                 Download
-                                            </Link>
+                                            </a>
                                         ) : (
                                             <span className="text-slate-400">Unavailable</span>
                                         )}

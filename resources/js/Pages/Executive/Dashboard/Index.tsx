@@ -79,10 +79,8 @@ export default function ExecutiveDashboardIndex({
     const printSectionId = 'executive-dashboard-print-section';
     const [anomalySearch, setAnomalySearch] = useState('');
     const [anomalySeverity, setAnomalySeverity] = useState('ALL');
-    const [anomalyStatus, setAnomalyStatus] = useState('ALL');
     const [alertSearch, setAlertSearch] = useState('');
     const [alertSeverity, setAlertSeverity] = useState('ALL');
-    const [alertStatus, setAlertStatus] = useState('ALL');
 
     const activeAnomalies = summary.open_anomaly_count + summary.in_review_anomaly_count;
     const activeAlerts = summary.open_alert_count + summary.in_review_alert_count;
@@ -152,18 +150,8 @@ export default function ExecutiveDashboardIndex({
         [recentAnomalyGroups],
     );
 
-    const anomalyStatusOptions = useMemo(
-        () => ['ALL', ...Array.from(new Set(recentAnomalyGroups.map((group) => group.representative.status.toUpperCase())))],
-        [recentAnomalyGroups],
-    );
-
     const alertSeverityOptions = useMemo(
         () => ['ALL', ...Array.from(new Set(recent_alerts.map((alert) => alert.severity.toUpperCase())))],
-        [recent_alerts],
-    );
-
-    const alertStatusOptions = useMemo(
-        () => ['ALL', ...Array.from(new Set(recent_alerts.map((alert) => alert.status.toUpperCase())))],
         [recent_alerts],
     );
 
@@ -172,9 +160,8 @@ export default function ExecutiveDashboardIndex({
 
         return recentAnomalyGroups.filter((group) => {
             const severityMatch = anomalySeverity === 'ALL' || group.representative.severity.toUpperCase() === anomalySeverity;
-            const statusMatch = anomalyStatus === 'ALL' || group.representative.status.toUpperCase() === anomalyStatus;
 
-            if (!severityMatch || !statusMatch) {
+            if (!severityMatch) {
                 return false;
             }
 
@@ -190,16 +177,15 @@ export default function ExecutiveDashboardIndex({
                 String(group.count),
             ].join(' ').toLowerCase().includes(keyword);
         });
-    }, [anomalySearch, anomalySeverity, anomalyStatus, recentAnomalyGroups]);
+    }, [anomalySearch, anomalySeverity, recentAnomalyGroups]);
 
     const filteredAlerts = useMemo(() => {
         const keyword = alertSearch.trim().toLowerCase();
 
         return recent_alerts.slice(0, 5).filter((alert) => {
             const severityMatch = alertSeverity === 'ALL' || alert.severity.toUpperCase() === alertSeverity;
-            const statusMatch = alertStatus === 'ALL' || alert.status.toUpperCase() === alertStatus;
 
-            if (!severityMatch || !statusMatch) {
+            if (!severityMatch) {
                 return false;
             }
 
@@ -214,7 +200,7 @@ export default function ExecutiveDashboardIndex({
                 alert.office?.name ?? 'N/A',
             ].join(' ').toLowerCase().includes(keyword);
         });
-    }, [alertSearch, alertSeverity, alertStatus, recent_alerts]);
+    }, [alertSearch, alertSeverity, recent_alerts]);
 
     const anomalyPreviewRows = useMemo(() => filteredAnomalyGroups.slice(0, 5), [filteredAnomalyGroups]);
     const alertPreviewRows = useMemo(() => filteredAlerts.slice(0, 5), [filteredAlerts]);
@@ -429,36 +415,27 @@ export default function ExecutiveDashboardIndex({
                 <div className="grid gap-6 xl:grid-cols-2">
                     <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
                         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-                            <h3 className="text-lg font-semibold text-slate-900">Recent Anomalies</h3>
+                            <h3 className="text-lg font-semibold text-slate-900">Recent Anomaly Signals</h3>
                             <Link href={route('executive.anomalies.index')} className="text-sm font-semibold text-red-700 hover:text-red-800 hover:underline">
-                                View All
+                                View all
                             </Link>
                         </div>
                         <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
-                            <div className="grid gap-2 md:grid-cols-8">
+                            <div className="grid gap-2 md:grid-cols-12">
                                 <input
                                     type="text"
                                     value={anomalySearch}
                                     onChange={(event) => setAnomalySearch(event.target.value)}
-                                    placeholder="Search anomaly, office, status"
-                                    className="md:col-span-4 rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                                    placeholder="Search anomaly type or office"
+                                    className="md:col-span-7 rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                                 />
                                 <select
                                     value={anomalySeverity}
                                     onChange={(event) => setAnomalySeverity(event.target.value)}
-                                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                                    className="md:col-span-3 rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                                 >
                                     {anomalySeverityOptions.map((value) => (
                                         <option key={value} value={value}>{value === 'ALL' ? 'All severities' : formatStatusLabel(value)}</option>
-                                    ))}
-                                </select>
-                                <select
-                                    value={anomalyStatus}
-                                    onChange={(event) => setAnomalyStatus(event.target.value)}
-                                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                                >
-                                    {anomalyStatusOptions.map((value) => (
-                                        <option key={value} value={value}>{value === 'ALL' ? 'All statuses' : formatStatusLabel(value)}</option>
                                     ))}
                                 </select>
                                 <button
@@ -466,14 +443,13 @@ export default function ExecutiveDashboardIndex({
                                     onClick={() => {
                                         setAnomalySearch('');
                                         setAnomalySeverity('ALL');
-                                        setAnomalyStatus('ALL');
                                     }}
-                                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                                    className="md:col-span-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
                                 >
                                     Clear
                                 </button>
                             </div>
-                            <p className="mt-2 text-xs text-slate-500">Showing {anomalyPreviewRows.length} of {filteredAnomalyGroups.length} filtered anomaly group(s).</p>
+                            <p className="mt-2 text-xs text-slate-500">Showing {anomalyPreviewRows.length} of {filteredAnomalyGroups.length} anomaly group(s).</p>
                         </div>
                         {anomalyPreviewRows.length === 0 ? (
                             <p className="px-5 py-6 text-sm text-slate-500">No data in current filter scope</p>
@@ -486,7 +462,7 @@ export default function ExecutiveDashboardIndex({
                                             <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Related Records</th>
                                             <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Severity</th>
                                             <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Office</th>
-                                            <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Status</th>
+                                            <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Workflow Stage</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -507,36 +483,27 @@ export default function ExecutiveDashboardIndex({
 
                     <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
                         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-                            <h3 className="text-lg font-semibold text-slate-900">Recent Alerts</h3>
+                            <h3 className="text-lg font-semibold text-slate-900">Recent Alert Signals</h3>
                             <Link href={route('executive.alerts.index')} className="text-sm font-semibold text-red-700 hover:text-red-800 hover:underline">
-                                View All
+                                View all
                             </Link>
                         </div>
                         <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
-                            <div className="grid gap-2 md:grid-cols-8">
+                            <div className="grid gap-2 md:grid-cols-12">
                                 <input
                                     type="text"
                                     value={alertSearch}
                                     onChange={(event) => setAlertSearch(event.target.value)}
-                                    placeholder="Search alert, office, status"
-                                    className="md:col-span-4 rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                                    placeholder="Search alert type or office"
+                                    className="md:col-span-7 rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                                 />
                                 <select
                                     value={alertSeverity}
                                     onChange={(event) => setAlertSeverity(event.target.value)}
-                                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                                    className="md:col-span-3 rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                                 >
                                     {alertSeverityOptions.map((value) => (
                                         <option key={value} value={value}>{value === 'ALL' ? 'All severities' : formatStatusLabel(value)}</option>
-                                    ))}
-                                </select>
-                                <select
-                                    value={alertStatus}
-                                    onChange={(event) => setAlertStatus(event.target.value)}
-                                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                                >
-                                    {alertStatusOptions.map((value) => (
-                                        <option key={value} value={value}>{value === 'ALL' ? 'All statuses' : formatStatusLabel(value)}</option>
                                     ))}
                                 </select>
                                 <button
@@ -544,14 +511,13 @@ export default function ExecutiveDashboardIndex({
                                     onClick={() => {
                                         setAlertSearch('');
                                         setAlertSeverity('ALL');
-                                        setAlertStatus('ALL');
                                     }}
-                                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                                    className="md:col-span-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
                                 >
                                     Clear
                                 </button>
                             </div>
-                            <p className="mt-2 text-xs text-slate-500">Showing {alertPreviewRows.length} of {filteredAlerts.length} filtered alert(s).</p>
+                            <p className="mt-2 text-xs text-slate-500">Showing {alertPreviewRows.length} of {filteredAlerts.length} alert(s).</p>
                         </div>
                         {alertPreviewRows.length === 0 ? (
                             <p className="px-5 py-6 text-sm text-slate-500">No data in current filter scope</p>
@@ -563,7 +529,7 @@ export default function ExecutiveDashboardIndex({
                                             <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Type</th>
                                             <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Severity</th>
                                             <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Office</th>
-                                            <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Status</th>
+                                            <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Workflow Stage</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">

@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PaginationNav from '@/Components/PaginationNav';
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import { Head, useForm, usePage } from '@inertiajs/react';
 
 type ArchiveRow = {
     archive_id: number;
@@ -137,9 +137,9 @@ export default function ExecutiveRecordArchivesIndex({ records, archiveScopes, y
                                     <td className="px-4 py-3">{row.notes ?? '-'}</td>
                                     <td className="px-4 py-3 text-right">
                                         {row.can_download ? (
-                                            <Link href={route('executive.record-archives.download', row.archive_id)} className="font-semibold text-red-700 hover:text-red-900">
+                                            <a href={route('executive.record-archives.download', row.archive_id)} className="font-semibold text-red-700 hover:text-red-900">
                                                 Download
-                                            </Link>
+                                            </a>
                                         ) : (
                                             <span className="text-slate-400">Unavailable</span>
                                         )}

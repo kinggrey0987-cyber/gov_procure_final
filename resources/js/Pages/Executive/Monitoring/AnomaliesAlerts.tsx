@@ -1,7 +1,7 @@
 import { ExecutiveChartCard, HorizontalBarChart, TrendGroupedBarChart } from '@/Components/Executive/Charts';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { downloadSectionAsPdfById } from '@/lib/printSection';
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
 
 type OptionOffice = { id: number; name: string };
@@ -92,7 +92,10 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
     monthly_trends,
     recent,
 }: Props) {
+    const pageSize = 5;
     const printSectionId = 'risk-alerts-print-section';
+    const [anomalyPage, setAnomalyPage] = useState(1);
+    const [alertPage, setAlertPage] = useState(1);
 
     const [form, setForm] = useState({
         office_id: filters.office_id ? String(filters.office_id) : '',
@@ -150,8 +153,29 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
 
     const severityMix = mergeSeverity(anomaly_severity_breakdown, alert_severity_breakdown);
     const statusMix = mergeStatus(status_breakdown.anomalies, status_breakdown.alerts);
-    const anomalyGroups = buildAnomalyGroups(recent.anomalies).slice(0, 5);
-    const representativeAnomalies = anomalyGroups.map((group) => group.representative);
+    const totalAnomalyPages = Math.max(1, Math.ceil(recent.anomalies.length / pageSize));
+    const totalAlertPages = Math.max(1, Math.ceil(recent.alerts.length / pageSize));
+
+    const normalizedAnomalyPage = Math.min(anomalyPage, totalAnomalyPages);
+    const normalizedAlertPage = Math.min(alertPage, totalAlertPages);
+
+    const visibleAnomalies = useMemo(() => {
+        const start = (normalizedAnomalyPage - 1) * pageSize;
+        return recent.anomalies.slice(start, start + pageSize);
+    }, [normalizedAnomalyPage, recent.anomalies]);
+
+    const visibleAlerts = useMemo(() => {
+        const start = (normalizedAlertPage - 1) * pageSize;
+        return recent.alerts.slice(start, start + pageSize);
+    }, [normalizedAlertPage, recent.alerts]);
+
+    useEffect(() => {
+        setAnomalyPage(1);
+    }, [recent.anomalies]);
+
+    useEffect(() => {
+        setAlertPage(1);
+    }, [recent.alerts]);
 
     const exportCsv = () => {
         const rows = [
@@ -331,92 +355,151 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                     </div>
                 </div>
 
-                <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-                    <div className="border-b border-slate-200 px-5 py-4">
-                        <h3 className="text-lg font-semibold text-slate-900">Recent Anomalies</h3>
-                        <p className="mt-1 text-sm text-slate-600">Distinct anomaly groups first, with representative records for executive triage.</p>
-                    </div>
-                    {recent.anomalies.length === 0 ? (
-                        <p className="px-5 py-6 text-sm text-slate-500">No anomalies found for the selected filters.</p>
-                    ) : (
-                        <div className="space-y-4 px-4 py-4">
-                            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                                {anomalyGroups.map((group) => (
-                                    <article key={group.key} className="rounded-lg border border-red-100 bg-red-50/50 px-3 py-2">
-                                        <p className="text-sm font-semibold text-slate-900">{group.label}</p>
-                                        <p className="mt-1 text-xs text-slate-600">{group.office} • {group.source}</p>
-                                        <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-red-700">{group.count} related record{group.count > 1 ? 's' : ''}</p>
-                                    </article>
-                                ))}
-                            </div>
-
-                            {representativeAnomalies.map((row) => (
-                                <article key={row.anomaly_id} className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-                                    <div className="flex flex-wrap items-start justify-between gap-3">
-                                        <p className="text-sm font-semibold text-slate-900">{formatAnomalyType(row.anomaly_type)}</p>
-                                        <div className="flex flex-wrap items-center gap-1.5">
-                                            {SeverityBadge(row.severity)}
-                                            {StatusPill(row.status)}
-                                        </div>
-                                    </div>
-
-                                    <div className="mt-3 grid gap-3 text-sm md:grid-cols-2">
-                                        <InfoCell label="Office" value={row.office?.name ?? 'N/A'} />
-                                        <InfoCell label="Source Context" value={formatAnomalySource(row)} />
-                                        <InfoCell label="Detected vs Expected / Threshold" value={formatDetectionVsExpected(row)} />
-                                        <InfoCell label="Detected Date" value={formatDate(row.detected_at)} />
-                                    </div>
-
-                                    <div className="mt-3 rounded-lg border border-red-100 bg-white px-3 py-2">
-                                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">Impact Summary</p>
-                                        <p className="mt-1 text-sm text-slate-700">{buildAnomalyImpact(row)}</p>
-                                    </div>
-                                </article>
-                            ))}
+                <div className="grid gap-6 xl:grid-cols-2">
+                    <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+                        <div className="border-b border-slate-200 px-5 py-4">
+                            <h3 className="text-lg font-semibold text-slate-900">Recent Anomalies</h3>
+                            <p className="mt-1 text-sm text-slate-600">Top 5 records per page. Open each record to view the full anomaly breakdown.</p>
                         </div>
-                    )}
-                </section>
+                        {recent.anomalies.length === 0 ? (
+                            <p className="px-5 py-6 text-sm text-slate-500">No anomalies found for the selected filters.</p>
+                        ) : (
+                            <>
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full divide-y divide-slate-200 text-sm">
+                                        <thead className="bg-slate-50">
+                                            <tr>
+                                                <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Type</th>
+                                                <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Severity</th>
+                                                <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Office</th>
+                                                <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Detected</th>
+                                                <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Workflow Stage</th>
+                                                <th className="px-4 py-2 text-right text-xs uppercase tracking-wide text-slate-600">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {visibleAnomalies.map((row) => (
+                                                <tr key={row.anomaly_id}>
+                                                    <td className="px-4 py-2 font-medium text-slate-800">{formatAnomalyType(row.anomaly_type)}</td>
+                                                    <td className="px-4 py-2">{SeverityBadge(row.severity)}</td>
+                                                    <td className="px-4 py-2 text-slate-700">{row.office?.name ?? 'N/A'}</td>
+                                                    <td className="px-4 py-2 text-slate-700">{formatDate(row.detected_at)}</td>
+                                                    <td className="px-4 py-2">{StatusPill(row.status)}</td>
+                                                    <td className="px-4 py-2 text-right">
+                                                        <Link href={route('executive.anomalies.show', row.anomaly_id)} className="font-semibold text-red-700 hover:text-red-900">
+                                                            View details
+                                                        </Link>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <SimplePager
+                                    page={normalizedAnomalyPage}
+                                    totalPages={totalAnomalyPages}
+                                    onPageChange={setAnomalyPage}
+                                    totalCount={recent.anomalies.length}
+                                    pageSize={pageSize}
+                                />
+                            </>
+                        )}
+                    </section>
 
-                <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-                    <div className="border-b border-slate-200 px-5 py-4">
-                        <h3 className="text-lg font-semibold text-slate-900">Recent Alerts</h3>
-                        <p className="mt-1 text-sm text-slate-600">Latest alerts with source context and executive relevance.</p>
-                    </div>
-                    {recent.alerts.length === 0 ? (
-                        <p className="px-5 py-6 text-sm text-slate-500">No alerts found for the selected filters.</p>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-slate-200 text-sm">
-                                <thead className="bg-slate-50">
-                                    <tr>
-                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Alert Type</th>
-                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Severity</th>
-                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Office</th>
-                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Source Context</th>
-                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Impact Summary</th>
-                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Detected</th>
-                                        <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {recent.alerts.slice(0, 5).map((row) => (
-                                        <tr key={row.alerts_id}>
-                                            <td className="px-4 py-2 font-medium text-slate-800">{formatAlertType(row.alert_type)}</td>
-                                            <td className="px-4 py-2">{SeverityBadge(row.severity)}</td>
-                                            <td className="px-4 py-2 text-slate-700">{row.office?.name ?? 'N/A'}</td>
-                                            <td className="px-4 py-2 text-slate-700">{formatAlertSource(row)}</td>
-                                            <td className="px-4 py-2 text-slate-700">{buildAlertImpact(row)}</td>
-                                            <td className="px-4 py-2 text-slate-700">{formatDate(row.detected_at)}</td>
-                                            <td className="px-4 py-2">{StatusPill(row.status)}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                    <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+                        <div className="border-b border-slate-200 px-5 py-4">
+                            <h3 className="text-lg font-semibold text-slate-900">Recent Alerts</h3>
+                            <p className="mt-1 text-sm text-slate-600">Top 5 records per page. Open each record to view the full alert breakdown.</p>
                         </div>
-                    )}
-                </section>
+                        {recent.alerts.length === 0 ? (
+                            <p className="px-5 py-6 text-sm text-slate-500">No alerts found for the selected filters.</p>
+                        ) : (
+                            <>
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full divide-y divide-slate-200 text-sm">
+                                        <thead className="bg-slate-50">
+                                            <tr>
+                                                <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Alert Type</th>
+                                                <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Severity</th>
+                                                <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Office</th>
+                                                <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Detected</th>
+                                                <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Workflow Stage</th>
+                                                <th className="px-4 py-2 text-right text-xs uppercase tracking-wide text-slate-600">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {visibleAlerts.map((row) => (
+                                                <tr key={row.alerts_id}>
+                                                    <td className="px-4 py-2 font-medium text-slate-800">{formatAlertType(row.alert_type)}</td>
+                                                    <td className="px-4 py-2">{SeverityBadge(row.severity)}</td>
+                                                    <td className="px-4 py-2 text-slate-700">{row.office?.name ?? 'N/A'}</td>
+                                                    <td className="px-4 py-2 text-slate-700">{formatDate(row.detected_at)}</td>
+                                                    <td className="px-4 py-2">{StatusPill(row.status)}</td>
+                                                    <td className="px-4 py-2 text-right">
+                                                        <Link href={route('executive.alerts.show', row.alerts_id)} className="font-semibold text-red-700 hover:text-red-900">
+                                                            View details
+                                                        </Link>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <SimplePager
+                                    page={normalizedAlertPage}
+                                    totalPages={totalAlertPages}
+                                    onPageChange={setAlertPage}
+                                    totalCount={recent.alerts.length}
+                                    pageSize={pageSize}
+                                />
+                            </>
+                        )}
+                    </section>
+                </div>
             </div>
         </AuthenticatedLayout>
+    );
+}
+
+function SimplePager({
+    page,
+    totalPages,
+    onPageChange,
+    totalCount,
+    pageSize,
+}: {
+    page: number;
+    totalPages: number;
+    onPageChange: (value: number) => void;
+    totalCount: number;
+    pageSize: number;
+}) {
+    const start = totalCount === 0 ? 0 : ((page - 1) * pageSize) + 1;
+    const end = Math.min(page * pageSize, totalCount);
+
+    return (
+        <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-xs text-slate-600">
+            <p>Showing {start}-{end} of {totalCount}</p>
+            <div className="flex items-center gap-2">
+                <button
+                    type="button"
+                    onClick={() => onPageChange(Math.max(1, page - 1))}
+                    disabled={page <= 1}
+                    className="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                    Prev
+                </button>
+                <span className="font-semibold text-slate-700">Page {page} of {totalPages}</span>
+                <button
+                    type="button"
+                    onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+                    disabled={page >= totalPages}
+                    className="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                    Next
+                </button>
+            </div>
+        </div>
     );
 }
 
