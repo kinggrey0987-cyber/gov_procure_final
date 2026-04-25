@@ -168,9 +168,9 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                     </div>
 
                     <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Low Stock Signals</h3>
+                        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">GSO Replenishment Basis Signals</h3>
                         <p className="mt-2 text-xs text-slate-500">
-                            Low Stock Threshold is the minimum safety stock level. Deficit is the gap between current available stock and that threshold.
+                            Low Stock Threshold is the minimum safety stock level. Deficit is the gap between current available stock and that threshold. These signals are internal stock replenishment planning context only; they are not automated PPMP approval, procurement approval, or PO approval.
                         </p>
                         <div className="mt-4 space-y-3">
                             {lowStockItems.slice(0, 6).map((item) => (
@@ -190,7 +190,7 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                                             ? 'Already Queued for Procurement'
                                             : initiatingInventoryId === item.inventory_id
                                             ? 'Initiating...'
-                                            : 'Review & Initiate PR'}
+                                            : 'Review Replenishment Basis'}
                                     </button>
                                     {item.is_already_queued && item.active_purchase_request_id ? (
                                         <p className="mt-1 text-[11px] font-semibold text-slate-500">Active PR: PR-{String(item.active_purchase_request_id).padStart(6, '0')}</p>
@@ -220,8 +220,8 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                 <Modal show={selectedLowStockItem !== null} maxWidth="lg" onClose={closeLowStockModal}>
                     <div className="space-y-4 p-6">
                         <div>
-                            <h4 className="text-base font-semibold text-slate-900">Initiate Purchase Request</h4>
-                            <p className="mt-1 text-sm text-slate-600">Review low-stock details and adjust requested quantity before queuing.</p>
+                            <h4 className="text-base font-semibold text-slate-900">Review GSO Replenishment Basis</h4>
+                            <p className="mt-1 text-sm text-slate-600">Review low-stock details and adjust requested quantity before queuing a procurement basis. BAC/procurement must still process the PR and create any PO.</p>
                         </div>
 
                         {selectedLowStockItem ? (
@@ -265,7 +265,7 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                             >
                                 {selectedLowStockItem && initiatingInventoryId === selectedLowStockItem.inventory_id
                                     ? 'Initiating...'
-                                    : 'Confirm Initiation'}
+                                    : 'Confirm Replenishment Basis'}
                             </button>
                         </div>
                     </div>

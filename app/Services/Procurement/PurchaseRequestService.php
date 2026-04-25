@@ -218,6 +218,7 @@ class PurchaseRequestService
         }
 
         $signalMarker = sprintf('LOW_STOCK_SIGNAL:inventory:%d', (int) $inventory->inventory_id);
+        $governanceLabel = 'GSO Replenishment Basis - internal stock replenishment planning context only; not an office-approved PPMP and not a procurement approval.';
 
         $alreadyQueued = PurchaseRequest::query()
             ->whereIn('status', ['OPEN', 'PROCESSING'])
@@ -230,7 +231,7 @@ class PurchaseRequestService
             ]);
         }
 
-        return DB::transaction(function () use ($actor, $inventory, $quantityRequested, $officeId, $signalMarker): PurchaseRequest {
+        return DB::transaction(function () use ($actor, $inventory, $quantityRequested, $officeId, $signalMarker, $governanceLabel): PurchaseRequest {
             $inventory->loadMissing('item');
 
             $item = $inventory->item;
@@ -251,7 +252,7 @@ class PurchaseRequestService
                 'total_estimated_budget' => 0,
                 'date_prepared' => now()->toDateString(),
                 'date_approved' => null,
-                'remarks' => 'System-generated PPMP context for low-stock signal procurement.',
+                'remarks' => $governanceLabel,
             ]);
 
             $ppmpItem = PpmpItem::query()->create([
@@ -263,7 +264,7 @@ class PurchaseRequestService
                 'estimated_budget' => 0,
                 'procurement_schedule' => 'IMMEDIATE',
                 'fund_source' => 'General Fund',
-                'remarks' => 'System-generated from low-stock signal.',
+                'remarks' => $governanceLabel,
             ]);
 
             $supplyRequest = SupplyRequest::query()->create([
@@ -275,7 +276,7 @@ class PurchaseRequestService
                 'needed_by_date' => now()->addDays(7)->toDateString(),
                 'request_category' => 'GENERAL',
                 'purpose' => sprintf(
-                    'System-generated low-stock procurement trigger for %s (inventory #%d).',
+                    'GSO Replenishment Basis for %s (inventory #%d). Internal stock replenishment planning context only; BAC/procurement must still process any PR/PO.',
                     (string) ($inventory->item?->item_name ?? 'Unassigned Item'),
                     (int) $inventory->inventory_id
                 ),
@@ -300,7 +301,7 @@ class PurchaseRequestService
                 'requested_by' => (int) $actor->id,
                 'status' => 'OPEN',
                 'remarks' => sprintf(
-                    '%s | Auto-generated from low-stock signal for %s.',
+                    '%s | GSO Replenishment Basis for %s. Internal stock replenishment planning context only; this is not automated PPMP approval, procurement approval, or PO approval.',
                     $signalMarker,
                     (string) ($inventory->item?->item_name ?? 'Unassigned Item')
                 ),
@@ -310,10 +311,10 @@ class PurchaseRequestService
                 'purchase_request_id' => (int) $purchaseRequest->purchase_request_id,
                 'item_id' => (int) $inventory->item_id,
                 'quantity_requested' => round($quantityRequested, 2),
-                'remarks' => 'Quantity generated from low-stock deficit.',
+                'remarks' => 'Quantity proposed from low-stock deficit under GSO Replenishment Basis; BAC/procurement processing remains required.',
             ]);
 
-            $this->recordStatus($purchaseRequest, null, 'OPEN', $actor, 'Purchase request auto-generated from low-stock signal.');
+            $this->recordStatus($purchaseRequest, null, 'OPEN', $actor, 'Purchase request queued from GSO Replenishment Basis; BAC/procurement processing and PO creation remain required.');
             $this->recordAudit($actor, 'AUTO_QUEUE_LOW_STOCK', $purchaseRequest);
 
             $deficit = max((float) $inventory->low_stock_threshold - (float) $inventory->available_stock, 0);

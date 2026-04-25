@@ -6,6 +6,7 @@ use App\Http\Requests\Document\DeleteDocumentRequest;
 use App\Http\Requests\Document\StoreDocumentRequest;
 use App\Models\Document;
 use App\Models\PublicDisclosure;
+use App\Services\AuditLogService;
 use App\Services\Documents\DocumentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -17,8 +18,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DocumentController extends Controller
 {
-    public function __construct(private readonly DocumentService $service)
-    {
+    public function __construct(
+        private readonly DocumentService $service,
+        private readonly AuditLogService $auditLogService,
+    ) {
     }
 
     private function publicDisk(): string
@@ -119,6 +122,22 @@ class DocumentController extends Controller
                 'file_path' => $path,
                 'file_name' => basename($path),
             ])->save();
+
+            $this->auditLogService->log(
+                actor: request()->user(),
+                moduleName: 'Public.DisclosureAttachmentDownload',
+                actionType: 'REBUILD_MISSING_PUBLIC_ATTACHMENT_FILE',
+                referenceType: Document::class,
+                referenceId: (int) $document->document_id,
+                details: [
+                    'disclosure_id' => (int) $public_disclosure->disclosure_id,
+                    'document_id' => (int) $document->document_id,
+                    'rebuilt_file_path' => $path,
+                    'request_context' => request()->user() ? 'authenticated' : 'public',
+                    'rebuilt_at' => now()->toIso8601String(),
+                ],
+                logDomain: 'BUSINESS',
+            );
         }
 
         return $this->streamDiskDownload($path, (string) $document->file_name);

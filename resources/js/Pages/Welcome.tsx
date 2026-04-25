@@ -80,11 +80,6 @@ export default function Welcome({ canLogin, summaryStats, latestDisclosures, mon
                 />
 
                 <main className="mx-auto max-w-7xl space-y-4 px-4 py-4 sm:px-6 lg:px-8">
-                    <section id="summary" className="space-y-3">
-                        <PublicStatCards stats={summaryStats} />
-                        <PublicInfoCards monthlyDisclosures={monthlyDisclosures} typeBreakdown={typeBreakdown} />
-                    </section>
-
                     <section id="disclosures" className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                         <div className="border-b border-slate-200 p-5">
                             <div className="inline-flex items-center rounded-full bg-red-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-red-700">
@@ -129,6 +124,11 @@ export default function Welcome({ canLogin, summaryStats, latestDisclosures, mon
                                 </article>
                             ))}
                         </div>
+                    </section>
+
+                    <section id="summary" className="space-y-3">
+                        <PublicStatCards stats={summaryStats} />
+                        <PublicInfoCards monthlyDisclosures={monthlyDisclosures} typeBreakdown={typeBreakdown} />
                     </section>
 
                     <section id="reports" className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">

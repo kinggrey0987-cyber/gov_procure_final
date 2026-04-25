@@ -29,11 +29,13 @@ class AlertController
         $query = Alert::query()->with(['anomaly', 'office', 'reviewer']);
 
         if (auth()->user()->isGsoOfficer()) {
-            $query->whereIn('alert_type', ['LOW_STOCK', 'STOCK_RISK', 'DELAYED_DELIVERY']);
+            $query->whereNull('anomaly_id')
+                ->whereIn('alert_type', ['LOW_STOCK', 'STOCK_RISK', 'DELAYED_DELIVERY']);
         }
 
         if (auth()->user()->isProcurement()) {
-            $query->whereIn('alert_type', ['PROCUREMENT_DELAY', 'SUPPLIER_RISK', 'WORKFLOW_BLOCKER']);
+            $query->whereNull('anomaly_id')
+                ->whereIn('alert_type', ['PROCUREMENT_DELAY', 'SUPPLIER_RISK', 'WORKFLOW_BLOCKER']);
         }
 
         $alerts = $query

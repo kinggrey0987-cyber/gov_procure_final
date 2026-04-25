@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Public;
 use App\Models\Document;
 use App\Models\PublicDisclosure;
 use App\Services\Documents\DocumentService;
+use App\Services\AuditLogService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -15,8 +16,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PublicDisclosurePortalController
 {
-    public function __construct(private readonly DocumentService $documentService)
-    {
+    public function __construct(
+        private readonly DocumentService $documentService,
+        private readonly AuditLogService $auditLogService,
+    ) {
     }
 
     private function publicDisk(): string
@@ -96,6 +99,21 @@ class PublicDisclosurePortalController
             $public_disclosure->forceFill([
                 'file_path' => $path,
             ])->save();
+
+            $this->auditLogService->log(
+                actor: Auth::user(),
+                moduleName: 'Public.DisclosureDownload',
+                actionType: 'REBUILD_MISSING_DISCLOSURE_FILE',
+                referenceType: PublicDisclosure::class,
+                referenceId: (int) $public_disclosure->disclosure_id,
+                details: [
+                    'disclosure_id' => (int) $public_disclosure->disclosure_id,
+                    'rebuilt_file_path' => $path,
+                    'request_context' => Auth::check() ? 'authenticated' : 'public',
+                    'rebuilt_at' => now()->toIso8601String(),
+                ],
+                logDomain: 'BUSINESS',
+            );
         }
 
         return $this->streamDiskDownload($path, basename($path));
