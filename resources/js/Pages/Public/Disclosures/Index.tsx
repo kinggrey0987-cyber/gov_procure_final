@@ -27,7 +27,7 @@ export default function PublicDisclosureIndex({ disclosures }: Props) {
                     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_8px_24px_rgba(15,23,42,0.06)] sm:p-8">
                         <div className="mb-4 flex items-center justify-between gap-3">
                             <Link
-                                href={route('home')}
+                                href={route('landing')}
                                 className="inline-flex rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                             >
                                 Back to Homepage

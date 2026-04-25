@@ -60,6 +60,13 @@ function formatDateTime(value: string | null): string {
     });
 }
 
+function formatDisclosureType(value: string): string {
+    return value
+        .replaceAll('_', ' ')
+        .toLowerCase()
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 export default function Welcome({ canLogin, summaryStats, latestDisclosures, monthlyDisclosures, typeBreakdown, publicReports }: WelcomeProps) {
     return (
         <>
@@ -111,7 +118,7 @@ export default function Welcome({ canLogin, summaryStats, latestDisclosures, mon
                                         <span className="text-sm font-semibold text-slate-500">{formatDateTime(item.published_at)}</span>
                                     </div>
                                     <h3 className="mt-3 line-clamp-2 text-lg font-bold text-slate-800">{item.title}</h3>
-                                    <p className="mt-1 text-sm text-slate-600">Type: {item.type}</p>
+                                    <p className="mt-1 text-sm text-slate-600">Type: {formatDisclosureType(item.type)}</p>
                                     <div className="mt-3 flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-2">
                                         <p className="text-sm text-slate-500">Public Attachments</p>
                                         <p className="text-base font-bold text-red-700">{item.attachment_count}</p>
@@ -152,6 +159,8 @@ export default function Welcome({ canLogin, summaryStats, latestDisclosures, mon
                                             public_disclosure: report.disclosure_id,
                                             document: report.document_id,
                                         })}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
                                         className={`mt-5 w-full ${primaryButtonClass}`}
                                     >
                                         Download File
