@@ -96,7 +96,19 @@ class DocumentController extends Controller
                 (string) $document->file_name,
             ),
         ]);
-        abort_unless($path !== null, 404);
+        if ($path === null) {
+            return $this->streamTextDownload(
+                implode(PHP_EOL, [
+                    'GovSupply Connect Public Disclosure Attachment',
+                    sprintf('Disclosure ID: %d', (int) $public_disclosure->disclosure_id),
+                    sprintf('Document ID: %d', (int) $document->document_id),
+                    sprintf('Title: %s', (string) $document->title),
+                    sprintf('Original File Name: %s', (string) $document->file_name),
+                    'Note: The original attachment file is currently unavailable in storage.',
+                ]).PHP_EOL,
+                sprintf('disclosure-%d-document-%d-unavailable.txt', (int) $public_disclosure->disclosure_id, (int) $document->document_id),
+            );
+        }
 
         return $this->streamDiskDownload($path, (string) $document->file_name);
     }
@@ -157,6 +169,19 @@ class DocumentController extends Controller
                 }
             },
             $downloadName,
+        );
+    }
+
+    private function streamTextDownload(string $content, string $downloadName): StreamedResponse
+    {
+        return response()->streamDownload(
+            static function () use ($content): void {
+                echo $content;
+            },
+            $downloadName,
+            [
+                'Content-Type' => 'text/plain; charset=UTF-8',
+            ],
         );
     }
 

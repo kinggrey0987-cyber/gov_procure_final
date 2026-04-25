@@ -60,7 +60,17 @@ class PublicDisclosurePortalController
         abort_unless(is_string($public_disclosure->file_path) && $public_disclosure->file_path !== '', 404);
 
         $path = $this->resolveExistingPublicDiskPath((string) $public_disclosure->file_path);
-        abort_unless($path !== null, 404);
+        if ($path === null) {
+            return $this->streamTextDownload(
+                implode(PHP_EOL, [
+                    'GovSupply Connect Public Disclosure Report',
+                    sprintf('Disclosure ID: %d', (int) $public_disclosure->disclosure_id),
+                    sprintf('Title: %s', (string) $public_disclosure->title),
+                    'Note: The original disclosure file is currently unavailable in storage.',
+                ]).PHP_EOL,
+                sprintf('disclosure-%d-unavailable.txt', (int) $public_disclosure->disclosure_id),
+            );
+        }
 
         return $this->streamDiskDownload($path, basename($path));
     }
@@ -118,6 +128,19 @@ class PublicDisclosurePortalController
                 }
             },
             $downloadName,
+        );
+    }
+
+    private function streamTextDownload(string $content, string $downloadName): StreamedResponse
+    {
+        return response()->streamDownload(
+            static function () use ($content): void {
+                echo $content;
+            },
+            $downloadName,
+            [
+                'Content-Type' => 'text/plain; charset=UTF-8',
+            ],
         );
     }
 }
