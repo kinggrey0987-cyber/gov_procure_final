@@ -17,6 +17,8 @@ Artisan::command('demo:reseed {--force : Reset transactional demo data before re
         return self::FAILURE;
     }
 
+    $this->call('migrate', ['--force' => true]);
+
     $resetTables = app(DemoDataResetService::class)->resetTransactionalData();
     $this->info('Reset transactional demo tables: '.implode(', ', $resetTables));
 

@@ -119,6 +119,19 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                     remarks: 'Returned PPMP example retained for executive planning review demonstration.',
                 );
 
+                $this->seedPpmp(
+                    officeId: $engOfficeId,
+                    preparer: $engUser,
+                    approver: $execUser,
+                    fiscalYear: 2027,
+                    plannedItems: [
+                        ['item_name' => 'Logbook', 'quantity' => 24, 'unit_cost' => 120],
+                        ['item_name' => 'Mouse', 'quantity' => 10, 'unit_cost' => 330],
+                    ],
+                    desiredStatus: 'SUBMITTED',
+                    remarks: 'Submitted PPMP example retained for pending executive approval workflow demonstration.',
+                );
+
                 return [
                     'MPDO' => $this->seedPpmp(
                         officeId: $mpdoOfficeId,
@@ -692,6 +705,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                     officeUser: $mpdoUser,
                     purchaseOrder: $purchaseOrders['mpdo-apr-burst-3'],
                     supplier: $purchaseOrders['mpdo-apr-burst-3']->supplier ?? $supplier,
+                    withDiscrepancy: true,
                 );
             });
 
@@ -958,6 +972,15 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
         string $neededByDate,
         array $lines,
     ): SupplyRequest {
+        if ((string) $ppmp->status !== 'APPROVED') {
+            throw new RuntimeException(sprintf(
+                'Supply request %s cannot be seeded from non-approved PPMP %d (%s).',
+                $requestCode,
+                (int) $ppmp->ppmp_id,
+                (string) $ppmp->status,
+            ));
+        }
+
         $supplyRequest = SupplyRequest::query()->updateOrCreate(
             ['request_code' => $requestCode],
             [
@@ -1089,6 +1112,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
         User $officeUser,
         PurchaseOrder $purchaseOrder,
         Supplier $supplier,
+        bool $withDiscrepancy = false,
     ): Delivery {
         $deliveryService = app(DeliveryService::class);
         $verificationService = app(DeliveryVerificationService::class);
@@ -1116,11 +1140,17 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                     'delivery_id' => (int) $delivery->delivery_id,
                     'purchase_order_item_id' => (int) $purchaseOrderItem->purchase_order_item_id,
                     'expected_quantity' => (float) $purchaseOrderItem->quantity_ordered,
-                    'received_quantity' => (float) $purchaseOrderItem->quantity_ordered,
+                    'received_quantity' => $withDiscrepancy
+                        ? max(1, (float) $purchaseOrderItem->quantity_ordered - 2)
+                        : (float) $purchaseOrderItem->quantity_ordered,
                     'damaged_quantity' => 0,
-                    'missing_quantity' => 0,
-                    'item_condition' => 'GOOD',
-                    'remarks' => 'Demo delivery verified without discrepancy.',
+                    'missing_quantity' => $withDiscrepancy
+                        ? min(2, (float) $purchaseOrderItem->quantity_ordered)
+                        : 0,
+                    'item_condition' => $withDiscrepancy ? 'PARTIAL' : 'GOOD',
+                    'remarks' => $withDiscrepancy
+                        ? 'Demo discrepancy flow: partial delivery with short quantity.'
+                        : 'Demo delivery verified without discrepancy.',
                 ]);
             }
         }
@@ -1133,19 +1163,20 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
             $verificationService->create($delivery, $gsoUser, [
                 'verification_date' => now()->toDateString(),
                 'verification_status' => 'APPROVED',
-                'discrepancy_notes' => null,
-                'remarks' => 'Verified and cleared for inventory sync in the demo workflow.',
+                'discrepancy_notes' => $withDiscrepancy
+                    ? 'Discrepancy noted: partial quantity received compared to purchase order quantities.'
+                    : null,
+                'remarks' => $withDiscrepancy
+                    ? 'Verified with discrepancy notes for claim traceability in demo workflow.'
+                    : 'Verified and cleared for inventory sync in the demo workflow.',
             ]);
         }
 
         $delivery = $delivery->fresh(['items', 'purchaseOrder', 'supplier', 'receiver']) ?? $delivery;
 
-        if ((string) $delivery->receipt_status !== 'VERIFIED') {
-            $delivery->forceFill(['receipt_status' => 'VERIFIED'])->save();
-            $delivery = $delivery->fresh(['items', 'purchaseOrder', 'supplier', 'receiver']) ?? $delivery;
+        if ((string) $delivery->receipt_status === 'VERIFIED') {
+            $inventoryService->updateFromVerifiedDelivery($delivery, $gsoUser);
         }
-
-        $inventoryService->updateFromVerifiedDelivery($delivery, $gsoUser);
 
         $distributionRecord = DistributionRecord::query()->where('delivery_id', (int) $delivery->delivery_id)->first();
         if (! $distributionRecord instanceof DistributionRecord) {

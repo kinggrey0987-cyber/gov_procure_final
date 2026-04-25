@@ -41,8 +41,11 @@ class SystemBackupController extends Controller
                 'name' => (string) $record->creator->name,
             ] : null,
             'notes' => $record->notes,
-            'can_download' => Storage::disk('local')->exists((string) $record->file_path)
-                || (is_array($record->payload) && array_key_exists('content', $record->payload)),
+            'can_download' => (string) $record->backup_status === 'completed'
+                && (
+                    Storage::disk('local')->exists((string) $record->file_path)
+                    || (is_array($record->payload) && array_key_exists('content', $record->payload))
+                ),
             'can_delete' => $request->user()?->can('admin.system-backup.delete', $record) ?? false,
         ]);
 
@@ -70,6 +73,7 @@ class SystemBackupController extends Controller
     public function download(Request $request, SystemBackup $system_backup)
     {
         abort_unless($request->user()?->can('admin.system-backup.download', $system_backup), 403);
+        abort_unless((string) $system_backup->backup_status === 'completed', 404);
 
         $path = (string) $system_backup->file_path;
         if ($path !== '' && Storage::disk('local')->exists($path)) {

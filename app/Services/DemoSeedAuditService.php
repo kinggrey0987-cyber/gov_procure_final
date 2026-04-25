@@ -9,9 +9,12 @@ use App\Models\Ppmp;
 use App\Models\PublicDisclosure;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequest;
+use App\Models\RecordArchive;
 use App\Models\SupplyRequest;
 use App\Models\SupplyRequestItem;
+use App\Models\SystemBackup;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 class DemoSeedAuditService
@@ -31,6 +34,9 @@ class DemoSeedAuditService
             $this->fixPurchaseOrdersWithoutPurchaseRequest($issues, $fixes);
             $this->fixDistributionContext($issues, $fixes);
             $this->fixPublicDisclosureFiles($issues, $fixes);
+            $this->fixArchiveFiles($issues, $fixes);
+            $this->fixBackupFiles($issues, $fixes);
+            $this->auditPublishedDisclosureReferences($issues, $fixes);
         });
 
         return [
@@ -227,6 +233,156 @@ class DemoSeedAuditService
                 ])->save();
 
                 $fixes[] = sprintf('Rebuilt missing attachment file for document %d.', (int) $document->document_id);
+            }
+        }
+    }
+
+    /**
+     * @param  array<int, string>  $issues
+     * @param  array<int, string>  $fixes
+     */
+    private function fixArchiveFiles(array &$issues, array &$fixes): void
+    {
+        if (! Schema::hasTable('record_archives')) {
+            return;
+        }
+
+        $archives = RecordArchive::query()->get();
+
+        foreach ($archives as $archive) {
+            $path = ltrim((string) $archive->file_path, '/');
+            if ($path !== '' && Storage::disk('local')->exists($path)) {
+                continue;
+            }
+
+            $issues[] = sprintf('Archive %d has missing file path.', (int) $archive->archive_id);
+
+            $fallbackPath = sprintf(
+                'record-archives/%d/rebuilt/archive-%d.json',
+                (int) $archive->archive_year,
+                (int) $archive->archive_id,
+            );
+
+            $payload = [
+                'archive_id' => (int) $archive->archive_id,
+                'archive_year' => (int) $archive->archive_year,
+                'archive_scope' => (string) $archive->archive_scope,
+                'generated_by' => (int) $archive->generated_by,
+                'generated_at' => optional($archive->generated_at)?->toIso8601String(),
+                'note' => 'Rebuilt by DemoSeedAuditService because original archive file was missing.',
+            ];
+
+            Storage::disk('local')->put($fallbackPath, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+            $archive->forceFill([
+                'file_path' => $fallbackPath,
+                'file_name' => basename($fallbackPath),
+                'file_size' => Storage::disk('local')->size($fallbackPath),
+            ])->save();
+
+            $fixes[] = sprintf('Rebuilt missing archive file for archive %d.', (int) $archive->archive_id);
+        }
+    }
+
+    /**
+     * @param  array<int, string>  $issues
+     * @param  array<int, string>  $fixes
+     */
+    private function fixBackupFiles(array &$issues, array &$fixes): void
+    {
+        if (! Schema::hasTable('system_backups')) {
+            return;
+        }
+
+        $backups = SystemBackup::query()->get();
+
+        foreach ($backups as $backup) {
+            $status = (string) $backup->backup_status;
+            $path = ltrim((string) $backup->file_path, '/');
+
+            if ($status !== 'completed') {
+                continue;
+            }
+
+            $hasLocalFile = $path !== '' && Storage::disk('local')->exists($path);
+            $hasPayload = is_array($backup->payload) && array_key_exists('content', $backup->payload);
+
+            if ($hasLocalFile || $hasPayload) {
+                continue;
+            }
+
+            $issues[] = sprintf('Completed backup %d has no downloadable content.', (int) $backup->backup_id);
+
+            $fallbackPath = sprintf(
+                'system-backups/%s/rebuilt-backup-%d.json',
+                (string) $backup->backup_type,
+                (int) $backup->backup_id,
+            );
+
+            $content = [
+                'backup_id' => (int) $backup->backup_id,
+                'backup_type' => (string) $backup->backup_type,
+                'backup_status' => $status,
+                'created_by' => (int) $backup->created_by,
+                'created_at' => optional($backup->created_at)?->toIso8601String(),
+                'note' => 'Rebuilt by DemoSeedAuditService because original backup artifact was missing.',
+            ];
+
+            Storage::disk('local')->put($fallbackPath, json_encode($content, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+            $backup->forceFill([
+                'file_path' => $fallbackPath,
+                'file_name' => basename($fallbackPath),
+                'file_size' => Storage::disk('local')->size($fallbackPath),
+                'payload' => [
+                    'format' => 'json',
+                    'content' => $content,
+                ],
+            ])->save();
+
+            $fixes[] = sprintf('Rebuilt downloadable payload for completed backup %d.', (int) $backup->backup_id);
+        }
+    }
+
+    /**
+     * @param  array<int, string>  $issues
+     * @param  array<int, string>  $fixes
+     */
+    private function auditPublishedDisclosureReferences(array &$issues, array &$fixes): void
+    {
+        $published = PublicDisclosure::query()->published()->get();
+
+        foreach ($published as $disclosure) {
+            $referenceType = (string) ($disclosure->reference_type ?? '');
+            $referenceId = (int) ($disclosure->reference_id ?? 0);
+
+            if ($referenceType === '' || $referenceId <= 0) {
+                continue;
+            }
+
+            if ($referenceType === Ppmp::class) {
+                $ppmp = Ppmp::query()->where('ppmp_id', $referenceId)->first();
+                if (! $ppmp) {
+                    $issues[] = sprintf('Published disclosure %d references missing PPMP %d.', (int) $disclosure->disclosure_id, $referenceId);
+                    continue;
+                }
+
+                if ((string) $ppmp->status !== 'APPROVED') {
+                    $issues[] = sprintf(
+                        'Published disclosure %d references non-approved PPMP %d (%s).',
+                        (int) $disclosure->disclosure_id,
+                        $referenceId,
+                        (string) $ppmp->status
+                    );
+
+                    $disclosure->forceFill([
+                        'status' => 'DRAFT',
+                        'published_at' => null,
+                        'published_by' => null,
+                    ])->save();
+
+                    $fixes[] = sprintf('Downgraded disclosure %d to DRAFT due to non-approved PPMP reference.', (int) $disclosure->disclosure_id);
+                }
             }
         }
     }
