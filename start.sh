@@ -9,6 +9,9 @@ php artisan package:discover --ansi || true
 php artisan storage:link || true
 php artisan optimize:clear || true
 php artisan migrate --force
+php artisan config:clear
+php artisan route:clear
+php artisan view:clear
 
 php-fpm -D
 
