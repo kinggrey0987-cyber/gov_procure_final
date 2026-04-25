@@ -2,7 +2,7 @@ import PublicHero from '@/Components/Public/PublicHero';
 import PublicInfoCards from '@/Components/Public/PublicInfoCards';
 import PublicNavbar from '@/Components/Public/PublicNavbar';
 import PublicStatCards from '@/Components/Public/PublicStatCards';
-import { Head, Link } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 
 type WelcomeProps = {
     canLogin: boolean;
@@ -92,9 +92,9 @@ export default function Welcome({ canLogin, summaryStats, latestDisclosures, mon
                             </div>
                             <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                                 <h2 className="text-2xl font-bold text-red-700">Latest Published Disclosures</h2>
-                                <Link href="/public/disclosures" className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50">
+                                <a href="/public/disclosures" className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50">
                                     View All Disclosures
-                                </Link>
+                                </a>
                             </div>
                             <p className="mt-1 text-sm text-slate-600">
                                 Public-facing procurement records currently available for transparency and review.
@@ -123,9 +123,9 @@ export default function Welcome({ canLogin, summaryStats, latestDisclosures, mon
                                         <p className="text-sm text-slate-500">Public Attachments</p>
                                         <p className="text-base font-bold text-red-700">{item.attachment_count}</p>
                                     </div>
-                                    <Link href={`/public/disclosures/${item.disclosure_id}`} className={`mt-3 ${primaryButtonClass}`}>
+                                    <a href={`/public/disclosures/${item.disclosure_id}`} className={`mt-3 ${primaryButtonClass}`}>
                                         View Disclosure
-                                    </Link>
+                                    </a>
                                 </article>
                             ))}
                         </div>
