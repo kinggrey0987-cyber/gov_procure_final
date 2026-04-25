@@ -43,9 +43,7 @@ export default function TransparencyMonitoringIndex({
     filters,
     filter_options,
     totals,
-    status_breakdown,
     type_breakdown,
-    office_publication_mix,
     recent_disclosures,
     published_disclosures,
     draft_disclosures,
@@ -58,6 +56,7 @@ export default function TransparencyMonitoringIndex({
         from_date: filters.from_date ?? '',
         to_date: filters.to_date ?? '',
     });
+    const [recentActivityPage, setRecentActivityPage] = useState(1);
 
     const activeTab = filters.tab ?? 'overview';
     const pendingOrOtherCount = Math.max(totals.disclosure_count - totals.published_count - totals.draft_count, 0);
@@ -69,14 +68,13 @@ export default function TransparencyMonitoringIndex({
     ];
 
     const typeMix = type_breakdown
-        .map((row) => ({ label: row.type || 'N/A', value: row.total }))
+        .map((row) => ({ label: formatLabel(row.type || 'N/A'), value: row.total }))
         .sort((a, b) => b.value - a.value)
         .slice(0, 6);
 
-    const statusMix = status_breakdown
-        .map((row) => ({ label: formatStatus(row.status || 'N/A'), value: row.total }))
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 6);
+    const recentActivityPerPage = 5;
+    const recentActivityTotalPages = Math.max(Math.ceil(recent_disclosures.length / recentActivityPerPage), 1);
+    const recentActivityRows = recent_disclosures.slice((recentActivityPage - 1) * recentActivityPerPage, recentActivityPage * recentActivityPerPage);
 
     useEffect(() => {
         setForm({
@@ -86,6 +84,10 @@ export default function TransparencyMonitoringIndex({
             to_date: filters.to_date ?? '',
         });
     }, [filters.from_date, filters.status, filters.to_date, filters.type]);
+
+    useEffect(() => {
+        setRecentActivityPage(1);
+    }, [recent_disclosures]);
 
     const activeFilters = useMemo(
         () => ({
@@ -106,9 +108,7 @@ export default function TransparencyMonitoringIndex({
                 'filters',
                 'filter_options',
                 'totals',
-                'status_breakdown',
                 'type_breakdown',
-                'office_publication_mix',
                 'monthly_publication_trend',
                 'recent_disclosures',
                 'published_disclosures',
@@ -310,12 +310,12 @@ export default function TransparencyMonitoringIndex({
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
-                                            {recent_disclosures.slice(0, 8).map((row) => (
+                                            {recentActivityRows.map((row) => (
                                                 <tr key={row.disclosure_id}>
                                                     <td className="px-4 py-3 text-slate-800">
                                                         <p className="font-medium text-slate-900">{row.title}</p>
                                                     </td>
-                                                    <td className="px-4 py-3 text-slate-700">{row.type}</td>
+                                                    <td className="px-4 py-3 text-slate-700">{formatLabel(row.type)}</td>
                                                     <td className="px-4 py-3">{StatusBadge(row.status)}</td>
                                                     <td className="px-4 py-3 text-slate-700">{formatDate(row.published_at)}</td>
                                                     <td className="px-4 py-3">
@@ -329,28 +329,34 @@ export default function TransparencyMonitoringIndex({
                                     </table>
                                 </div>
                             )}
-                        </section>
 
-                        <section className="rounded-2xl border border-red-100 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-                            <h3 className="text-base font-semibold text-slate-900">Office Publication Mix</h3>
-                            <p className="mt-1 text-sm text-slate-600">Published disclosures by office ownership.</p>
-                            <div className="mt-4">
-                                <HorizontalBarChart
-                                    data={office_publication_mix.map((row) => ({ label: row.label || 'N/A', value: row.total }))}
-                                    emptyText="No data in current filter scope"
-                                />
-                            </div>
-                        </section>
-
-                        <section className="rounded-2xl border border-red-100 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-                            <h3 className="text-base font-semibold text-slate-900">Status Distribution</h3>
-                            <p className="mt-1 text-sm text-slate-600">Compact summary by disclosure status.</p>
-                            <div className="mt-4">
-                                <HorizontalBarChart
-                                    data={statusMix}
-                                    emptyText="No data in current filter scope"
-                                />
-                            </div>
+                            {recent_disclosures.length > recentActivityPerPage ? (
+                                <div className="flex items-center justify-between border-t border-slate-200 px-6 py-4">
+                                    <p className="text-xs text-slate-600">
+                                        Showing {(recentActivityPage - 1) * recentActivityPerPage + 1}
+                                        {'–'}
+                                        {Math.min(recentActivityPage * recentActivityPerPage, recent_disclosures.length)} of {recent_disclosures.length}
+                                    </p>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setRecentActivityPage((current) => Math.max(current - 1, 1))}
+                                            disabled={recentActivityPage === 1}
+                                            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 enabled:hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            Previous 5
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setRecentActivityPage((current) => Math.min(current + 1, recentActivityTotalPages))}
+                                            disabled={recentActivityPage === recentActivityTotalPages}
+                                            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 enabled:hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            Next 5
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : null}
                         </section>
                     </div>
                 )}
@@ -368,7 +374,7 @@ export default function TransparencyMonitoringIndex({
                                     <div className="flex flex-wrap items-start justify-between gap-3">
                                         <div>
                                             <p className="text-lg font-semibold text-slate-900">{row.title}</p>
-                                            <p className="mt-1 text-sm text-slate-600">{row.type}</p>
+                                            <p className="mt-1 text-sm text-slate-600">{formatLabel(row.type)}</p>
                                             <p className="text-xs text-slate-500">Publisher: {row.publisher?.name ?? 'N/A'} • Published: {formatDate(row.published_at)}</p>
                                         </div>
                                         {StatusBadge(row.status)}
@@ -408,7 +414,7 @@ export default function TransparencyMonitoringIndex({
                                     <div className="flex flex-wrap items-start justify-between gap-3">
                                         <div>
                                             <p className="text-lg font-semibold text-slate-900">{row.title}</p>
-                                            <p className="mt-1 text-sm text-slate-600">{row.type}</p>
+                                            <p className="mt-1 text-sm text-slate-600">{formatLabel(row.type)}</p>
                                             <p className="text-xs text-slate-500">Last updated: {formatDate(row.updated_at ?? null)}</p>
                                         </div>
                                         {StatusBadge(row.status)}
@@ -453,10 +459,10 @@ function StatusBadge(value: string) {
     const normalized = value.toUpperCase();
     const tone = normalized === 'PUBLISHED' ? 'bg-emerald-100 text-emerald-800' : normalized === 'DRAFT' ? 'bg-slate-200 text-slate-700' : 'bg-amber-100 text-amber-800';
 
-    return <span className={`inline-flex cursor-default select-none rounded-full px-2 py-0.5 text-xs font-semibold ${tone}`}>{formatStatus(value)}</span>;
+    return <span className={`inline-flex cursor-default select-none rounded-full px-2 py-0.5 text-xs font-semibold ${tone}`}>{formatLabel(value)}</span>;
 }
 
-function formatStatus(value: string): string {
+function formatLabel(value: string): string {
     return value.replaceAll('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
