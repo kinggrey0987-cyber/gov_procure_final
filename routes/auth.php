@@ -44,19 +44,19 @@ Route::middleware('guest')->group(function () {
         ->name('password.store');
 });
 
+Route::get('two-factor-challenge', [TwoFactorChallengeController::class, 'show'])
+    ->name('two-factor.challenge.show');
+
+Route::post('two-factor-challenge/verify', [TwoFactorChallengeController::class, 'verify'])
+    ->name('two-factor.challenge.verify');
+
+Route::post('two-factor-challenge/resend', [TwoFactorChallengeController::class, 'resend'])
+    ->name('two-factor.challenge.resend');
+
+Route::post('two-factor-challenge/cancel', [TwoFactorChallengeController::class, 'cancel'])
+    ->name('two-factor.challenge.cancel');
+
 Route::middleware('auth')->group(function () {
-    Route::get('two-factor-challenge', [TwoFactorChallengeController::class, 'show'])
-        ->name('two-factor.challenge.show');
-
-    Route::post('two-factor-challenge/verify', [TwoFactorChallengeController::class, 'verify'])
-        ->name('two-factor.challenge.verify');
-
-    Route::post('two-factor-challenge/resend', [TwoFactorChallengeController::class, 'resend'])
-        ->name('two-factor.challenge.resend');
-
-    Route::post('two-factor-challenge/cancel', [TwoFactorChallengeController::class, 'cancel'])
-        ->name('two-factor.challenge.cancel');
-
     Route::get('force-password-change', [ForcePasswordChangeController::class, 'edit'])
         ->middleware('twofactor')
         ->name('force-password.edit');

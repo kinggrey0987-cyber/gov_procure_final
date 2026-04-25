@@ -57,6 +57,8 @@ class AuthenticatedSessionController extends Controller
                 'two_factor.pending' => true,
                 'two_factor.verified' => false,
                 'two_factor.user_id' => (int) $user->id,
+                'two_factor.challenge_id' => (int) $challengeResult['challenge']->id,
+                'two_factor.pending_expires_at' => optional($challengeResult['challenge']->expires_at)?->toIso8601String(),
                 'two_factor.remember' => $request->boolean('remember'),
             ]);
 
@@ -76,6 +78,11 @@ class AuthenticatedSessionController extends Controller
             'two_factor.verified' => true,
             'two_factor.user_id' => (int) $user->id,
         ]);
+        $request->session()->forget([
+            'two_factor.challenge_id',
+            'two_factor.pending_expires_at',
+            'two_factor.remember',
+        ]);
 
         return redirect()->intended(route('dashboard', absolute: false));
     }
@@ -86,6 +93,16 @@ class AuthenticatedSessionController extends Controller
     public function destroy(Request $request): RedirectResponse
     {
         Auth::guard('web')->logout();
+
+        $request->session()->forget([
+            'two_factor.pending',
+            'two_factor.verified',
+            'two_factor.user_id',
+            'two_factor.verified_at',
+            'two_factor.remember',
+            'two_factor.challenge_id',
+            'two_factor.pending_expires_at',
+        ]);
 
         $request->session()->invalidate();
 

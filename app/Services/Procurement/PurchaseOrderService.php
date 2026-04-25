@@ -2,7 +2,9 @@
 
 namespace App\Services\Procurement;
 
+use App\Enums\UserRole;
 use App\Models\ApprovalHistory;
+use App\Models\Delivery;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\PurchaseRequest;
@@ -143,6 +145,48 @@ class PurchaseOrderService
                 'remarks' => 'Purchase order placement recorded.',
                 'approved_at' => null,
             ]);
+
+            $delivery = Delivery::query()
+                ->where('purchase_order_id', (int) $purchaseOrder->purchase_order_id)
+                ->first();
+
+            if (! $delivery instanceof Delivery) {
+                $delivery = Delivery::query()->create([
+                    'delivery_code' => $this->generateAutoDeliveryCode(),
+                    'purchase_order_id' => (int) $purchaseOrder->purchase_order_id,
+                    'supplier_id' => (int) $purchaseOrder->supplier_id,
+                    'actual_delivery_date' => null,
+                    'expected_arrival_date' => $purchaseOrder->expected_delivery_date,
+                    'received_by' => null,
+                    'receipt_status' => 'PENDING',
+                    'remarks' => 'Auto-created when purchase order was placed.',
+                ]);
+
+                StatusHistory::query()->create([
+                    'reference_type' => Delivery::class,
+                    'reference_id' => (int) $delivery->delivery_id,
+                    'old_status' => null,
+                    'new_status' => 'PENDING',
+                    'changed_by' => (int) $actor->id,
+                    'remarks' => 'Delivery intake auto-created from placed purchase order.',
+                    'changed_at' => now(),
+                ]);
+
+                $gsoOfficers = User::query()
+                    ->whereHas('role', fn ($query) => $query->where('code', UserRole::GSO_OFFICER->value))
+                    ->get();
+
+                if ($gsoOfficers->isNotEmpty()) {
+                    $this->notificationService->notifyUsers(
+                        users: $gsoOfficers,
+                        title: 'New Delivery Intake Ready',
+                        message: sprintf('PO %s was placed and is now queued for receiving.', (string) $purchaseOrder->po_number),
+                        notificationType: 'DELIVERY_INTAKE_READY',
+                        referenceType: Delivery::class,
+                        referenceId: (int) $delivery->delivery_id,
+                    );
+                }
+            }
 
             return $purchaseOrder->fresh(['supplier', 'creator', 'purchaseRequest', 'supplyRequest', 'items']) ?? $purchaseOrder;
         });
@@ -325,6 +369,14 @@ class PurchaseOrderService
         }
 
         return sprintf('PO-%s-%05d', date('Y'), $nextSequence);
+    }
+
+    private function generateAutoDeliveryCode(): string
+    {
+        $lastDelivery = Delivery::query()->latest('delivery_id')->first();
+        $nextNumber = ((int) ($lastDelivery?->delivery_id ?? 0)) + 1;
+
+        return sprintf('DEL-%s-%05d', date('Y'), $nextNumber);
     }
 
     private function recordStatus(PurchaseOrder $purchaseOrder, ?string $oldStatus, string $newStatus, User $actor, string $remarks): void

@@ -60,6 +60,7 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
                 `PR-${String(request.purchase_request_id).padStart(6, '0')}`,
                 request.office_name,
                 request.status,
+                displayProcurementStatus(request.status),
                 formatDate(request.created_at),
             ]
                 .join(' ')
@@ -169,7 +170,7 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
                                     >
                                         {requestStatuses.map((status) => (
                                             <option key={status} value={status}>
-                                                {status === 'ALL' ? 'All statuses' : status.replaceAll('_', ' ')}
+                                                {status === 'ALL' ? 'All statuses' : displayProcurementStatus(status)}
                                             </option>
                                         ))}
                                     </select>
@@ -200,7 +201,7 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
                                             <p className="text-sm text-slate-600">{request.office_name}</p>
                                         </div>
                                         <div className="text-right">
-                                            <span className={statusClass(request.status)}>{request.status.replaceAll('_', ' ')}</span>
+                                            <span className={statusClass(request.status)}>{displayProcurementStatus(request.status)}</span>
                                             <p className="mt-1 text-xs text-slate-500">{formatDate(request.created_at)}</p>
                                         </div>
                                     </div>
@@ -243,7 +244,7 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
                                     >
                                         {orderStatuses.map((status) => (
                                             <option key={status} value={status}>
-                                                {status === 'ALL' ? 'All statuses' : status.replaceAll('_', ' ')}
+                                                {status === 'ALL' ? 'All statuses' : displayProcurementStatus(status)}
                                             </option>
                                         ))}
                                     </select>
@@ -321,6 +322,17 @@ function statusClass(status: string) {
     };
 
     return map[status] ?? `${base} bg-slate-100 text-slate-700`;
+}
+
+function displayProcurementStatus(status: string): string {
+    const normalized = status.toUpperCase();
+    const map: Record<string, string> = {
+        OPEN: 'Pending Review',
+        PROCESSING: 'In Processing',
+        COMPLETED: 'Completed',
+    };
+
+    return map[normalized] ?? status.replaceAll('_', ' ');
 }
 
 function formatDate(value?: string | null) {

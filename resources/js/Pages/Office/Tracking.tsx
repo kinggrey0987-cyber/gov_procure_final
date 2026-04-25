@@ -53,6 +53,7 @@ export default function OfficeTracking({ summary, recentRequests, notificationPr
             const searchIndex = [
                 request.request_code,
                 request.status,
+                displayOfficeRequestStatus(request.status),
                 formatDate(request.request_date),
                 `${request.items_count} item(s)`,
             ]
@@ -148,7 +149,7 @@ export default function OfficeTracking({ summary, recentRequests, notificationPr
                                 >
                                     {requestStatusOptions.map((status) => (
                                         <option key={status} value={status}>
-                                            {status === 'ALL' ? 'All statuses' : status.replaceAll('_', ' ')}
+                                            {status === 'ALL' ? 'All statuses' : displayOfficeRequestStatus(status)}
                                         </option>
                                     ))}
                                 </select>
@@ -260,7 +261,21 @@ function StatusBadge({ status }: { status: string }) {
                     ? 'bg-rose-100 text-rose-700'
                     : 'bg-amber-100 text-amber-700';
 
-    return <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${style}`}>{status.replaceAll('_', ' ')}</span>;
+    return <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${style}`}>{displayOfficeRequestStatus(status)}</span>;
+}
+
+function displayOfficeRequestStatus(status: string): string {
+    const normalized = status.toUpperCase();
+    const map: Record<string, string> = {
+        OPEN: 'Pending Review',
+        SUBMITTED: 'Submitted',
+        PROCESSING: 'In Processing',
+        APPROVED: 'Approved',
+        COMPLETED: 'Completed',
+        REJECTED: 'Rejected',
+    };
+
+    return map[normalized] ?? status.replaceAll('_', ' ');
 }
 
 function MetricCard({ label, value, tone }: { label: string; value: number; tone: 'slate' | 'amber' | 'emerald' | 'sky' }) {

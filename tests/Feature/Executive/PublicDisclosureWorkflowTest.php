@@ -5,11 +5,13 @@ namespace Tests\Feature\Executive;
 use App\Enums\UserRole;
 use App\Http\Middleware\EnsureMustChangePassword;
 use App\Http\Middleware\EnsureTwoFactorVerified;
+use App\Models\Document;
 use App\Models\Office;
 use App\Models\PublicDisclosure;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class PublicDisclosureWorkflowTest extends TestCase
@@ -31,6 +33,8 @@ class PublicDisclosureWorkflowTest extends TestCase
             EnsureTwoFactorVerified::class,
             EnsureMustChangePassword::class,
         ]);
+
+        Storage::fake('public');
 
         $this->office = Office::query()->create([
             'name' => 'Executive Office',
@@ -95,6 +99,32 @@ class PublicDisclosureWorkflowTest extends TestCase
 
         $response->assertForbidden();
         $this->assertDatabaseCount('public_disclosures', 0);
+    }
+
+    public function test_exec_create_disclosure_without_uploaded_files_generates_source_attachment(): void
+    {
+        $response = $this->actingAs($this->executiveUser)->post(route('executive.disclosures.store'), [
+            'title' => 'PR Week 4 April',
+            'type' => 'PROCUREMENT_SUMMARY',
+            'reference_type' => 'App\\Models\\PurchaseRequest',
+            'reference_id' => 404,
+            'description' => 'Disclosure for procurement records in the fourth week of April.',
+            'status' => 'DRAFT',
+        ]);
+
+        $response->assertRedirect();
+
+        $disclosure = PublicDisclosure::query()->firstOrFail();
+
+        $attachment = Document::query()
+            ->where('related_module', 'public_disclosures')
+            ->where('related_reference_id', (int) $disclosure->disclosure_id)
+            ->first();
+
+        $this->assertNotNull($attachment);
+        $this->assertStringContainsString('disclosure-'.$disclosure->disclosure_id.'-source-record', (string) $attachment->file_name);
+        $this->assertStringContainsString('documents/public_disclosures/'.$disclosure->disclosure_id.'/', (string) $attachment->file_path);
+        $this->assertTrue(Storage::disk('public')->exists((string) $attachment->file_path));
     }
 
     private function createUser(UserRole $role, Office $office): User

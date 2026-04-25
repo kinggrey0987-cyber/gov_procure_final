@@ -576,6 +576,7 @@ function formatMonth(value: string): string {
 
 function formatStatusLabel(value: string): string {
     const aliases: Record<string, string> = {
+        OPEN: 'Pending Review',
         APPROVED: 'Approved',
         RETURNED_FOR_REVISION: 'Returned for Revision',
         SUBMITTED: 'Submitted',

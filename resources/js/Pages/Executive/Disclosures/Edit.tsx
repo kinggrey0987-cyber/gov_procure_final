@@ -23,6 +23,7 @@ type Props = {
     eligibleSources: {
         approved_ppmps: EligibleSource[];
         completed_purchase_orders: EligibleSource[];
+        recent_purchase_requests: EligibleSource[];
         distribution_summaries: EligibleSource[];
     };
 };
@@ -42,6 +43,7 @@ export default function DisclosureEdit({ disclosure, eligibleSources }: Props) {
     const sourceOptions = [
         ...eligibleSources.approved_ppmps,
         ...eligibleSources.completed_purchase_orders,
+        ...eligibleSources.recent_purchase_requests,
         ...eligibleSources.distribution_summaries,
     ];
 

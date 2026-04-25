@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Models\Office;
 use App\Models\Ppmp;
 use App\Models\PpmpItem;
+use App\Models\Delivery;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequest;
 use App\Models\Role;
@@ -33,6 +34,7 @@ class ProcurementFoundationFlowTest extends TestCase
         $office = $this->createOffice();
         $officeUser = $this->createUser(UserRole::OFFICE_USER, $office);
         $procurementOfficer = $this->createUser(UserRole::PROCUREMENT_OFFICER, $office);
+        $this->createUser(UserRole::GSO_OFFICER, $office);
 
         $ppmp = Ppmp::query()->create([
             'office_id' => $office->id,
@@ -98,6 +100,7 @@ class ProcurementFoundationFlowTest extends TestCase
         ]);
 
         $this->actingAs($procurementOfficer)->post(route('procurement.purchase-requests.process', $purchaseRequest->purchase_request_id), [
+            'action' => 'process',
             'remarks' => 'Processing PR',
         ])->assertRedirect();
 
@@ -150,11 +153,17 @@ class ProcurementFoundationFlowTest extends TestCase
         ]);
 
         $this->actingAs($procurementOfficer)->post(route('procurement.purchase-orders.place', $purchaseOrder->purchase_order_id), [
+            'action' => 'process',
             'remarks' => 'PO placed',
         ])->assertRedirect();
 
         $purchaseOrder->refresh();
         $this->assertSame('PLACED', $purchaseOrder->status);
+
+        $delivery = Delivery::query()->where('purchase_order_id', $purchaseOrder->purchase_order_id)->first();
+        $this->assertNotNull($delivery);
+        $this->assertSame('PENDING', (string) $delivery->receipt_status);
+        $this->assertSame((int) $purchaseOrder->supplier_id, (int) $delivery->supplier_id);
 
         $prHistory = StatusHistory::query()
             ->where('reference_type', PurchaseRequest::class)

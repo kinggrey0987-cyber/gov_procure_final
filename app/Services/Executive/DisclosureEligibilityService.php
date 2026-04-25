@@ -5,6 +5,7 @@ namespace App\Services\Executive;
 use App\Models\DistributionRecord;
 use App\Models\Ppmp;
 use App\Models\PurchaseOrder;
+use App\Models\PurchaseRequest;
 use Illuminate\Support\Collection;
 
 class DisclosureEligibilityService
@@ -63,6 +64,30 @@ class DisclosureEligibilityService
             ])
             ->values();
 
+        $recentPurchaseRequests = PurchaseRequest::query()
+            ->with('office:id,name')
+            ->whereIn('status', ['OPEN', 'PROCESSING'])
+            ->orderByDesc('updated_at')
+            ->limit(20)
+            ->get(['purchase_request_id', 'office_id', 'status', 'updated_at'])
+            ->map(static fn (PurchaseRequest $purchaseRequest): array => [
+                'label' => sprintf(
+                    'PR-%d | %s | %s',
+                    (int) $purchaseRequest->purchase_request_id,
+                    $purchaseRequest->office?->name ?? 'Unknown Office',
+                    (string) $purchaseRequest->status
+                ),
+                'source_group' => 'Purchase Request',
+                'source_code' => sprintf('PR-%d', (int) $purchaseRequest->purchase_request_id),
+                'office' => $purchaseRequest->office?->name ?? 'Unknown Office',
+                'release_date' => optional($purchaseRequest->updated_at)?->format('Y-m-d'),
+                'reference_type' => PurchaseRequest::class,
+                'reference_id' => (int) $purchaseRequest->purchase_request_id,
+                'suggested_type' => 'PROCUREMENT_SUMMARY',
+                'suggested_title' => sprintf('Procurement Summary - PR-%d', (int) $purchaseRequest->purchase_request_id),
+            ])
+            ->values();
+
         $distributionSummaries = DistributionRecord::query()
             ->with('office:id,name')
             ->where('status', 'RECEIVED')
@@ -90,6 +115,7 @@ class DisclosureEligibilityService
         return [
             'approved_ppmps' => $approvedPpmps,
             'completed_purchase_orders' => $completedPurchaseOrders,
+            'recent_purchase_requests' => $recentPurchaseRequests,
             'distribution_summaries' => $distributionSummaries,
         ];
     }

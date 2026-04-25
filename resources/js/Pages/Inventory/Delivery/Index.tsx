@@ -97,7 +97,7 @@ export default function DeliveryIndex({ deliveries, filters }: Props) {
 
                 <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                     <p className="text-sm text-slate-600">
-                        Delivery Monitoring is the main intake and status page. Verification remains a contextual action per delivery record.
+                        When a purchase order is placed by BAC, a delivery intake is created automatically in PENDING status. Use Open Receiving once items physically arrive.
                     </p>
                 </div>
 
@@ -129,7 +129,7 @@ export default function DeliveryIndex({ deliveries, filters }: Props) {
                                         <div className="flex justify-end gap-3">
                                             {delivery.receipt_status === 'PENDING' && (
                                                 <Link href={route('inventory.deliveries.edit', delivery.delivery_id)} className="text-sm font-semibold text-amber-700 hover:text-amber-900">
-                                                    Receive
+                                                    Open Receiving
                                                 </Link>
                                             )}
                                             {(delivery.receipt_status === 'RECEIVED' || delivery.receipt_status === 'PARTIALLY_RECEIVED') && (

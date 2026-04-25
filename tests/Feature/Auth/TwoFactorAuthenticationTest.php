@@ -38,6 +38,8 @@ class TwoFactorAuthenticationTest extends TestCase
         $response->assertRedirect(route('two-factor.challenge.show', absolute: false));
         $response->assertSessionHas('status', 'A verification code was sent to your email address.');
         $response->assertSessionMissing('error');
+        $response->assertSessionHas('two_factor.challenge_id');
+        $response->assertSessionHas('two_factor.pending_expires_at');
 
         $this->assertDatabaseCount('two_factor_challenges', 1);
         $this->assertAuthenticatedAs($user);
@@ -124,7 +126,9 @@ class TwoFactorAuthenticationTest extends TestCase
             'code' => '123456',
         ]);
 
-        $response->assertSessionHasErrors('code');
+        $response->assertRedirect(route('login', absolute: false));
+        $response->assertSessionHas('error', 'Your verification session expired. Please sign in again.');
+        $this->assertGuest();
     }
 
     public function test_reused_code_is_rejected(): void
@@ -164,7 +168,9 @@ class TwoFactorAuthenticationTest extends TestCase
             'code' => '654321',
         ]);
 
-        $response->assertSessionHasErrors('code');
+        $response->assertRedirect(route('login', absolute: false));
+        $response->assertSessionHas('error', 'Your verification session expired. Please sign in again.');
+        $this->assertGuest();
     }
 
     public function test_too_many_attempts_are_blocked(): void
@@ -188,10 +194,12 @@ class TwoFactorAuthenticationTest extends TestCase
         ]);
 
         $this->post(route('two-factor.challenge.verify'), ['code' => '000000'])
-            ->assertSessionHasErrors('code');
+            ->assertRedirect(route('login', absolute: false))
+            ->assertSessionHas('error', 'Your verification session expired. Please sign in again.');
 
         $this->post(route('two-factor.challenge.verify'), ['code' => '000000'])
-            ->assertSessionHasErrors('code');
+            ->assertRedirect(route('login', absolute: false))
+            ->assertSessionHas('error', 'Your verification session expired. Please sign in again.');
 
         $latest = TwoFactorChallenge::query()->latest('id')->firstOrFail();
         $this->assertNotNull($latest->consumed_at);
@@ -317,6 +325,81 @@ class TwoFactorAuthenticationTest extends TestCase
         ])->assertRedirect(route('dashboard', absolute: false));
 
         $this->get('/dashboard')->assertRedirect(route('office.dashboard', absolute: false));
+    }
+
+    public function test_two_factor_challenge_page_redirects_to_login_when_pending_session_is_missing(): void
+    {
+        Mail::fake();
+
+        $user = $this->createUser(UserRole::OFFICE_USER, 'missing.pending@gsc.local');
+
+        $response = $this->post('/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $response->assertRedirect(route('two-factor.challenge.show', absolute: false));
+
+        $this->flushTwoFactorSessionState();
+
+        $this->get(route('two-factor.challenge.show'))
+            ->assertRedirect(route('login', absolute: false))
+            ->assertSessionHas('error', 'Your verification session expired. Please sign in again.');
+
+        $this->assertGuest();
+    }
+
+    public function test_expired_challenge_redirects_cleanly_instead_of_forbidden(): void
+    {
+        $user = $this->createUser(UserRole::PROCUREMENT_OFFICER, 'expired.challenge@gsc.local');
+
+        $challenge = TwoFactorChallenge::query()->create([
+            'user_id' => $user->id,
+            'code_hash' => Hash::make('123456'),
+            'expires_at' => now()->subMinute(),
+            'consumed_at' => null,
+            'attempts' => 0,
+            'ip_address' => '127.0.0.1',
+            'user_agent' => 'phpunit',
+        ]);
+
+        $this->actingAs($user)->withSession([
+            'two_factor.pending' => true,
+            'two_factor.verified' => false,
+            'two_factor.user_id' => $user->id,
+            'two_factor.challenge_id' => $challenge->id,
+            'two_factor.pending_expires_at' => $challenge->expires_at?->toIso8601String(),
+        ]);
+
+        $this->post(route('two-factor.challenge.verify'), [
+            'code' => '123456',
+        ])
+            ->assertRedirect(route('login', absolute: false))
+            ->assertSessionHas('error', 'Your verification session expired. Please sign in again.');
+
+        $this->assertGuest();
+    }
+
+    public function test_logout_clears_two_factor_pending_session_state(): void
+    {
+        $user = $this->createUser(UserRole::ADMIN, 'logout.clear@gsc.local');
+
+        $this->actingAs($user)->withSession([
+            'two_factor.pending' => true,
+            'two_factor.verified' => false,
+            'two_factor.user_id' => $user->id,
+            'two_factor.challenge_id' => 123,
+            'two_factor.pending_expires_at' => now()->addMinutes(10)->toIso8601String(),
+            'two_factor.remember' => true,
+        ]);
+
+        $this->post('/logout')->assertRedirect('/');
+
+        $this->assertGuest();
+        $this->assertFalse((bool) session('two_factor.pending', false));
+        $this->assertNull(session('two_factor.user_id'));
+        $this->assertNull(session('two_factor.challenge_id'));
+        $this->assertNull(session('two_factor.pending_expires_at'));
     }
 
     public function test_public_role_login_does_not_require_internal_two_factor_flow(): void
@@ -452,5 +535,18 @@ class TwoFactorAuthenticationTest extends TestCase
                 'role_id' => $roleModel->id,
                 'office_id' => $office->id,
             ]);
+    }
+
+    private function flushTwoFactorSessionState(): void
+    {
+        session()->forget([
+            'two_factor.pending',
+            'two_factor.verified',
+            'two_factor.user_id',
+            'two_factor.verified_at',
+            'two_factor.remember',
+            'two_factor.challenge_id',
+            'two_factor.pending_expires_at',
+        ]);
     }
 }

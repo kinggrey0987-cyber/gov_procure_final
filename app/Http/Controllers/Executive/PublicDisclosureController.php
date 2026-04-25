@@ -5,7 +5,11 @@ namespace App\Http\Controllers\Executive;
 use App\Http\Requests\PublicDisclosure\PublishPublicDisclosureRequest;
 use App\Http\Requests\PublicDisclosure\StorePublicDisclosureRequest;
 use App\Http\Requests\PublicDisclosure\UpdatePublicDisclosureRequest;
+use App\Models\DistributionRecord;
+use App\Models\Ppmp;
 use App\Models\PublicDisclosure;
+use App\Models\PurchaseOrder;
+use App\Models\PurchaseRequest;
 use App\Services\Analytics\PublicDisclosureService;
 use App\Services\Documents\DocumentService;
 use App\Services\Executive\DisclosureEligibilityService;
@@ -86,6 +90,20 @@ class PublicDisclosureController
                 'title' => pathinfo($supportingFile->getClientOriginalName(), PATHINFO_FILENAME),
                 'file' => $supportingFile,
             ]);
+        }
+
+        if (! $request->hasFile('main_file') && count($supportingFiles) === 0) {
+            $generatedAttachment = $this->buildGeneratedDisclosureAttachment($disclosure);
+
+            $this->documentService->createGeneratedAttachment(
+                actor: $user,
+                relatedModule: 'public_disclosures',
+                relatedReferenceId: (int) $disclosure->disclosure_id,
+                title: $generatedAttachment['title'],
+                fileName: $generatedAttachment['file_name'],
+                content: $generatedAttachment['content'],
+                mimeExtension: 'txt',
+            );
         }
 
         return Redirect::route('executive.disclosures.show', $disclosure->disclosure_id)
@@ -176,5 +194,81 @@ class PublicDisclosureController
 
         return Redirect::route('executive.disclosures.show', $public_disclosure->disclosure_id)
             ->with('success', 'Disclosure published successfully.');
+    }
+
+    /**
+     * @return array{title: string, file_name: string, content: string}
+     */
+    private function buildGeneratedDisclosureAttachment(PublicDisclosure $disclosure): array
+    {
+        $referenceType = (string) ($disclosure->reference_type ?? '');
+        $referenceId = (int) ($disclosure->reference_id ?? 0);
+        $sourceLabel = $this->resolveDisclosureSourceLabel($referenceType, $referenceId);
+        $preparedAt = now()->format('Y-m-d H:i:s');
+
+        return [
+            'title' => sprintf('Source Record Snapshot - %s', (string) $disclosure->title),
+            'file_name' => sprintf('disclosure-%d-source-record', (int) $disclosure->disclosure_id),
+            'content' => implode(PHP_EOL, [
+                'PUBLIC DISCLOSURE SOURCE RECORD SNAPSHOT',
+                str_repeat('=', 42),
+                sprintf('Disclosure ID: %d', (int) $disclosure->disclosure_id),
+                sprintf('Title: %s', (string) $disclosure->title),
+                sprintf('Type: %s', (string) $disclosure->type),
+                sprintf('Status: %s', (string) $disclosure->status),
+                sprintf('Reference Type: %s', $referenceType !== '' ? $referenceType : 'N/A'),
+                sprintf('Reference ID: %s', $referenceId > 0 ? (string) $referenceId : 'N/A'),
+                sprintf('Resolved Source: %s', $sourceLabel),
+                sprintf('Prepared At: %s', $preparedAt),
+                '',
+                'Description:',
+                (string) ($disclosure->description ?? 'No description provided.'),
+            ]),
+        ];
+    }
+
+    private function resolveDisclosureSourceLabel(string $referenceType, int $referenceId): string
+    {
+        if ($referenceId <= 0 || $referenceType === '') {
+            return 'Unknown source record';
+        }
+
+        if ($referenceType === PurchaseRequest::class) {
+            $record = PurchaseRequest::query()->with('office:id,name')->find($referenceId, ['purchase_request_id', 'office_id', 'status']);
+
+            if ($record) {
+                return sprintf('PR-%d | %s | %s', (int) $record->purchase_request_id, $record->office?->name ?? 'Unknown Office', (string) $record->status);
+            }
+        }
+
+        if ($referenceType === PurchaseOrder::class) {
+            $record = PurchaseOrder::query()->with('purchaseRequest.office:id,name')->find($referenceId, ['purchase_order_id', 'purchase_request_id', 'po_number', 'status']);
+
+            if ($record) {
+                $code = (string) ($record->po_number ?: ('PO-'.$record->purchase_order_id));
+
+                return sprintf('PO %s | %s | %s', $code, $record->purchaseRequest?->office?->name ?? 'Unknown Office', (string) $record->status);
+            }
+        }
+
+        if ($referenceType === Ppmp::class) {
+            $record = Ppmp::query()->with('office:id,name')->find($referenceId, ['ppmp_id', 'office_id', 'fiscal_year', 'status']);
+
+            if ($record) {
+                return sprintf('PPMP-%d | %s | FY %d | %s', (int) $record->ppmp_id, $record->office?->name ?? 'Unknown Office', (int) $record->fiscal_year, (string) $record->status);
+            }
+        }
+
+        if ($referenceType === DistributionRecord::class) {
+            $record = DistributionRecord::query()->with('office:id,name')->find($referenceId, ['distribution_record_id', 'distribution_code', 'office_id', 'status']);
+
+            if ($record) {
+                $code = (string) ($record->distribution_code ?: ('DIST-'.$record->distribution_record_id));
+
+                return sprintf('%s | %s | %s', $code, $record->office?->name ?? 'Unknown Office', (string) $record->status);
+            }
+        }
+
+        return sprintf('%s #%d (not found)', class_basename($referenceType), $referenceId);
     }
 }

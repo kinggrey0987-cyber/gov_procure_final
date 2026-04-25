@@ -71,6 +71,62 @@ class DocumentService
         return $document->fresh(['uploader']) ?? $document;
     }
 
+    public function createGeneratedAttachment(
+        User $actor,
+        string $relatedModule,
+        int $relatedReferenceId,
+        string $title,
+        string $fileName,
+        string $content,
+        string $mimeExtension = 'txt',
+    ): Document {
+        $module = $this->accessService->normalizeModule($relatedModule);
+        $parent = $this->accessService->resolveParentOrFail($module, $relatedReferenceId);
+
+        if (! $this->accessService->canManage($actor, $module, $parent)) {
+            throw ValidationException::withMessages([
+                'authorization' => 'You are not authorized to create attachments for this record.',
+            ]);
+        }
+
+        $safeName = trim($fileName) !== '' ? $fileName : 'generated-attachment';
+        $storedFileName = Str::uuid()->toString().'_'.$safeName.'.'.$mimeExtension;
+        $filePath = 'documents/'.$module.'/'.$relatedReferenceId.'/'.$storedFileName;
+        Storage::disk('public')->put($filePath, $content);
+
+        $document = DB::transaction(function () use ($actor, $module, $relatedReferenceId, $title, $safeName, $mimeExtension, $filePath): Document {
+            $document = Document::query()->create([
+                'uploaded_by' => (int) $actor->id,
+                'title' => $title,
+                'file_name' => $safeName.'.'.$mimeExtension,
+                'file_path' => $filePath,
+                'related_module' => $module,
+                'related_reference_id' => $relatedReferenceId,
+                'uploaded_at' => now(),
+            ]);
+
+            $this->auditLogService->log(
+                actor: $actor,
+                moduleName: 'Documents.Attachment',
+                actionType: 'GENERATE',
+                referenceType: Document::class,
+                referenceId: (int) $document->document_id,
+                details: [
+                    'related_module' => $module,
+                    'related_reference_id' => $relatedReferenceId,
+                    'file_name' => $document->file_name,
+                    'generated' => true,
+                ],
+                logDomain: 'BUSINESS',
+                officeId: $actor->office_id,
+            );
+
+            return $document;
+        });
+
+        return $document->fresh(['uploader']) ?? $document;
+    }
+
     /**
      * @return Collection<int, Document>
      */

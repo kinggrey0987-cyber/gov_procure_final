@@ -67,7 +67,7 @@ export default function InventoryTracking({ summary }: Props) {
                     <StatCard label="Movement Logs" value={summary.movement_count} tone="sky" />
                     <StatCard label="Released Distribution" value={summary.released_distribution_count} tone="blue" />
                     <StatCard label="Received Distribution" value={summary.received_distribution_count} tone="emerald" />
-                    <StatCard label="Open Claims" value={summary.open_claim_count} tone="rose" />
+                    <StatCard label="Pending Claims" value={summary.open_claim_count} tone="rose" />
                 </div>
 
                 <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
