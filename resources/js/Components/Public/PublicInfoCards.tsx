@@ -87,7 +87,7 @@ export default function PublicInfoCards({ monthlyDisclosures, typeBreakdown }: P
                         {breakdown.map((row, index) => (
                             <p key={row.label}>
                                 <span className="mr-2 inline-block h-2 w-2 rounded-full" style={{ backgroundColor: chartColors[index % chartColors.length] }} />
-                                {row.label} ({row.count})
+                                {formatDisclosureType(row.label)} ({row.count})
                             </p>
                         ))}
                     </div>
@@ -95,4 +95,11 @@ export default function PublicInfoCards({ monthlyDisclosures, typeBreakdown }: P
             </article>
         </section>
     );
+}
+
+function formatDisclosureType(value: string): string {
+    return value
+        .replaceAll('_', ' ')
+        .toLowerCase()
+        .replace(/\b\w/g, (char) => char.toUpperCase());
 }

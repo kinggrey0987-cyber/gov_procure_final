@@ -19,6 +19,11 @@ use Illuminate\Support\Facades\Storage;
 
 class DemoSeedAuditService
 {
+    private function publicDisk(): string
+    {
+        return (string) config('filesystems.public_disk', 'public');
+    }
+
     /**
      * @return array{issues: array<int, string>, fixes: array<int, string>}
      */
@@ -195,11 +200,11 @@ class DemoSeedAuditService
 
         foreach ($published as $disclosure) {
             $path = ltrim((string) $disclosure->file_path, '/');
-            if ($path === '' || ! Storage::disk('public')->exists($path)) {
+            if ($path === '' || ! Storage::disk($this->publicDisk())->exists($path)) {
                 $issues[] = sprintf('Published disclosure %d has missing main file.', (int) $disclosure->disclosure_id);
 
                 $fallbackPath = sprintf('reports/public_disclosures/disclosure-%d.txt', (int) $disclosure->disclosure_id);
-                Storage::disk('public')->put(
+                Storage::disk($this->publicDisk())->put(
                     $fallbackPath,
                     sprintf("GovSupply Connect disclosure fallback\nDisclosure ID: %d\n", (int) $disclosure->disclosure_id)
                 );
@@ -215,14 +220,14 @@ class DemoSeedAuditService
 
             foreach ($documents as $document) {
                 $docPath = ltrim((string) $document->file_path, '/');
-                if ($docPath !== '' && Storage::disk('public')->exists($docPath)) {
+                if ($docPath !== '' && Storage::disk($this->publicDisk())->exists($docPath)) {
                     continue;
                 }
 
                 $issues[] = sprintf('Disclosure attachment %d has missing file.', (int) $document->document_id);
                 $rebuiltPath = sprintf('documents/public_disclosures/%d/rebuilt-%d.txt', (int) $disclosure->disclosure_id, (int) $document->document_id);
 
-                Storage::disk('public')->put(
+                Storage::disk($this->publicDisk())->put(
                     $rebuiltPath,
                     sprintf("Rebuilt attachment\nDisclosure ID: %d\nDocument ID: %d\n", (int) $disclosure->disclosure_id, (int) $document->document_id)
                 );

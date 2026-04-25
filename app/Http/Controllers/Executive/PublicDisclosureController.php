@@ -18,6 +18,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -30,6 +31,11 @@ class PublicDisclosureController
         private readonly DisclosureEligibilityService $eligibilityService,
         private readonly DocumentService $documentService,
     ) {
+    }
+
+    private function publicDisk(): string
+    {
+        return (string) config('filesystems.public_disk', 'public');
     }
 
     public function index(): RedirectResponse
@@ -75,7 +81,7 @@ class PublicDisclosureController
             /** @var UploadedFile $mainFile */
             $mainFile = $request->file('main_file');
             $storedFileName = Str::uuid()->toString().'_'.$mainFile->getClientOriginalName();
-            $payload['file_path'] = $mainFile->storeAs('public_disclosures', $storedFileName, 'public');
+            $payload['file_path'] = $mainFile->storeAs('public_disclosures', $storedFileName, $this->publicDisk());
         }
 
         $disclosure = $this->disclosureService->createFromPayload($user, $payload);

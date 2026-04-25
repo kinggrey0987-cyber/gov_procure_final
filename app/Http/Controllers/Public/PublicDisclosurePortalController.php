@@ -9,12 +9,17 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PublicDisclosurePortalController
 {
     public function __construct(private readonly DocumentService $documentService)
     {
+    }
+
+    private function publicDisk(): string
+    {
+        return (string) config('filesystems.public_disk', 'public');
     }
 
     public function index(): Response
@@ -49,7 +54,7 @@ class PublicDisclosurePortalController
         ]);
     }
 
-    public function download(PublicDisclosure $public_disclosure): BinaryFileResponse
+    public function download(PublicDisclosure $public_disclosure): StreamedResponse
     {
         abort_unless($this->isPublished($public_disclosure), 404);
         abort_unless(is_string($public_disclosure->file_path) && $public_disclosure->file_path !== '', 404);
@@ -57,7 +62,7 @@ class PublicDisclosurePortalController
         $path = $this->resolveExistingPublicDiskPath((string) $public_disclosure->file_path);
         abort_unless($path !== null, 404);
 
-        return response()->download(Storage::disk('public')->path($path), basename($path));
+        return $this->streamDiskDownload($path, basename($path));
     }
 
     private function isPublished(PublicDisclosure $disclosure): bool
@@ -90,11 +95,29 @@ class PublicDisclosurePortalController
         }
 
         foreach (array_values(array_unique($candidates)) as $candidate) {
-            if ($candidate !== '' && Storage::disk('public')->exists($candidate)) {
+            if ($candidate !== '' && Storage::disk($this->publicDisk())->exists($candidate)) {
                 return $candidate;
             }
         }
 
         return null;
+    }
+
+    private function streamDiskDownload(string $path, string $downloadName): StreamedResponse
+    {
+        $disk = Storage::disk($this->publicDisk());
+        $stream = $disk->readStream($path);
+
+        abort_unless(is_resource($stream), 404);
+
+        return response()->streamDownload(
+            static function () use ($stream): void {
+                fpassthru($stream);
+                if (is_resource($stream)) {
+                    fclose($stream);
+                }
+            },
+            $downloadName,
+        );
     }
 }

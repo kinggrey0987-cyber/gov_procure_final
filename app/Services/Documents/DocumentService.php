@@ -14,6 +14,11 @@ use Illuminate\Validation\ValidationException;
 
 class DocumentService
 {
+    private function publicDisk(): string
+    {
+        return (string) config('filesystems.public_disk', 'public');
+    }
+
     public function __construct(
         private readonly DocumentAccessService $accessService,
         private readonly AuditLogService $auditLogService,
@@ -37,7 +42,7 @@ class DocumentService
         /** @var UploadedFile $file */
         $file = $payload['file'];
         $storedFileName = Str::uuid()->toString().'_'.$file->getClientOriginalName();
-        $filePath = $file->storeAs('documents/'.$module.'/'.$relatedReferenceId, $storedFileName, 'public');
+        $filePath = $file->storeAs('documents/'.$module.'/'.$relatedReferenceId, $storedFileName, $this->publicDisk());
 
         $document = DB::transaction(function () use ($actor, $module, $relatedReferenceId, $payload, $file, $filePath): Document {
             $document = Document::query()->create([
@@ -92,7 +97,7 @@ class DocumentService
         $safeName = trim($fileName) !== '' ? $fileName : 'generated-attachment';
         $storedFileName = Str::uuid()->toString().'_'.$safeName.'.'.$mimeExtension;
         $filePath = 'documents/'.$module.'/'.$relatedReferenceId.'/'.$storedFileName;
-        Storage::disk('public')->put($filePath, $content);
+        Storage::disk($this->publicDisk())->put($filePath, $content);
 
         $document = DB::transaction(function () use ($actor, $module, $relatedReferenceId, $title, $safeName, $mimeExtension, $filePath): Document {
             $document = Document::query()->create([
@@ -171,7 +176,7 @@ class DocumentService
         }
 
         DB::transaction(function () use ($actor, $document): void {
-            Storage::disk('public')->delete((string) $document->file_path);
+            Storage::disk($this->publicDisk())->delete((string) $document->file_path);
 
             $this->auditLogService->log(
                 actor: $actor,

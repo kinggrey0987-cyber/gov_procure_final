@@ -8,6 +8,11 @@ use Illuminate\Support\Facades\Storage;
 
 class DemoDataResetService
 {
+    private function publicDisk(): string
+    {
+        return (string) config('filesystems.public_disk', 'public');
+    }
+
     /**
      * @return array<int, string>
      */
@@ -61,9 +66,9 @@ class DemoDataResetService
             }
         });
 
-        Storage::disk('public')->deleteDirectory('public_disclosures');
-        Storage::disk('public')->deleteDirectory('documents/public_disclosures');
-        Storage::disk('public')->deleteDirectory('reports/public_disclosures');
+        Storage::disk($this->publicDisk())->deleteDirectory('public_disclosures');
+        Storage::disk($this->publicDisk())->deleteDirectory('documents/public_disclosures');
+        Storage::disk($this->publicDisk())->deleteDirectory('reports/public_disclosures');
         Storage::disk('local')->deleteDirectory('record-archives');
         Storage::disk('local')->deleteDirectory('system-backups');
 

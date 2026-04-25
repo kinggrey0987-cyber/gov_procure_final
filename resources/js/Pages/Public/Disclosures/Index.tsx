@@ -18,53 +18,58 @@ type Props = {
 
 export default function PublicDisclosureIndex({ disclosures }: Props) {
     const rows = disclosures.data ?? [];
+    const currentPage = disclosures.current_page || undefined;
 
     return (
         <>
             <Head title="Public Disclosures" />
-            <div className="min-h-screen bg-slate-50 py-12">
+            <div className="min-h-screen bg-gradient-to-b from-red-50 via-white to-red-50 py-12">
                 <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-                    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_8px_24px_rgba(15,23,42,0.06)] sm:p-8">
+                    <div className="rounded-2xl border border-red-200 bg-white p-6 shadow-[0_10px_24px_rgba(15,23,42,0.08)] sm:p-8">
                         <div className="mb-4 flex items-center justify-between gap-3">
                             <Link
                                 href={route('landing')}
-                                className="inline-flex rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                className="inline-flex rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
                             >
                                 Back to Homepage
                             </Link>
+                            <span className="inline-flex rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700">
+                                {rows.length} Published on this page
+                            </span>
                         </div>
 
                         <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Public Disclosures</h1>
                         <p className="mt-2 text-sm text-slate-600">Published procurement records available for public transparency.</p>
 
-                        <div className="mt-6 overflow-hidden rounded-xl border border-slate-200">
+                        <div className="mt-6 overflow-hidden rounded-xl border border-red-200">
                             {rows.length === 0 ? (
                                 <div className="px-6 py-12 text-center">
                                     <p className="text-base font-medium text-slate-800">No public disclosures available yet.</p>
                                 </div>
                             ) : (
                                 <div className="overflow-x-auto">
-                                    <table className="min-w-full divide-y divide-slate-200 text-sm">
-                                        <thead className="bg-slate-50">
+                                    <table className="min-w-full divide-y divide-red-100 text-sm">
+                                        <thead className="bg-red-50/80">
                                             <tr>
-                                                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Title</th>
-                                                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Type</th>
-                                                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Published</th>
-                                                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Action</th>
+                                                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">Title</th>
+                                                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">Type</th>
+                                                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">Published</th>
+                                                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">Action</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-slate-100 bg-white">
+                                        <tbody className="divide-y divide-red-100 bg-white">
                                             {rows.map((row) => (
-                                                <tr key={row.disclosure_id} className="transition-colors hover:bg-slate-50/80">
+                                                <tr key={row.disclosure_id} className="transition-colors hover:bg-red-50/50">
                                                     <td className="px-5 py-3.5 text-sm font-medium text-slate-900">{row.title}</td>
-                                                    <td className="px-5 py-3.5 text-slate-700">{formatTypeLabel(row.type)}</td>
+                                                    <td className="px-5 py-3.5 text-slate-700">
+                                                        <span className="inline-flex rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">
+                                                            {formatTypeLabel(row.type)}
+                                                        </span>
+                                                    </td>
                                                     <td className="px-5 py-3.5 text-slate-700">{formatPublishedDate(row.published_at)}</td>
                                                     <td className="px-5 py-3.5">
                                                         <Link
-                                                            href={route('public.disclosures.show', {
-                                                                public_disclosure: row.disclosure_id,
-                                                                page: disclosures.current_page || undefined,
-                                                            })}
+                                                            href={buildDisclosureHref(row.disclosure_id, currentPage)}
                                                             className="inline-flex rounded-lg bg-red-700 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-800"
                                                         >
                                                             View Disclosure
@@ -86,6 +91,11 @@ export default function PublicDisclosureIndex({ disclosures }: Props) {
             </div>
         </>
     );
+}
+
+function buildDisclosureHref(disclosureId: number, page?: number): string {
+    const base = `/public/disclosures/${disclosureId}`;
+    return page ? `${base}?page=${page}` : base;
 }
 
 function formatTypeLabel(value: string): string {

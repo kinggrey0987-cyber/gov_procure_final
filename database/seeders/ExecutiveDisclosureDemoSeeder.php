@@ -15,6 +15,11 @@ use Illuminate\Support\Facades\Storage;
 
 class ExecutiveDisclosureDemoSeeder extends Seeder
 {
+    private function publicDisk(): string
+    {
+        return (string) config('filesystems.public_disk', 'public');
+    }
+
     public function run(): void
     {
         $executive = User::query()
@@ -255,7 +260,7 @@ class ExecutiveDisclosureDemoSeeder extends Seeder
         $slug = strtolower(str_replace(' ', '-', trim($title)));
         $path = sprintf('reports/public_disclosures/%s.txt', $slug);
 
-        Storage::disk('public')->put(
+        Storage::disk($this->publicDisk())->put(
             $path,
             implode("\n", [
                 'GovSupply Connect Public Disclosure Report',
@@ -282,7 +287,7 @@ class ExecutiveDisclosureDemoSeeder extends Seeder
                 (string) $attachment['suffix'],
             );
 
-            Storage::disk('public')->put($path, (string) $attachment['body']);
+            Storage::disk($this->publicDisk())->put($path, (string) $attachment['body']);
 
             Document::query()->updateOrCreate(
                 [

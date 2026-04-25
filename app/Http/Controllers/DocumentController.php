@@ -13,12 +13,17 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DocumentController extends Controller
 {
     public function __construct(private readonly DocumentService $service)
     {
+    }
+
+    private function publicDisk(): string
+    {
+        return (string) config('filesystems.public_disk', 'public');
     }
 
     public function index(Request $request, string $related_module, int $related_reference_id): JsonResponse
@@ -47,7 +52,7 @@ class DocumentController extends Controller
         return back()->with('success', 'Attachment uploaded successfully.');
     }
 
-    public function show(Request $request, Document $document): BinaryFileResponse
+    public function show(Request $request, Document $document): StreamedResponse
     {
         try {
             $this->service->authorizeViewDocument($document, $request->user());
@@ -58,7 +63,7 @@ class DocumentController extends Controller
         $path = $this->resolveExistingPublicDiskPath((string) $document->file_path);
         abort_unless($path !== null, 404);
 
-        return response()->download(Storage::disk('public')->path($path), (string) $document->file_name);
+        return $this->streamDiskDownload($path, (string) $document->file_name);
     }
 
     public function destroy(DeleteDocumentRequest $request, Document $document): RedirectResponse
@@ -72,7 +77,7 @@ class DocumentController extends Controller
         return back()->with('success', 'Attachment deleted successfully.');
     }
 
-    public function downloadPublicDisclosureDocument(PublicDisclosure $public_disclosure, Document $document): BinaryFileResponse
+    public function downloadPublicDisclosureDocument(PublicDisclosure $public_disclosure, Document $document): StreamedResponse
     {
         abort_unless($this->belongsToPublicDisclosure($document, $public_disclosure), 404);
 
@@ -93,7 +98,7 @@ class DocumentController extends Controller
         ]);
         abort_unless($path !== null, 404);
 
-        return response()->download(Storage::disk('public')->path($path), (string) $document->file_name);
+        return $this->streamDiskDownload($path, (string) $document->file_name);
     }
 
     private function normalizePublicDiskPath(string $path): string
@@ -129,12 +134,30 @@ class DocumentController extends Controller
         }
 
         foreach (array_values(array_unique($candidates)) as $candidate) {
-            if ($candidate !== '' && Storage::disk('public')->exists($candidate)) {
+            if ($candidate !== '' && Storage::disk($this->publicDisk())->exists($candidate)) {
                 return $candidate;
             }
         }
 
         return null;
+    }
+
+    private function streamDiskDownload(string $path, string $downloadName): StreamedResponse
+    {
+        $disk = Storage::disk($this->publicDisk());
+        $stream = $disk->readStream($path);
+
+        abort_unless(is_resource($stream), 404);
+
+        return response()->streamDownload(
+            static function () use ($stream): void {
+                fpassthru($stream);
+                if (is_resource($stream)) {
+                    fclose($stream);
+                }
+            },
+            $downloadName,
+        );
     }
 
     private function belongsToPublicDisclosure(Document $document, PublicDisclosure $publicDisclosure): bool
