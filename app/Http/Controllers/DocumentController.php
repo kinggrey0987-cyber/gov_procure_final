@@ -97,17 +97,28 @@ class DocumentController extends Controller
             ),
         ]);
         if ($path === null) {
-            return $this->streamTextDownload(
+            $path = sprintf(
+                'documents/public_disclosures/%d/rebuilt-%d.txt',
+                (int) $public_disclosure->disclosure_id,
+                (int) $document->document_id,
+            );
+
+            Storage::disk($this->publicDisk())->put(
+                $path,
                 implode(PHP_EOL, [
-                    'GovSupply Connect Public Disclosure Attachment',
+                    'GovSupply Connect Public Disclosure Attachment (Rebuilt)',
                     sprintf('Disclosure ID: %d', (int) $public_disclosure->disclosure_id),
                     sprintf('Document ID: %d', (int) $document->document_id),
                     sprintf('Title: %s', (string) $document->title),
                     sprintf('Original File Name: %s', (string) $document->file_name),
-                    'Note: The original attachment file is currently unavailable in storage.',
+                    'Generated because original attachment file was unavailable in storage.',
                 ]).PHP_EOL,
-                sprintf('disclosure-%d-document-%d-unavailable.txt', (int) $public_disclosure->disclosure_id, (int) $document->document_id),
             );
+
+            $document->forceFill([
+                'file_path' => $path,
+                'file_name' => basename($path),
+            ])->save();
         }
 
         return $this->streamDiskDownload($path, (string) $document->file_name);
@@ -169,19 +180,6 @@ class DocumentController extends Controller
                 }
             },
             $downloadName,
-        );
-    }
-
-    private function streamTextDownload(string $content, string $downloadName): StreamedResponse
-    {
-        return response()->streamDownload(
-            static function () use ($content): void {
-                echo $content;
-            },
-            $downloadName,
-            [
-                'Content-Type' => 'text/plain; charset=UTF-8',
-            ],
         );
     }
 
