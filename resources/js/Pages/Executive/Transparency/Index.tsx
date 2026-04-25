@@ -337,23 +337,17 @@ export default function TransparencyMonitoringIndex({
                                         {'–'}
                                         {Math.min(recentActivityPage * recentActivityPerPage, recent_disclosures.length)} of {recent_disclosures.length}
                                     </p>
-                                    <div className="flex items-center gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => setRecentActivityPage((current) => Math.max(current - 1, 1))}
-                                            disabled={recentActivityPage === 1}
-                                            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 enabled:hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                                        >
-                                            Previous 5
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setRecentActivityPage((current) => Math.min(current + 1, recentActivityTotalPages))}
-                                            disabled={recentActivityPage === recentActivityTotalPages}
-                                            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 enabled:hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                                        >
-                                            Next 5
-                                        </button>
+                                    <div className="flex flex-wrap items-center justify-end gap-2">
+                                        {Array.from({ length: recentActivityTotalPages }, (_, index) => index + 1).map((pageNumber) => (
+                                            <button
+                                                key={pageNumber}
+                                                type="button"
+                                                onClick={() => setRecentActivityPage(pageNumber)}
+                                                className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${recentActivityPage === pageNumber ? 'border-red-700 bg-red-700 text-white' : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`}
+                                            >
+                                                Page {pageNumber}
+                                            </button>
+                                        ))}
                                     </div>
                                 </div>
                             ) : null}

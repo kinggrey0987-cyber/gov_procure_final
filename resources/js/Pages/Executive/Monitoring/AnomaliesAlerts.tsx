@@ -477,24 +477,17 @@ function SimplePager({
     return (
         <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-xs text-slate-600">
             <p>Showing {start}-{end} of {totalCount}</p>
-            <div className="flex items-center gap-2">
-                <button
-                    type="button"
-                    onClick={() => onPageChange(Math.max(1, page - 1))}
-                    disabled={page <= 1}
-                    className="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                    Prev
-                </button>
-                <span className="font-semibold text-slate-700">Page {page} of {totalPages}</span>
-                <button
-                    type="button"
-                    onClick={() => onPageChange(Math.min(totalPages, page + 1))}
-                    disabled={page >= totalPages}
-                    className="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                    Next
-                </button>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+                {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => (
+                    <button
+                        key={pageNumber}
+                        type="button"
+                        onClick={() => onPageChange(pageNumber)}
+                        className={`rounded border px-2 py-1 font-semibold ${page === pageNumber ? 'border-red-700 bg-red-700 text-white' : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`}
+                    >
+                        Page {pageNumber}
+                    </button>
+                ))}
             </div>
         </div>
     );
