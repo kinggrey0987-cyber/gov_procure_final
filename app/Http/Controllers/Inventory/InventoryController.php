@@ -55,7 +55,7 @@ class InventoryController
 
         $inventories = $query
             ->orderByDesc('last_updated')
-            ->paginate(20)
+            ->paginate(5)
             ->withQueryString();
 
         $categories = ItemCategory::query()

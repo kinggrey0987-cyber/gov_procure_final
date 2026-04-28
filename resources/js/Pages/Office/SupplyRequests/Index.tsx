@@ -1,8 +1,9 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PaginationNav from '@/Components/PaginationNav';
+import MonthFilterSelect from '@/Components/MonthFilterSelect';
 import useDebouncedValue from '@/hooks/useDebouncedValue';
 import { Head, Link, router } from '@inertiajs/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type RequestRow = {
     supply_request_id: number;
@@ -19,29 +20,40 @@ type Props = {
     };
     filters?: {
         status?: string;
+        month?: string;
         search?: string;
     };
 };
 
 export default function SupplyRequestsIndex({ supplyRequests, filters }: Props) {
     const [status, setStatus] = useState(filters?.status ?? '');
+    const [month, setMonth] = useState(filters?.month ?? '');
     const [search, setSearch] = useState(filters?.search ?? '');
     const debouncedSearch = useDebouncedValue(search, 450);
+    const hasMountedRef = useRef(false);
 
     useEffect(() => {
         setStatus(filters?.status ?? '');
+        setMonth(filters?.month ?? '');
         setSearch(filters?.search ?? '');
-    }, [filters?.search, filters?.status]);
+    }, [filters?.month, filters?.search, filters?.status]);
 
     const activeFilters = useMemo(
         () => ({
             status,
+            month,
             search: debouncedSearch,
         }),
-        [status, debouncedSearch],
+        [month, status, debouncedSearch],
     );
 
     useEffect(() => {
+        if (!hasMountedRef.current) {
+            hasMountedRef.current = true;
+
+            return;
+        }
+
         router.get(route('office.supply-requests.index'), activeFilters, {
             preserveState: true,
             replace: true,
@@ -82,17 +94,26 @@ export default function SupplyRequestsIndex({ supplyRequests, filters }: Props) 
                 <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="border-b border-slate-200 px-6 py-4">
                         <h4 className="text-lg font-semibold text-slate-800">Request List</h4>
-                        <div className="mt-3 grid gap-2 md:grid-cols-3">
+                        <div className="mt-3 grid gap-2 md:grid-cols-4">
+                            <select
+                                value={status}
+                                onChange={(event) => setStatus(event.target.value)}
+                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                            >
+                                <option value="">All statuses</option>
+                                {['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'RETURNED_FOR_REVISION', 'PROCESSING', 'RELEASED', 'RECEIVED'].map((option) => (
+                                    <option key={option} value={option}>{option.replaceAll('_', ' ')}</option>
+                                ))}
+                            </select>
+                            <MonthFilterSelect
+                                value={month}
+                                onChange={setMonth}
+                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                            />
                             <input
                                 value={search}
                                 onChange={(event) => setSearch(event.target.value)}
                                 placeholder="Search request code, purpose, status"
-                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                            />
-                            <input
-                                value={status}
-                                onChange={(event) => setStatus(event.target.value)}
-                                placeholder="Status"
                                 className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                             />
                             <button
@@ -144,7 +165,7 @@ export default function SupplyRequestsIndex({ supplyRequests, filters }: Props) 
                     )}
                 </div>
 
-                <PaginationNav links={supplyRequests.links} />
+                <PaginationNav links={supplyRequests.links} preserveState={false} />
             </div>
         </AuthenticatedLayout>
     );

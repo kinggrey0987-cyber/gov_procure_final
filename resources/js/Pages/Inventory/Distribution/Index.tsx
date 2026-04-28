@@ -1,8 +1,9 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PaginationNav from '@/Components/PaginationNav';
+import MonthFilterSelect from '@/Components/MonthFilterSelect';
 import useDebouncedValue from '@/hooks/useDebouncedValue';
 import { Head, Link, router } from '@inertiajs/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type RecordRow = {
     distribution_record_id: number;
@@ -23,6 +24,7 @@ type Props = {
     };
     filters?: {
         status?: string;
+        month?: string;
         search?: string;
     };
 };
@@ -30,22 +32,32 @@ type Props = {
 export default function DistributionIndex({ records, filters }: Props) {
     const [search, setSearch] = useState(filters?.search ?? '');
     const [statusFilter, setStatusFilter] = useState(filters?.status ?? '');
+    const [month, setMonth] = useState(filters?.month ?? '');
     const debouncedSearch = useDebouncedValue(search, 450);
+    const hasMountedRef = useRef(false);
 
     useEffect(() => {
         setSearch(filters?.search ?? '');
         setStatusFilter(filters?.status ?? '');
-    }, [filters?.search, filters?.status]);
+        setMonth(filters?.month ?? '');
+    }, [filters?.month, filters?.search, filters?.status]);
 
     const activeFilters = useMemo(
         () => ({
             status: statusFilter,
+            month,
             search: debouncedSearch,
         }),
-        [statusFilter, debouncedSearch],
+        [statusFilter, month, debouncedSearch],
     );
 
     useEffect(() => {
+        if (!hasMountedRef.current) {
+            hasMountedRef.current = true;
+
+            return;
+        }
+
         router.get(route('inventory.distribution-records.index'), activeFilters, {
             preserveState: true,
             replace: true,
@@ -100,7 +112,7 @@ export default function DistributionIndex({ records, filters }: Props) {
                 </div>
 
                 <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div className="grid gap-3 md:grid-cols-[1fr_220px_auto] md:items-end">
+                    <div className="grid gap-3 md:grid-cols-[1fr_220px_180px_auto] md:items-end">
                         <div>
                             <label htmlFor="distribution-search" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 Search
@@ -111,6 +123,17 @@ export default function DistributionIndex({ records, filters }: Props) {
                                     value={search}
                                 onChange={(event) => setSearch(event.target.value)}
                                 placeholder="Code, office request, office, status"
+                                className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                            />
+                        </div>
+
+                        <div>
+                            <label htmlFor="distribution-month" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Month
+                            </label>
+                            <MonthFilterSelect
+                                value={month}
+                                onChange={setMonth}
                                 className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                             />
                         </div>
@@ -137,6 +160,7 @@ export default function DistributionIndex({ records, filters }: Props) {
                             onClick={() => {
                                 setSearch('');
                                 setStatusFilter('');
+                                setMonth('');
                             }}
                             className="inline-flex h-[42px] items-center justify-center rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                         >
@@ -194,7 +218,7 @@ export default function DistributionIndex({ records, filters }: Props) {
                     </table>
                 </div>
 
-                <PaginationNav links={records.links} />
+                <PaginationNav links={records.links} preserveState={false} />
             </div>
         </AuthenticatedLayout>
     );

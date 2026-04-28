@@ -3,7 +3,7 @@ import PaginationNav from '@/Components/PaginationNav';
 import useSmartRefresh from '@/hooks/useSmartRefresh';
 import useDebouncedValue from '@/hooks/useDebouncedValue';
 import { Head, Link, router } from '@inertiajs/react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type PurchaseRequestRow = {
     purchase_request_id: number;
@@ -43,44 +43,41 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
     const [status, setStatus] = useState(filters?.status ?? '');
     const [search, setSearch] = useState(filters?.search ?? '');
     const debouncedSearch = useDebouncedValue(search, 450);
+    const hasMountedRef = useRef(false);
 
     useEffect(() => {
         setStatus(filters?.status ?? '');
         setSearch(filters?.search ?? '');
     }, [filters?.search, filters?.status]);
 
-    const activeFilters = useMemo(
-        () => ({
-            status,
-            search: debouncedSearch,
-        }),
-        [status, debouncedSearch],
-    );
+    const activeFilters = useMemo(() => {
+        const nextFilters: { status?: string; search?: string } = {};
 
-    const refreshWithActiveFilters = useCallback(() => {
-        router.get(
-            route('procurement.purchase-requests.index'),
-            {
-                status,
-                search: debouncedSearch,
-            },
-            {
-                preserveState: true,
-                replace: true,
-                only: ['purchaseRequests', 'filters'],
-            },
-        );
-    }, [debouncedSearch, status]);
+        if (status) {
+            nextFilters.status = status;
+        }
+
+        if (debouncedSearch) {
+            nextFilters.search = debouncedSearch;
+        }
+
+        return nextFilters;
+    }, [status, debouncedSearch]);
 
     const { isRefreshing, lastRefreshedAt } = useSmartRefresh({
         only: ['purchaseRequests', 'filters'],
         refreshOnFocus: true,
         refreshOnMount: false,
         pollIntervalMs: 30000,
-        onRefresh: refreshWithActiveFilters,
     });
 
     useEffect(() => {
+        if (!hasMountedRef.current) {
+            hasMountedRef.current = true;
+
+            return;
+        }
+
         router.get(route('procurement.purchase-requests.index'), activeFilters, {
             preserveState: true,
             replace: true,
@@ -109,6 +106,19 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                 </section>
 
                 <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <h3 className="text-sm font-semibold text-slate-900">Filter request review queue</h3>
+                            <p className="text-xs text-slate-500">Filters update automatically; no apply button required.</p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={resetFilters}
+                            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                            Reset
+                        </button>
+                    </div>
                     <div className="grid gap-3 md:grid-cols-5">
                         <select
                             value={status}
@@ -131,13 +141,7 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                             className="md:col-span-2 rounded-lg border-slate-300 text-sm"
                         />
 
-                        <button
-                            type="button"
-                            onClick={resetFilters}
-                            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 md:col-start-5"
-                        >
-                            Reset
-                        </button>
+                        <p className="flex items-center text-xs text-slate-500 md:col-span-2">Showing 5 records per page. Use pagination for the next 5.</p>
                     </div>
                 </section>
 
@@ -213,7 +217,7 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                     </table>
                 </section>
 
-                <PaginationNav links={purchaseRequests.links} />
+                <PaginationNav links={purchaseRequests.links} preserveState={false} />
             </div>
         </AuthenticatedLayout>
     );

@@ -27,7 +27,7 @@ class RecordArchiveController extends Controller
             ->with('generator:id,name')
             ->orderByDesc('generated_at')
             ->orderByDesc('archive_id')
-            ->paginate(15)
+            ->paginate(5)
             ->withQueryString();
 
         $records->through(static fn (RecordArchive $record): array => [

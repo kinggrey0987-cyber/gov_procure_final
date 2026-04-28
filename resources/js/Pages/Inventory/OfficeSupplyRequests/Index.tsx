@@ -4,7 +4,7 @@ import useDebouncedValue from '@/hooks/useDebouncedValue';
 import useSmartRefresh from '@/hooks/useSmartRefresh';
 import { humanizeEnum } from '@/lib/displayLabels';
 import { Head, Link, router } from '@inertiajs/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type PaginationLink = {
     url: string | null;
@@ -58,6 +58,7 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
     const debouncedQ = useDebouncedValue(q, 450);
     const [queueingRequestId, setQueueingRequestId] = useState<number | null>(null);
     const [processingRequestId, setProcessingRequestId] = useState<number | null>(null);
+    const hasMountedRef = useRef(false);
 
     useEffect(() => {
         setQ(filters.q ?? '');
@@ -83,6 +84,12 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
     );
 
     useEffect(() => {
+        if (!hasMountedRef.current) {
+            hasMountedRef.current = true;
+
+            return;
+        }
+
         router.get(
             route('inventory.office-supply-requests.index'),
             activeFilters,
@@ -260,7 +267,7 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                 </div>
 
                 <div>
-                    <PaginationNav links={requests.links} />
+                    <PaginationNav links={requests.links} preserveState={false} />
                 </div>
             </div>
         </AuthenticatedLayout>

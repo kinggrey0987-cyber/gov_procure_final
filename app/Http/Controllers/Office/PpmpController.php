@@ -27,10 +27,18 @@ class PpmpController extends Controller
     {
         abort_unless($request->user()?->can('office.ppmp.view-any'), 403);
 
+        $status = strtoupper(trim((string) $request->input('status', '')));
+        $month = trim((string) $request->input('month', ''));
+
         $ppmps = Ppmp::query()
             ->forOffice((int) $request->user()?->office_id)
+            ->when($status !== '', fn ($query) => $query->where('status', $status))
+            ->when(preg_match('/^\d{4}-\d{2}$/', $month) === 1, function ($query) use ($month): void {
+                [$year, $monthNumber] = array_map('intval', explode('-', $month));
+                $query->whereYear('date_prepared', $year)->whereMonth('date_prepared', $monthNumber);
+            })
             ->latest('ppmp_id')
-            ->paginate(15)
+            ->paginate(5)
             ->through(fn (Ppmp $ppmp): array => [
                 'ppmp_id' => (int) $ppmp->ppmp_id,
                 'ppmp_code' => sprintf('PPMP-%d-%04d', (int) $ppmp->fiscal_year, (int) $ppmp->ppmp_id),
@@ -42,6 +50,10 @@ class PpmpController extends Controller
 
         return Inertia::render('Office/Ppmp/Index', [
             'ppmps' => $ppmps,
+            'filters' => [
+                'status' => $status,
+                'month' => $month,
+            ],
         ]);
     }
 

@@ -33,8 +33,10 @@ class ExecutiveMonitoringController
 
         $filters = $request->validate([
             'office_id' => ['nullable', 'integer', 'exists:offices,id'],
+            'status' => ['nullable', 'string', 'max:60'],
             'pr_status' => ['nullable', 'string', 'max:60'],
             'po_status' => ['nullable', 'string', 'max:60'],
+            'month' => ['nullable', 'date_format:Y-m'],
             'from_date' => ['nullable', 'date'],
             'to_date' => ['nullable', 'date', 'after_or_equal:from_date'],
             'po_page' => ['nullable', 'integer', 'min:1'],
@@ -52,6 +54,7 @@ class ExecutiveMonitoringController
             'severity' => ['nullable', 'string', 'max:60'],
             'status' => ['nullable', 'string', 'max:60'],
             'anomaly_type' => ['nullable', 'string', 'max:80'],
+            'month' => ['nullable', 'date_format:Y-m'],
             'from_date' => ['nullable', 'date'],
             'to_date' => ['nullable', 'date', 'after_or_equal:from_date'],
         ]);
@@ -72,7 +75,9 @@ class ExecutiveMonitoringController
 
         $filters = $request->validate([
             'status' => ['nullable', 'string', 'max:60'],
+            'office_id' => ['nullable', 'integer', 'exists:offices,id'],
             'type' => ['nullable', 'string', 'max:80'],
+            'month' => ['nullable', 'date_format:Y-m'],
             'from_date' => ['nullable', 'date'],
             'to_date' => ['nullable', 'date', 'after_or_equal:from_date'],
             'tab' => ['nullable', 'in:overview,published,drafts'],

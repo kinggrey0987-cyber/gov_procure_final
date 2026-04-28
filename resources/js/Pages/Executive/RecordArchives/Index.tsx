@@ -177,7 +177,7 @@ export default function ExecutiveRecordArchivesIndex({ records, archiveScopes, y
                     </table>
                 </section>
 
-                <PaginationNav links={records.links} />
+                <PaginationNav links={records.links} preserveState={false} />
             </div>
         </AuthenticatedLayout>
     );

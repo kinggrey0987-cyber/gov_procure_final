@@ -26,6 +26,7 @@ class DistributionRecordController
         abort_unless(auth()->user()->can('distribution.view-any'), 403);
 
         $status = strtoupper(trim((string) $request->input('status', '')));
+        $month = trim((string) $request->input('month', ''));
         $search = trim((string) $request->input('search', ''));
 
         $records = DistributionRecord::query()
@@ -33,6 +34,10 @@ class DistributionRecordController
             ->withCount(['items', 'claims'])
             ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
             ->when($status !== '', fn ($query) => $query->where('status', $status))
+            ->when(preg_match('/^\d{4}-\d{2}$/', $month) === 1, function ($query) use ($month): void {
+                [$year, $monthNumber] = array_map('intval', explode('-', $month));
+                $query->whereYear('created_at', $year)->whereMonth('created_at', $monthNumber);
+            })
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($nested) use ($search): void {
                     $nested->where('distribution_code', 'like', '%'.$search.'%')
@@ -42,13 +47,14 @@ class DistributionRecordController
                 });
             })
             ->orderByDesc('created_at')
-            ->paginate(20)
+            ->paginate(5)
             ->withQueryString();
 
         return Inertia::render('Inventory/Distribution/Index', [
             'records' => $records,
             'filters' => [
                 'status' => $status,
+                'month' => $month,
                 'search' => $search,
             ],
         ]);

@@ -208,13 +208,21 @@ class ExecutiveMonitoringService
             });
         }
 
-        if (! empty($filters['pr_status'])) {
+        $statusFilter = $filters['status'] ?? null;
+
+        if (! empty($statusFilter)) {
+            $purchaseRequestQuery->where('status', $statusFilter);
+            $purchaseOrderQuery->where('status', $statusFilter);
+        } elseif (! empty($filters['pr_status'])) {
             $purchaseRequestQuery->where('status', $filters['pr_status']);
         }
 
-        if (! empty($filters['po_status'])) {
+        if (empty($statusFilter) && ! empty($filters['po_status'])) {
             $purchaseOrderQuery->where('status', $filters['po_status']);
         }
+
+        $this->applyMonth($purchaseRequestQuery, $filters['month'] ?? null, 'created_at');
+        $this->applyMonth($purchaseOrderQuery, $filters['month'] ?? null, 'created_at');
 
         $this->applyDateRange($purchaseRequestQuery, $filters['from_date'] ?? null, $filters['to_date'] ?? null, 'created_at');
         $this->applyDateRange($purchaseOrderQuery, $filters['from_date'] ?? null, $filters['to_date'] ?? null, 'created_at');
@@ -231,14 +239,17 @@ class ExecutiveMonitoringService
         return [
             'filters' => [
                 'office_id' => $filters['office_id'] ?? null,
+                'status' => $statusFilter,
                 'pr_status' => $filters['pr_status'] ?? null,
                 'po_status' => $filters['po_status'] ?? null,
+                'month' => $filters['month'] ?? null,
                 'from_date' => $filters['from_date'] ?? null,
                 'to_date' => $filters['to_date'] ?? null,
                 'po_page' => $poPage,
             ],
             'filter_options' => [
                 'offices' => Office::query()->select(['id', 'name'])->orderBy('name')->get(),
+                'statuses' => $this->distinctValues([PurchaseRequest::query(), PurchaseOrder::query()], 'status'),
                 'pr_statuses' => PurchaseRequest::query()->select('status')->whereNotNull('status')->distinct()->orderBy('status')->pluck('status')->values(),
                 'po_statuses' => PurchaseOrder::query()->select('status')->whereNotNull('status')->distinct()->orderBy('status')->pluck('status')->values(),
             ],
@@ -318,6 +329,9 @@ class ExecutiveMonitoringService
             $anomalyQuery->where('anomaly_type', $filters['anomaly_type']);
         }
 
+        $this->applyMonth($anomalyQuery, $filters['month'] ?? null, 'detected_at');
+        $this->applyMonth($alertQuery, $filters['month'] ?? null, 'detected_at');
+
         $this->applyDateRange($anomalyQuery, $filters['from_date'] ?? null, $filters['to_date'] ?? null, 'detected_at');
         $this->applyDateRange($alertQuery, $filters['from_date'] ?? null, $filters['to_date'] ?? null, 'detected_at');
 
@@ -330,6 +344,7 @@ class ExecutiveMonitoringService
                 'severity' => $filters['severity'] ?? null,
                 'status' => $filters['status'] ?? null,
                 'anomaly_type' => $filters['anomaly_type'] ?? null,
+                'month' => $filters['month'] ?? null,
                 'from_date' => $filters['from_date'] ?? null,
                 'to_date' => $filters['to_date'] ?? null,
             ],
@@ -483,9 +498,18 @@ class ExecutiveMonitoringService
             $query->where('status', $filters['status']);
         }
 
+        if (! empty($filters['office_id'])) {
+            $officeId = (int) $filters['office_id'];
+            $query->whereHas('publisher', static function (Builder $publisherQuery) use ($officeId): void {
+                $publisherQuery->where('office_id', $officeId);
+            });
+        }
+
         if (! empty($filters['type'])) {
             $query->where('type', $filters['type']);
         }
+
+        $this->applyMonth($query, $filters['month'] ?? null, 'published_at');
 
         $this->applyDateRange($query, $filters['from_date'] ?? null, $filters['to_date'] ?? null, 'published_at');
 
@@ -494,12 +518,15 @@ class ExecutiveMonitoringService
         return [
             'filters' => [
                 'status' => $filters['status'] ?? null,
+                'office_id' => $filters['office_id'] ?? null,
                 'type' => $filters['type'] ?? null,
+                'month' => $filters['month'] ?? null,
                 'from_date' => $filters['from_date'] ?? null,
                 'to_date' => $filters['to_date'] ?? null,
                 'tab' => $filters['tab'] ?? 'overview',
             ],
             'filter_options' => [
+                'offices' => Office::query()->select(['id', 'name'])->orderBy('name')->get(),
                 'statuses' => PublicDisclosure::query()->select('status')->whereNotNull('status')->distinct()->orderBy('status')->pluck('status')->values(),
                 'types' => PublicDisclosure::query()->select('type')->whereNotNull('type')->distinct()->orderBy('type')->pluck('type')->values(),
             ],
@@ -556,6 +583,21 @@ class ExecutiveMonitoringService
         if (! empty($toDate)) {
             $query->whereDate($column, '<=', $toDate);
         }
+    }
+
+    private function applyMonth(Builder $query, mixed $monthValue, string $column): void
+    {
+        if (empty($monthValue) || ! is_string($monthValue)) {
+            return;
+        }
+
+        if (preg_match('/^\d{4}-\d{2}$/', $monthValue) !== 1) {
+            return;
+        }
+
+        [$year, $month] = array_map('intval', explode('-', $monthValue));
+
+        $query->whereYear($column, $year)->whereMonth($column, $month);
     }
 
     /**

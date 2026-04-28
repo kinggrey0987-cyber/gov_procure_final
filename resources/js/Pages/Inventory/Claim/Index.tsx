@@ -1,8 +1,9 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PaginationNav from '@/Components/PaginationNav';
+import MonthFilterSelect from '@/Components/MonthFilterSelect';
 import useDebouncedValue from '@/hooks/useDebouncedValue';
 import { Head, Link, router } from '@inertiajs/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type ClaimRow = {
     claims_id: number;
@@ -20,29 +21,40 @@ type Props = {
     };
     filters?: {
         status?: string;
+        month?: string;
         search?: string;
     };
 };
 
 export default function ClaimIndex({ claims, filters }: Props) {
     const [status, setStatus] = useState(filters?.status ?? '');
+    const [month, setMonth] = useState(filters?.month ?? '');
     const [search, setSearch] = useState(filters?.search ?? '');
     const debouncedSearch = useDebouncedValue(search, 450);
+    const hasMountedRef = useRef(false);
 
     useEffect(() => {
         setStatus(filters?.status ?? '');
+        setMonth(filters?.month ?? '');
         setSearch(filters?.search ?? '');
-    }, [filters?.search, filters?.status]);
+    }, [filters?.month, filters?.search, filters?.status]);
 
     const activeFilters = useMemo(
         () => ({
             status,
+            month,
             search: debouncedSearch,
         }),
-        [status, debouncedSearch],
+        [status, month, debouncedSearch],
     );
 
     useEffect(() => {
+        if (!hasMountedRef.current) {
+            hasMountedRef.current = true;
+
+            return;
+        }
+
         router.get(route('inventory.claims.index'), activeFilters, {
             preserveState: true,
             replace: true,
@@ -63,18 +75,25 @@ export default function ClaimIndex({ claims, filters }: Props) {
         >
             <Head title="Claims" />
             <div className="py-8">
-                <div className="mb-4 grid gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm md:grid-cols-3">
+                <div className="mb-4 grid gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm md:grid-cols-4">
+                    <select
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                        value={status}
+                        onChange={(event) => setStatus(event.target.value)}
+                    >
+                        <option value="">All statuses</option>
+                        {['OPEN', 'IN_REVIEW', 'RESOLVED', 'REJECTED'].map((option) => <option key={option} value={option}>{displayClaimStatus(option)}</option>)}
+                    </select>
+                    <MonthFilterSelect
+                        value={month}
+                        onChange={setMonth}
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    />
                     <input
                         className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                         value={search}
                         placeholder="Search claim code, type, office"
                         onChange={(event) => setSearch(event.target.value)}
-                    />
-                    <input
-                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                        value={status}
-                        placeholder="Status"
-                        onChange={(event) => setStatus(event.target.value)}
                     />
                     <button
                         type="button"
@@ -123,7 +142,7 @@ export default function ClaimIndex({ claims, filters }: Props) {
                 </div>
 
                 <div className="mt-4">
-                    <PaginationNav links={claims.links} />
+                    <PaginationNav links={claims.links} preserveState={false} />
                 </div>
             </div>
         </AuthenticatedLayout>

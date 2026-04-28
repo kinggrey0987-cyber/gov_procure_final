@@ -13,7 +13,7 @@ type Props = {
 };
 
 export default function PaginationNav({ links, preserveState = true, preserveScroll = true }: Props) {
-    const numberedLinks = links.filter((link) => /\d+/.test(stripHtml(link.label)));
+    const numberedLinks = links.filter((link) => /\d+/.test(normalizePaginationLabel(link.label)));
 
     if (numberedLinks.length <= 1) {
         return null;
@@ -22,8 +22,8 @@ export default function PaginationNav({ links, preserveState = true, preserveScr
     return (
         <nav className="flex flex-wrap items-center gap-2" aria-label="Pagination Navigation">
             {links.map((link, index) => {
-                const text = stripHtml(link.label).trim();
-                const isArrow = text.includes('Previous') || text.includes('Next') || text.includes('«') || text.includes('»');
+                const text = normalizePaginationLabel(link.label);
+                const isArrow = text === 'Previous' || text === 'Next';
 
                 return (
                     <Link
@@ -49,7 +49,39 @@ export default function PaginationNav({ links, preserveState = true, preserveScr
     );
 }
 
-function stripHtml(label: string): string {
-    return label.replace(/<[^>]*>/g, '');
+function normalizePaginationLabel(label: string): string {
+    const decoded = decodeHtmlEntities(label.replace(/<[^>]*>/g, '')).trim();
+    const normalized = decoded
+        .replace(/&laquo;|&#171;|&#x00ab;/gi, '«')
+        .replace(/&raquo;|&#187;|&#x00bb;/gi, '»')
+        .replace(/&amp;/gi, '&')
+        .trim();
+
+    if (/previous/i.test(normalized) || normalized.includes('«')) {
+        return 'Previous';
+    }
+
+    if (/next/i.test(normalized) || normalized.includes('»')) {
+        return 'Next';
+    }
+
+    return normalized;
 }
 
+function decodeHtmlEntities(value: string): string {
+    if (typeof document === 'undefined') {
+        return value
+            .replace(/&laquo;/gi, '«')
+            .replace(/&raquo;/gi, '»')
+            .replace(/&amp;/gi, '&')
+            .replace(/&lt;/gi, '<')
+            .replace(/&gt;/gi, '>')
+            .replace(/&quot;/gi, '"')
+            .replace(/&#039;/gi, "'");
+    }
+
+    const textarea = document.createElement('textarea');
+    textarea.innerHTML = value;
+
+    return textarea.value;
+}

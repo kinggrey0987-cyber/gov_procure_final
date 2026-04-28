@@ -1,4 +1,5 @@
 import { ExecutiveChartCard, HorizontalBarChart } from '@/Components/Executive/Charts';
+import MonthFilterSelect from '@/Components/MonthFilterSelect';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { downloadSectionAsPdfById } from '@/lib/printSection';
 import { Head, Link, router } from '@inertiajs/react';
@@ -13,15 +14,20 @@ type DisclosureRow = {
     publisher?: { id: number; name: string } | null;
 };
 
+type OfficeOption = { id: number; name: string };
+
 type Props = {
     filters: {
         status?: string | null;
+        office_id?: number | null;
         type?: string | null;
+        month?: string | null;
         from_date?: string | null;
         to_date?: string | null;
         tab?: 'overview' | 'published' | 'drafts';
     };
     filter_options: {
+        offices: OfficeOption[];
         statuses: string[];
         types: string[];
     };
@@ -51,10 +57,9 @@ export default function TransparencyMonitoringIndex({
     const printSectionId = 'transparency-monitoring-print-section';
 
     const [form, setForm] = useState({
+        office_id: filters.office_id ? String(filters.office_id) : '',
         status: filters.status ?? '',
-        type: filters.type ?? '',
-        from_date: filters.from_date ?? '',
-        to_date: filters.to_date ?? '',
+        month: filters.month ?? '',
     });
     const [recentActivityPage, setRecentActivityPage] = useState(1);
 
@@ -78,12 +83,11 @@ export default function TransparencyMonitoringIndex({
 
     useEffect(() => {
         setForm({
+            office_id: filters.office_id ? String(filters.office_id) : '',
             status: filters.status ?? '',
-            type: filters.type ?? '',
-            from_date: filters.from_date ?? '',
-            to_date: filters.to_date ?? '',
+            month: filters.month ?? '',
         });
-    }, [filters.from_date, filters.status, filters.to_date, filters.type]);
+    }, [filters.month, filters.office_id, filters.status]);
 
     useEffect(() => {
         setRecentActivityPage(1);
@@ -92,12 +96,11 @@ export default function TransparencyMonitoringIndex({
     const activeFilters = useMemo(
         () => ({
             status: form.status,
-            type: form.type,
-            from_date: form.from_date,
-            to_date: form.to_date,
+            office_id: form.office_id,
+            month: form.month,
             tab: activeTab,
         }),
-        [activeTab, form.from_date, form.status, form.to_date, form.type],
+        [activeTab, form.month, form.office_id, form.status],
     );
 
     useEffect(() => {
@@ -182,7 +185,20 @@ export default function TransparencyMonitoringIndex({
 
                 <section className="rounded-2xl border border-red-200 bg-white p-5 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
                     <div className="flex flex-wrap items-end gap-3">
-                        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                            <select
+                                className="h-10 rounded-lg border-slate-300 text-sm"
+                                value={form.office_id}
+                                onChange={(event) => setForm((current) => ({ ...current, office_id: event.target.value }))}
+                            >
+                                <option value="">All offices</option>
+                                {filter_options.offices.map((office) => (
+                                    <option key={office.id} value={office.id}>
+                                        {office.name}
+                                    </option>
+                                ))}
+                            </select>
+
                             <select
                                 className="h-10 rounded-lg border-slate-300 text-sm"
                                 value={form.status}
@@ -196,31 +212,10 @@ export default function TransparencyMonitoringIndex({
                                 ))}
                             </select>
 
-                            <select
+                            <MonthFilterSelect
                                 className="h-10 rounded-lg border-slate-300 text-sm"
-                                value={form.type}
-                                onChange={(event) => setForm((current) => ({ ...current, type: event.target.value }))}
-                            >
-                                <option value="">All disclosure types</option>
-                                {filter_options.types.map((type) => (
-                                    <option key={type} value={type}>
-                                        {type}
-                                    </option>
-                                ))}
-                            </select>
-
-                            <input
-                                type="date"
-                                className="h-10 rounded-lg border-slate-300 text-sm"
-                                value={form.from_date}
-                                onChange={(event) => setForm((current) => ({ ...current, from_date: event.target.value }))}
-                            />
-
-                            <input
-                                type="date"
-                                className="h-10 rounded-lg border-slate-300 text-sm"
-                                value={form.to_date}
-                                onChange={(event) => setForm((current) => ({ ...current, to_date: event.target.value }))}
+                                value={form.month}
+                                onChange={(value) => setForm((current) => ({ ...current, month: value }))}
                             />
                         </div>
 

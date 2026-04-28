@@ -1,4 +1,5 @@
 import { DonutChart, ExecutiveChartCard, HorizontalBarChart, TrendGroupedBarChart } from '@/Components/Executive/Charts';
+import MonthFilterSelect from '@/Components/MonthFilterSelect';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PaginationNav from '@/Components/PaginationNav';
 import { downloadSectionAsPdfById } from '@/lib/printSection';
@@ -30,14 +31,17 @@ type PurchaseOrderRow = {
 type Props = {
     filters: {
         office_id?: number | null;
+        status?: string | null;
         pr_status?: string | null;
         po_status?: string | null;
+        month?: string | null;
         from_date?: string | null;
         to_date?: string | null;
         po_page?: number | null;
     };
     filter_options: {
         offices: OfficeOption[];
+        statuses: string[];
         pr_statuses: string[];
         po_statuses: string[];
     };
@@ -83,8 +87,8 @@ export default function ProcurementAnalyticsIndex({
 
     const [form, setForm] = useState({
         office_id: filters.office_id ? String(filters.office_id) : '',
-        pr_status: filters.pr_status ?? '',
-        po_status: filters.po_status ?? '',
+        status: filters.status ?? '',
+        month: filters.month ?? '',
         from_date: filters.from_date ?? '',
         to_date: filters.to_date ?? '',
         po_page: filters.po_page ? String(filters.po_page) : '',
@@ -93,24 +97,24 @@ export default function ProcurementAnalyticsIndex({
     useEffect(() => {
         setForm({
             office_id: filters.office_id ? String(filters.office_id) : '',
-            pr_status: filters.pr_status ?? '',
-            po_status: filters.po_status ?? '',
+            status: filters.status ?? '',
+            month: filters.month ?? '',
             from_date: filters.from_date ?? '',
             to_date: filters.to_date ?? '',
             po_page: filters.po_page ? String(filters.po_page) : '',
         });
-    }, [filters.from_date, filters.office_id, filters.po_page, filters.po_status, filters.pr_status, filters.to_date]);
+    }, [filters.from_date, filters.month, filters.office_id, filters.po_page, filters.status, filters.to_date]);
 
     const activeFilters = useMemo(
         () => ({
             office_id: form.office_id,
-            pr_status: form.pr_status,
-            po_status: form.po_status,
+            status: form.status,
+            month: form.month,
             from_date: form.from_date,
             to_date: form.to_date,
             po_page: form.po_page,
         }),
-        [form.from_date, form.office_id, form.po_page, form.po_status, form.pr_status, form.to_date],
+        [form.from_date, form.month, form.office_id, form.po_page, form.status, form.to_date],
     );
 
     useEffect(() => {
@@ -186,7 +190,7 @@ export default function ProcurementAnalyticsIndex({
 
                 <section className="rounded-2xl border border-red-200 bg-white p-5 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
                     <div className="flex flex-wrap items-end gap-3">
-                        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                             <select
                                 className="h-10 rounded-lg border-slate-300 text-sm"
                                 value={form.office_id}
@@ -202,41 +206,21 @@ export default function ProcurementAnalyticsIndex({
 
                             <select
                                 className="h-10 rounded-lg border-slate-300 text-sm"
-                                value={form.pr_status}
-                                onChange={(event) => setForm((current) => ({ ...current, pr_status: event.target.value, po_page: '' }))}
+                                value={form.status}
+                                onChange={(event) => setForm((current) => ({ ...current, status: event.target.value, po_page: '' }))}
                             >
-                                <option value="">All PR statuses</option>
-                                {filter_options.pr_statuses.map((status) => (
+                                <option value="">All statuses</option>
+                                {filter_options.statuses.map((status) => (
                                     <option key={status} value={status}>
                                         {status}
                                     </option>
                                 ))}
                             </select>
 
-                            <select
+                            <MonthFilterSelect
                                 className="h-10 rounded-lg border-slate-300 text-sm"
-                                value={form.po_status}
-                                onChange={(event) => setForm((current) => ({ ...current, po_status: event.target.value, po_page: '' }))}
-                            >
-                                <option value="">All PO statuses</option>
-                                {filter_options.po_statuses.map((status) => (
-                                    <option key={status} value={status}>
-                                        {status}
-                                    </option>
-                                ))}
-                            </select>
-
-                            <input
-                                type="date"
-                                className="h-10 rounded-lg border-slate-300 text-sm"
-                                value={form.from_date}
-                                onChange={(event) => setForm((current) => ({ ...current, from_date: event.target.value, po_page: '' }))}
-                            />
-                            <input
-                                type="date"
-                                className="h-10 rounded-lg border-slate-300 text-sm"
-                                value={form.to_date}
-                                onChange={(event) => setForm((current) => ({ ...current, to_date: event.target.value, po_page: '' }))}
+                                value={form.month}
+                                onChange={(value) => setForm((current) => ({ ...current, month: value, from_date: '', to_date: '', po_page: '' }))}
                             />
                         </div>
 
@@ -335,7 +319,7 @@ export default function ProcurementAnalyticsIndex({
                                 </tbody>
                             </table>
                             <div className="px-6 py-4">
-                                <PaginationNav links={recent.purchase_orders.links} />
+                                <PaginationNav links={recent.purchase_orders.links} preserveState={false} />
                             </div>
                         </div>
                     )}

@@ -27,14 +27,23 @@ export default function useSmartRefresh({
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
     const inFlightRef = useRef(false);
+    const lastRequestedUrlRef = useRef<string | null>(null);
 
     const runInertiaReload = useCallback(async () => {
+        const requestUrl = typeof window === 'undefined' ? null : window.location.href;
+        lastRequestedUrlRef.current = requestUrl;
+
         await new Promise<void>((resolve) => {
             router.reload({
                 only,
+                async: true,
                 onFinish: () => resolve(),
             });
         });
+
+        if (requestUrl && typeof window !== 'undefined' && window.location.href !== requestUrl) {
+            return;
+        }
     }, [only]);
 
     const refreshNow = useCallback(async () => {
@@ -52,7 +61,9 @@ export default function useSmartRefresh({
                 await runInertiaReload();
             }
 
-            setLastRefreshedAt(new Date());
+            if (!lastRequestedUrlRef.current || typeof window === 'undefined' || window.location.href === lastRequestedUrlRef.current) {
+                setLastRefreshedAt(new Date());
+            }
         } finally {
             inFlightRef.current = false;
             setIsRefreshing(false);

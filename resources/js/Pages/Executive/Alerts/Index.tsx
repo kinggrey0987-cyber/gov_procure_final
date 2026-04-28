@@ -1,8 +1,9 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PaginationNav from '@/Components/PaginationNav';
+import MonthFilterSelect from '@/Components/MonthFilterSelect';
 import useDebouncedValue from '@/hooks/useDebouncedValue';
 import { Head, Link, router } from '@inertiajs/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type AlertRow = {
     alerts_id: number;
@@ -20,6 +21,7 @@ type Props = {
     filters: {
         status?: string;
         severity?: string;
+        month?: string;
         search?: string;
     };
 };
@@ -27,25 +29,35 @@ type Props = {
 export default function ExecutiveAlertIndex({ alerts, filters }: Props) {
     const [status, setStatus] = useState(filters.status ?? '');
     const [severity, setSeverity] = useState(filters.severity ?? '');
+    const [month, setMonth] = useState(filters.month ?? '');
     const [search, setSearch] = useState(filters.search ?? '');
     const debouncedSearch = useDebouncedValue(search, 450);
+    const hasMountedRef = useRef(false);
 
     useEffect(() => {
         setStatus(filters.status ?? '');
         setSeverity(filters.severity ?? '');
+        setMonth(filters.month ?? '');
         setSearch(filters.search ?? '');
-    }, [filters.search, filters.severity, filters.status]);
+    }, [filters.month, filters.search, filters.severity, filters.status]);
 
     const activeFilters = useMemo(
         () => ({
             status,
             severity,
+            month,
             search: debouncedSearch,
         }),
-        [status, severity, debouncedSearch],
+        [status, severity, month, debouncedSearch],
     );
 
     useEffect(() => {
+        if (!hasMountedRef.current) {
+            hasMountedRef.current = true;
+
+            return;
+        }
+
         router.get(route('executive.alerts.index'), activeFilters, {
             preserveState: true,
             replace: true,
@@ -58,18 +70,27 @@ export default function ExecutiveAlertIndex({ alerts, filters }: Props) {
             <Head title="Alerts" />
             <div className="py-10">
                 <div className="mx-auto max-w-6xl space-y-4 px-4 sm:px-6 lg:px-8">
-                    <div className="grid gap-2 rounded-xl border bg-white p-3 md:grid-cols-3">
-                        <input
+                    <div className="grid gap-2 rounded-xl border bg-white p-3 md:grid-cols-4">
+                        <select
                             className="rounded border px-3 py-2 text-sm"
                             value={severity}
-                            placeholder="Severity"
                             onChange={(event) => setSeverity(event.target.value)}
-                        />
-                        <input
+                        >
+                            <option value="">All severities</option>
+                            {['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map((option) => <option key={option} value={option}>{option}</option>)}
+                        </select>
+                        <select
                             className="rounded border px-3 py-2 text-sm"
                             value={status}
-                            placeholder="Status"
                             onChange={(event) => setStatus(event.target.value)}
+                        >
+                            <option value="">All statuses</option>
+                            {['OPEN', 'IN_REVIEW', 'RESOLVED', 'DISMISSED'].map((option) => <option key={option} value={option}>{option.replaceAll('_', ' ')}</option>)}
+                        </select>
+                        <MonthFilterSelect
+                            className="rounded border px-3 py-2 text-sm"
+                            value={month}
+                            onChange={setMonth}
                         />
                         <input
                             className="rounded border px-3 py-2 text-sm"
@@ -108,7 +129,7 @@ export default function ExecutiveAlertIndex({ alerts, filters }: Props) {
                         </table>
                     </div>
 
-                    <PaginationNav links={alerts.links} />
+                    <PaginationNav links={alerts.links} preserveState={false} />
                 </div>
             </div>
         </AuthenticatedLayout>

@@ -1,5 +1,8 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link } from '@inertiajs/react';
+import PaginationNav from '@/Components/PaginationNav';
+import MonthFilterSelect from '@/Components/MonthFilterSelect';
+import { Head, Link, router } from '@inertiajs/react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type PpmpRow = {
     ppmp_id: number;
@@ -11,10 +14,39 @@ type PpmpRow = {
 };
 
 type Props = {
-    ppmps: { data: PpmpRow[] };
+    ppmps: { data: PpmpRow[]; links: Array<{ url: string | null; label: string; active: boolean }> };
+    filters?: {
+        status?: string;
+        month?: string;
+    };
 };
 
-export default function PpmpIndex({ ppmps }: Props) {
+export default function PpmpIndex({ ppmps, filters }: Props) {
+    const [status, setStatus] = useState(filters?.status ?? '');
+    const [month, setMonth] = useState(filters?.month ?? '');
+    const hasMountedRef = useRef(false);
+
+    useEffect(() => {
+        setStatus(filters?.status ?? '');
+        setMonth(filters?.month ?? '');
+    }, [filters?.month, filters?.status]);
+
+    const activeFilters = useMemo(() => ({ status, month }), [month, status]);
+
+    useEffect(() => {
+        if (!hasMountedRef.current) {
+            hasMountedRef.current = true;
+
+            return;
+        }
+
+        router.get(route('office.ppmp.index'), activeFilters, {
+            preserveState: true,
+            replace: true,
+            only: ['ppmps', 'filters'],
+        });
+    }, [activeFilters]);
+
     return (
         <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">PPMP</h2>}>
             <Head title="PPMP" />
@@ -38,6 +70,30 @@ export default function PpmpIndex({ ppmps }: Props) {
                 <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="border-b border-slate-200 px-6 py-4">
                         <h4 className="text-lg font-semibold text-slate-800">PPMP List</h4>
+                        <div className="mt-3 grid gap-2 md:grid-cols-3">
+                            <select
+                                value={status}
+                                onChange={(event) => setStatus(event.target.value)}
+                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                            >
+                                <option value="">All statuses</option>
+                                {['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'RETURNED_FOR_REVISION'].map((option) => (
+                                    <option key={option} value={option}>{option.replaceAll('_', ' ')}</option>
+                                ))}
+                            </select>
+                            <MonthFilterSelect
+                                value={month}
+                                onChange={setMonth}
+                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => router.get(route('office.ppmp.index'))}
+                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                            >
+                                Reset
+                            </button>
+                        </div>
                     </div>
                     {ppmps.data.length === 0 ? (
                         <div className="px-6 py-10 text-sm text-slate-600">No PPMP entries yet.</div>
@@ -79,6 +135,8 @@ export default function PpmpIndex({ ppmps }: Props) {
                         </div>
                     )}
                 </section>
+
+                <PaginationNav links={ppmps.links} preserveState={false} />
             </div>
         </AuthenticatedLayout>
     );

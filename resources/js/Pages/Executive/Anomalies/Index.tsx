@@ -1,8 +1,9 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PaginationNav from '@/Components/PaginationNav';
+import MonthFilterSelect from '@/Components/MonthFilterSelect';
 import useDebouncedValue from '@/hooks/useDebouncedValue';
 import { Head, Link, router } from '@inertiajs/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type AnomalyRow = {
     anomaly_id: number;
@@ -17,14 +18,17 @@ type Props = {
         data: AnomalyRow[];
         links: Array<{ url: string | null; label: string; active: boolean }>;
     };
-    filters: { status?: string; severity?: string; anomaly_type?: string; search?: string };
+    filters: { status?: string; severity?: string; anomaly_type?: string; month?: string; search?: string };
+    filter_options: { anomaly_types: string[] };
 };
 
-export default function ExecutiveAnomalyIndex({ anomalies, filters }: Props) {
+export default function ExecutiveAnomalyIndex({ anomalies, filters, filter_options }: Props) {
     const [status, setStatus] = useState(filters.status ?? '');
     const [severity, setSeverity] = useState(filters.severity ?? '');
     const [anomalyType, setAnomalyType] = useState(filters.anomaly_type ?? '');
+    const [month, setMonth] = useState(filters.month ?? '');
     const [search, setSearch] = useState(filters.search ?? '');
+    const hasMountedRef = useRef(false);
 
     const debouncedSearch = useDebouncedValue(search, 450);
 
@@ -32,24 +36,32 @@ export default function ExecutiveAnomalyIndex({ anomalies, filters }: Props) {
         setStatus(filters.status ?? '');
         setSeverity(filters.severity ?? '');
         setAnomalyType(filters.anomaly_type ?? '');
+        setMonth(filters.month ?? '');
         setSearch(filters.search ?? '');
-    }, [filters.anomaly_type, filters.search, filters.severity, filters.status]);
+    }, [filters.anomaly_type, filters.month, filters.search, filters.severity, filters.status]);
 
     const activeFilters = useMemo(
         () => ({
             status,
             severity,
             anomaly_type: anomalyType,
+            month,
             search: debouncedSearch,
         }),
-        [status, severity, anomalyType, debouncedSearch],
+        [status, severity, anomalyType, month, debouncedSearch],
     );
 
     useEffect(() => {
+        if (!hasMountedRef.current) {
+            hasMountedRef.current = true;
+
+            return;
+        }
+
         router.get(route('executive.anomalies.index'), activeFilters, {
             preserveState: true,
             replace: true,
-            only: ['anomalies', 'filters'],
+            only: ['anomalies', 'filters', 'filter_options'],
         });
     }, [activeFilters]);
 
@@ -59,24 +71,37 @@ export default function ExecutiveAnomalyIndex({ anomalies, filters }: Props) {
 
             <div className="py-10">
                 <div className="mx-auto max-w-6xl space-y-4 px-4 sm:px-6 lg:px-8">
-                    <div className="grid gap-2 rounded-xl border bg-white p-3 md:grid-cols-4">
-                        <input
+                    <div className="grid gap-2 rounded-xl border bg-white p-3 md:grid-cols-5">
+                        <select
                             className="rounded border px-3 py-2 text-sm"
                             value={status}
-                            placeholder="Status"
                             onChange={(e) => setStatus(e.target.value)}
-                        />
-                        <input
+                        >
+                            <option value="">All statuses</option>
+                            {['OPEN', 'IN_REVIEW', 'RESOLVED', 'DISMISSED'].map((option) => <option key={option} value={option}>{option.replaceAll('_', ' ')}</option>)}
+                        </select>
+                        <select
                             className="rounded border px-3 py-2 text-sm"
                             value={severity}
-                            placeholder="Severity"
                             onChange={(e) => setSeverity(e.target.value)}
-                        />
-                        <input
+                        >
+                            <option value="">All severities</option>
+                            {['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map((option) => <option key={option} value={option}>{option}</option>)}
+                        </select>
+                        <select
                             className="rounded border px-3 py-2 text-sm"
                             value={anomalyType}
-                            placeholder="Anomaly type"
                             onChange={(e) => setAnomalyType(e.target.value)}
+                        >
+                            <option value="">All anomaly types</option>
+                            {filter_options.anomaly_types.map((option) => (
+                                <option key={option} value={option}>{formatAnomalyType(option)}</option>
+                            ))}
+                        </select>
+                        <MonthFilterSelect
+                            className="rounded border px-3 py-2 text-sm"
+                            value={month}
+                            onChange={setMonth}
                         />
                         <input
                             className="rounded border px-3 py-2 text-sm"
@@ -85,7 +110,7 @@ export default function ExecutiveAnomalyIndex({ anomalies, filters }: Props) {
                             onChange={(e) => setSearch(e.target.value)}
                         />
                         <button
-                            className="rounded bg-indigo-600 px-4 py-2 text-sm text-white md:col-span-4 md:justify-self-start"
+                            className="rounded bg-indigo-600 px-4 py-2 text-sm text-white md:col-span-5 md:justify-self-start"
                             onClick={() => router.post(route('executive.anomalies.detect'))}
                         >
                             Run Detection
@@ -121,7 +146,7 @@ export default function ExecutiveAnomalyIndex({ anomalies, filters }: Props) {
                         </table>
                     </div>
 
-                    <PaginationNav links={anomalies.links} />
+                    <PaginationNav links={anomalies.links} preserveState={false} />
                 </div>
             </div>
         </AuthenticatedLayout>

@@ -36,6 +36,10 @@ class AnomalyController
             ->when($request->string('status')->toString(), fn ($query, $status) => $query->where('status', strtoupper((string) $status)))
             ->when($request->string('severity')->toString(), fn ($query, $severity) => $query->where('severity', strtoupper((string) $severity)))
             ->when($request->string('anomaly_type')->toString(), fn ($query, $type) => $query->where('anomaly_type', strtoupper((string) $type)))
+            ->when(preg_match('/^\d{4}-\d{2}$/', (string) $request->input('month', '')) === 1, function ($query) use ($request): void {
+                [$year, $month] = array_map('intval', explode('-', (string) $request->input('month')));
+                $query->whereYear('detected_at', $year)->whereMonth('detected_at', $month);
+            })
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($nested) use ($search): void {
                     $nested->where('anomaly_type', 'like', '%'.$search.'%')
@@ -45,14 +49,22 @@ class AnomalyController
                 });
             })
             ->orderByDesc('detected_at')
-            ->paginate(20)
+            ->paginate(5)
             ->withQueryString();
 
         return Inertia::render('Executive/Anomalies/Index', [
             'anomalies' => $anomalies,
             'filters' => [
-                ...$request->only(['status', 'severity', 'anomaly_type']),
+                ...$request->only(['status', 'severity', 'anomaly_type', 'month']),
                 'search' => $search,
+            ],
+            'filter_options' => [
+                'anomaly_types' => Anomaly::query()
+                    ->select('anomaly_type')
+                    ->distinct()
+                    ->orderBy('anomaly_type')
+                    ->pluck('anomaly_type')
+                    ->values(),
             ],
         ]);
     }

@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, useForm } from '@inertiajs/react';
+import { PageProps } from '@/types';
+import { Head, useForm, usePage } from '@inertiajs/react';
 import { useMemo } from 'react';
 
 type DistributionRecordOption = {
@@ -18,6 +19,8 @@ type Props = {
 };
 
 export default function ClaimCreate({ distributionRecords, preselectedDistributionRecordId = null }: Props) {
+    const { auth } = usePage<PageProps>().props;
+    const isOfficeUser = auth?.user?.role_code === 'OFFICE_USER';
     const preselectedRecord = preselectedDistributionRecordId
         ? distributionRecords.find((record) => record.distribution_record_id === preselectedDistributionRecordId)
         : null;
@@ -52,7 +55,7 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                         className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
                         onSubmit={(e) => {
                             e.preventDefault();
-                            form.post(route('inventory.claims.store'), { forceFormData: true });
+                            form.post(route(isOfficeUser ? 'office.claims.store' : 'inventory.claims.store'), { forceFormData: true });
                         }}
                     >
                         <div>

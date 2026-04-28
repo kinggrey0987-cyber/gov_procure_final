@@ -1,8 +1,9 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PaginationNav from '@/Components/PaginationNav';
+import MonthFilterSelect from '@/Components/MonthFilterSelect';
 import useDebouncedValue from '@/hooks/useDebouncedValue';
 import { Head, Link, router } from '@inertiajs/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type DeliveryRow = {
     delivery_id: number;
@@ -33,29 +34,40 @@ type Props = {
     };
     filters?: {
         status?: string;
+        month?: string;
         search?: string;
     };
 };
 
 export default function DeliveryIndex({ deliveries, filters }: Props) {
     const [status, setStatus] = useState(filters?.status ?? '');
+    const [month, setMonth] = useState(filters?.month ?? '');
     const [search, setSearch] = useState(filters?.search ?? '');
     const debouncedSearch = useDebouncedValue(search, 450);
+    const hasMountedRef = useRef(false);
 
     useEffect(() => {
         setStatus(filters?.status ?? '');
+        setMonth(filters?.month ?? '');
         setSearch(filters?.search ?? '');
-    }, [filters?.search, filters?.status]);
+    }, [filters?.month, filters?.search, filters?.status]);
 
     const activeFilters = useMemo(
         () => ({
             status,
+            month,
             search: debouncedSearch,
         }),
-        [status, debouncedSearch],
+        [status, month, debouncedSearch],
     );
 
     useEffect(() => {
+        if (!hasMountedRef.current) {
+            hasMountedRef.current = true;
+
+            return;
+        }
+
         router.get(route('inventory.deliveries.index'), activeFilters, {
             preserveState: true,
             replace: true,
@@ -68,7 +80,7 @@ export default function DeliveryIndex({ deliveries, filters }: Props) {
             <Head title="Deliveries" />
 
             <div className="space-y-4 py-8">
-                <div className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm md:grid-cols-3">
+                <div className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm md:grid-cols-4">
                     <input
                         className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                         value={search}
@@ -86,6 +98,11 @@ export default function DeliveryIndex({ deliveries, filters }: Props) {
                         <option value="PARTIALLY_RECEIVED">PARTIALLY_RECEIVED</option>
                         <option value="VERIFIED">VERIFIED</option>
                     </select>
+                    <MonthFilterSelect
+                        value={month}
+                        onChange={setMonth}
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    />
                     <button
                         type="button"
                         onClick={() => router.get(route('inventory.deliveries.index'))}
@@ -151,7 +168,7 @@ export default function DeliveryIndex({ deliveries, filters }: Props) {
                     </table>
                 </div>
 
-                <PaginationNav links={deliveries.links} />
+                <PaginationNav links={deliveries.links} preserveState={false} />
             </div>
         </AuthenticatedLayout>
     );

@@ -41,7 +41,7 @@ class PurchaseRequestController extends Controller
                 });
             })
             ->latest('purchase_request_id')
-            ->paginate(15)
+            ->paginate(5)
             ->withQueryString();
 
         return Inertia::render('Procurement/PurchaseRequests/Index', [

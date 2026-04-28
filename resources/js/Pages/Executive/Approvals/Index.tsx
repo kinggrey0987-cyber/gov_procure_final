@@ -1,10 +1,11 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { DonutChart, ExecutiveChartCard, HorizontalBarChart } from '@/Components/Executive/Charts';
+import MonthFilterSelect from '@/Components/MonthFilterSelect';
 import PaginationNav from '@/Components/PaginationNav';
 import PpmpDecisionModal from '@/Components/PpmpDecisionModal';
 import useSmartRefresh from '@/hooks/useSmartRefresh';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { FormEvent, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 type DecisionStatus = 'APPROVED' | 'REJECTED' | 'RETURNED_FOR_REVISION';
 
@@ -37,6 +38,7 @@ type Props = {
     filters: {
         office_id?: number | null;
         status?: string | null;
+        month?: string | null;
         from_date?: string | null;
         to_date?: string | null;
         search?: string | null;
@@ -52,12 +54,13 @@ export default function ExecutiveApprovalsIndex({ records, summary, filters, fil
     const { isRefreshing, lastRefreshedAt } = useSmartRefresh({
         only: ['records', 'summary', 'filters', 'filter_options'],
         refreshOnFocus: true,
-        refreshOnMount: true,
+        refreshOnMount: false,
     });
 
     const [form, setForm] = useState({
         office_id: filters.office_id ? String(filters.office_id) : '',
         status: filters.status ?? '',
+        month: filters.month ?? '',
         from_date: filters.from_date ?? '',
         to_date: filters.to_date ?? '',
         search: filters.search ?? '',
@@ -65,9 +68,24 @@ export default function ExecutiveApprovalsIndex({ records, summary, filters, fil
     const [decisionTarget, setDecisionTarget] = useState<{ ppmpId: number; status: DecisionStatus } | null>(null);
     const decisionForm = useForm({ status: '', remarks: '' });
 
-    const onSubmit = (event: FormEvent) => {
-        event.preventDefault();
-        router.get(route('executive.ppmp-approvals.index'), form, { preserveState: true, replace: true });
+    useEffect(() => {
+        setForm({
+            office_id: filters.office_id ? String(filters.office_id) : '',
+            status: filters.status ?? '',
+            month: filters.month ?? '',
+            from_date: filters.from_date ?? '',
+            to_date: filters.to_date ?? '',
+            search: filters.search ?? '',
+        });
+    }, [filters.from_date, filters.month, filters.office_id, filters.search, filters.status, filters.to_date]);
+
+    const updateFilters = (nextForm: typeof form) => {
+        setForm(nextForm);
+        router.get(route('executive.ppmp-approvals.index'), nextForm, {
+            preserveState: true,
+            replace: true,
+            only: ['records', 'summary', 'filters', 'filter_options', 'office_breakdown'],
+        });
     };
 
     const requestDecisionConfirmation = (ppmpId: number, status: DecisionStatus) => {
@@ -162,12 +180,12 @@ export default function ExecutiveApprovalsIndex({ records, summary, filters, fil
                 </div>
 
                 <section className="rounded-2xl border border-red-200 bg-white p-5 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
-                    <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3">
-                        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                    <div className="flex flex-wrap items-end gap-3">
+                        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                         <select
                             className="h-10 rounded-lg border-slate-300 text-sm"
                             value={form.office_id}
-                            onChange={(event) => setForm((current) => ({ ...current, office_id: event.target.value }))}
+                            onChange={(event) => updateFilters({ ...form, office_id: event.target.value })}
                         >
                             <option value="">All offices</option>
                             {filter_options.offices.map((office) => (
@@ -180,7 +198,7 @@ export default function ExecutiveApprovalsIndex({ records, summary, filters, fil
                         <select
                             className="h-10 rounded-lg border-slate-300 text-sm"
                             value={form.status}
-                            onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}
+                            onChange={(event) => updateFilters({ ...form, status: event.target.value })}
                         >
                             <option value="">All statuses</option>
                             {filter_options.statuses.map((status) => (
@@ -190,18 +208,10 @@ export default function ExecutiveApprovalsIndex({ records, summary, filters, fil
                             ))}
                         </select>
 
-                        <input
-                            type="date"
+                        <MonthFilterSelect
                             className="h-10 rounded-lg border-slate-300 text-sm"
-                            value={form.from_date}
-                            onChange={(event) => setForm((current) => ({ ...current, from_date: event.target.value }))}
-                        />
-
-                        <input
-                            type="date"
-                            className="h-10 rounded-lg border-slate-300 text-sm"
-                            value={form.to_date}
-                            onChange={(event) => setForm((current) => ({ ...current, to_date: event.target.value }))}
+                            value={form.month}
+                            onChange={(value) => updateFilters({ ...form, month: value, from_date: '', to_date: '' })}
                         />
 
                         <input
@@ -210,6 +220,7 @@ export default function ExecutiveApprovalsIndex({ records, summary, filters, fil
                             placeholder="Search PPMP code, office, preparer"
                             value={form.search}
                             onChange={(event) => setForm((current) => ({ ...current, search: event.target.value }))}
+                            onBlur={() => updateFilters(form)}
                         />
                         </div>
 
@@ -221,11 +232,8 @@ export default function ExecutiveApprovalsIndex({ records, summary, filters, fil
                             >
                                 Reset
                             </button>
-                            <button type="submit" className="h-10 rounded-lg bg-red-700 px-4 text-sm font-semibold text-white hover:bg-red-800">
-                                Apply
-                            </button>
                         </div>
-                    </form>
+                    </div>
                 </section>
 
                 <div className="grid gap-6 xl:grid-cols-12">
@@ -326,7 +334,7 @@ export default function ExecutiveApprovalsIndex({ records, summary, filters, fil
                         </article>
                     ))}
 
-                    {records.data.length > 0 ? <PaginationNav links={records.links} /> : null}
+                    {records.data.length > 0 ? <PaginationNav links={records.links} preserveState={false} /> : null}
                 </section>
             </div>
 

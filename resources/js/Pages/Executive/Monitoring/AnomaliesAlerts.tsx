@@ -1,4 +1,5 @@
 import { ExecutiveChartCard, HorizontalBarChart, TrendGroupedBarChart } from '@/Components/Executive/Charts';
+import MonthFilterSelect from '@/Components/MonthFilterSelect';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { downloadSectionAsPdfById } from '@/lib/printSection';
 import { Head, Link, router } from '@inertiajs/react';
@@ -42,6 +43,7 @@ type Props = {
         severity?: string | null;
         status?: string | null;
         anomaly_type?: string | null;
+        month?: string | null;
         from_date?: string | null;
         to_date?: string | null;
     };
@@ -99,34 +101,25 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
 
     const [form, setForm] = useState({
         office_id: filters.office_id ? String(filters.office_id) : '',
-        severity: filters.severity ?? '',
         status: filters.status ?? '',
-        anomaly_type: filters.anomaly_type ?? '',
-        from_date: filters.from_date ?? '',
-        to_date: filters.to_date ?? '',
+        month: filters.month ?? '',
     });
 
     useEffect(() => {
         setForm({
             office_id: filters.office_id ? String(filters.office_id) : '',
-            severity: filters.severity ?? '',
             status: filters.status ?? '',
-            anomaly_type: filters.anomaly_type ?? '',
-            from_date: filters.from_date ?? '',
-            to_date: filters.to_date ?? '',
+            month: filters.month ?? '',
         });
-    }, [filters.anomaly_type, filters.from_date, filters.office_id, filters.severity, filters.status, filters.to_date]);
+    }, [filters.month, filters.office_id, filters.status]);
 
     const activeFilters = useMemo(
         () => ({
             office_id: form.office_id,
-            severity: form.severity,
             status: form.status,
-            anomaly_type: form.anomaly_type,
-            from_date: form.from_date,
-            to_date: form.to_date,
+            month: form.month,
         }),
-        [form.anomaly_type, form.from_date, form.office_id, form.severity, form.status, form.to_date],
+        [form.month, form.office_id, form.status],
     );
 
     useEffect(() => {
@@ -219,7 +212,7 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
 
                 <section className="rounded-2xl border border-red-200 bg-white p-5 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
                     <div className="flex flex-wrap items-end gap-3">
-                        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
+                        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                             <select
                                 className="h-10 rounded-lg border-slate-300 text-sm"
                                 value={form.office_id}
@@ -229,19 +222,6 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                                 {filter_options.offices.map((office) => (
                                     <option key={office.id} value={office.id}>
                                         {office.name}
-                                    </option>
-                                ))}
-                            </select>
-
-                            <select
-                                className="h-10 rounded-lg border-slate-300 text-sm"
-                                value={form.severity}
-                                onChange={(event) => setForm((current) => ({ ...current, severity: event.target.value }))}
-                            >
-                                <option value="">All severities</option>
-                                {filter_options.severities.map((severity) => (
-                                    <option key={severity} value={severity}>
-                                        {severity}
                                     </option>
                                 ))}
                             </select>
@@ -259,31 +239,10 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                                 ))}
                             </select>
 
-                            <select
+                            <MonthFilterSelect
                                 className="h-10 rounded-lg border-slate-300 text-sm"
-                                value={form.anomaly_type}
-                                onChange={(event) => setForm((current) => ({ ...current, anomaly_type: event.target.value }))}
-                            >
-                                <option value="">All anomaly types</option>
-                                {filter_options.anomaly_types.map((anomalyType) => (
-                                    <option key={anomalyType} value={anomalyType}>
-                                        {formatAnomalyType(anomalyType)}
-                                    </option>
-                                ))}
-                            </select>
-
-                            <input
-                                type="date"
-                                className="h-10 rounded-lg border-slate-300 text-sm"
-                                value={form.from_date}
-                                onChange={(event) => setForm((current) => ({ ...current, from_date: event.target.value }))}
-                            />
-
-                            <input
-                                type="date"
-                                className="h-10 rounded-lg border-slate-300 text-sm"
-                                value={form.to_date}
-                                onChange={(event) => setForm((current) => ({ ...current, to_date: event.target.value }))}
+                                value={form.month}
+                                onChange={(value) => setForm((current) => ({ ...current, month: value }))}
                             />
                         </div>
 

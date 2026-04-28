@@ -2,7 +2,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PaginationNav from '@/Components/PaginationNav';
 import useDebouncedValue from '@/hooks/useDebouncedValue';
 import { Head, Link, router } from '@inertiajs/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type PurchaseOrderRow = {
     purchase_order_id: number;
@@ -41,21 +41,34 @@ export default function PurchaseOrdersIndex({ purchaseOrders, filters }: Props) 
     const [status, setStatus] = useState(filters?.status ?? '');
     const [search, setSearch] = useState(filters?.search ?? '');
     const debouncedSearch = useDebouncedValue(search, 450);
+    const hasMountedRef = useRef(false);
 
     useEffect(() => {
         setStatus(filters?.status ?? '');
         setSearch(filters?.search ?? '');
     }, [filters?.search, filters?.status]);
 
-    const activeFilters = useMemo(
-        () => ({
-            status,
-            search: debouncedSearch,
-        }),
-        [status, debouncedSearch],
-    );
+    const activeFilters = useMemo(() => {
+        const nextFilters: { status?: string; search?: string } = {};
+
+        if (status) {
+            nextFilters.status = status;
+        }
+
+        if (debouncedSearch) {
+            nextFilters.search = debouncedSearch;
+        }
+
+        return nextFilters;
+    }, [status, debouncedSearch]);
 
     useEffect(() => {
+        if (!hasMountedRef.current) {
+            hasMountedRef.current = true;
+
+            return;
+        }
+
         router.get(route('procurement.purchase-orders.index'), activeFilters, {
             preserveState: true,
             replace: true,
@@ -80,6 +93,19 @@ export default function PurchaseOrdersIndex({ purchaseOrders, filters }: Props) 
                 </section>
 
                 <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <h3 className="text-sm font-semibold text-slate-900">Filter purchase orders</h3>
+                            <p className="text-xs text-slate-500">Filters update automatically; no apply button required.</p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={resetFilters}
+                            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                            Reset
+                        </button>
+                    </div>
                     <div className="grid gap-3 md:grid-cols-5">
                         <select
                             value={status}
@@ -100,13 +126,7 @@ export default function PurchaseOrdersIndex({ purchaseOrders, filters }: Props) 
                             className="md:col-span-2 rounded-lg border-slate-300 text-sm"
                         />
 
-                        <button
-                            type="button"
-                            onClick={resetFilters}
-                            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 md:col-start-5"
-                        >
-                            Reset
-                        </button>
+                        <p className="flex items-center text-xs text-slate-500 md:col-span-2">Showing 5 records per page. Use pagination for the next 5.</p>
                     </div>
                 </section>
 

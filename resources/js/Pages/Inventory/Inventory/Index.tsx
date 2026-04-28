@@ -2,7 +2,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PaginationNav from '@/Components/PaginationNav';
 import useDebouncedValue from '@/hooks/useDebouncedValue';
 import { Head, Link, router } from '@inertiajs/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type InventoryRow = {
     inventory_id: number;
@@ -47,6 +47,7 @@ export default function InventoryIndex({ inventories, categories, filters }: Pro
     const [categoryId, setCategoryId] = useState(String(filters.category_id ?? ''));
     const [stockStatus, setStockStatus] = useState(filters.stock_status ?? '');
     const debouncedQ = useDebouncedValue(q, 450);
+    const hasMountedRef = useRef(false);
 
     useEffect(() => {
         setQ(filters.q ?? '');
@@ -64,6 +65,12 @@ export default function InventoryIndex({ inventories, categories, filters }: Pro
     );
 
     useEffect(() => {
+        if (!hasMountedRef.current) {
+            hasMountedRef.current = true;
+
+            return;
+        }
+
         router.get(route('inventory.inventory.index'), activeFilters, {
             preserveState: true,
             replace: true,
@@ -193,7 +200,7 @@ export default function InventoryIndex({ inventories, categories, filters }: Pro
                     </table>
                 </div>
 
-                <PaginationNav links={inventories.links} />
+                <PaginationNav links={inventories.links} preserveState={false} />
             </div>
         </AuthenticatedLayout>
     );

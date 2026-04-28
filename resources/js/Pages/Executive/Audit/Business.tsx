@@ -137,6 +137,15 @@ export default function BusinessAudit({ auditLogs, filters, analytics, filter_op
         });
     };
 
+    const updateDateRange = (range: string) => {
+        const dateRange = getDateRange(range);
+        setForm((current) => ({
+            ...current,
+            from_date: dateRange.from_date,
+            to_date: dateRange.to_date,
+        }));
+    };
+
     return (
         <AuthenticatedLayout header="Governance Logs">
             <Head title="Governance Logs" />
@@ -186,8 +195,19 @@ export default function BusinessAudit({ auditLogs, filters, analytics, filter_op
                                 ))}
                             </datalist>
 
-                            <input type="date" className="h-10 rounded-lg border-slate-300 text-sm" value={form.from_date} onChange={(e) => setForm((v) => ({ ...v, from_date: e.target.value }))} />
-                            <input type="date" className="h-10 rounded-lg border-slate-300 text-sm" value={form.to_date} onChange={(e) => setForm((v) => ({ ...v, to_date: e.target.value }))} />
+                            <select
+                                className="h-10 rounded-lg border-slate-300 text-sm xl:col-span-2"
+                                value={resolveDateRangeKey(form.from_date, form.to_date)}
+                                onChange={(event) => updateDateRange(event.target.value)}
+                            >
+                                <option value="all">All dates</option>
+                                <option value="today">Today</option>
+                                <option value="last_7_days">Last 7 days</option>
+                                <option value="last_30_days">Last 30 days</option>
+                                <option value="this_month">This month</option>
+                                <option value="last_month">Last month</option>
+                                <option value="custom" disabled>Selected date range</option>
+                            </select>
                         </div>
 
                         <div className="ml-auto flex items-center gap-2">
@@ -272,7 +292,7 @@ export default function BusinessAudit({ auditLogs, filters, analytics, filter_op
                         </div>
                     )}
                     <div className="px-6 py-4">
-                        <PaginationNav links={auditLogs.links} />
+                        <PaginationNav links={auditLogs.links} preserveState={false} />
                     </div>
                 </section>
             </div>
@@ -316,6 +336,62 @@ function formatActionLabel(value: string): string {
 
     const raw = aliases[value] ?? value;
     return raw.replaceAll('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function getDateRange(range: string): { from_date: string; to_date: string } {
+    const today = new Date();
+    const end = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+    if (range === 'today') {
+        return { from_date: formatDateInput(end), to_date: formatDateInput(end) };
+    }
+
+    if (range === 'last_7_days') {
+        return { from_date: formatDateInput(addDays(end, -6)), to_date: formatDateInput(end) };
+    }
+
+    if (range === 'last_30_days') {
+        return { from_date: formatDateInput(addDays(end, -29)), to_date: formatDateInput(end) };
+    }
+
+    if (range === 'this_month') {
+        return { from_date: formatDateInput(new Date(end.getFullYear(), end.getMonth(), 1)), to_date: formatDateInput(end) };
+    }
+
+    if (range === 'last_month') {
+        const firstDay = new Date(end.getFullYear(), end.getMonth() - 1, 1);
+        const lastDay = new Date(end.getFullYear(), end.getMonth(), 0);
+
+        return { from_date: formatDateInput(firstDay), to_date: formatDateInput(lastDay) };
+    }
+
+    return { from_date: '', to_date: '' };
+}
+
+function resolveDateRangeKey(fromDate: string, toDate: string): string {
+    const ranges = ['today', 'last_7_days', 'last_30_days', 'this_month', 'last_month'];
+    const match = ranges.find((range) => {
+        const value = getDateRange(range);
+
+        return value.from_date === fromDate && value.to_date === toDate;
+    });
+
+    if (match) {
+        return match;
+    }
+
+    return fromDate || toDate ? 'custom' : 'all';
+}
+
+function addDays(date: Date, days: number): Date {
+    const next = new Date(date);
+    next.setDate(next.getDate() + days);
+
+    return next;
+}
+
+function formatDateInput(date: Date): string {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
 function formatReferenceLabel(value: string): string {

@@ -136,7 +136,7 @@ class RequestWorkflowController
 
         $rows = $rows->values();
 
-        $perPage = 15;
+        $perPage = 5;
         $page = LengthAwarePaginator::resolveCurrentPage();
         $requests = new LengthAwarePaginator(
             $rows->forPage($page, $perPage)->values(),

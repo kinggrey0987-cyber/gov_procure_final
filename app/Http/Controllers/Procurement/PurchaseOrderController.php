@@ -45,7 +45,7 @@ class PurchaseOrderController extends Controller
                 });
             })
             ->latest('purchase_order_id')
-            ->paginate(15)
+            ->paginate(5)
             ->withQueryString();
 
         return Inertia::render('Procurement/PurchaseOrders/Index', [
@@ -126,7 +126,7 @@ class PurchaseOrderController extends Controller
             ->when($status !== '', fn ($query) => $query->where('status', $status))
             ->where('status', '!=', 'DRAFT')
             ->latest('purchase_order_id')
-            ->paginate(15)
+            ->paginate(5)
             ->withQueryString();
 
         return Inertia::render('Procurement/Records/Index', [

@@ -30,12 +30,17 @@ class SupplyRequestController extends Controller
         abort_unless($request->user()?->can('office.supply-request.view-any'), 403);
 
         $status = strtoupper(trim((string) $request->input('status', '')));
+        $month = trim((string) $request->input('month', ''));
         $search = trim((string) $request->input('search', ''));
 
         $supplyRequests = SupplyRequest::query()
             ->with(['items.item.inventory', 'purchaseRequests', 'purchaseOrders', 'distributionRecords'])
             ->forOffice((int) $request->user()?->office_id)
             ->when($status !== '', fn ($query) => $query->where('status', $status))
+            ->when(preg_match('/^\d{4}-\d{2}$/', $month) === 1, function ($query) use ($month): void {
+                [$year, $monthNumber] = array_map('intval', explode('-', $month));
+                $query->whereYear('request_date', $year)->whereMonth('request_date', $monthNumber);
+            })
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($nested) use ($search): void {
                     $nested->where('request_code', 'like', '%'.$search.'%')
@@ -44,7 +49,7 @@ class SupplyRequestController extends Controller
                 });
             })
             ->latest('supply_request_id')
-            ->paginate(15)
+            ->paginate(5)
             ->through(function (SupplyRequest $supplyRequest): array {
                 $requiresProcurement = $this->requiresProcurement($supplyRequest);
                 $trackingStatus = $this->resolveTrackingStatus($supplyRequest, $requiresProcurement);
@@ -65,6 +70,7 @@ class SupplyRequestController extends Controller
             'supplyRequests' => $supplyRequests,
             'filters' => [
                 'status' => $status,
+                'month' => $month,
                 'search' => $search,
             ],
         ]);

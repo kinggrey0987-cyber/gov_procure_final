@@ -29,6 +29,7 @@ class ClaimController
         abort_unless(auth()->user()->can('claim.view-any'), 403);
 
         $status = strtoupper(trim((string) $request->input('status', '')));
+        $month = trim((string) $request->input('month', ''));
         $search = trim((string) $request->input('search', ''));
 
         $query = Claim::query()->with(['distributionRecord', 'claimant', 'office']);
@@ -39,6 +40,10 @@ class ClaimController
 
         $claims = $query
             ->when($status !== '', fn ($builder) => $builder->where('status', $status))
+            ->when(preg_match('/^\d{4}-\d{2}$/', $month) === 1, function ($builder) use ($month): void {
+                [$year, $monthNumber] = array_map('intval', explode('-', $month));
+                $builder->whereYear('created_at', $year)->whereMonth('created_at', $monthNumber);
+            })
             ->when($search !== '', function ($builder) use ($search): void {
                 $builder->where(function ($nested) use ($search): void {
                     $nested->where('claim_code', 'like', '%'.$search.'%')
@@ -47,13 +52,14 @@ class ClaimController
                 });
             })
             ->orderByDesc('created_at')
-            ->paginate(20)
+            ->paginate(5)
             ->withQueryString();
 
         return Inertia::render('Inventory/Claim/Index', [
             'claims' => $claims,
             'filters' => [
                 'status' => $status,
+                'month' => $month,
                 'search' => $search,
             ],
         ]);

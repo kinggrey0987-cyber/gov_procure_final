@@ -1,6 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PaginationNav from '@/Components/PaginationNav';
 import { Head, Link, router } from '@inertiajs/react';
+import { useEffect, useState } from 'react';
 
 type RecordRow = {
     purchase_order_id: number;
@@ -34,27 +35,45 @@ type Props = {
 const statuses = ['PLACED', 'COMPLETED', 'CANCELLED'];
 
 export default function ProcurementRecordsIndex({ records, filters }: Props) {
+    const [status, setStatus] = useState(filters.status ?? '');
+
+    useEffect(() => {
+        setStatus(filters.status ?? '');
+    }, [filters.status]);
+
+    const updateStatus = (nextStatus: string) => {
+        setStatus(nextStatus);
+
+        router.get(
+            route('procurement.purchase-orders.records'),
+            nextStatus ? { status: nextStatus } : {},
+            {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+                only: ['records', 'filters'],
+            },
+        );
+    };
+
     return (
         <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Procurement Records</h2>}>
             <Head title="Procurement Records" />
 
             <div className="space-y-4 py-8">
                 <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <p className="text-sm text-slate-600">Completed and finalized procurement history for audit and traceability.</p>
+                    <div>
+                        <p className="text-sm text-slate-600">Completed and finalized procurement history for audit and traceability.</p>
+                        <p className="mt-1 text-xs text-slate-500">Filters update automatically and results are limited to 5 records per page.</p>
+                    </div>
                     <div className="flex items-center gap-2">
                         <label htmlFor="status" className="text-sm text-slate-600">
                             Filter by status
                         </label>
                         <select
                             id="status"
-                            value={filters.status || ''}
-                            onChange={(event) => {
-                                router.get(
-                                    route('procurement.purchase-orders.records'),
-                                    { status: event.target.value },
-                                    { preserveState: true, preserveScroll: true },
-                                );
-                            }}
+                            value={status}
+                            onChange={(event) => updateStatus(event.target.value)}
                             className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                         >
                             <option value="">All</option>

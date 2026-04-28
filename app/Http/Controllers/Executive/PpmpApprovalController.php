@@ -32,6 +32,7 @@ class PpmpApprovalController extends Controller
         $filters = $request->validate([
             'office_id' => ['nullable', 'integer', 'exists:offices,id'],
             'status' => ['nullable', 'string', 'max:60'],
+            'month' => ['nullable', 'date_format:Y-m'],
             'from_date' => ['nullable', 'date'],
             'to_date' => ['nullable', 'date', 'after_or_equal:from_date'],
             'search' => ['nullable', 'string', 'max:80'],
@@ -51,6 +52,11 @@ class PpmpApprovalController extends Controller
 
         if (! empty($filters['status'])) {
             $query->where('status', strtoupper((string) $filters['status']));
+        }
+
+        if (! empty($filters['month'])) {
+            [$year, $month] = array_map('intval', explode('-', (string) $filters['month']));
+            $query->whereYear('created_at', $year)->whereMonth('created_at', $month);
         }
 
         if (! empty($filters['from_date'])) {
@@ -125,6 +131,7 @@ class PpmpApprovalController extends Controller
             'filters' => [
                 'office_id' => $filters['office_id'] ?? null,
                 'status' => $filters['status'] ?? null,
+                'month' => $filters['month'] ?? null,
                 'from_date' => $filters['from_date'] ?? null,
                 'to_date' => $filters['to_date'] ?? null,
                 'search' => $filters['search'] ?? null,

@@ -41,6 +41,10 @@ class AlertController
         $alerts = $query
             ->when($request->string('status')->toString(), fn ($q, $status) => $q->where('status', strtoupper((string) $status)))
             ->when($request->string('severity')->toString(), fn ($q, $severity) => $q->where('severity', strtoupper((string) $severity)))
+            ->when(preg_match('/^\d{4}-\d{2}$/', (string) $request->input('month', '')) === 1, function ($q) use ($request): void {
+                [$year, $month] = array_map('intval', explode('-', (string) $request->input('month')));
+                $q->whereYear('detected_at', $year)->whereMonth('detected_at', $month);
+            })
             ->when($search !== '', function ($q) use ($search): void {
                 $q->where(function ($nested) use ($search): void {
                     $nested->where('alert_type', 'like', '%'.$search.'%')
@@ -50,13 +54,13 @@ class AlertController
                 });
             })
             ->orderByDesc('detected_at')
-            ->paginate(20)
+            ->paginate(5)
             ->withQueryString();
 
         return Inertia::render('Executive/Alerts/Index', [
             'alerts' => $alerts,
             'filters' => [
-                ...$request->only(['status', 'severity']),
+                ...$request->only(['status', 'severity', 'month']),
                 'search' => $search,
             ],
         ]);
