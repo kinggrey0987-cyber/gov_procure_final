@@ -24,16 +24,23 @@ class DeliveryController
         abort_unless(auth()->user()->can('delivery.view-any'), 403);
 
         $status = strtoupper(trim((string) $request->input('status', '')));
+        $year = trim((string) $request->input('year', ''));
         $month = trim((string) $request->input('month', ''));
         $search = trim((string) $request->input('search', ''));
+
+        $yearOptions = Delivery::query()
+            ->where('created_at', '!=', null)
+            ->selectRaw('DISTINCT YEAR(created_at) as year')
+            ->orderByDesc('year')
+            ->pluck('year')
+            ->map(fn ($value): int => (int) $value)
+            ->values();
 
         $deliveries = Delivery::query()
             ->with(['purchaseOrder', 'supplier', 'receiver'])
             ->when($status !== '', fn ($query) => $query->where('receipt_status', $status))
-            ->when(preg_match('/^\d{4}-\d{2}$/', $month) === 1, function ($query) use ($month): void {
-                [$year, $monthNumber] = array_map('intval', explode('-', $month));
-                $query->whereYear('created_at', $year)->whereMonth('created_at', $monthNumber);
-            })
+            ->when(preg_match('/^\d{4}$/', $year) === 1, fn ($query) => $query->whereYear('created_at', (int) $year))
+            ->when(preg_match('/^\d{1,2}$/', $month) === 1, fn ($query) => $query->whereMonth('created_at', (int) $month))
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($nested) use ($search): void {
                     $nested->where('delivery_code', 'like', '%'.$search.'%')
@@ -49,8 +56,12 @@ class DeliveryController
             'deliveries' => $deliveries,
             'filters' => [
                 'status' => $status,
+                'year' => $year,
                 'month' => $month,
                 'search' => $search,
+            ],
+            'filter_options' => [
+                'years' => $yearOptions,
             ],
         ]);
     }

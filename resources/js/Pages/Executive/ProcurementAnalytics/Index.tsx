@@ -34,6 +34,7 @@ type Props = {
         status?: string | null;
         pr_status?: string | null;
         po_status?: string | null;
+        year?: string | null;
         month?: string | null;
         from_date?: string | null;
         to_date?: string | null;
@@ -44,6 +45,7 @@ type Props = {
         statuses: string[];
         pr_statuses: string[];
         po_statuses: string[];
+        years: number[];
     };
     totals: {
         purchase_request_count: number;
@@ -88,6 +90,7 @@ export default function ProcurementAnalyticsIndex({
     const [form, setForm] = useState({
         office_id: filters.office_id ? String(filters.office_id) : '',
         status: filters.status ?? '',
+        year: filters.year ?? '',
         month: filters.month ?? '',
         from_date: filters.from_date ?? '',
         to_date: filters.to_date ?? '',
@@ -98,23 +101,25 @@ export default function ProcurementAnalyticsIndex({
         setForm({
             office_id: filters.office_id ? String(filters.office_id) : '',
             status: filters.status ?? '',
+            year: filters.year ?? '',
             month: filters.month ?? '',
             from_date: filters.from_date ?? '',
             to_date: filters.to_date ?? '',
             po_page: filters.po_page ? String(filters.po_page) : '',
         });
-    }, [filters.from_date, filters.month, filters.office_id, filters.po_page, filters.status, filters.to_date]);
+    }, [filters.from_date, filters.month, filters.office_id, filters.po_page, filters.status, filters.to_date, filters.year]);
 
     const activeFilters = useMemo(
         () => ({
             office_id: form.office_id,
             status: form.status,
+            year: form.year,
             month: form.month,
             from_date: form.from_date,
             to_date: form.to_date,
             po_page: form.po_page,
         }),
-        [form.from_date, form.month, form.office_id, form.po_page, form.status, form.to_date],
+        [form.from_date, form.month, form.office_id, form.po_page, form.status, form.to_date, form.year],
     );
 
     useEffect(() => {
@@ -190,7 +195,7 @@ export default function ProcurementAnalyticsIndex({
 
                 <section className="rounded-2xl border border-red-200 bg-white p-5 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
                     <div className="flex flex-wrap items-end gap-3">
-                        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                             <select
                                 className="h-10 rounded-lg border-slate-300 text-sm"
                                 value={form.office_id}
@@ -219,8 +224,11 @@ export default function ProcurementAnalyticsIndex({
 
                             <MonthFilterSelect
                                 className="h-10 rounded-lg border-slate-300 text-sm"
-                                value={form.month}
-                                onChange={(value) => setForm((current) => ({ ...current, month: value, from_date: '', to_date: '', po_page: '' }))}
+                                month={form.month}
+                                year={form.year}
+                                yearOptions={filter_options.years}
+                                onMonthChange={(value) => setForm((current) => ({ ...current, month: value, from_date: '', to_date: '', po_page: '' }))}
+                                onYearChange={(value) => setForm((current) => ({ ...current, year: value, from_date: '', to_date: '', po_page: '' }))}
                             />
                         </div>
 

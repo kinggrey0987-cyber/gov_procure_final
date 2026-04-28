@@ -26,18 +26,25 @@ class DistributionRecordController
         abort_unless(auth()->user()->can('distribution.view-any'), 403);
 
         $status = strtoupper(trim((string) $request->input('status', '')));
+        $year = trim((string) $request->input('year', ''));
         $month = trim((string) $request->input('month', ''));
         $search = trim((string) $request->input('search', ''));
+
+        $yearOptions = DistributionRecord::query()
+            ->where('created_at', '!=', null)
+            ->selectRaw('DISTINCT YEAR(created_at) as year')
+            ->orderByDesc('year')
+            ->pluck('year')
+            ->map(fn ($value): int => (int) $value)
+            ->values();
 
         $records = DistributionRecord::query()
             ->with(['supplyRequest', 'delivery', 'office', 'preparer', 'receiver'])
             ->withCount(['items', 'claims'])
             ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
             ->when($status !== '', fn ($query) => $query->where('status', $status))
-            ->when(preg_match('/^\d{4}-\d{2}$/', $month) === 1, function ($query) use ($month): void {
-                [$year, $monthNumber] = array_map('intval', explode('-', $month));
-                $query->whereYear('created_at', $year)->whereMonth('created_at', $monthNumber);
-            })
+            ->when(preg_match('/^\d{4}$/', $year) === 1, fn ($query) => $query->whereYear('created_at', (int) $year))
+            ->when(preg_match('/^\d{1,2}$/', $month) === 1, fn ($query) => $query->whereMonth('created_at', (int) $month))
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($nested) use ($search): void {
                     $nested->where('distribution_code', 'like', '%'.$search.'%')
@@ -54,8 +61,12 @@ class DistributionRecordController
             'records' => $records,
             'filters' => [
                 'status' => $status,
+                'year' => $year,
                 'month' => $month,
                 'search' => $search,
+            ],
+            'filter_options' => [
+                'years' => $yearOptions,
             ],
         ]);
     }

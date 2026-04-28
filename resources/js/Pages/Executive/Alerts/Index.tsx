@@ -21,14 +21,19 @@ type Props = {
     filters: {
         status?: string;
         severity?: string;
+        year?: string;
         month?: string;
         search?: string;
     };
+    filter_options?: {
+        years: number[];
+    };
 };
 
-export default function ExecutiveAlertIndex({ alerts, filters }: Props) {
+export default function ExecutiveAlertIndex({ alerts, filters, filter_options }: Props) {
     const [status, setStatus] = useState(filters.status ?? '');
     const [severity, setSeverity] = useState(filters.severity ?? '');
+    const [year, setYear] = useState(filters.year ?? '');
     const [month, setMonth] = useState(filters.month ?? '');
     const [search, setSearch] = useState(filters.search ?? '');
     const debouncedSearch = useDebouncedValue(search, 450);
@@ -37,18 +42,20 @@ export default function ExecutiveAlertIndex({ alerts, filters }: Props) {
     useEffect(() => {
         setStatus(filters.status ?? '');
         setSeverity(filters.severity ?? '');
+        setYear(filters.year ?? '');
         setMonth(filters.month ?? '');
         setSearch(filters.search ?? '');
-    }, [filters.month, filters.search, filters.severity, filters.status]);
+    }, [filters.month, filters.search, filters.severity, filters.status, filters.year]);
 
     const activeFilters = useMemo(
         () => ({
             status,
             severity,
+            year,
             month,
             search: debouncedSearch,
         }),
-        [status, severity, month, debouncedSearch],
+        [status, severity, year, month, debouncedSearch],
     );
 
     useEffect(() => {
@@ -70,7 +77,7 @@ export default function ExecutiveAlertIndex({ alerts, filters }: Props) {
             <Head title="Alerts" />
             <div className="py-10">
                 <div className="mx-auto max-w-6xl space-y-4 px-4 sm:px-6 lg:px-8">
-                    <div className="grid gap-2 rounded-xl border bg-white p-3 md:grid-cols-4">
+                    <div className="grid gap-2 rounded-xl border bg-white p-3 md:grid-cols-5">
                         <select
                             className="rounded border px-3 py-2 text-sm"
                             value={severity}
@@ -89,8 +96,11 @@ export default function ExecutiveAlertIndex({ alerts, filters }: Props) {
                         </select>
                         <MonthFilterSelect
                             className="rounded border px-3 py-2 text-sm"
-                            value={month}
-                            onChange={setMonth}
+                            month={month}
+                            year={year}
+                            yearOptions={filter_options?.years ?? []}
+                            onMonthChange={setMonth}
+                            onYearChange={setYear}
                         />
                         <input
                             className="rounded border px-3 py-2 text-sm"

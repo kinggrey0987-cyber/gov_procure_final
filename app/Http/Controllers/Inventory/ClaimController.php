@@ -29,8 +29,17 @@ class ClaimController
         abort_unless(auth()->user()->can('claim.view-any'), 403);
 
         $status = strtoupper(trim((string) $request->input('status', '')));
+        $year = trim((string) $request->input('year', ''));
         $month = trim((string) $request->input('month', ''));
         $search = trim((string) $request->input('search', ''));
+
+        $yearOptions = Claim::query()
+            ->where('created_at', '!=', null)
+            ->selectRaw('DISTINCT YEAR(created_at) as year')
+            ->orderByDesc('year')
+            ->pluck('year')
+            ->map(fn ($value): int => (int) $value)
+            ->values();
 
         $query = Claim::query()->with(['distributionRecord', 'claimant', 'office']);
 
@@ -40,10 +49,8 @@ class ClaimController
 
         $claims = $query
             ->when($status !== '', fn ($builder) => $builder->where('status', $status))
-            ->when(preg_match('/^\d{4}-\d{2}$/', $month) === 1, function ($builder) use ($month): void {
-                [$year, $monthNumber] = array_map('intval', explode('-', $month));
-                $builder->whereYear('created_at', $year)->whereMonth('created_at', $monthNumber);
-            })
+            ->when(preg_match('/^\d{4}$/', $year) === 1, fn ($builder) => $builder->whereYear('created_at', (int) $year))
+            ->when(preg_match('/^\d{1,2}$/', $month) === 1, fn ($builder) => $builder->whereMonth('created_at', (int) $month))
             ->when($search !== '', function ($builder) use ($search): void {
                 $builder->where(function ($nested) use ($search): void {
                     $nested->where('claim_code', 'like', '%'.$search.'%')
@@ -59,8 +66,12 @@ class ClaimController
             'claims' => $claims,
             'filters' => [
                 'status' => $status,
+                'year' => $year,
                 'month' => $month,
                 'search' => $search,
+            ],
+            'filter_options' => [
+                'years' => $yearOptions,
             ],
         ]);
     }

@@ -25,6 +25,7 @@ class AlertController
         abort_unless(auth()->user()->can('alert.view-any'), 403);
 
         $search = trim((string) $request->input('search', ''));
+        $year = trim((string) $request->input('year', ''));
 
         $query = Alert::query()->with(['anomaly', 'office', 'reviewer']);
 
@@ -41,9 +42,10 @@ class AlertController
         $alerts = $query
             ->when($request->string('status')->toString(), fn ($q, $status) => $q->where('status', strtoupper((string) $status)))
             ->when($request->string('severity')->toString(), fn ($q, $severity) => $q->where('severity', strtoupper((string) $severity)))
-            ->when(preg_match('/^\d{4}-\d{2}$/', (string) $request->input('month', '')) === 1, function ($q) use ($request): void {
-                [$year, $month] = array_map('intval', explode('-', (string) $request->input('month')));
-                $q->whereYear('detected_at', $year)->whereMonth('detected_at', $month);
+            ->when(preg_match('/^\d{4}$/', $year) === 1, fn ($q) => $q->whereYear('detected_at', (int) $year))
+            ->when(preg_match('/^\d{1,2}$/', (string) $request->input('month', '')) === 1, function ($q) use ($request): void {
+                $month = (int) $request->input('month');
+                $q->whereMonth('detected_at', $month);
             })
             ->when($search !== '', function ($q) use ($search): void {
                 $q->where(function ($nested) use ($search): void {
@@ -61,7 +63,19 @@ class AlertController
             'alerts' => $alerts,
             'filters' => [
                 ...$request->only(['status', 'severity', 'month']),
+                'year' => $year,
                 'search' => $search,
+            ],
+            'filter_options' => [
+                'years' => Alert::query()
+                    ->select('detected_at')
+                    ->whereNotNull('detected_at')
+                    ->distinct()
+                    ->orderByDesc('detected_at')
+                    ->get()
+                    ->map(fn (Alert $alert): int => (int) \Illuminate\Support\Carbon::parse($alert->detected_at)->format('Y'))
+                    ->unique()
+                    ->values(),
             ],
         ]);
     }

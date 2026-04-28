@@ -30,17 +30,25 @@ class SupplyRequestController extends Controller
         abort_unless($request->user()?->can('office.supply-request.view-any'), 403);
 
         $status = strtoupper(trim((string) $request->input('status', '')));
+        $year = trim((string) $request->input('year', ''));
         $month = trim((string) $request->input('month', ''));
         $search = trim((string) $request->input('search', ''));
+
+        $yearOptions = SupplyRequest::query()
+            ->forOffice((int) $request->user()?->office_id)
+            ->where('request_date', '!=', null)
+            ->selectRaw('DISTINCT YEAR(request_date) as year')
+            ->orderByDesc('year')
+            ->pluck('year')
+            ->map(fn ($value): int => (int) $value)
+            ->values();
 
         $supplyRequests = SupplyRequest::query()
             ->with(['items.item.inventory', 'purchaseRequests', 'purchaseOrders', 'distributionRecords'])
             ->forOffice((int) $request->user()?->office_id)
             ->when($status !== '', fn ($query) => $query->where('status', $status))
-            ->when(preg_match('/^\d{4}-\d{2}$/', $month) === 1, function ($query) use ($month): void {
-                [$year, $monthNumber] = array_map('intval', explode('-', $month));
-                $query->whereYear('request_date', $year)->whereMonth('request_date', $monthNumber);
-            })
+            ->when(preg_match('/^\d{4}$/', $year) === 1, fn ($query) => $query->whereYear('request_date', (int) $year))
+            ->when(preg_match('/^\d{1,2}$/', $month) === 1, fn ($query) => $query->whereMonth('request_date', (int) $month))
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($nested) use ($search): void {
                     $nested->where('request_code', 'like', '%'.$search.'%')
@@ -70,8 +78,12 @@ class SupplyRequestController extends Controller
             'supplyRequests' => $supplyRequests,
             'filters' => [
                 'status' => $status,
+                'year' => $year,
                 'month' => $month,
                 'search' => $search,
+            ],
+            'filter_options' => [
+                'years' => $yearOptions,
             ],
         ]);
     }

@@ -34,13 +34,18 @@ type Props = {
     };
     filters?: {
         status?: string;
+        year?: string;
         month?: string;
         search?: string;
     };
+    filter_options?: {
+        years: number[];
+    };
 };
 
-export default function DeliveryIndex({ deliveries, filters }: Props) {
+export default function DeliveryIndex({ deliveries, filters, filter_options }: Props) {
     const [status, setStatus] = useState(filters?.status ?? '');
+    const [year, setYear] = useState(filters?.year ?? '');
     const [month, setMonth] = useState(filters?.month ?? '');
     const [search, setSearch] = useState(filters?.search ?? '');
     const debouncedSearch = useDebouncedValue(search, 450);
@@ -48,17 +53,19 @@ export default function DeliveryIndex({ deliveries, filters }: Props) {
 
     useEffect(() => {
         setStatus(filters?.status ?? '');
+        setYear(filters?.year ?? '');
         setMonth(filters?.month ?? '');
         setSearch(filters?.search ?? '');
-    }, [filters?.month, filters?.search, filters?.status]);
+    }, [filters?.month, filters?.search, filters?.status, filters?.year]);
 
     const activeFilters = useMemo(
         () => ({
             status,
+            year,
             month,
             search: debouncedSearch,
         }),
-        [status, month, debouncedSearch],
+        [status, year, month, debouncedSearch],
     );
 
     useEffect(() => {
@@ -80,7 +87,7 @@ export default function DeliveryIndex({ deliveries, filters }: Props) {
             <Head title="Deliveries" />
 
             <div className="space-y-4 py-8">
-                <div className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm md:grid-cols-4">
+                <div className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm md:grid-cols-5">
                     <input
                         className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                         value={search}
@@ -98,11 +105,41 @@ export default function DeliveryIndex({ deliveries, filters }: Props) {
                         <option value="PARTIALLY_RECEIVED">PARTIALLY_RECEIVED</option>
                         <option value="VERIFIED">VERIFIED</option>
                     </select>
-                    <MonthFilterSelect
-                        value={month}
-                        onChange={setMonth}
+                    <select
                         className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                    />
+                        value={year}
+                        onChange={(event) => setYear(event.target.value)}
+                    >
+                        <option value="">All years</option>
+                        {(filter_options?.years ?? []).map((option) => (
+                            <option key={option} value={option}>
+                                {option}
+                            </option>
+                        ))}
+                    </select>
+                    <select
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                        value={month}
+                        onChange={(event) => setMonth(event.target.value)}
+                    >
+                        <option value="">All months</option>
+                        {[
+                            ['01', 'January'],
+                            ['02', 'February'],
+                            ['03', 'March'],
+                            ['04', 'April'],
+                            ['05', 'May'],
+                            ['06', 'June'],
+                            ['07', 'July'],
+                            ['08', 'August'],
+                            ['09', 'September'],
+                            ['10', 'October'],
+                            ['11', 'November'],
+                            ['12', 'December'],
+                        ].map(([value, label]) => (
+                            <option key={value} value={value}>{label}</option>
+                        ))}
+                    </select>
                     <button
                         type="button"
                         onClick={() => router.get(route('inventory.deliveries.index'))}

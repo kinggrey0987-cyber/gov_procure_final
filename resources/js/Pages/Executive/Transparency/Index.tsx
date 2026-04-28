@@ -21,6 +21,7 @@ type Props = {
         status?: string | null;
         office_id?: number | null;
         type?: string | null;
+        year?: string | null;
         month?: string | null;
         from_date?: string | null;
         to_date?: string | null;
@@ -30,6 +31,7 @@ type Props = {
         offices: OfficeOption[];
         statuses: string[];
         types: string[];
+        years: number[];
     };
     totals: {
         disclosure_count: number;
@@ -59,6 +61,7 @@ export default function TransparencyMonitoringIndex({
     const [form, setForm] = useState({
         office_id: filters.office_id ? String(filters.office_id) : '',
         status: filters.status ?? '',
+        year: filters.year ?? '',
         month: filters.month ?? '',
     });
     const [recentActivityPage, setRecentActivityPage] = useState(1);
@@ -85,9 +88,10 @@ export default function TransparencyMonitoringIndex({
         setForm({
             office_id: filters.office_id ? String(filters.office_id) : '',
             status: filters.status ?? '',
+            year: filters.year ?? '',
             month: filters.month ?? '',
         });
-    }, [filters.month, filters.office_id, filters.status]);
+    }, [filters.month, filters.office_id, filters.status, filters.year]);
 
     useEffect(() => {
         setRecentActivityPage(1);
@@ -97,10 +101,11 @@ export default function TransparencyMonitoringIndex({
         () => ({
             status: form.status,
             office_id: form.office_id,
+            year: form.year,
             month: form.month,
             tab: activeTab,
         }),
-        [activeTab, form.month, form.office_id, form.status],
+        [activeTab, form.month, form.office_id, form.status, form.year],
     );
 
     useEffect(() => {
@@ -185,7 +190,7 @@ export default function TransparencyMonitoringIndex({
 
                 <section className="rounded-2xl border border-red-200 bg-white p-5 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
                     <div className="flex flex-wrap items-end gap-3">
-                        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                             <select
                                 className="h-10 rounded-lg border-slate-300 text-sm"
                                 value={form.office_id}
@@ -214,8 +219,11 @@ export default function TransparencyMonitoringIndex({
 
                             <MonthFilterSelect
                                 className="h-10 rounded-lg border-slate-300 text-sm"
-                                value={form.month}
-                                onChange={(value) => setForm((current) => ({ ...current, month: value }))}
+                                month={form.month}
+                                year={form.year}
+                                yearOptions={filter_options.years}
+                                onMonthChange={(value) => setForm((current) => ({ ...current, month: value }))}
+                                onYearChange={(value) => setForm((current) => ({ ...current, year: value }))}
                             />
                         </div>
 

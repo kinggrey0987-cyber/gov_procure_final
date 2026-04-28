@@ -38,6 +38,7 @@ type Props = {
     filters: {
         office_id?: number | null;
         status?: string | null;
+        year?: string | null;
         month?: string | null;
         from_date?: string | null;
         to_date?: string | null;
@@ -46,6 +47,7 @@ type Props = {
     filter_options: {
         offices: OfficeOption[];
         statuses: string[];
+        years: number[];
     };
     office_breakdown: Array<{ office_id: number; office_name: string; total: number }>;
 };
@@ -60,6 +62,7 @@ export default function ExecutiveApprovalsIndex({ records, summary, filters, fil
     const [form, setForm] = useState({
         office_id: filters.office_id ? String(filters.office_id) : '',
         status: filters.status ?? '',
+        year: filters.year ?? '',
         month: filters.month ?? '',
         from_date: filters.from_date ?? '',
         to_date: filters.to_date ?? '',
@@ -72,12 +75,13 @@ export default function ExecutiveApprovalsIndex({ records, summary, filters, fil
         setForm({
             office_id: filters.office_id ? String(filters.office_id) : '',
             status: filters.status ?? '',
+            year: filters.year ?? '',
             month: filters.month ?? '',
             from_date: filters.from_date ?? '',
             to_date: filters.to_date ?? '',
             search: filters.search ?? '',
         });
-    }, [filters.from_date, filters.month, filters.office_id, filters.search, filters.status, filters.to_date]);
+    }, [filters.from_date, filters.month, filters.office_id, filters.search, filters.status, filters.to_date, filters.year]);
 
     const updateFilters = (nextForm: typeof form) => {
         setForm(nextForm);
@@ -181,7 +185,7 @@ export default function ExecutiveApprovalsIndex({ records, summary, filters, fil
 
                 <section className="rounded-2xl border border-red-200 bg-white p-5 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
                     <div className="flex flex-wrap items-end gap-3">
-                        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
                         <select
                             className="h-10 rounded-lg border-slate-300 text-sm"
                             value={form.office_id}
@@ -210,8 +214,11 @@ export default function ExecutiveApprovalsIndex({ records, summary, filters, fil
 
                         <MonthFilterSelect
                             className="h-10 rounded-lg border-slate-300 text-sm"
-                            value={form.month}
-                            onChange={(value) => updateFilters({ ...form, month: value, from_date: '', to_date: '' })}
+                            month={form.month}
+                            year={form.year}
+                            yearOptions={filter_options.years}
+                            onMonthChange={(value) => updateFilters({ ...form, month: value, from_date: '', to_date: '' })}
+                            onYearChange={(value) => updateFilters({ ...form, year: value })}
                         />
 
                         <input

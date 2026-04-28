@@ -221,6 +221,8 @@ class ExecutiveMonitoringService
             $purchaseOrderQuery->where('status', $filters['po_status']);
         }
 
+        $this->applyYear($purchaseRequestQuery, $filters['year'] ?? null, 'created_at');
+        $this->applyYear($purchaseOrderQuery, $filters['year'] ?? null, 'created_at');
         $this->applyMonth($purchaseRequestQuery, $filters['month'] ?? null, 'created_at');
         $this->applyMonth($purchaseOrderQuery, $filters['month'] ?? null, 'created_at');
 
@@ -242,6 +244,7 @@ class ExecutiveMonitoringService
                 'status' => $statusFilter,
                 'pr_status' => $filters['pr_status'] ?? null,
                 'po_status' => $filters['po_status'] ?? null,
+                'year' => $filters['year'] ?? null,
                 'month' => $filters['month'] ?? null,
                 'from_date' => $filters['from_date'] ?? null,
                 'to_date' => $filters['to_date'] ?? null,
@@ -252,6 +255,9 @@ class ExecutiveMonitoringService
                 'statuses' => $this->distinctValues([PurchaseRequest::query(), PurchaseOrder::query()], 'status'),
                 'pr_statuses' => PurchaseRequest::query()->select('status')->whereNotNull('status')->distinct()->orderBy('status')->pluck('status')->values(),
                 'po_statuses' => PurchaseOrder::query()->select('status')->whereNotNull('status')->distinct()->orderBy('status')->pluck('status')->values(),
+                'years' => $this->buildYearOptions(
+                    $this->buildYearRows((clone $purchaseRequestBase)->get(['created_at']), (clone $purchaseOrderBase)->get(['created_at']), 'created_at')
+                ),
             ],
             'totals' => [
                 'purchase_request_count' => (clone $purchaseRequestBase)->count(),
@@ -329,6 +335,8 @@ class ExecutiveMonitoringService
             $anomalyQuery->where('anomaly_type', $filters['anomaly_type']);
         }
 
+        $this->applyYear($anomalyQuery, $filters['year'] ?? null, 'detected_at');
+        $this->applyYear($alertQuery, $filters['year'] ?? null, 'detected_at');
         $this->applyMonth($anomalyQuery, $filters['month'] ?? null, 'detected_at');
         $this->applyMonth($alertQuery, $filters['month'] ?? null, 'detected_at');
 
@@ -347,6 +355,7 @@ class ExecutiveMonitoringService
                 'month' => $filters['month'] ?? null,
                 'from_date' => $filters['from_date'] ?? null,
                 'to_date' => $filters['to_date'] ?? null,
+                'year' => $filters['year'] ?? null,
             ],
             'filter_options' => [
                 'offices' => Office::query()->select(['id', 'name'])->orderBy('name')->get(),
@@ -366,6 +375,9 @@ class ExecutiveMonitoringService
                     ->map(fn ($value): string => strtoupper((string) $value))
                     ->unique()
                     ->values(),
+                'years' => $this->buildYearOptions(
+                    $this->buildYearRows((clone $anomalyBase)->get(['detected_at']), (clone $alertBase)->get(['detected_at']), 'detected_at')
+                ),
             ],
             'totals' => [
                 'anomaly_count' => (clone $anomalyBase)->count(),
@@ -509,6 +521,7 @@ class ExecutiveMonitoringService
             $query->where('type', $filters['type']);
         }
 
+        $this->applyYear($query, $filters['year'] ?? null, 'published_at');
         $this->applyMonth($query, $filters['month'] ?? null, 'published_at');
 
         $this->applyDateRange($query, $filters['from_date'] ?? null, $filters['to_date'] ?? null, 'published_at');
@@ -524,11 +537,15 @@ class ExecutiveMonitoringService
                 'from_date' => $filters['from_date'] ?? null,
                 'to_date' => $filters['to_date'] ?? null,
                 'tab' => $filters['tab'] ?? 'overview',
+                'year' => $filters['year'] ?? null,
             ],
             'filter_options' => [
                 'offices' => Office::query()->select(['id', 'name'])->orderBy('name')->get(),
                 'statuses' => PublicDisclosure::query()->select('status')->whereNotNull('status')->distinct()->orderBy('status')->pluck('status')->values(),
                 'types' => PublicDisclosure::query()->select('type')->whereNotNull('type')->distinct()->orderBy('type')->pluck('type')->values(),
+                'years' => $this->buildYearOptions(
+                    $this->buildYearRows((clone $base)->get(['published_at', 'created_at']), collect(), 'published_at')
+                ),
             ],
             'totals' => [
                 'disclosure_count' => (clone $base)->count(),
@@ -600,6 +617,14 @@ class ExecutiveMonitoringService
         $query->whereYear($column, $year)->whereMonth($column, $month);
     }
 
+    private function applyYear(Builder $query, mixed $yearValue, string $column): void
+    {
+        if (empty($yearValue) || ! is_string($yearValue) || preg_match('/^\d{4}$/', $yearValue) !== 1) {
+            return;
+        }
+
+        $query->whereYear($column, (int) $yearValue);
+    }
     /**
      * @param  list<Builder>  $queries
      * @return Collection<int, string>
@@ -659,6 +684,40 @@ class ExecutiveMonitoringService
                 'total' => $group->count(),
             ])
             ->sortBy('month')
+            ->values();
+    }
+
+    /**
+     * @param  Collection<int, mixed>  $rows
+     * @return Collection<int, int>
+     */
+    private function buildYearOptions(Collection $rows): Collection
+    {
+        return $rows
+            ->map(static function ($row): ?int {
+                $date = $row->published_at ?? $row->detected_at ?? $row->created_at ?? null;
+
+                if (empty($date)) {
+                    return null;
+                }
+
+                return (int) Carbon::parse($date)->format('Y');
+            })
+            ->filter(static fn ($year): bool => is_int($year))
+            ->unique()
+            ->sortDesc()
+            ->values();
+    }
+
+    /**
+     * @param  Collection<int, mixed>  $firstRows
+     * @param  Collection<int, mixed>  $secondRows
+     * @return Collection<int, mixed>
+     */
+    private function buildYearRows(Collection $firstRows, Collection $secondRows, string $column): Collection
+    {
+        return $firstRows
+            ->concat($secondRows)
             ->values();
     }
 

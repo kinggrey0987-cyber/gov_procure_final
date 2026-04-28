@@ -24,14 +24,19 @@ type Props = {
     };
     filters?: {
         status?: string;
+        year?: string;
         month?: string;
         search?: string;
     };
+    filter_options?: {
+        years: number[];
+    };
 };
 
-export default function DistributionIndex({ records, filters }: Props) {
+export default function DistributionIndex({ records, filters, filter_options }: Props) {
     const [search, setSearch] = useState(filters?.search ?? '');
     const [statusFilter, setStatusFilter] = useState(filters?.status ?? '');
+    const [year, setYear] = useState(filters?.year ?? '');
     const [month, setMonth] = useState(filters?.month ?? '');
     const debouncedSearch = useDebouncedValue(search, 450);
     const hasMountedRef = useRef(false);
@@ -39,16 +44,18 @@ export default function DistributionIndex({ records, filters }: Props) {
     useEffect(() => {
         setSearch(filters?.search ?? '');
         setStatusFilter(filters?.status ?? '');
+        setYear(filters?.year ?? '');
         setMonth(filters?.month ?? '');
-    }, [filters?.month, filters?.search, filters?.status]);
+    }, [filters?.month, filters?.search, filters?.status, filters?.year]);
 
     const activeFilters = useMemo(
         () => ({
             status: statusFilter,
+            year,
             month,
             search: debouncedSearch,
         }),
-        [statusFilter, month, debouncedSearch],
+        [statusFilter, year, month, debouncedSearch],
     );
 
     useEffect(() => {
@@ -112,7 +119,7 @@ export default function DistributionIndex({ records, filters }: Props) {
                 </div>
 
                 <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div className="grid gap-3 md:grid-cols-[1fr_220px_180px_auto] md:items-end">
+                    <div className="grid gap-3 md:grid-cols-[1fr_220px_180px_180px_auto] md:items-end">
                         <div>
                             <label htmlFor="distribution-search" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 Search
@@ -128,14 +135,52 @@ export default function DistributionIndex({ records, filters }: Props) {
                         </div>
 
                         <div>
+                            <label htmlFor="distribution-year" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Year
+                            </label>
+                            <select
+                                id="distribution-year"
+                                value={year}
+                                onChange={(event) => setYear(event.target.value)}
+                                className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                            >
+                                <option value="">All years</option>
+                                {(filter_options?.years ?? []).map((option) => (
+                                    <option key={option} value={option}>
+                                        {option}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
                             <label htmlFor="distribution-month" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 Month
                             </label>
-                            <MonthFilterSelect
+                            <select
+                                id="distribution-month"
                                 value={month}
-                                onChange={setMonth}
+                                onChange={(event) => setMonth(event.target.value)}
                                 className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                            />
+                            >
+                                <option value="">All months</option>
+                                {[
+                                    ['01', 'January'],
+                                    ['02', 'February'],
+                                    ['03', 'March'],
+                                    ['04', 'April'],
+                                    ['05', 'May'],
+                                    ['06', 'June'],
+                                    ['07', 'July'],
+                                    ['08', 'August'],
+                                    ['09', 'September'],
+                                    ['10', 'October'],
+                                    ['11', 'November'],
+                                    ['12', 'December'],
+                                ].map(([value, label]) => (
+                                    <option key={value} value={value}>{label}</option>
+                                ))}
+                            </select>
                         </div>
 
                         <div>

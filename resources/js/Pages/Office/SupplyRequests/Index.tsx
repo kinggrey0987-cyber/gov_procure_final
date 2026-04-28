@@ -20,13 +20,18 @@ type Props = {
     };
     filters?: {
         status?: string;
+        year?: string;
         month?: string;
         search?: string;
     };
+    filter_options?: {
+        years: number[];
+    };
 };
 
-export default function SupplyRequestsIndex({ supplyRequests, filters }: Props) {
+export default function SupplyRequestsIndex({ supplyRequests, filters, filter_options }: Props) {
     const [status, setStatus] = useState(filters?.status ?? '');
+    const [year, setYear] = useState(filters?.year ?? '');
     const [month, setMonth] = useState(filters?.month ?? '');
     const [search, setSearch] = useState(filters?.search ?? '');
     const debouncedSearch = useDebouncedValue(search, 450);
@@ -34,17 +39,19 @@ export default function SupplyRequestsIndex({ supplyRequests, filters }: Props) 
 
     useEffect(() => {
         setStatus(filters?.status ?? '');
+        setYear(filters?.year ?? '');
         setMonth(filters?.month ?? '');
         setSearch(filters?.search ?? '');
-    }, [filters?.month, filters?.search, filters?.status]);
+    }, [filters?.month, filters?.search, filters?.status, filters?.year]);
 
     const activeFilters = useMemo(
         () => ({
             status,
+            year,
             month,
             search: debouncedSearch,
         }),
-        [month, status, debouncedSearch],
+        [month, status, year, debouncedSearch],
     );
 
     useEffect(() => {
@@ -94,7 +101,7 @@ export default function SupplyRequestsIndex({ supplyRequests, filters }: Props) 
                 <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="border-b border-slate-200 px-6 py-4">
                         <h4 className="text-lg font-semibold text-slate-800">Request List</h4>
-                        <div className="mt-3 grid gap-2 md:grid-cols-4">
+                        <div className="mt-3 grid gap-2 md:grid-cols-5">
                             <select
                                 value={status}
                                 onChange={(event) => setStatus(event.target.value)}
@@ -105,11 +112,43 @@ export default function SupplyRequestsIndex({ supplyRequests, filters }: Props) 
                                     <option key={option} value={option}>{option.replaceAll('_', ' ')}</option>
                                 ))}
                             </select>
-                            <MonthFilterSelect
-                                value={month}
-                                onChange={setMonth}
+                            <select
+                                value={year}
+                                onChange={(event) => setYear(event.target.value)}
                                 className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                            />
+                            >
+                                <option value="">All years</option>
+                                {(filter_options?.years ?? []).map((option) => (
+                                    <option key={option} value={option}>
+                                        {option}
+                                    </option>
+                                ))}
+                            </select>
+                            <select
+                                value={month}
+                                onChange={(event) => setMonth(event.target.value)}
+                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                            >
+                                <option value="">All months</option>
+                                {[
+                                    ['01', 'January'],
+                                    ['02', 'February'],
+                                    ['03', 'March'],
+                                    ['04', 'April'],
+                                    ['05', 'May'],
+                                    ['06', 'June'],
+                                    ['07', 'July'],
+                                    ['08', 'August'],
+                                    ['09', 'September'],
+                                    ['10', 'October'],
+                                    ['11', 'November'],
+                                    ['12', 'December'],
+                                ].map(([value, label]) => (
+                                    <option key={value} value={value}>
+                                        {label}
+                                    </option>
+                                ))}
+                            </select>
                             <input
                                 value={search}
                                 onChange={(event) => setSearch(event.target.value)}

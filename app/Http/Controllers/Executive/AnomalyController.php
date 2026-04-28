@@ -30,15 +30,17 @@ class AnomalyController
         abort_unless(auth()->user()->can('anomaly.view-any'), 403);
 
         $search = trim((string) $request->input('search', ''));
+        $year = trim((string) $request->input('year', ''));
 
         $anomalies = Anomaly::query()
             ->with(['office', 'item'])
             ->when($request->string('status')->toString(), fn ($query, $status) => $query->where('status', strtoupper((string) $status)))
             ->when($request->string('severity')->toString(), fn ($query, $severity) => $query->where('severity', strtoupper((string) $severity)))
             ->when($request->string('anomaly_type')->toString(), fn ($query, $type) => $query->where('anomaly_type', strtoupper((string) $type)))
-            ->when(preg_match('/^\d{4}-\d{2}$/', (string) $request->input('month', '')) === 1, function ($query) use ($request): void {
-                [$year, $month] = array_map('intval', explode('-', (string) $request->input('month')));
-                $query->whereYear('detected_at', $year)->whereMonth('detected_at', $month);
+            ->when(preg_match('/^\d{4}$/', $year) === 1, fn ($query) => $query->whereYear('detected_at', (int) $year))
+            ->when(preg_match('/^\d{1,2}$/', (string) $request->input('month', '')) === 1, function ($query) use ($request): void {
+                $month = (int) $request->input('month');
+                $query->whereMonth('detected_at', $month);
             })
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($nested) use ($search): void {
@@ -56,6 +58,7 @@ class AnomalyController
             'anomalies' => $anomalies,
             'filters' => [
                 ...$request->only(['status', 'severity', 'anomaly_type', 'month']),
+                'year' => $year,
                 'search' => $search,
             ],
             'filter_options' => [
@@ -64,6 +67,15 @@ class AnomalyController
                     ->distinct()
                     ->orderBy('anomaly_type')
                     ->pluck('anomaly_type')
+                    ->values(),
+                'years' => Anomaly::query()
+                    ->select('detected_at')
+                    ->whereNotNull('detected_at')
+                    ->distinct()
+                    ->orderByDesc('detected_at')
+                    ->get()
+                    ->map(fn (Anomaly $anomaly): int => (int) \Illuminate\Support\Carbon::parse($anomaly->detected_at)->format('Y'))
+                    ->unique()
                     ->values(),
             ],
         ]);

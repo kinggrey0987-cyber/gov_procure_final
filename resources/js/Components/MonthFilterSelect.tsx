@@ -1,56 +1,38 @@
 type Props = {
-    value: string;
-    onChange: (value: string) => void;
+    month: string;
+    year: string;
+    onMonthChange: (value: string) => void;
+    onYearChange: (value: string) => void;
+    yearOptions: number[];
     className?: string;
-    allLabel?: string;
-    yearAllLabel?: string;
-    monthsBack?: number;
+    allMonthLabel?: string;
+    allYearLabel?: string;
 };
 
 export default function MonthFilterSelect({
-    value,
-    onChange,
+    month,
+    year,
+    onMonthChange,
+    onYearChange,
+    yearOptions,
     className,
-    allLabel = 'All months',
-    yearAllLabel = 'All years',
-    monthsBack = 24,
+    allMonthLabel = 'All months',
+    allYearLabel = 'All years',
 }: Props) {
-    const { monthValue, yearValue } = parseMonthValue(value);
     const monthOptions = buildMonthOptions();
-    const yearOptions = buildYearOptions(monthsBack, value);
-
-    const updateMonth = (nextMonthValue: string) => {
-        if (!nextMonthValue || !yearValue) {
-            onChange('');
-
-            return;
-        }
-
-        onChange(`${yearValue}-${nextMonthValue}`);
-    };
-
-    const updateYear = (nextYearValue: string) => {
-        if (!nextYearValue || !monthValue) {
-            onChange('');
-
-            return;
-        }
-
-        onChange(`${nextYearValue}-${monthValue}`);
-    };
 
     return (
         <div className="grid gap-2 md:grid-cols-2">
-            <select value={monthValue} onChange={(event) => updateMonth(event.target.value)} className={className}>
-                <option value="">{allLabel}</option>
+            <select value={month} onChange={(event) => onMonthChange(event.target.value)} className={className}>
+                <option value="">{allMonthLabel}</option>
                 {monthOptions.map((option) => (
                     <option key={option.value} value={option.value}>
                         {option.label}
                     </option>
                 ))}
             </select>
-            <select value={yearValue} onChange={(event) => updateYear(event.target.value)} className={className}>
-                <option value="">{yearAllLabel}</option>
+            <select value={year} onChange={(event) => onYearChange(event.target.value)} className={className}>
+                <option value="">{allYearLabel}</option>
                 {yearOptions.map((year) => (
                     <option key={year} value={year}>
                         {year}
@@ -59,12 +41,6 @@ export default function MonthFilterSelect({
             </select>
         </div>
     );
-}
-
-function parseMonthValue(value: string) {
-    const [yearValue = '', monthValue = ''] = value.split('-');
-
-    return { monthValue, yearValue };
 }
 
 function buildMonthOptions() {
@@ -82,20 +58,4 @@ function buildMonthOptions() {
         { value: '11', label: 'November' },
         { value: '12', label: 'December' },
     ];
-}
-
-function buildYearOptions(monthsBack: number, currentValue: string) {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const oldestDate = new Date(currentYear, now.getMonth() - Math.max(monthsBack - 1, 0), 1);
-    const oldestYear = oldestDate.getFullYear();
-    const [selectedYear] = currentValue.split('-').map(Number);
-    const endYear = Number.isFinite(selectedYear) ? Math.min(oldestYear, selectedYear) : oldestYear;
-    const years: number[] = [];
-
-    for (let year = currentYear; year >= endYear; year -= 1) {
-        years.push(year);
-    }
-
-    return years;
 }

@@ -43,6 +43,7 @@ type Props = {
         severity?: string | null;
         status?: string | null;
         anomaly_type?: string | null;
+        year?: string | null;
         month?: string | null;
         from_date?: string | null;
         to_date?: string | null;
@@ -52,6 +53,7 @@ type Props = {
         severities: string[];
         statuses: string[];
         anomaly_types: string[];
+        years: number[];
     };
     totals: {
         anomaly_count: number;
@@ -102,6 +104,7 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
     const [form, setForm] = useState({
         office_id: filters.office_id ? String(filters.office_id) : '',
         status: filters.status ?? '',
+        year: filters.year ?? '',
         month: filters.month ?? '',
     });
 
@@ -109,17 +112,19 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
         setForm({
             office_id: filters.office_id ? String(filters.office_id) : '',
             status: filters.status ?? '',
+            year: filters.year ?? '',
             month: filters.month ?? '',
         });
-    }, [filters.month, filters.office_id, filters.status]);
+    }, [filters.month, filters.office_id, filters.status, filters.year]);
 
     const activeFilters = useMemo(
         () => ({
             office_id: form.office_id,
             status: form.status,
+            year: form.year,
             month: form.month,
         }),
-        [form.month, form.office_id, form.status],
+        [form.month, form.office_id, form.status, form.year],
     );
 
     useEffect(() => {
@@ -212,7 +217,7 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
 
                 <section className="rounded-2xl border border-red-200 bg-white p-5 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
                     <div className="flex flex-wrap items-end gap-3">
-                        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                             <select
                                 className="h-10 rounded-lg border-slate-300 text-sm"
                                 value={form.office_id}
@@ -241,8 +246,11 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
 
                             <MonthFilterSelect
                                 className="h-10 rounded-lg border-slate-300 text-sm"
-                                value={form.month}
-                                onChange={(value) => setForm((current) => ({ ...current, month: value }))}
+                                month={form.month}
+                                year={form.year}
+                                yearOptions={filter_options.years}
+                                onMonthChange={(value) => setForm((current) => ({ ...current, month: value }))}
+                                onYearChange={(value) => setForm((current) => ({ ...current, year: value }))}
                             />
                         </div>
 

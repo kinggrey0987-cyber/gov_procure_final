@@ -18,14 +18,15 @@ type Props = {
         data: AnomalyRow[];
         links: Array<{ url: string | null; label: string; active: boolean }>;
     };
-    filters: { status?: string; severity?: string; anomaly_type?: string; month?: string; search?: string };
-    filter_options: { anomaly_types: string[] };
+    filters: { status?: string; severity?: string; anomaly_type?: string; year?: string; month?: string; search?: string };
+    filter_options: { anomaly_types: string[]; years: number[] };
 };
 
 export default function ExecutiveAnomalyIndex({ anomalies, filters, filter_options }: Props) {
     const [status, setStatus] = useState(filters.status ?? '');
     const [severity, setSeverity] = useState(filters.severity ?? '');
     const [anomalyType, setAnomalyType] = useState(filters.anomaly_type ?? '');
+    const [year, setYear] = useState(filters.year ?? '');
     const [month, setMonth] = useState(filters.month ?? '');
     const [search, setSearch] = useState(filters.search ?? '');
     const hasMountedRef = useRef(false);
@@ -36,19 +37,21 @@ export default function ExecutiveAnomalyIndex({ anomalies, filters, filter_optio
         setStatus(filters.status ?? '');
         setSeverity(filters.severity ?? '');
         setAnomalyType(filters.anomaly_type ?? '');
+        setYear(filters.year ?? '');
         setMonth(filters.month ?? '');
         setSearch(filters.search ?? '');
-    }, [filters.anomaly_type, filters.month, filters.search, filters.severity, filters.status]);
+    }, [filters.anomaly_type, filters.month, filters.search, filters.severity, filters.status, filters.year]);
 
     const activeFilters = useMemo(
         () => ({
             status,
             severity,
             anomaly_type: anomalyType,
+            year,
             month,
             search: debouncedSearch,
         }),
-        [status, severity, anomalyType, month, debouncedSearch],
+        [status, severity, anomalyType, year, month, debouncedSearch],
     );
 
     useEffect(() => {
@@ -71,7 +74,7 @@ export default function ExecutiveAnomalyIndex({ anomalies, filters, filter_optio
 
             <div className="py-10">
                 <div className="mx-auto max-w-6xl space-y-4 px-4 sm:px-6 lg:px-8">
-                    <div className="grid gap-2 rounded-xl border bg-white p-3 md:grid-cols-5">
+                    <div className="grid gap-2 rounded-xl border bg-white p-3 md:grid-cols-6">
                         <select
                             className="rounded border px-3 py-2 text-sm"
                             value={status}
@@ -100,8 +103,11 @@ export default function ExecutiveAnomalyIndex({ anomalies, filters, filter_optio
                         </select>
                         <MonthFilterSelect
                             className="rounded border px-3 py-2 text-sm"
-                            value={month}
-                            onChange={setMonth}
+                            month={month}
+                            year={year}
+                            yearOptions={filter_options.years}
+                            onMonthChange={setMonth}
+                            onYearChange={setYear}
                         />
                         <input
                             className="rounded border px-3 py-2 text-sm"

@@ -1,6 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PaginationNav from '@/Components/PaginationNav';
-import MonthFilterSelect from '@/Components/MonthFilterSelect';
 import { Head, Link, router } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -17,21 +16,27 @@ type Props = {
     ppmps: { data: PpmpRow[]; links: Array<{ url: string | null; label: string; active: boolean }> };
     filters?: {
         status?: string;
+        year?: string;
         month?: string;
+    };
+    filter_options?: {
+        years: number[];
     };
 };
 
-export default function PpmpIndex({ ppmps, filters }: Props) {
+export default function PpmpIndex({ ppmps, filters, filter_options }: Props) {
     const [status, setStatus] = useState(filters?.status ?? '');
+    const [year, setYear] = useState(filters?.year ?? '');
     const [month, setMonth] = useState(filters?.month ?? '');
     const hasMountedRef = useRef(false);
 
     useEffect(() => {
         setStatus(filters?.status ?? '');
+        setYear(filters?.year ?? '');
         setMonth(filters?.month ?? '');
-    }, [filters?.month, filters?.status]);
+    }, [filters?.month, filters?.status, filters?.year]);
 
-    const activeFilters = useMemo(() => ({ status, month }), [month, status]);
+    const activeFilters = useMemo(() => ({ status, year, month }), [month, status, year]);
 
     useEffect(() => {
         if (!hasMountedRef.current) {
@@ -70,7 +75,7 @@ export default function PpmpIndex({ ppmps, filters }: Props) {
                 <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="border-b border-slate-200 px-6 py-4">
                         <h4 className="text-lg font-semibold text-slate-800">PPMP List</h4>
-                        <div className="mt-3 grid gap-2 md:grid-cols-3">
+                        <div className="mt-3 grid gap-2 md:grid-cols-4">
                             <select
                                 value={status}
                                 onChange={(event) => setStatus(event.target.value)}
@@ -81,11 +86,43 @@ export default function PpmpIndex({ ppmps, filters }: Props) {
                                     <option key={option} value={option}>{option.replaceAll('_', ' ')}</option>
                                 ))}
                             </select>
-                            <MonthFilterSelect
-                                value={month}
-                                onChange={setMonth}
+                            <select
+                                value={year}
+                                onChange={(event) => setYear(event.target.value)}
                                 className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                            />
+                            >
+                                <option value="">All years</option>
+                                {(filter_options?.years ?? []).map((option) => (
+                                    <option key={option} value={option}>
+                                        {option}
+                                    </option>
+                                ))}
+                            </select>
+                            <select
+                                value={month}
+                                onChange={(event) => setMonth(event.target.value)}
+                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                            >
+                                <option value="">All months</option>
+                                {[
+                                    ['01', 'January'],
+                                    ['02', 'February'],
+                                    ['03', 'March'],
+                                    ['04', 'April'],
+                                    ['05', 'May'],
+                                    ['06', 'June'],
+                                    ['07', 'July'],
+                                    ['08', 'August'],
+                                    ['09', 'September'],
+                                    ['10', 'October'],
+                                    ['11', 'November'],
+                                    ['12', 'December'],
+                                ].map(([value, label]) => (
+                                    <option key={value} value={value}>
+                                        {label}
+                                    </option>
+                                ))}
+                            </select>
                             <button
                                 type="button"
                                 onClick={() => router.get(route('office.ppmp.index'))}

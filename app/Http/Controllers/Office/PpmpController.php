@@ -28,14 +28,26 @@ class PpmpController extends Controller
         abort_unless($request->user()?->can('office.ppmp.view-any'), 403);
 
         $status = strtoupper(trim((string) $request->input('status', '')));
+        $year = trim((string) $request->input('year', ''));
         $month = trim((string) $request->input('month', ''));
 
+        $officeId = (int) $request->user()?->office_id;
+
+        $yearOptions = Ppmp::query()
+            ->forOffice($officeId)
+            ->where('date_prepared', '!=', null)
+            ->selectRaw('DISTINCT YEAR(date_prepared) as year')
+            ->orderByDesc('year')
+            ->pluck('year')
+            ->map(fn ($value): int => (int) $value)
+            ->values();
+
         $ppmps = Ppmp::query()
-            ->forOffice((int) $request->user()?->office_id)
+            ->forOffice($officeId)
             ->when($status !== '', fn ($query) => $query->where('status', $status))
-            ->when(preg_match('/^\d{4}-\d{2}$/', $month) === 1, function ($query) use ($month): void {
-                [$year, $monthNumber] = array_map('intval', explode('-', $month));
-                $query->whereYear('date_prepared', $year)->whereMonth('date_prepared', $monthNumber);
+            ->when(preg_match('/^\d{4}$/', $year) === 1, fn ($query) => $query->whereYear('date_prepared', (int) $year))
+            ->when(preg_match('/^\d{1,2}$/', $month) === 1, function ($query) use ($month): void {
+                $query->whereMonth('date_prepared', (int) $month);
             })
             ->latest('ppmp_id')
             ->paginate(5)
@@ -52,7 +64,11 @@ class PpmpController extends Controller
             'ppmps' => $ppmps,
             'filters' => [
                 'status' => $status,
+                'year' => $year,
                 'month' => $month,
+            ],
+            'filter_options' => [
+                'years' => $yearOptions,
             ],
         ]);
     }
