@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import PaginationNav from '@/Components/PaginationNav';
 import { Head, Link, router } from '@inertiajs/react';
 
 type ReadyRecord = {
@@ -16,6 +17,11 @@ type ReadyRecord = {
 type Props = {
     records: {
         data: ReadyRecord[];
+        links: Array<{
+            url: string | null;
+            label: string;
+            active: boolean;
+        }>;
     };
 };
 
@@ -43,6 +49,7 @@ export default function SuppliesReadyForClaimIndex({ records }: Props) {
                 <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="border-b border-slate-200 px-6 py-4">
                         <h4 className="text-lg font-semibold text-slate-800">Ready Supply Records</h4>
+                        <p className="mt-1 text-xs text-slate-500">Showing up to 5 recent supply records on this page.</p>
                     </div>
 
                     {records.data.length === 0 ? (
@@ -113,6 +120,8 @@ export default function SuppliesReadyForClaimIndex({ records }: Props) {
                         </div>
                     )}
                 </section>
+
+                <PaginationNav links={records.links} preserveState={false} />
             </div>
         </AuthenticatedLayout>
     );

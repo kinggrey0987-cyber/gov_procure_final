@@ -21,7 +21,8 @@ class InventoryMovementController
         $movements = InventoryMovement::query()
             ->with(['inventory.item', 'performer'])
             ->recent()
-            ->paginate(25);
+            ->paginate(5)
+            ->withQueryString();
 
         $movements->setCollection(
             $movements->getCollection()->map(function (InventoryMovement $movement): array {

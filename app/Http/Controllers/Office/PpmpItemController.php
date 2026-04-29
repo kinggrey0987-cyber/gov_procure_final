@@ -25,7 +25,7 @@ class PpmpItemController extends Controller
 
         return Inertia::render('Office/PpmpItems/Index', [
             'ppmp' => $ppmp,
-            'items' => $ppmp->items()->latest('ppmp_item_id')->paginate(20),
+            'items' => $ppmp->items()->latest('ppmp_item_id')->paginate(5)->withQueryString(),
         ]);
     }
 

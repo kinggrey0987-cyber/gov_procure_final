@@ -23,7 +23,7 @@ class DistributionRecordController
 
     public function index(Request $request): Response
     {
-        abort_unless(auth()->user()->can('distribution.view-any'), 403);
+        abort_unless(request()->user()->can('distribution.view-any'), 403);
 
         $status = strtoupper(trim((string) $request->input('status', '')));
         $year = trim((string) $request->input('year', ''));
@@ -32,10 +32,10 @@ class DistributionRecordController
 
         $yearOptions = DistributionRecord::query()
             ->where('created_at', '!=', null)
-            ->selectRaw('DISTINCT YEAR(created_at) as year')
-            ->orderByDesc('year')
-            ->pluck('year')
-            ->map(fn ($value): int => (int) $value)
+            ->latest('created_at')
+            ->pluck('created_at')
+            ->map(fn ($value): int => (int) $value->year)
+            ->unique()
             ->values();
 
         $records = DistributionRecord::query()
@@ -73,78 +73,12 @@ class DistributionRecordController
 
     public function create(Request $request): Response
     {
-        abort_unless(auth()->user()->can('distribution.manage'), 403);
+        abort_unless($request->user()?->can('distribution.manage'), 403);
 
         $focusSupplyRequestId = (int) $request->query('supply_request_id', 0);
 
-        $procurementBackedRows = Delivery::query()
-            ->verified()
-            ->whereHas('purchaseOrder', function ($query): void {
-                $query->whereNotNull('supply_request_id')
-                    ->whereHas('supplyRequest.office', fn ($officeQuery) => $officeQuery->where('code', '!=', 'GSO'));
-            })
-            ->whereDoesntHave('distributionRecords')
-            ->with(['purchaseOrder.supplyRequest.office'])
-            ->latest('delivery_id')
-            ->get()
-            ->map(function (Delivery $delivery): ?array {
-                $supplyRequest = $delivery->purchaseOrder?->supplyRequest;
-
-                if (!$supplyRequest instanceof SupplyRequest) {
-                    return null;
-                }
-
-                return [
-                    'supply_request_id' => (int) $supplyRequest->supply_request_id,
-                    'request_code' => (string) $supplyRequest->request_code,
-                    'office_id' => (int) $supplyRequest->office_id,
-                    'office_name' => (string) ($supplyRequest->office?->name ?? 'Unknown Office'),
-                    'release_basis' => 'VERIFIED_DELIVERY',
-                    'release_basis_label' => 'From Verified Delivery',
-                    'delivery_id' => (int) $delivery->delivery_id,
-                    'delivery_code' => (string) $delivery->delivery_code,
-                    'receipt_status' => (string) $delivery->receipt_status,
-                    'releasable_reason' => null,
-                ];
-            })
-            ->filter()
-            ->values();
-
-        $inventoryBackedRows = SupplyRequest::query()
-            ->submitted()
-            ->whereHas('office', fn ($officeQuery) => $officeQuery->where('code', '!=', 'GSO'))
-            ->whereDoesntHave('distributionRecords')
-            ->with(['office', 'items.item.inventory'])
-            ->latest('supply_request_id')
-            ->get()
-            ->map(function (SupplyRequest $request): ?array {
-                $shortageTotal = 0.0;
-
-                foreach ($request->items as $item) {
-                    $requested = (float) $item->quantity_requested;
-                    $available = (float) ($item->item?->inventory?->available_stock ?? 0);
-                    $shortageTotal += max($requested - $available, 0);
-                }
-
-                if ($shortageTotal > 0) {
-                    return null;
-                }
-
-                return [
-                    'supply_request_id' => (int) $request->supply_request_id,
-                    'request_code' => (string) $request->request_code,
-                    'office_id' => (int) $request->office_id,
-                    'office_name' => (string) ($request->office?->name ?? 'Unknown Office'),
-                    'release_basis' => 'AVAILABLE_INVENTORY',
-                    'release_basis_label' => 'From Available Inventory',
-                    'delivery_id' => null,
-                    'delivery_code' => null,
-                    'receipt_status' => null,
-                    'releasable_reason' => null,
-                ];
-            })
-            ->filter()
-            ->values();
+        $procurementBackedRows = $this->procurementBackedReleaseRows();
+        $inventoryBackedRows = $this->inventoryBackedReleaseRows();
 
         /** @var Collection<int, array<string, mixed>> $eligibleRows */
         $eligibleRows = $inventoryBackedRows
@@ -173,6 +107,98 @@ class DistributionRecordController
             'focusSupplyRequestId' => $focusSupplyRequestId > 0 ? $focusSupplyRequestId : null,
             'focusReleasableReason' => $focusedReason,
         ]);
+    }
+
+    /**
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function procurementBackedReleaseRows(): Collection
+    {
+        return Delivery::query()
+            ->verified()
+            ->whereHas('purchaseOrder', function ($query): void {
+                $query->where('supply_request_id', '!=', null)
+                    ->whereHas('supplyRequest.office', fn ($officeQuery) => $officeQuery->where('code', '!=', 'GSO'));
+            })
+            ->whereDoesntHave('distributionRecords')
+            ->with(['purchaseOrder.supplyRequest.office'])
+            ->latest('delivery_id')
+            ->get()
+            ->map(fn (Delivery $delivery): ?array => $this->releaseRowFromVerifiedDelivery($delivery))
+            ->filter()
+            ->values();
+    }
+
+    private function releaseRowFromVerifiedDelivery(Delivery $delivery): ?array
+    {
+        $supplyRequest = $delivery->purchaseOrder?->supplyRequest;
+
+        if (!$supplyRequest instanceof SupplyRequest) {
+            return null;
+        }
+
+        return [
+            'supply_request_id' => (int) $supplyRequest->supply_request_id,
+            'request_code' => (string) $supplyRequest->request_code,
+            'office_id' => (int) $supplyRequest->office_id,
+            'office_name' => (string) ($supplyRequest->office?->name ?? 'Unknown Office'),
+            'release_basis' => 'VERIFIED_DELIVERY',
+            'release_basis_label' => 'From Verified Delivery',
+            'delivery_id' => (int) $delivery->delivery_id,
+            'delivery_code' => (string) $delivery->delivery_code,
+            'receipt_status' => (string) $delivery->receipt_status,
+            'releasable_reason' => null,
+        ];
+    }
+
+    /**
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function inventoryBackedReleaseRows(): Collection
+    {
+        return SupplyRequest::query()
+            ->submitted()
+            ->whereHas('office', fn ($officeQuery) => $officeQuery->where('code', '!=', 'GSO'))
+            ->whereDoesntHave('distributionRecords')
+            ->with(['office', 'items.item.inventory'])
+            ->latest('supply_request_id')
+            ->get()
+            ->map(fn (SupplyRequest $request): ?array => $this->releaseRowFromAvailableInventory($request))
+            ->filter()
+            ->values();
+    }
+
+    private function releaseRowFromAvailableInventory(SupplyRequest $request): ?array
+    {
+        if ($this->supplyRequestShortageTotal($request) > 0) {
+            return null;
+        }
+
+        return [
+            'supply_request_id' => (int) $request->supply_request_id,
+            'request_code' => (string) $request->request_code,
+            'office_id' => (int) $request->office_id,
+            'office_name' => (string) ($request->office?->name ?? 'Unknown Office'),
+            'release_basis' => 'AVAILABLE_INVENTORY',
+            'release_basis_label' => 'From Available Inventory',
+            'delivery_id' => null,
+            'delivery_code' => null,
+            'receipt_status' => null,
+            'releasable_reason' => null,
+        ];
+    }
+
+    private function supplyRequestShortageTotal(SupplyRequest $request): float
+    {
+        $shortageTotal = 0.0;
+
+        foreach ($request->items as $item) {
+            $requested = (float) $item->quantity_requested;
+            $available = (float) ($item->item?->inventory?->available_stock ?? 0);
+            $shortageTotal += max($requested - $available, 0);
+        }
+
+        return $shortageTotal;
     }
 
     private function resolveFocusReason(?SupplyRequest $request): ?string
@@ -223,9 +249,9 @@ class DistributionRecordController
 
     public function store(StoreDistributionRecordRequest $request): RedirectResponse
     {
-        abort_unless(auth()->user()->can('distribution.manage'), 403);
+        abort_unless(request()->user()->can('distribution.manage'), 403);
 
-        $record = $this->distributionService->createRecord(auth()->user(), $request->validated());
+        $record = $this->distributionService->createRecord(request()->user(), $request->validated());
 
         return Redirect::route('inventory.distribution-records.show', $record->distribution_record_id)
             ->with('success', 'Distribution record created successfully.');
@@ -233,7 +259,7 @@ class DistributionRecordController
 
     public function show(DistributionRecord $distribution_record): Response
     {
-        abort_unless(auth()->user()->can('distribution.view', $distribution_record), 403);
+        abort_unless(request()->user()->can('distribution.view', $distribution_record), 403);
 
         $distribution_record->load([
             'items.item.category',
@@ -324,7 +350,7 @@ class DistributionRecordController
 
     public function manageItems(DistributionRecord $distribution_record): Response
     {
-        abort_unless(auth()->user()->can('distribution.manage', $distribution_record), 403);
+        abort_unless(request()->user()->can('distribution.manage', $distribution_record), 403);
 
         $distribution_record->load('items');
 
@@ -335,7 +361,7 @@ class DistributionRecordController
 
     public function edit(DistributionRecord $distribution_record): Response
     {
-        abort_unless(auth()->user()->can('distribution.manage', $distribution_record), 403);
+        abort_unless(request()->user()->can('distribution.manage', $distribution_record), 403);
 
         return Inertia::render('Inventory/Distribution/Edit', [
             'record' => $distribution_record,
@@ -344,9 +370,9 @@ class DistributionRecordController
 
     public function update(UpdateDistributionRecordRequest $request, DistributionRecord $distribution_record): RedirectResponse
     {
-        abort_unless(auth()->user()->can('distribution.manage', $distribution_record), 403);
+        abort_unless(request()->user()->can('distribution.manage', $distribution_record), 403);
 
-        $this->distributionService->updateRecord($distribution_record, auth()->user(), $request->validated());
+        $this->distributionService->updateRecord($distribution_record, request()->user(), $request->validated());
 
         return Redirect::route('inventory.distribution-records.show', $distribution_record->distribution_record_id)
             ->with('success', 'Distribution record updated successfully.');
@@ -354,11 +380,11 @@ class DistributionRecordController
 
     public function receive(DistributionRecord $distribution_record): RedirectResponse
     {
-        abort_unless(auth()->user()->can('distribution.receive', $distribution_record), 403);
+        abort_unless(request()->user()->can('distribution.receive', $distribution_record), 403);
 
-        $this->distributionService->markReceivedByOffice($distribution_record, auth()->user());
+        $this->distributionService->markReceivedByOffice($distribution_record, request()->user());
 
-        $routeName = auth()->user()->isOfficeUser()
+        $routeName = request()->user()->isOfficeUser()
             ? 'office.distribution-records.show'
             : 'inventory.distribution-records.show';
 

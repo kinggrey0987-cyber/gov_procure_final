@@ -17,7 +17,7 @@ type DeliveryRow = {
         supplier_name?: string;
     };
     receiver?: {
-        full_name?: string;
+        name?: string;
     };
 };
 
@@ -177,7 +177,7 @@ export default function DeliveryIndex({ deliveries, filters, filter_options }: P
                                     <td className="px-4 py-3">
                                         <span className={statusClass(delivery.receipt_status)}>{delivery.receipt_status}</span>
                                     </td>
-                                    <td className="px-4 py-3 text-slate-700">{delivery.receiver?.full_name ?? '-'}</td>
+                                    <td className="px-4 py-3 text-slate-700">{delivery.receiver?.name ?? '-'}</td>
                                     <td className="px-4 py-3 text-slate-600">{new Date(delivery.created_at).toLocaleDateString()}</td>
                                     <td className="px-4 py-3 text-right">
                                         <div className="flex justify-end gap-3">

@@ -15,7 +15,9 @@ class ItemCategoryController
 {
     public function index(Request $request): Response
     {
-        abort_unless(auth()->user()->can('inventory.catalog.view-any'), 403);
+        $user = $request->user();
+
+        abort_unless($user?->can('inventory.catalog.view-any'), 403);
 
         $query = ItemCategory::query()->withCount('items')->latest('item_category_id');
 
@@ -30,25 +32,25 @@ class ItemCategoryController
         }
 
         return Inertia::render('Inventory/ItemCategories/Index', [
-            'categories' => $query->paginate(15)->withQueryString(),
+            'categories' => $query->paginate(5)->withQueryString(),
             'filters' => [
                 'q' => $search,
                 'status' => $status,
             ],
-            'canManage' => auth()->user()->can('inventory.catalog.manage'),
+            'canManage' => $user?->can('inventory.catalog.manage') ?? false,
         ]);
     }
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
-        abort_unless(auth()->user()->can('inventory.catalog.manage'), 403);
+        abort_unless($request->user()?->can('inventory.catalog.manage'), 403);
 
         return Inertia::render('Inventory/ItemCategories/Create');
     }
 
     public function store(StoreItemCategoryRequest $request): RedirectResponse
     {
-        abort_unless(auth()->user()->can('inventory.catalog.manage'), 403);
+        abort_unless($request->user()?->can('inventory.catalog.manage'), 403);
 
         $category = ItemCategory::query()->create($request->validated());
 
@@ -56,9 +58,11 @@ class ItemCategoryController
             ->with('success', 'Item category created successfully.');
     }
 
-    public function show(ItemCategory $item_category): Response
+    public function show(Request $request, ItemCategory $item_category): Response
     {
-        abort_unless(auth()->user()->can('inventory.catalog.view-any'), 403);
+        $user = $request->user();
+
+        abort_unless($user?->can('inventory.catalog.view-any'), 403);
 
         $item_category->loadCount('items');
 
@@ -73,13 +77,13 @@ class ItemCategoryController
                 'created_at' => optional($item_category->created_at)?->toIso8601String(),
                 'updated_at' => optional($item_category->updated_at)?->toIso8601String(),
             ],
-            'canManage' => auth()->user()->can('inventory.catalog.manage'),
+            'canManage' => $user?->can('inventory.catalog.manage') ?? false,
         ]);
     }
 
-    public function edit(ItemCategory $item_category): Response
+    public function edit(Request $request, ItemCategory $item_category): Response
     {
-        abort_unless(auth()->user()->can('inventory.catalog.manage'), 403);
+        abort_unless($request->user()?->can('inventory.catalog.manage'), 403);
 
         return Inertia::render('Inventory/ItemCategories/Edit', [
             'category' => [
@@ -94,7 +98,7 @@ class ItemCategoryController
 
     public function update(UpdateItemCategoryRequest $request, ItemCategory $item_category): RedirectResponse
     {
-        abort_unless(auth()->user()->can('inventory.catalog.manage'), 403);
+        abort_unless($request->user()?->can('inventory.catalog.manage'), 403);
 
         $item_category->fill($request->validated())->save();
 
@@ -102,9 +106,9 @@ class ItemCategoryController
             ->with('success', 'Item category updated successfully.');
     }
 
-    public function toggleStatus(ItemCategory $item_category): RedirectResponse
+    public function toggleStatus(Request $request, ItemCategory $item_category): RedirectResponse
     {
-        abort_unless(auth()->user()->can('inventory.catalog.manage'), 403);
+        abort_unless($request->user()?->can('inventory.catalog.manage'), 403);
 
         $item_category->forceFill([
             'status' => (string) $item_category->status === 'active' ? 'inactive' : 'active',

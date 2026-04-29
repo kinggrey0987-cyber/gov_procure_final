@@ -84,7 +84,7 @@ class AuthenticatedSessionController extends Controller
             'two_factor.remember',
         ]);
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        return redirect()->route('dashboard');
     }
 
     /**

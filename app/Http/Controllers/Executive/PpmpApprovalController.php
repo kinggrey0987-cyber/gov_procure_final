@@ -91,18 +91,35 @@ class PpmpApprovalController extends Controller
 
         $summary = [
             'pending_ppmp_approvals' => Ppmp::query()
-                ->whereIn('status', DashboardStatusGroups::executivePendingPpmpStatuses())
+                ->where(function ($query): void {
+                    foreach (DashboardStatusGroups::executivePendingPpmpStatuses() as $index => $status) {
+                        if ($index === 0) {
+                            $query->where('status', $status);
+
+                            continue;
+                        }
+
+                        $query->orWhere('status', $status);
+                    }
+                })
                 ->count(),
             'returned_for_revision' => Ppmp::query()->where('status', 'RETURNED_FOR_REVISION')->count(),
             'recently_approved' => Ppmp::query()->where('status', 'APPROVED')->whereDate('updated_at', '>=', now()->subDays(30)->toDateString())->count(),
             'rejected' => Ppmp::query()->where('status', 'REJECTED')->count(),
         ];
 
-        $officeBreakdown = Ppmp::query()
-            ->join('offices', 'offices.id', '=', 'ppmp.office_id')
-            ->whereIn('ppmp.status', ['SUBMITTED', 'APPROVED', 'REJECTED', 'RETURNED_FOR_REVISION'])
-            ->selectRaw('offices.id as office_id, offices.name as office_name, COUNT(*) as total')
-            ->groupBy('offices.id', 'offices.name')
+        $officeBreakdown = Office::query()
+            ->select(['offices.id as office_id', 'offices.name as office_name'])
+            ->withCount([
+                'ppmps as total' => function ($query): void {
+                    $query->where(function ($statusQuery): void {
+                        $statusQuery->where('status', 'SUBMITTED')
+                            ->orWhere('status', 'APPROVED')
+                            ->orWhere('status', 'REJECTED')
+                            ->orWhere('status', 'RETURNED_FOR_REVISION');
+                    });
+                },
+            ])
             ->orderByDesc('total')
             ->limit(10)
             ->get();
@@ -142,14 +159,14 @@ class PpmpApprovalController extends Controller
                 'search' => $filters['search'] ?? null,
             ],
             'filter_options' => [
-                'offices' => Office::query()->select(['id', 'name'])->orderBy('name')->get(),
+                'offices' => Office::query()->select(['id', 'name'])->orderBy('name', 'asc')->get(),
                 'statuses' => ['SUBMITTED', 'APPROVED', 'REJECTED', 'RETURNED_FOR_REVISION'],
                 'years' => Ppmp::query()
                     ->where('date_prepared', '!=', null)
-                    ->selectRaw('DISTINCT YEAR(date_prepared) as year')
-                    ->orderByDesc('year')
-                    ->pluck('year')
-                    ->map(fn ($value): int => (int) $value)
+                    ->latest('date_prepared')
+                    ->pluck('date_prepared')
+                    ->map(fn ($value): int => (int) $value->year)
+                    ->unique()
                     ->values(),
             ],
             'office_breakdown' => $officeBreakdown,
@@ -168,65 +185,10 @@ class PpmpApprovalController extends Controller
         ]);
 
         $history = $this->historyTimelineService->forRecord($request->user(), $ppmp);
-
-        $attachments = $this->documentService
-            ->listForRelated($request->user(), 'ppmp', (int) $ppmp->ppmp_id)
-            ->map(fn ($document): array => [
-                'document_id' => (int) $document->document_id,
-                'title' => (string) $document->title,
-                'file_name' => (string) $document->file_name,
-                'uploaded_at' => optional($document->uploaded_at)?->toIso8601String(),
-                'uploaded_by' => (int) $document->uploaded_by,
-                'uploader_name' => $document->uploader?->name,
-            ])->values();
-
-        $categorySummary = collect($ppmp->items)
-            ->groupBy('item_category_id')
-            ->map(fn ($items, $categoryId): array => [
-                'item_category_id' => (int) $categoryId,
-                'items_count' => $items->count(),
-                'estimated_budget_total' => (float) $items->sum('estimated_budget'),
-            ])
-            ->sortByDesc('estimated_budget_total')
-            ->values();
-
-        $submittedAt = DB::table('status_history')
-            ->where('reference_type', Ppmp::class)
-            ->where('reference_id', (int) $ppmp->ppmp_id)
-            ->where('new_status', 'SUBMITTED')
-            ->max('changed_at');
-
-        $workflowTimeline = $history['status']
-            ->filter(function ($entry): bool {
-                $newStatus = strtoupper((string) ($entry->new_status ?? ''));
-                $oldStatus = strtoupper((string) ($entry->old_status ?? ''));
-
-                if ($newStatus === '') {
-                    return false;
-                }
-
-                if ($newStatus === 'DRAFT') {
-                    return $oldStatus === '';
-                }
-
-                if ($oldStatus === $newStatus) {
-                    return false;
-                }
-
-                return in_array($newStatus, ['SUBMITTED', 'APPROVED', 'REJECTED', 'RETURNED_FOR_REVISION'], true);
-            })
-            ->map(fn ($entry): array => [
-                'id' => (int) $entry->id,
-                'old_status' => $entry->old_status,
-                'new_status' => (string) $entry->new_status,
-                'remarks' => $entry->remarks,
-                'changed_at' => optional($entry->changed_at)?->toIso8601String(),
-                'changed_by' => $entry->changedBy ? [
-                    'id' => (int) $entry->changedBy->id,
-                    'name' => (string) $entry->changedBy->name,
-                ] : null,
-            ])
-            ->values();
+        $attachments = $this->approvalAttachments($request, $ppmp);
+        $categorySummary = $this->approvalCategorySummary($ppmp);
+        $submittedAt = $this->ppmpSubmittedAt($ppmp);
+        $workflowTimeline = $this->approvalWorkflowTimeline($history['status']);
 
         return Inertia::render('Executive/Approvals/Show', [
             'ppmp' => [
@@ -262,6 +224,81 @@ class PpmpApprovalController extends Controller
             'workflowTimeline' => $workflowTimeline,
             'canSignoff' => $request->user()?->can('executive.ppmp-approval.signoff', $ppmp) ?? false,
         ]);
+    }
+
+    private function approvalAttachments(Request $request, Ppmp $ppmp)
+    {
+        return $this->documentService
+            ->listForRelated($request->user(), 'ppmp', (int) $ppmp->ppmp_id)
+            ->map(fn ($document): array => [
+                'document_id' => (int) $document->document_id,
+                'title' => (string) $document->title,
+                'file_name' => (string) $document->file_name,
+                'uploaded_at' => optional($document->uploaded_at)?->toIso8601String(),
+                'uploaded_by' => (int) $document->uploaded_by,
+                'uploader_name' => $document->uploader?->name,
+            ])
+            ->values();
+    }
+
+    private function approvalCategorySummary(Ppmp $ppmp)
+    {
+        return collect($ppmp->items)
+            ->groupBy('item_category_id')
+            ->map(fn ($items, $categoryId): array => [
+                'item_category_id' => (int) $categoryId,
+                'items_count' => $items->count(),
+                'estimated_budget_total' => (float) $items->sum('estimated_budget'),
+            ])
+            ->sortByDesc('estimated_budget_total')
+            ->values();
+    }
+
+    private function ppmpSubmittedAt(Ppmp $ppmp): mixed
+    {
+        return DB::table('status_history')
+            ->where('reference_type', Ppmp::class)
+            ->where('reference_id', (int) $ppmp->ppmp_id)
+            ->where('new_status', 'SUBMITTED')
+            ->max('changed_at');
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, mixed>  $statusHistory
+     */
+    private function approvalWorkflowTimeline($statusHistory)
+    {
+        return $statusHistory
+            ->filter(function ($entry): bool {
+                $newStatus = strtoupper((string) ($entry->new_status ?? ''));
+                $oldStatus = strtoupper((string) ($entry->old_status ?? ''));
+
+                if ($newStatus === '') {
+                    return false;
+                }
+
+                if ($newStatus === 'DRAFT') {
+                    return $oldStatus === '';
+                }
+
+                if ($oldStatus === $newStatus) {
+                    return false;
+                }
+
+                return in_array($newStatus, ['SUBMITTED', 'APPROVED', 'REJECTED', 'RETURNED_FOR_REVISION'], true);
+            })
+            ->map(fn ($entry): array => [
+                'id' => (int) $entry->id,
+                'old_status' => $entry->old_status,
+                'new_status' => (string) $entry->new_status,
+                'remarks' => $entry->remarks,
+                'changed_at' => optional($entry->changed_at)?->toIso8601String(),
+                'changed_by' => $entry->changedBy ? [
+                    'id' => (int) $entry->changedBy->id,
+                    'name' => (string) $entry->changedBy->name,
+                ] : null,
+            ])
+            ->values();
     }
 
     public function updateStatus(UpdatePpmpApprovalStatusRequest $request, Ppmp $ppmp): RedirectResponse

@@ -37,10 +37,10 @@ class SupplyRequestController extends Controller
         $yearOptions = SupplyRequest::query()
             ->forOffice((int) $request->user()?->office_id)
             ->where('request_date', '!=', null)
-            ->selectRaw('DISTINCT YEAR(request_date) as year')
-            ->orderByDesc('year')
-            ->pluck('year')
-            ->map(fn ($value): int => (int) $value)
+            ->latest('request_date')
+            ->pluck('request_date')
+            ->map(fn ($value): int => (int) $value->year)
+            ->unique()
             ->values();
 
         $supplyRequests = SupplyRequest::query()
@@ -140,59 +140,9 @@ class SupplyRequestController extends Controller
 
         $requiresProcurement = $this->requiresProcurement($supplyRequest);
         $trackingStatus = $this->resolveTrackingStatus($supplyRequest, $requiresProcurement);
-
-        $ppmpItemContext = (int) $supplyRequest->ppmp_id > 0
-            ? collect($this->service->ppmpItemOptionsForRequestContext((int) $supplyRequest->office_id, (int) $supplyRequest->ppmp_id))
-                ->keyBy('ppmp_item_id')
-            : collect();
-
-        $supplyRequestData = [
-            'supply_request_id' => (int) $supplyRequest->supply_request_id,
-            'office_id' => (int) $supplyRequest->office_id,
-            'ppmp_id' => $supplyRequest->ppmp_id ? (int) $supplyRequest->ppmp_id : null,
-            'request_code' => (string) $supplyRequest->request_code,
-            'status' => $trackingStatus,
-            'raw_status' => (string) $supplyRequest->status,
-            'request_date' => optional($supplyRequest->request_date)?->toDateString(),
-            'needed_by_date' => optional($supplyRequest->needed_by_date)?->toDateString(),
-            'request_category' => (string) $supplyRequest->request_category,
-            'purpose' => (string) $supplyRequest->purpose,
-            'priority_level' => (string) $supplyRequest->priority_level,
-            'review_notes' => $supplyRequest->review_notes,
-            'items' => $supplyRequest->items->map(function ($item) use ($ppmpItemContext): array {
-                $context = $ppmpItemContext->get((int) $item->ppmp_item_id, []);
-
-                return [
-                    'supply_request_item_id' => (int) $item->supply_request_item_id,
-                    'ppmp_item_id' => (int) $item->ppmp_item_id,
-                    'item_name_snapshot' => (string) ($item->item_name_snapshot ?? ''),
-                    'quantity_requested' => (float) $item->quantity_requested,
-                    'planned_quantity' => isset($context['planned_quantity']) ? (float) $context['planned_quantity'] : null,
-                    'already_requested_quantity' => isset($context['requested_quantity']) ? (float) $context['requested_quantity'] : null,
-                    'remaining_quantity' => isset($context['remaining_quantity']) ? (float) $context['remaining_quantity'] : null,
-                    'over_requested_quantity' => isset($context['over_requested_quantity']) ? (float) $context['over_requested_quantity'] : null,
-                    'exceeds_ppmp_allocation' => isset($context['over_requested_quantity'])
-                        ? (float) $context['over_requested_quantity'] > 0
-                        : false,
-                ];
-            })->values()->all(),
-            'processing_timeline' => $this->buildProcessingTimeline($trackingStatus, $requiresProcurement),
-        ];
-
         $history = $this->historyTimelineService->forRecord($request->user(), $supplyRequest);
-
-        $distributionRecords = DistributionRecord::query()
-            ->where('supply_request_id', (int) $supplyRequest->supply_request_id)
-            ->whereIn('status', ['RELEASED', 'RECEIVED'])
-            ->latest('distribution_record_id')
-            ->get(['distribution_record_id', 'status', 'storage_location', 'release_date'])
-            ->map(fn (DistributionRecord $record): array => [
-                'distribution_record_id' => (int) $record->distribution_record_id,
-                'status' => (string) $record->status,
-                'storage_location' => (string) ($record->storage_location ?? ''),
-                'release_date' => optional($record->release_date)?->toDateString(),
-            ])
-            ->values();
+        $supplyRequestData = $this->showPayload($supplyRequest, $trackingStatus, $requiresProcurement);
+        $distributionRecords = $this->releasedDistributionRecords($supplyRequest);
 
         $canEdit = $request->user()?->can('office.supply-request.update', $supplyRequest) ?? false;
         $canSubmit = $request->user()?->can('office.supply-request.submit', $supplyRequest) ?? false;
@@ -224,6 +174,81 @@ class SupplyRequestController extends Controller
                 ] : null,
             ])->values(),
         ]);
+    }
+
+    private function showPayload(SupplyRequest $supplyRequest, string $trackingStatus, bool $requiresProcurement): array
+    {
+        $ppmpItemContext = $this->ppmpItemContext($supplyRequest);
+
+        return [
+            'supply_request_id' => (int) $supplyRequest->supply_request_id,
+            'office_id' => (int) $supplyRequest->office_id,
+            'ppmp_id' => $supplyRequest->ppmp_id ? (int) $supplyRequest->ppmp_id : null,
+            'request_code' => (string) $supplyRequest->request_code,
+            'status' => $trackingStatus,
+            'raw_status' => (string) $supplyRequest->status,
+            'request_date' => optional($supplyRequest->request_date)?->toDateString(),
+            'needed_by_date' => optional($supplyRequest->needed_by_date)?->toDateString(),
+            'request_category' => (string) $supplyRequest->request_category,
+            'purpose' => (string) $supplyRequest->purpose,
+            'priority_level' => (string) $supplyRequest->priority_level,
+            'review_notes' => $supplyRequest->review_notes,
+            'items' => $this->mappedSupplyRequestItems($supplyRequest, $ppmpItemContext),
+            'processing_timeline' => $this->buildProcessingTimeline($trackingStatus, $requiresProcurement),
+        ];
+    }
+
+    private function ppmpItemContext(SupplyRequest $supplyRequest)
+    {
+        if ((int) $supplyRequest->ppmp_id <= 0) {
+            return collect();
+        }
+
+        return collect($this->service->ppmpItemOptionsForRequestContext((int) $supplyRequest->office_id, (int) $supplyRequest->ppmp_id))
+            ->keyBy('ppmp_item_id');
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, array<string, mixed>>  $ppmpItemContext
+     */
+    private function mappedSupplyRequestItems(SupplyRequest $supplyRequest, $ppmpItemContext): array
+    {
+        return $supplyRequest->items
+            ->map(function ($item) use ($ppmpItemContext): array {
+                $context = $ppmpItemContext->get((int) $item->ppmp_item_id, []);
+
+                return [
+                    'supply_request_item_id' => (int) $item->supply_request_item_id,
+                    'ppmp_item_id' => (int) $item->ppmp_item_id,
+                    'item_name_snapshot' => (string) ($item->item_name_snapshot ?? ''),
+                    'quantity_requested' => (float) $item->quantity_requested,
+                    'planned_quantity' => isset($context['planned_quantity']) ? (float) $context['planned_quantity'] : null,
+                    'already_requested_quantity' => isset($context['requested_quantity']) ? (float) $context['requested_quantity'] : null,
+                    'remaining_quantity' => isset($context['remaining_quantity']) ? (float) $context['remaining_quantity'] : null,
+                    'over_requested_quantity' => isset($context['over_requested_quantity']) ? (float) $context['over_requested_quantity'] : null,
+                    'exceeds_ppmp_allocation' => isset($context['over_requested_quantity'])
+                        ? (float) $context['over_requested_quantity'] > 0
+                        : false,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function releasedDistributionRecords(SupplyRequest $supplyRequest)
+    {
+        return DistributionRecord::query()
+            ->where('supply_request_id', (int) $supplyRequest->supply_request_id)
+            ->whereIn('status', ['RELEASED', 'RECEIVED'])
+            ->latest('distribution_record_id')
+            ->get(['distribution_record_id', 'status', 'storage_location', 'release_date'])
+            ->map(fn (DistributionRecord $record): array => [
+                'distribution_record_id' => (int) $record->distribution_record_id,
+                'status' => (string) $record->status,
+                'storage_location' => (string) ($record->storage_location ?? ''),
+                'release_date' => optional($record->release_date)?->toDateString(),
+            ])
+            ->values();
     }
 
     private function requiresProcurement(SupplyRequest $supplyRequest): bool
@@ -437,7 +462,7 @@ class SupplyRequestController extends Controller
             ->forOffice($officeId)
             ->whereIn('status', ['RELEASED', 'RECEIVED'])
             ->latest('distribution_record_id')
-            ->paginate(15)
+            ->paginate(5)
             ->through(fn (DistributionRecord $record): array => [
                 'distribution_record_id' => (int) $record->distribution_record_id,
                 'request_id' => (string) ($record->supplyRequest?->request_code ?? 'N/A'),
@@ -448,7 +473,8 @@ class SupplyRequestController extends Controller
                 'ready_since' => optional($record->release_date)?->toDateString(),
                 'status' => (string) $record->status,
                 'supply_request_id' => (int) ($record->supply_request_id ?? 0),
-            ]);
+            ])
+            ->withQueryString();
 
         return Inertia::render('Office/SuppliesReadyForClaim/Index', [
             'records' => $records,

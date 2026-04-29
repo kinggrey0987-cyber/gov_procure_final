@@ -36,10 +36,10 @@ class PpmpController extends Controller
         $yearOptions = Ppmp::query()
             ->forOffice($officeId)
             ->where('date_prepared', '!=', null)
-            ->selectRaw('DISTINCT YEAR(date_prepared) as year')
-            ->orderByDesc('year')
-            ->pluck('year')
-            ->map(fn ($value): int => (int) $value)
+            ->latest('date_prepared')
+            ->pluck('date_prepared')
+            ->map(fn ($value): int => (int) $value->year)
+            ->unique()
             ->values();
 
         $ppmps = Ppmp::query()
@@ -161,7 +161,7 @@ class PpmpController extends Controller
     {
         return Item::query()
             ->with('category:item_category_id,category_name')
-            ->orderBy('item_name')
+            ->orderBy('item_name', 'asc')
             ->get(['item_id', 'item_category_id', 'item_name'])
             ->map(fn (Item $item): array => [
                 'item_id' => (int) $item->item_id,

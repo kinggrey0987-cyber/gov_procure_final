@@ -25,7 +25,7 @@ class SupplyRequestItemController extends Controller
 
         return Inertia::render('Office/SupplyRequestItems/Index', [
             'supplyRequest' => $supplyRequest,
-            'items' => $supplyRequest->items()->latest('supply_request_item_id')->paginate(20),
+            'items' => $supplyRequest->items()->latest('supply_request_item_id')->paginate(5)->withQueryString(),
         ]);
     }
 

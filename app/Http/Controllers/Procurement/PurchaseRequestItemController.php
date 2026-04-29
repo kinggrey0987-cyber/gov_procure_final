@@ -25,7 +25,7 @@ class PurchaseRequestItemController extends Controller
 
         return Inertia::render('Procurement/PurchaseRequestItems/Index', [
             'purchaseRequest' => $purchaseRequest,
-            'items' => $purchaseRequest->items()->latest('purchase_request_item_id')->paginate(20),
+            'items' => $purchaseRequest->items()->latest('purchase_request_item_id')->paginate(5)->withQueryString(),
         ]);
     }
 

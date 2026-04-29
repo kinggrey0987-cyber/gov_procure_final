@@ -30,7 +30,7 @@ class TwoFactorChallengeController extends Controller
         }
 
         if (! $this->twoFactorService->requiresTwoFactor($user)) {
-            return redirect()->intended(route('dashboard', absolute: false));
+            return redirect()->route('dashboard');
         }
 
         $pendingUserId = (int) $request->session()->get('two_factor.user_id', 0);
@@ -38,7 +38,7 @@ class TwoFactorChallengeController extends Controller
         $verified = (bool) $request->session()->get('two_factor.verified', false);
 
         if ($verified && $pendingUserId === (int) $user->id) {
-            return redirect()->intended(route('dashboard', absolute: false));
+            return redirect()->route('dashboard');
         }
 
         if (! $pending || $pendingUserId !== (int) $user->id) {
@@ -126,7 +126,7 @@ class TwoFactorChallengeController extends Controller
             'two_factor.pending_expires_at',
         ]);
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        return redirect()->route('dashboard');
     }
 
     public function resend(Request $request): RedirectResponse

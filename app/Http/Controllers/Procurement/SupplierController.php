@@ -26,7 +26,8 @@ class SupplierController extends Controller
             ->with(['purchaseOrders.items.item.category'])
             ->withCount('purchaseOrders')
             ->latest('supplier_id')
-            ->paginate(15);
+            ->paginate(5)
+            ->withQueryString();
 
         $suppliers->setCollection(
             $suppliers->getCollection()->map(function (Supplier $supplier): Supplier {

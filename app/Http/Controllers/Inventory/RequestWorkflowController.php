@@ -12,7 +12,7 @@ use App\Services\Procurement\PurchaseRequestService;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -24,105 +24,11 @@ class RequestWorkflowController
 
     public function officeSupplyRequests(Request $request): Response
     {
-        abort_unless(Auth::user()?->can('inventory.view-any'), 403);
-
-        $query = SupplyRequest::query()
-            ->with(['office', 'requester', 'items.item.inventory', 'purchaseRequests'])
-            ->whereHas('office', fn ($officeQuery) => $officeQuery->where('code', '!=', 'GSO'))
-            ->withCount('distributionRecords')
-            ->latest('supply_request_id');
+        abort_unless($request->user()?->can('inventory.view-any'), 403);
 
         $search = trim((string) $request->query('q', ''));
-        if ($search !== '') {
-            $query->where(function ($builder) use ($search): void {
-                $builder
-                    ->where('request_code', 'like', '%'.$search.'%')
-                    ->orWhere('purpose', 'like', '%'.$search.'%')
-                    ->orWhereHas('office', fn ($officeQuery) => $officeQuery->where('name', 'like', '%'.$search.'%'));
-            });
-        }
-
         $officeId = (int) $request->query('office_id', 0);
-        if ($officeId > 0) {
-            $query->where('office_id', $officeId);
-        }
-
-        $rawRequests = $query->get();
-
-        $distributionReadySupplyRequestIds = Delivery::query()
-            ->verified()
-            ->whereDoesntHave('distributionRecords')
-            ->with('purchaseOrder:supply_request_id,purchase_order_id')
-            ->get()
-            ->map(fn (Delivery $delivery): ?int => $delivery->purchaseOrder?->supply_request_id)
-            ->filter()
-            ->map(fn ($id): int => (int) $id)
-            ->values()
-            ->all();
-
-        $distributionReadyLookup = array_flip($distributionReadySupplyRequestIds);
-
-        $rows = $rawRequests->map(function (SupplyRequest $request) use ($distributionReadyLookup): array {
-            $requestedTotal = 0.0;
-            $shortageTotal = 0.0;
-            $requestedItems = [];
-
-            foreach ($request->items as $item) {
-                $requested = (float) $item->quantity_requested;
-                $available = (float) ($item->item?->inventory?->available_stock ?? 0);
-
-                $requestedTotal += $requested;
-                $shortageTotal += max($requested - $available, 0);
-
-                $requestedItems[] = [
-                    'item_name' => (string) ($item->item?->item_name ?? $item->item_name_snapshot ?? 'Unknown Item'),
-                    'quantity_requested' => round($requested, 2),
-                    'unit' => (string) ($item->item?->default_unit ?? 'UNIT'),
-                ];
-            }
-
-            $hasPurchaseRequest = $request->purchaseRequests->isNotEmpty();
-            $stockAssessment = $shortageTotal > 0 ? 'SHORTAGE_REQUIRES_PROCUREMENT' : 'STOCK_READY';
-            $hasDistributionCandidate = isset($distributionReadyLookup[(int) $request->supply_request_id])
-                || (
-                    $stockAssessment === 'STOCK_READY'
-                    && ! $hasPurchaseRequest
-                    && (int) $request->distribution_records_count === 0
-                );
-
-            $workflowBucket = 'UNDER_VALIDATION';
-            if ($hasPurchaseRequest) {
-                $workflowBucket = 'QUEUED_FOR_PROCUREMENT';
-            } elseif ($stockAssessment === 'STOCK_READY' && (int) $request->distribution_records_count === 0) {
-                $workflowBucket = 'READY_FOR_DISTRIBUTION';
-            } elseif ($stockAssessment === 'STOCK_READY') {
-                $workflowBucket = 'STOCK_READY_AWAITING_RELEASE_CONTEXT';
-            }
-
-            return [
-                'supply_request_id' => (int) $request->supply_request_id,
-                'request_code' => (string) $request->request_code,
-                'status' => (string) $request->status,
-                'priority_level' => (string) $request->priority_level,
-                'needed_by_date' => optional($request->needed_by_date)?->toDateString(),
-                'office' => $request->office ? [
-                    'id' => (int) $request->office->id,
-                    'name' => (string) $request->office->name,
-                ] : null,
-                'requester' => $request->requester ? [
-                    'name' => (string) $request->requester->name,
-                ] : null,
-                'item_count' => $request->items->count(),
-                'requested_total' => round($requestedTotal, 2),
-                'shortage_total' => round($shortageTotal, 2),
-                'requested_items' => $requestedItems,
-                'stock_assessment' => $stockAssessment,
-                'has_purchase_request' => $hasPurchaseRequest,
-                'has_distribution_candidate' => $hasDistributionCandidate,
-                'distribution_records_count' => (int) $request->distribution_records_count,
-                'workflow_bucket' => $workflowBucket,
-            ];
-        });
+        $rows = $this->officeSupplyRequestRows($search, $officeId);
 
         $stockAssessmentFilter = trim((string) $request->query('stock_assessment', ''));
         if ($stockAssessmentFilter !== '') {
@@ -136,9 +42,145 @@ class RequestWorkflowController
 
         $rows = $rows->values();
 
+        $requests = $this->paginateOfficeSupplyRows($rows, $request);
+
+        return Inertia::render('Inventory/OfficeSupplyRequests/Index', [
+            'requests' => $requests,
+            'offices' => $this->officeOptions(),
+            'filters' => [
+                'q' => $search,
+                'office_id' => $officeId > 0 ? $officeId : null,
+                'stock_assessment' => $stockAssessmentFilter,
+                'workflow_bucket' => $workflowBucketFilter,
+                'page' => $requests->currentPage(),
+            ],
+        ]);
+    }
+
+    /**
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function officeSupplyRequestRows(string $search, int $officeId): Collection
+    {
+        $query = SupplyRequest::query()
+            ->with(['office', 'requester', 'items.item.inventory', 'purchaseRequests'])
+            ->whereHas('office', fn ($officeQuery) => $officeQuery->where('code', '!=', 'GSO'))
+            ->withCount('distributionRecords')
+            ->latest('supply_request_id');
+
+        if ($search !== '') {
+            $query->where(function ($builder) use ($search): void {
+                $builder
+                    ->where('request_code', 'like', '%'.$search.'%')
+                    ->orWhere('purpose', 'like', '%'.$search.'%')
+                    ->orWhereHas('office', fn ($officeQuery) => $officeQuery->where('name', 'like', '%'.$search.'%'));
+            });
+        }
+
+        if ($officeId > 0) {
+            $query->where('office_id', $officeId);
+        }
+
+        $distributionReadyLookup = $this->distributionReadySupplyRequestLookup();
+
+        return $query
+            ->get()
+            ->map(fn (SupplyRequest $request): array => $this->officeSupplyRequestRow($request, $distributionReadyLookup));
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function distributionReadySupplyRequestLookup(): array
+    {
+        $ids = Delivery::query()
+            ->verified()
+            ->whereDoesntHave('distributionRecords')
+            ->with('purchaseOrder:supply_request_id,purchase_order_id')
+            ->get()
+            ->map(fn (Delivery $delivery): ?int => $delivery->purchaseOrder?->supply_request_id)
+            ->filter()
+            ->map(fn ($id): int => (int) $id)
+            ->values()
+            ->all();
+
+        return array_flip($ids);
+    }
+
+    /**
+     * @param  array<int, int>  $distributionReadyLookup
+     * @return array<string, mixed>
+     */
+    private function officeSupplyRequestRow(SupplyRequest $request, array $distributionReadyLookup): array
+    {
+        $requestedTotal = 0.0;
+        $shortageTotal = 0.0;
+        $requestedItems = [];
+
+        foreach ($request->items as $item) {
+            $requested = (float) $item->quantity_requested;
+            $available = (float) ($item->item?->inventory?->available_stock ?? 0);
+
+            $requestedTotal += $requested;
+            $shortageTotal += max($requested - $available, 0);
+
+            $requestedItems[] = [
+                'item_name' => (string) ($item->item?->item_name ?? $item->item_name_snapshot ?? 'Unknown Item'),
+                'quantity_requested' => round($requested, 2),
+                'unit' => (string) ($item->item?->default_unit ?? 'UNIT'),
+            ];
+        }
+
+        $hasPurchaseRequest = $request->purchaseRequests->isNotEmpty();
+        $stockAssessment = $shortageTotal > 0 ? 'SHORTAGE_REQUIRES_PROCUREMENT' : 'STOCK_READY';
+        $distributionRecordsCount = (int) $request->distribution_records_count;
+
+        return [
+            'supply_request_id' => (int) $request->supply_request_id,
+            'request_code' => (string) $request->request_code,
+            'status' => (string) $request->status,
+            'priority_level' => (string) $request->priority_level,
+            'needed_by_date' => optional($request->needed_by_date)?->toDateString(),
+            'office' => $request->office ? [
+                'id' => (int) $request->office->id,
+                'name' => (string) $request->office->name,
+            ] : null,
+            'requester' => $request->requester ? [
+                'name' => (string) $request->requester->name,
+            ] : null,
+            'item_count' => $request->items->count(),
+            'requested_total' => round($requestedTotal, 2),
+            'shortage_total' => round($shortageTotal, 2),
+            'requested_items' => $requestedItems,
+            'stock_assessment' => $stockAssessment,
+            'has_purchase_request' => $hasPurchaseRequest,
+            'has_distribution_candidate' => isset($distributionReadyLookup[(int) $request->supply_request_id]) || ($stockAssessment === 'STOCK_READY' && ! $hasPurchaseRequest && $distributionRecordsCount === 0),
+            'distribution_records_count' => $distributionRecordsCount,
+            'workflow_bucket' => $this->workflowBucket($hasPurchaseRequest, $stockAssessment, $distributionRecordsCount),
+        ];
+    }
+
+    private function workflowBucket(bool $hasPurchaseRequest, string $stockAssessment, int $distributionRecordsCount): string
+    {
+        if ($hasPurchaseRequest) {
+            return 'QUEUED_FOR_PROCUREMENT';
+        }
+
+        if ($stockAssessment === 'STOCK_READY' && $distributionRecordsCount === 0) {
+            return 'READY_FOR_DISTRIBUTION';
+        }
+
+        return $stockAssessment === 'STOCK_READY'
+            ? 'STOCK_READY_AWAITING_RELEASE_CONTEXT'
+            : 'UNDER_VALIDATION';
+    }
+
+    private function paginateOfficeSupplyRows(Collection $rows, Request $request): LengthAwarePaginator
+    {
         $perPage = 5;
         $page = LengthAwarePaginator::resolveCurrentPage();
-        $requests = new LengthAwarePaginator(
+
+        return new LengthAwarePaginator(
             $rows->forPage($page, $perPage)->values(),
             $rows->count(),
             $perPage,
@@ -148,27 +190,21 @@ class RequestWorkflowController
                 'query' => $request->query(),
             ]
         );
+    }
 
-        $offices = Office::query()
-            ->orderBy('name')
+    /**
+     * @return Collection<int, array{id: int, name: string}>
+     */
+    private function officeOptions(): Collection
+    {
+        return Office::query()
+            ->orderBy('name', 'asc')
             ->get(['id', 'name'])
             ->map(fn (Office $office): array => [
                 'id' => (int) $office->id,
                 'name' => (string) $office->name,
             ])
             ->values();
-
-        return Inertia::render('Inventory/OfficeSupplyRequests/Index', [
-            'requests' => $requests,
-            'offices' => $offices,
-            'filters' => [
-                'q' => $search,
-                'office_id' => $officeId > 0 ? $officeId : null,
-                'stock_assessment' => $stockAssessmentFilter,
-                'workflow_bucket' => $workflowBucketFilter,
-                'page' => $requests->currentPage(),
-            ],
-        ]);
     }
 
     public function officeSupplyRequestShow(Request $request, SupplyRequest $supplyRequest): Response
@@ -245,14 +281,40 @@ class RequestWorkflowController
         ]);
     }
 
-    public function procurementRequests(): Response
+    public function procurementRequests(Request $request): Response
     {
-        abort_unless(Auth::user()?->can('inventory.view-any'), 403);
+        abort_unless($request->user()?->can('inventory.view-any'), 403);
 
-        $focusInventoryId = (int) request()->query('focus_inventory_id', 0);
+        $focusInventoryId = (int) $request->query('focus_inventory_id', 0);
 
-        $activeLowStockQueueByInventoryId = PurchaseRequest::query()
-            ->whereIn('status', ['OPEN', 'PROCESSING'])
+        return Inertia::render('Inventory/ProcurementRequests/Index', [
+            'purchaseRequests' => $this->purchaseRequestRecords(),
+            'shortageCandidates' => $this->shortageCandidates(),
+            'lowStockItems' => $this->lowStockItems($this->activeLowStockQueueByInventoryId()),
+            'atReorderItems' => $this->atReorderItems(),
+            'focusInventoryId' => $focusInventoryId > 0 ? $focusInventoryId : null,
+        ]);
+    }
+
+    private function purchaseRequestRecords()
+    {
+        return PurchaseRequest::query()
+            ->with(['office', 'requester', 'supplyRequest'])
+            ->latest('purchase_request_id')
+            ->paginate(5)
+            ->withQueryString();
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function activeLowStockQueueByInventoryId(): array
+    {
+        return PurchaseRequest::query()
+            ->where(function ($query): void {
+                $query->where('status', 'OPEN')
+                    ->orWhere('status', 'PROCESSING');
+            })
             ->where('remarks', 'like', '%LOW_STOCK_SIGNAL:inventory:%')
             ->get(['purchase_request_id', 'remarks'])
             ->reduce(function (array $carry, PurchaseRequest $request): array {
@@ -270,71 +332,98 @@ class RequestWorkflowController
 
                 return $carry;
             }, []);
+    }
 
-        $purchaseRequests = PurchaseRequest::query()
-            ->with(['office', 'requester', 'supplyRequest'])
-            ->latest('purchase_request_id')
-            ->paginate(12);
-
-        $shortageCandidates = SupplyRequest::query()
+    /**
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function shortageCandidates(): Collection
+    {
+        return SupplyRequest::query()
             ->submitted()
             ->whereDoesntHave('purchaseRequests')
             ->with(['office', 'items.item.inventory'])
             ->latest('supply_request_id')
             ->limit(20)
             ->get()
-            ->map(function (SupplyRequest $request): array {
-                $requestedTotal = 0.0;
-                $shortageTotal = 0.0;
-
-                foreach ($request->items as $item) {
-                    $requested = (float) $item->quantity_requested;
-                    $available = (float) ($item->item?->inventory?->available_stock ?? 0);
-
-                    $requestedTotal += $requested;
-                    $shortageTotal += max($requested - $available, 0);
-                }
-
-                return [
-                    'supply_request_id' => (int) $request->supply_request_id,
-                    'request_code' => (string) $request->request_code,
-                    'office' => $request->office ? [
-                        'name' => (string) $request->office->name,
-                    ] : null,
-                    'needed_by_date' => optional($request->needed_by_date)?->toDateString(),
-                    'requested_total' => round($requestedTotal, 2),
-                    'shortage_total' => round($shortageTotal, 2),
-                ];
-            })
+            ->map(fn (SupplyRequest $request): array => $this->shortageCandidateRow($request))
             ->filter(fn (array $request): bool => $request['shortage_total'] > 0)
             ->values();
+    }
 
-        $lowStockItems = Inventory::query()
+    /**
+     * @return array<string, mixed>
+     */
+    private function shortageCandidateRow(SupplyRequest $request): array
+    {
+        $requestedTotal = 0.0;
+        $shortageTotal = 0.0;
+
+        foreach ($request->items as $item) {
+            $requested = (float) $item->quantity_requested;
+            $available = (float) ($item->item?->inventory?->available_stock ?? 0);
+
+            $requestedTotal += $requested;
+            $shortageTotal += max($requested - $available, 0);
+        }
+
+        return [
+            'supply_request_id' => (int) $request->supply_request_id,
+            'request_code' => (string) $request->request_code,
+            'office' => $request->office ? [
+                'name' => (string) $request->office->name,
+            ] : null,
+            'needed_by_date' => optional($request->needed_by_date)?->toDateString(),
+            'requested_total' => round($requestedTotal, 2),
+            'shortage_total' => round($shortageTotal, 2),
+        ];
+    }
+
+    /**
+     * @param  array<int, int>  $activeLowStockQueueByInventoryId
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function lowStockItems(array $activeLowStockQueueByInventoryId): Collection
+    {
+        return Inventory::query()
             ->with('item')
             ->whereColumn('available_stock', '<', 'low_stock_threshold')
             ->orderByRaw('(low_stock_threshold - available_stock) DESC')
             ->limit(12)
             ->get()
-            ->map(function (Inventory $inventory) use ($activeLowStockQueueByInventoryId): array {
-                $inventoryId = (int) $inventory->inventory_id;
-                $deficit = round(max((float) $inventory->low_stock_threshold - (float) $inventory->available_stock, 0), 2);
-                $activePurchaseRequestId = $activeLowStockQueueByInventoryId[$inventoryId] ?? null;
-
-                return [
-                    'inventory_id' => $inventoryId,
-                    'item_name' => (string) ($inventory->item?->item_name ?? 'Unassigned Item'),
-                    'available_stock' => (float) $inventory->available_stock,
-                    'low_stock_threshold' => (float) $inventory->low_stock_threshold,
-                    'deficit' => $deficit,
-                    'suggested_quantity' => $deficit,
-                    'is_already_queued' => $activePurchaseRequestId !== null,
-                    'active_purchase_request_id' => $activePurchaseRequestId,
-                ];
-            })
+            ->map(fn (Inventory $inventory): array => $this->lowStockItemRow($inventory, $activeLowStockQueueByInventoryId))
             ->filter(fn (array $row): bool => $row['deficit'] > 0)
             ->values();
+    }
 
-        $atReorderItems = Inventory::query()
+    /**
+     * @param  array<int, int>  $activeLowStockQueueByInventoryId
+     * @return array<string, mixed>
+     */
+    private function lowStockItemRow(Inventory $inventory, array $activeLowStockQueueByInventoryId): array
+    {
+        $inventoryId = (int) $inventory->inventory_id;
+        $deficit = round(max((float) $inventory->low_stock_threshold - (float) $inventory->available_stock, 0), 2);
+        $activePurchaseRequestId = $activeLowStockQueueByInventoryId[$inventoryId] ?? null;
+
+        return [
+            'inventory_id' => $inventoryId,
+            'item_name' => (string) ($inventory->item?->item_name ?? 'Unassigned Item'),
+            'available_stock' => (float) $inventory->available_stock,
+            'low_stock_threshold' => (float) $inventory->low_stock_threshold,
+            'deficit' => $deficit,
+            'suggested_quantity' => $deficit,
+            'is_already_queued' => $activePurchaseRequestId !== null,
+            'active_purchase_request_id' => $activePurchaseRequestId,
+        ];
+    }
+
+    /**
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function atReorderItems(): Collection
+    {
+        return Inventory::query()
             ->with('item')
             ->whereColumn('available_stock', '=', 'low_stock_threshold')
             ->orderByDesc('last_updated')
@@ -347,14 +436,6 @@ class RequestWorkflowController
                 'low_stock_threshold' => (float) $inventory->low_stock_threshold,
             ])
             ->values();
-
-        return Inertia::render('Inventory/ProcurementRequests/Index', [
-            'purchaseRequests' => $purchaseRequests,
-            'shortageCandidates' => $shortageCandidates,
-            'lowStockItems' => $lowStockItems,
-            'atReorderItems' => $atReorderItems,
-            'focusInventoryId' => $focusInventoryId > 0 ? $focusInventoryId : null,
-        ]);
     }
 
     public function processDistribution(Request $request, SupplyRequest $supplyRequest): RedirectResponse

@@ -26,7 +26,7 @@ class ClaimController
 
     public function index(Request $request): Response
     {
-        abort_unless(auth()->user()->can('claim.view-any'), 403);
+        abort_unless(request()->user()->can('claim.view-any'), 403);
 
         $status = strtoupper(trim((string) $request->input('status', '')));
         $year = trim((string) $request->input('year', ''));
@@ -35,16 +35,16 @@ class ClaimController
 
         $yearOptions = Claim::query()
             ->where('created_at', '!=', null)
-            ->selectRaw('DISTINCT YEAR(created_at) as year')
-            ->orderByDesc('year')
-            ->pluck('year')
-            ->map(fn ($value): int => (int) $value)
+            ->latest('created_at')
+            ->pluck('created_at')
+            ->map(fn ($value): int => (int) $value->year)
+            ->unique()
             ->values();
 
         $query = Claim::query()->with(['distributionRecord', 'claimant', 'office']);
 
-        if (auth()->user()->isOfficeUser()) {
-            $query->where('office_id', (int) auth()->user()->office_id);
+        if (request()->user()->isOfficeUser()) {
+            $query->where('office_id', (int) request()->user()->office_id);
         }
 
         $claims = $query
@@ -78,10 +78,10 @@ class ClaimController
 
     public function create(Request $request): Response
     {
-        abort_unless(auth()->user()->can('claim.create'), 403);
+        abort_unless(request()->user()->can('claim.create'), 403);
 
         $distributionRecords = DistributionRecord::query()
-            ->when(auth()->user()->isOfficeUser(), fn ($query) => $query->where('office_id', auth()->user()->office_id))
+            ->when(request()->user()->isOfficeUser(), fn ($query) => $query->where('office_id', request()->user()->office_id))
             ->whereIn('status', ['RELEASED', 'RECEIVED'])
             ->with(['office', 'supplyRequest'])
             ->orderByDesc('release_date')
@@ -110,20 +110,20 @@ class ClaimController
 
     public function store(StoreClaimRequest $request): RedirectResponse
     {
-        abort_unless(auth()->user()->can('claim.create'), 403);
+        abort_unless(request()->user()->can('claim.create'), 403);
 
         $validated = $request->validated();
         $distributionRecord = DistributionRecord::query()
             ->where('distribution_record_id', (int) $validated['distribution_record_id'])
             ->firstOrFail();
 
-        $claim = $this->claimService->createClaim(auth()->user(), array_merge($validated, [
+        $claim = $this->claimService->createClaim(request()->user(), array_merge($validated, [
             'distribution_record' => $distributionRecord,
         ]));
 
         if ($request->hasFile('attachment_file')) {
             $this->documentService->upload(
-                auth()->user(),
+                request()->user(),
                 'claims',
                 (int) $claim->claims_id,
                 [
@@ -133,7 +133,7 @@ class ClaimController
             );
         }
 
-        $showRoute = auth()->user()->isOfficeUser() ? 'office.claims.show' : 'inventory.claims.show';
+        $showRoute = request()->user()->isOfficeUser() ? 'office.claims.show' : 'inventory.claims.show';
 
         return Redirect::route($showRoute, $claim->claims_id)
             ->with('success', 'Claim recorded successfully.');
@@ -141,14 +141,14 @@ class ClaimController
 
     public function show(Claim $claim): Response
     {
-        abort_unless(auth()->user()->can('claim.view', $claim), 403);
+        abort_unless(request()->user()->can('claim.view', $claim), 403);
 
-        $history = $this->historyTimelineService->forRecord(auth()->user(), $claim);
+        $history = $this->historyTimelineService->forRecord(request()->user(), $claim);
 
         $claim->load(['distributionRecord.items.item.category', 'distributionRecord.office', 'distributionRecord.supplyRequest', 'claimant', 'office']);
 
         $documents = $this->documentService
-            ->listForRelated(auth()->user(), 'claims', (int) $claim->claims_id)
+            ->listForRelated(request()->user(), 'claims', (int) $claim->claims_id)
             ->map(fn ($document): array => [
                 'document_id' => (int) $document->document_id,
                 'title' => (string) $document->title,
@@ -177,8 +177,8 @@ class ClaimController
             ] : null,
             'attachments' => $documents,
             'attachmentPermissions' => [
-                'upload' => auth()->user()->can('claim.view', $claim),
-                'delete' => auth()->user()->can('claim.view', $claim),
+                'upload' => request()->user()->can('claim.view', $claim),
+                'delete' => request()->user()->can('claim.view', $claim),
             ],
             'statusHistory' => $history['status']->map(fn ($entry): array => [
                 'id' => (int) $entry->id,
@@ -206,11 +206,11 @@ class ClaimController
 
     public function updateStatus(UpdateClaimStatusRequest $request, Claim $claim): RedirectResponse
     {
-        abort_unless(auth()->user()->can('claim.update', $claim), 403);
+        abort_unless(request()->user()->can('claim.update', $claim), 403);
 
-        $this->claimService->updateClaimStatus($claim, auth()->user(), $request->validated());
+        $this->claimService->updateClaimStatus($claim, request()->user(), $request->validated());
 
-        $showRoute = auth()->user()->isOfficeUser() ? 'office.claims.show' : 'inventory.claims.show';
+        $showRoute = request()->user()->isOfficeUser() ? 'office.claims.show' : 'inventory.claims.show';
 
         return Redirect::route($showRoute, $claim->claims_id)
             ->with('success', 'Claim status updated successfully.');

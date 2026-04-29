@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import PaginationNav from '@/Components/PaginationNav';
 import { humanizeEnum } from '@/lib/displayLabels';
 import { Head, Link } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
@@ -16,6 +17,11 @@ type MovementRow = {
 type Props = {
     movements: {
         data: MovementRow[];
+        links: Array<{
+            url: string | null;
+            label: string;
+            active: boolean;
+        }>;
     };
 };
 
@@ -105,7 +111,7 @@ export default function MovementIndex({ movements }: Props) {
                             </button>
                         </div>
                     </div>
-                    <p className="mt-3 text-xs text-slate-500">Showing {filteredRows.length} of {movements.data.length} movement log(s).</p>
+                    <p className="mt-3 text-xs text-slate-500">Showing {filteredRows.length} of {movements.data.length} recent movement log(s) on this page.</p>
                 </div>
 
                 <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -150,6 +156,10 @@ export default function MovementIndex({ movements }: Props) {
                             ) : null}
                         </tbody>
                     </table>
+                </div>
+
+                <div className="mt-4">
+                    <PaginationNav links={movements.links} preserveState={false} />
                 </div>
             </div>
         </AuthenticatedLayout>

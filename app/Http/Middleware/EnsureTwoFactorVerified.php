@@ -49,6 +49,8 @@ class EnsureTwoFactorVerified
                 'two_factor.pending' => true,
                 'two_factor.verified' => false,
                 'two_factor.user_id' => (int) $user->id,
+                'two_factor.challenge_id' => (int) $challengeResult['challenge']->id,
+                'two_factor.pending_expires_at' => optional($challengeResult['challenge']->expires_at)?->toIso8601String(),
             ]);
 
             if (! $challengeResult['delivery_ok']) {

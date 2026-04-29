@@ -21,7 +21,7 @@ class DeliveryController
 
     public function index(Request $request): Response
     {
-        abort_unless(auth()->user()->can('delivery.view-any'), 403);
+        abort_unless(request()->user()->can('delivery.view-any'), 403);
 
         $status = strtoupper(trim((string) $request->input('status', '')));
         $year = trim((string) $request->input('year', ''));
@@ -30,10 +30,10 @@ class DeliveryController
 
         $yearOptions = Delivery::query()
             ->where('created_at', '!=', null)
-            ->selectRaw('DISTINCT YEAR(created_at) as year')
-            ->orderByDesc('year')
-            ->pluck('year')
-            ->map(fn ($value): int => (int) $value)
+            ->latest('created_at')
+            ->pluck('created_at')
+            ->map(fn ($value): int => (int) $value->year)
+            ->unique()
             ->values();
 
         $deliveries = Delivery::query()
@@ -68,7 +68,7 @@ class DeliveryController
 
     public function create(): Response
     {
-        abort_unless(auth()->user()->can('delivery.create'), 403);
+        abort_unless(request()->user()->can('delivery.create'), 403);
 
         $purchaseOrders = PurchaseOrder::query()
             ->where('status', 'PLACED')
@@ -82,10 +82,10 @@ class DeliveryController
 
     public function store(StoreDeliveryRequest $request): RedirectResponse
     {
-        abort_unless(auth()->user()->can('delivery.create'), 403);
+        abort_unless(request()->user()->can('delivery.create'), 403);
 
         $delivery = $this->deliveryService->create(
-            actor: auth()->user(),
+            actor: request()->user(),
             payload: $request->validated(),
         );
 
@@ -95,7 +95,7 @@ class DeliveryController
 
     public function show(Delivery $delivery): Response
     {
-        abort_unless(auth()->user()->can('delivery.view', $delivery), 403);
+        abort_unless(request()->user()->can('delivery.view', $delivery), 403);
 
         $delivery->load(['purchaseOrder', 'supplier', 'receiver', 'items.purchaseOrderItem.item', 'verifications.verifier']);
 
@@ -153,7 +153,7 @@ class DeliveryController
 
     public function edit(Delivery $delivery): Response
     {
-        abort_unless(auth()->user()->can('delivery.update', $delivery), 403);
+        abort_unless(request()->user()->can('delivery.update', $delivery), 403);
 
         return Inertia::render('Inventory/Delivery/Edit', [
             'delivery' => $delivery,
@@ -162,11 +162,11 @@ class DeliveryController
 
     public function update(UpdateDeliveryRequest $request, Delivery $delivery): RedirectResponse
     {
-        abort_unless(auth()->user()->can('delivery.update', $delivery), 403);
+        abort_unless(request()->user()->can('delivery.update', $delivery), 403);
 
         $this->deliveryService->updateReceipt(
             delivery: $delivery,
-            actor: auth()->user(),
+            actor: request()->user(),
             payload: $request->validated(),
         );
 

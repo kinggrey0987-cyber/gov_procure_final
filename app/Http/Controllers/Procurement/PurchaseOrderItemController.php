@@ -40,7 +40,7 @@ class PurchaseOrderItemController extends Controller
 
         return Inertia::render('Procurement/PurchaseOrderItems/Index', [
             'purchaseOrder' => $purchaseOrder,
-            'items' => $purchaseOrder->items()->latest('purchase_order_item_id')->paginate(20),
+            'items' => $purchaseOrder->items()->latest('purchase_order_item_id')->paginate(5)->withQueryString(),
             'sourceItems' => $sourceItems,
         ]);
     }
