@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Office;
 
+use App\Enums\FundSource;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -17,6 +18,7 @@ class StorePpmpRequest extends FormRequest
         return [
             'fiscal_year' => ['required', 'integer', 'min:2000', 'max:3000'],
             'date_prepared' => ['required', 'date'],
+            'fund_source' => ['required', 'string', Rule::in(FundSource::values())],
             'remarks' => ['nullable', 'string', 'max:2000'],
             'items' => ['nullable', 'array'],
             'items.*.item_id' => ['required_with:items', 'integer', 'exists:items,item_id'],
@@ -24,7 +26,7 @@ class StorePpmpRequest extends FormRequest
             'items.*.quantity' => ['required_with:items', 'numeric', 'gt:0'],
             'items.*.unit_cost' => ['required_with:items', 'numeric', 'gte:0'],
             'items.*.procurement_schedule' => ['required_with:items', 'string', Rule::in(['Q1', 'Q2', 'Q3', 'Q4'])],
-            'items.*.fund_source' => ['required_with:items', 'string', 'max:100'],
+            'items.*.fund_source' => ['nullable', 'string', 'max:100'],
             'items.*.remarks' => ['nullable', 'string', 'max:1000'],
         ];
     }

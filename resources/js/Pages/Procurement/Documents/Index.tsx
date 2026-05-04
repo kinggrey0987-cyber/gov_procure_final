@@ -8,6 +8,7 @@ type DocumentRow = {
     document_id: number;
     title: string;
     file_name: string;
+    document_kind?: string | null;
     related_module: string;
     related_reference_id: number;
     related_reference_label?: string | null;
@@ -39,6 +40,24 @@ const MODULE_LABELS: Record<string, string> = {
     purchase_requests: 'Purchase Request',
     purchase_orders: 'Purchase Order',
 };
+
+const DOCUMENT_KIND_LABELS: Record<string, string> = {
+    procurement_record: 'Procurement Record',
+    supplier_quotation: 'Supplier Quotation',
+    canvass_sheet: 'Canvass Sheet',
+    noa: 'Notice of Award',
+    signed_po: 'Signed PO',
+    other_supporting_doc: 'Other Supporting Doc',
+};
+
+const DOCUMENT_KIND_OPTIONS = [
+    { value: 'procurement_record', label: 'Procurement Record' },
+    { value: 'supplier_quotation', label: 'Supplier Quotation' },
+    { value: 'canvass_sheet', label: 'Canvass Sheet' },
+    { value: 'noa', label: 'Notice of Award' },
+    { value: 'signed_po', label: 'Signed PO' },
+    { value: 'other_supporting_doc', label: 'Other Supporting Doc' },
+];
 
 export default function ProcurementDocumentsIndex({
     documents,
@@ -76,11 +95,13 @@ export default function ProcurementDocumentsIndex({
     const uploadForm = useForm<{
         related_module: '' | 'purchase_requests' | 'purchase_orders';
         related_reference_id: string;
+        document_kind: string;
         title: string;
         file: File | null;
     }>({
         related_module: '',
         related_reference_id: '',
+        document_kind: '',
         title: '',
         file: null,
     });
@@ -113,8 +134,9 @@ export default function ProcurementDocumentsIndex({
 
         const relatedModule = uploadForm.data.related_module;
         const relatedReferenceId = Number(uploadForm.data.related_reference_id);
+        const documentKind = uploadForm.data.document_kind;
 
-        if (!relatedModule || !Number.isInteger(relatedReferenceId) || relatedReferenceId <= 0) {
+        if (!relatedModule || !Number.isInteger(relatedReferenceId) || relatedReferenceId <= 0 || !documentKind) {
             return;
         }
 
@@ -122,12 +144,13 @@ export default function ProcurementDocumentsIndex({
             route('documents.store', {
                 related_module: relatedModule,
                 related_reference_id: relatedReferenceId,
+                document_kind: documentKind,
             }),
             {
                 forceFormData: true,
                 preserveScroll: true,
                 onSuccess: () => {
-                    uploadForm.reset('title', 'file', 'related_reference_id');
+                    uploadForm.reset('title', 'file', 'related_reference_id', 'document_kind');
                     setShowUpload(false);
                 },
             },
@@ -174,9 +197,14 @@ export default function ProcurementDocumentsIndex({
                         <div className="space-y-4 p-6">
                             <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                                 <p className="font-semibold">Document scope and publishing flow</p>
+                                <p className="mt-1 text-amber-800">
+                                    Use this registry for procurement-record files that belong to a PR or PO. Keep operational and public-release documents in their own workflow screens.
+                                </p>
                                 <ul className="mt-2 list-disc space-y-1 pl-5 text-amber-800">
                                     <li>Accepted files: PDF, DOC, DOCX, XLS, XLSX, CSV, PNG, JPG, JPEG.</li>
                                     <li>Maximum file size: 10 MB per upload.</li>
+                                    <li>Good fits here include supplier quotations, canvass sheets, NOA files, signed PO copies, and other procurement-record attachments.</li>
+                                    <li>Do not store delivery receipts, inspection/verification forms, or distribution records here. Those belong in the delivery workflow.</li>
                                     <li>This BAC repository is internal. Uploaded files do not automatically become public disclosures.</li>
                                     <li>Executive users can later prepare and publish public disclosures through the Executive module, then attach selected disclosure documents for public release.</li>
                                 </ul>
@@ -222,6 +250,7 @@ export default function ProcurementDocumentsIndex({
                                             onChange={(event) => {
                                                 uploadForm.setData('related_module', event.target.value as '' | 'purchase_requests' | 'purchase_orders');
                                                 uploadForm.setData('related_reference_id', '');
+                                                uploadForm.setData('document_kind', '');
                                             }}
                                         >
                                             <option value="">Select module</option>
@@ -245,6 +274,23 @@ export default function ProcurementDocumentsIndex({
                                                 </option>
                                             ))}
                                         </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-700">Document Type</label>
+                                        <select
+                                            className="w-full rounded-lg border-red-200 text-sm"
+                                            value={uploadForm.data.document_kind}
+                                            onChange={(event) => uploadForm.setData('document_kind', event.target.value)}
+                                        >
+                                            <option value="">Select document type</option>
+                                            {DOCUMENT_KIND_OPTIONS.map((option) => (
+                                                <option key={option.value} value={option.value}>
+                                                    {option.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {uploadForm.errors.document_kind && <p className="mt-1 text-xs text-rose-700">{uploadForm.errors.document_kind}</p>}
                                     </div>
 
                                     <div>
@@ -307,6 +353,7 @@ export default function ProcurementDocumentsIndex({
                                     <thead className="bg-slate-50">
                                         <tr>
                                             <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Title</th>
+                                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Type</th>
                                             <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">File</th>
                                             <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Reference</th>
                                             <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Uploaded</th>
@@ -320,6 +367,9 @@ export default function ProcurementDocumentsIndex({
                                                 <td className="px-4 py-3">
                                                     <p className="font-semibold text-slate-900">{document.title}</p>
                                                     <p className="mt-1 text-xs text-slate-500">{MODULE_LABELS[document.related_module] ?? document.related_module}</p>
+                                                </td>
+                                                <td className="px-4 py-3 text-slate-700">
+                                                    {DOCUMENT_KIND_LABELS[document.document_kind ?? ''] ?? document.document_kind ?? 'General'}
                                                 </td>
                                                 <td className="px-4 py-3 text-slate-700">
                                                     <p>{document.file_name}</p>

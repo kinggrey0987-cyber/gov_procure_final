@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\FundSource;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -27,6 +28,7 @@ class Ppmp extends Model
         'prepared_by',
         'approved_by',
         'fiscal_year',
+        'fund_source',
         'status',
         'total_estimated_budget',
         'date_prepared',
@@ -39,6 +41,7 @@ class Ppmp extends Model
         'prepared_by' => 'integer',
         'approved_by' => 'integer',
         'fiscal_year' => 'integer',
+        'fund_source' => FundSource::class,
         'total_estimated_budget' => 'decimal:2',
         'date_prepared' => 'date',
         'date_approved' => 'date',

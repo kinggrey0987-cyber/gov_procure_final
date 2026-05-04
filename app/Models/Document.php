@@ -22,6 +22,7 @@ class Document extends Model
         'uploaded_by',
         'title',
         'file_name',
+        'document_kind',
         'file_path',
         'related_module',
         'related_reference_id',

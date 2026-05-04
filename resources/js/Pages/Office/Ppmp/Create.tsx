@@ -2,6 +2,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import useSmartRefresh from '@/hooks/useSmartRefresh';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEvent } from 'react';
+import { FUND_SOURCES, DEFAULT_FUND_SOURCE } from '@/constants/fundSources';
 
 type ItemOption = {
     item_id: number;
@@ -16,7 +17,6 @@ type ItemDraft = {
     quantity: string;
     unit_cost: string;
     procurement_schedule: string;
-    fund_source: string;
     remarks: string;
 };
 
@@ -36,6 +36,7 @@ export default function PpmpCreate({ itemOptions }: Props) {
     const form = useForm({
         fiscal_year: new Date().getFullYear(),
         date_prepared: new Date().toISOString().slice(0, 10),
+        fund_source: DEFAULT_FUND_SOURCE,
         remarks: '',
         items: [emptyItem()],
     });
@@ -86,6 +87,14 @@ export default function PpmpCreate({ itemOptions }: Props) {
                             <span className="mb-1 block text-sm font-medium text-slate-700">Date Prepared</span>
                             <input type="date" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={form.data.date_prepared} onChange={(event) => form.setData('date_prepared', event.target.value)} />
                         </label>
+                        <label className="block md:col-span-2">
+                            <span className="mb-1 block text-sm font-medium text-slate-700">Fund Source</span>
+                            <select value={form.data.fund_source} onChange={(event) => form.setData('fund_source', event.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                                {FUND_SOURCES.map((option) => (
+                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                ))}
+                            </select>
+                        </label>
                     </div>
                     <label className="mt-4 block">
                         <span className="mb-1 block text-sm font-medium text-slate-700">Remarks</span>
@@ -130,10 +139,6 @@ export default function PpmpCreate({ itemOptions }: Props) {
                                         </select>
                                     </label>
                                     <label className="block">
-                                        <span className="mb-1 block text-sm font-medium text-slate-700">Fund Source</span>
-                                        <input value={item.fund_source} onChange={(event) => patchItem(index, { fund_source: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="MOOE" />
-                                    </label>
-                                    <label className="block">
                                         <span className="mb-1 block text-sm font-medium text-slate-700">Item Remarks</span>
                                         <input value={item.remarks} onChange={(event) => patchItem(index, { remarks: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
                                     </label>
@@ -161,7 +166,6 @@ function emptyItem(): ItemDraft {
         quantity: '1',
         unit_cost: '0',
         procurement_schedule: '',
-        fund_source: '',
         remarks: '',
     };
 }

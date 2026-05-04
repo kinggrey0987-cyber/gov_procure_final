@@ -31,6 +31,7 @@ class PpmpService
                 'prepared_by' => $actor->id,
                 'approved_by' => null,
                 'fiscal_year' => (int) $payload['fiscal_year'],
+                'fund_source' => $payload['fund_source'],
                 'status' => 'DRAFT',
                 'total_estimated_budget' => 0,
                 'date_prepared' => $payload['date_prepared'],
@@ -54,16 +55,23 @@ class PpmpService
 
         return DB::transaction(function () use ($ppmp, $actor, $payload): Ppmp {
             $oldStatus = (string) $ppmp->status;
+            $oldFundSource = (string) $ppmp->fund_source;
+            $newFundSource = $payload['fund_source'] ?? $ppmp->fund_source;
 
             $ppmp->fill([
                 'fiscal_year' => (int) $payload['fiscal_year'],
                 'date_prepared' => $payload['date_prepared'],
+                'fund_source' => $newFundSource,
                 'remarks' => $payload['remarks'] ?? $ppmp->remarks,
             ])->save();
 
             $this->recomputeTotalBudget($ppmp);
             $this->recordStatus($ppmp, $oldStatus, 'DRAFT', $actor, 'PPMP updated');
-            $this->recordAudit($actor, 'UPDATE', $ppmp);
+            $this->recordAudit($actor, 'UPDATE', $ppmp, [
+                'fund_source_changed' => $oldFundSource !== $newFundSource,
+                'old_fund_source' => $oldFundSource !== $newFundSource ? $oldFundSource : null,
+                'new_fund_source' => $oldFundSource !== $newFundSource ? $newFundSource : null,
+            ]);
 
             return $ppmp->fresh(['items', 'office', 'preparer', 'approver']) ?? $ppmp;
         });
@@ -122,7 +130,7 @@ class PpmpService
                 'unit_cost' => $unitCost,
                 'estimated_budget' => $estimatedBudget,
                 'procurement_schedule' => $payload['procurement_schedule'],
-                'fund_source' => $payload['fund_source'],
+                'fund_source' => $ppmp->fund_source,
                 'remarks' => $payload['remarks'] ?? null,
             ]);
 
@@ -158,7 +166,7 @@ class PpmpService
                 'unit_cost' => $unitCost,
                 'estimated_budget' => round($quantity * $unitCost, 2),
                 'procurement_schedule' => $payload['procurement_schedule'],
-                'fund_source' => $payload['fund_source'],
+                'fund_source' => $ppmp->fund_source,
                 'remarks' => $payload['remarks'] ?? null,
             ])->save();
 
@@ -236,19 +244,25 @@ class PpmpService
         }
     }
 
-    private function recordAudit(User $actor, string $actionType, Ppmp $ppmp): void
+    private function recordAudit(User $actor, string $actionType, Ppmp $ppmp, ?array $additionalDetails = null): void
     {
+        $details = [
+            'office_id' => $ppmp->office_id,
+            'status' => $ppmp->status,
+            'fiscal_year' => $ppmp->fiscal_year,
+        ];
+
+        if ($additionalDetails) {
+            $details = array_merge($details, $additionalDetails);
+        }
+
         $this->auditLogService->log(
             actor: $actor,
             moduleName: 'Office.PPMP',
             actionType: $actionType,
             referenceType: Ppmp::class,
             referenceId: (int) $ppmp->ppmp_id,
-            details: [
-                'office_id' => $ppmp->office_id,
-                'status' => $ppmp->status,
-                'fiscal_year' => $ppmp->fiscal_year,
-            ],
+            details: $details,
             logDomain: 'BUSINESS',
             officeId: (int) $ppmp->office_id,
         );

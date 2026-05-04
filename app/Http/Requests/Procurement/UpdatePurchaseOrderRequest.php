@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Procurement;
 
+use App\Enums\ProcurementMethod;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -24,7 +25,7 @@ class UpdatePurchaseOrderRequest extends FormRequest
         return [
             'supplier_id' => ['required', 'integer', 'exists:suppliers,supplier_id'],
             'po_number' => ['required', 'string', 'max:80', Rule::unique('purchase_orders', 'po_number')->ignore($purchaseOrderId, 'purchase_order_id')],
-            'procurement_method' => ['required', 'string', 'max:120'],
+            'procurement_method' => ['required', 'string', Rule::in(ProcurementMethod::values())],
             'expected_delivery_date' => ['nullable', 'date'],
             'terms_notes' => ['nullable', 'string'],
             'remarks' => ['nullable', 'string'],

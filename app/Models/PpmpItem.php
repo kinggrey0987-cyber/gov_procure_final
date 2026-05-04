@@ -27,7 +27,6 @@ class PpmpItem extends Model
         'unit_cost',
         'estimated_budget',
         'procurement_schedule',
-        'fund_source',
         'remarks',
     ];
 

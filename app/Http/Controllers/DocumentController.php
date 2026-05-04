@@ -223,6 +223,7 @@ class DocumentController extends Controller
             'title' => (string) $document->title,
             'file_name' => (string) $document->file_name,
             'file_path' => (string) $document->file_path,
+            'document_kind' => (string) ($document->document_kind ?? ''),
             'related_module' => (string) $document->related_module,
             'related_reference_id' => (int) $document->related_reference_id,
             'uploaded_at' => optional($document->uploaded_at)?->toIso8601String(),

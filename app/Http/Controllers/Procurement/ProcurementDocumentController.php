@@ -61,6 +61,7 @@ class ProcurementDocumentController extends Controller
             'document_id' => (int) $document->document_id,
             'title' => (string) $document->title,
             'file_name' => (string) $document->file_name,
+            'document_kind' => (string) ($document->document_kind ?? ''),
             'related_module' => (string) $document->related_module,
             'related_reference_id' => (int) $document->related_reference_id,
             'related_reference_label' => $this->resolveReferenceLabel($document),

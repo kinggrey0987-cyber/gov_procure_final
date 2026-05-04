@@ -3,6 +3,7 @@ import InputError from '@/Components/InputError';
 import useSmartRefresh from '@/hooks/useSmartRefresh';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { FormEvent, useState } from 'react';
+import { FUND_SOURCES } from '@/constants/fundSources';
 
 type ItemOption = {
     item_id: number;
@@ -19,7 +20,6 @@ type ExistingItem = {
     unit_cost: number;
     estimated_budget?: number;
     procurement_schedule: string;
-    fund_source: string;
     remarks?: string | null;
     item?: { item_name?: string | null } | null;
 };
@@ -29,7 +29,9 @@ type Props = {
         ppmp_id: number;
         fiscal_year: number;
         date_prepared: string;
+        fund_source: string;
         remarks: string | null;
+        status: string;
         items: ExistingItem[];
     };
     itemOptions: ItemOption[];
@@ -47,6 +49,7 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
     const form = useForm({
         fiscal_year: ppmp.fiscal_year,
         date_prepared: ppmp.date_prepared,
+        fund_source: ppmp.fund_source,
         remarks: ppmp.remarks ?? '',
     });
 
@@ -56,7 +59,6 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
         quantity: '1',
         unit_cost: '0',
         procurement_schedule: '',
-        fund_source: '',
         remarks: '',
     });
 
@@ -73,7 +75,7 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
         newItem.post(route('office.ppmp.items.store', ppmp.ppmp_id), {
             preserveScroll: true,
             onSuccess: () => {
-                newItem.reset('item_id', 'item_category_id', 'quantity', 'unit_cost', 'procurement_schedule', 'fund_source', 'remarks');
+                newItem.reset('item_id', 'item_category_id', 'quantity', 'unit_cost', 'procurement_schedule', 'remarks');
                 newItem.setData('quantity', '1');
                 newItem.setData('unit_cost', '0');
             },
@@ -125,6 +127,18 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                         <label className="block">
                             <span className="mb-1 block text-sm font-medium text-slate-700">Date Prepared</span>
                             <input type="date" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={form.data.date_prepared} onChange={(event) => form.setData('date_prepared', event.target.value)} />
+                        </label>
+                        <label className="block md:col-span-2">
+                            <span className="mb-1 block text-sm font-medium text-slate-700">Fund Source</span>
+                            {ppmp.status === 'DRAFT' || ppmp.status === 'RETURNED_FOR_REVISION' ? (
+                                <select value={form.data.fund_source} onChange={(event) => form.setData('fund_source', event.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                                    {FUND_SOURCES.map((option) => (
+                                        <option key={option.value} value={option.value}>{option.label}</option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <input type="text" className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm" value={FUND_SOURCES.find(f => f.value === form.data.fund_source)?.label || form.data.fund_source} readOnly />
+                            )}
                         </label>
                     </div>
                     <label className="block">
@@ -209,15 +223,6 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                                                     ))}
                                                 </select>
                                             </label>
-
-                                            <label className="block">
-                                                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Fund Source</span>
-                                                <input
-                                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                                                    value={row.fund_source}
-                                                    onChange={(event) => setEditingRows({ ...editingRows, [item.ppmp_item_id]: { ...row, fund_source: event.target.value } })}
-                                                />
-                                            </label>
                                         </div>
 
                                         <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 pt-3">
@@ -270,12 +275,6 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                                 ))}
                             </select>
                             <InputError message={newItem.errors.procurement_schedule} className="mt-1" />
-                        </label>
-
-                        <label className="block">
-                            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Fund Source</span>
-                            <input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={newItem.data.fund_source} onChange={(event) => newItem.setData('fund_source', event.target.value)} />
-                            <InputError message={newItem.errors.fund_source} className="mt-1" />
                         </label>
                     </div>
 

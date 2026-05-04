@@ -3,6 +3,7 @@
 namespace App\Services\Office;
 
 use App\Models\ApprovalHistory;
+use App\Models\Office;
 use App\Models\Ppmp;
 use App\Models\PpmpItem;
 use App\Models\SupplyRequest;
@@ -30,10 +31,11 @@ class SupplyRequestService
     public function create(User $actor, array $payload): SupplyRequest
     {
         $this->resolveOfficePpmp((int) $payload['ppmp_id'], $actor);
+        $office = Office::query()->findOrFail((int) $actor->office_id);
 
-        return DB::transaction(function () use ($actor, $payload): SupplyRequest {
+        return DB::transaction(function () use ($actor, $payload, $office): SupplyRequest {
             $supplyRequest = SupplyRequest::query()->create([
-                'request_code' => $this->buildRequestCode((int) $actor->office_id),
+                'request_code' => $this->buildRequestCode((int) $actor->office_id, $office),
                 'office_id' => $actor->office_id,
                 'requested_by' => $actor->id,
                 'ppmp_id' => (int) $payload['ppmp_id'],
@@ -445,9 +447,22 @@ class SupplyRequestService
         );
     }
 
-    private function buildRequestCode(int $officeId): string
+    private function buildRequestCode(int $officeId, Office $office): string
     {
-        return sprintf('SR-%d-%s', $officeId, now()->format('YmdHisv'));
+        $countThisMonth = SupplyRequest::query()
+            ->where('office_id', $officeId)
+            ->whereYear('created_at', now()->year)
+            ->whereMonth('created_at', now()->month)
+            ->count();
+
+        $nextSequence = $countThisMonth + 1;
+
+        return sprintf(
+            'SR-%s-%s-%02d',
+            (string) $office->code,
+            now()->format('Ym'),
+            $nextSequence
+        );
     }
 
     private function createOrUpdatePpmpOverRequestAnomalies(SupplyRequest $supplyRequest): int

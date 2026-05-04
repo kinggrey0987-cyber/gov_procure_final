@@ -1,6 +1,4 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import ApprovalHistoryTimeline from '@/Components/ApprovalHistoryTimeline';
-import StatusHistoryTimeline from '@/Components/StatusHistoryTimeline';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEvent, useMemo, useState } from 'react';
 
@@ -328,8 +326,15 @@ export default function SupplyRequestShow({
 
                 {activeTab === 'status' ? (
                     <>
-                        <StatusHistoryTimeline entries={statusHistory} />
-                        <ApprovalHistoryTimeline entries={approvalHistory} />
+                        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                            <h4 className="text-xl font-semibold text-slate-800">Workflow History</h4>
+                            <p className="mt-2 text-sm text-slate-600">
+                                Detailed status and approval history is intentionally kept out of the page layout to reduce visual noise.
+                            </p>
+                            <p className="mt-3 text-sm text-slate-600">
+                                Use the current request state at the top of the page as the primary on-screen status indicator.
+                            </p>
+                        </section>
                     </>
                 ) : null}
             </div>

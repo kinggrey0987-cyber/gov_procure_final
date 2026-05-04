@@ -3,6 +3,7 @@
 namespace App\Services\Procurement;
 
 use App\Models\Inventory;
+use App\Models\Office;
 use App\Models\Ppmp;
 use App\Models\PpmpItem;
 use App\Models\ApprovalHistory;
@@ -59,11 +60,11 @@ class PurchaseRequestService
 
         return DB::transaction(function () use ($actor, $payload, $supplyRequest): PurchaseRequest {
             $purchaseRequest = PurchaseRequest::query()->create([
-                'supply_request_id' => (int) $supplyRequest->supply_request_id,
-                'office_id' => (int) $supplyRequest->office_id,
-                'requested_by' => (int) $supplyRequest->requested_by,
-                'status' => 'OPEN',
-                'remarks' => $payload['remarks'] ?? null,
+                    'supply_request_id' => (int) $supplyRequest->supply_request_id,
+                    'office_id' => (int) $supplyRequest->office_id,
+                    'requested_by' => (int) $supplyRequest->requested_by,
+                    'status' => 'OPEN',
+                    'remarks' => $payload['remarks'] ?? null,
             ]);
 
             $itemRows = [];
@@ -268,7 +269,7 @@ class PurchaseRequestService
             ]);
 
             $supplyRequest = SupplyRequest::query()->create([
-                'request_code' => sprintf('SR-LS-%s-%04d', now()->format('YmdHis'), random_int(1000, 9999)),
+                    'request_code' => $this->buildRequestCode($officeId),
                 'office_id' => $officeId,
                 'requested_by' => (int) $actor->id,
                 'ppmp_id' => (int) $ppmp->ppmp_id,
@@ -530,6 +531,26 @@ class PurchaseRequestService
             return $item;
         });
     }
+
+        private function buildRequestCode(int $officeId): string
+        {
+            $office = Office::query()->findOrFail($officeId);
+
+            $countThisMonth = SupplyRequest::query()
+                ->where('office_id', $officeId)
+                ->whereYear('created_at', now()->year)
+                ->whereMonth('created_at', now()->month)
+                ->count();
+
+            $nextSequence = $countThisMonth + 1;
+
+            return sprintf(
+                'SR-%s-%s-%02d',
+                (string) $office->code,
+                now()->format('Ym'),
+                $nextSequence
+            );
+        }
 
     private function assertProcurementActor(User $actor): void
     {

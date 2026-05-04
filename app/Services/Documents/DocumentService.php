@@ -49,6 +49,7 @@ class DocumentService
                 'uploaded_by' => (int) $actor->id,
                 'title' => (string) $payload['title'],
                 'file_name' => $file->getClientOriginalName(),
+                'document_kind' => isset($payload['document_kind']) ? (string) $payload['document_kind'] : null,
                 'file_path' => $filePath,
                 'related_module' => $module,
                 'related_reference_id' => $relatedReferenceId,
@@ -104,6 +105,7 @@ class DocumentService
                 'uploaded_by' => (int) $actor->id,
                 'title' => $title,
                 'file_name' => $safeName.'.'.$mimeExtension,
+                'document_kind' => null,
                 'file_path' => $filePath,
                 'related_module' => $module,
                 'related_reference_id' => $relatedReferenceId,
@@ -193,7 +195,7 @@ class DocumentService
                 officeId: $actor->office_id,
             );
 
-            $document->delete();
+            Document::query()->whereKey((int) $document->document_id)->delete();
         });
     }
 }

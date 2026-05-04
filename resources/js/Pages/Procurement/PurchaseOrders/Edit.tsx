@@ -1,6 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, useForm } from '@inertiajs/react';
 import { FormEvent } from 'react';
+import { PROCUREMENT_METHODS } from '@/constants/procurementMethods';
 
 type SupplierOption = {
     supplier_id: number;
@@ -61,12 +62,22 @@ export default function PurchaseOrdersEdit({ purchaseOrder, suppliers }: Props) 
                             onChange={(event) => form.setData('po_number', event.target.value)}
                             className="rounded border-gray-300 text-sm"
                         />
-                        <input
-                            type="text"
-                            value={form.data.procurement_method}
-                            onChange={(event) => form.setData('procurement_method', event.target.value)}
-                            className="rounded border-gray-300 text-sm"
-                        />
+                        <div>
+                            <label className="text-sm font-semibold text-slate-700">Procurement Method</label>
+                            <p className="text-xs text-slate-500 mt-1">This field records the declared mode of procurement used externally (e.g., PhilGEPS) for compliance and audit purposes.</p>
+                            <select
+                                value={form.data.procurement_method}
+                                onChange={(event) => form.setData('procurement_method', event.target.value)}
+                                className="mt-2 rounded border-gray-300 text-sm"
+                                required
+                            >
+                                {PROCUREMENT_METHODS.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
                         <input
                             type="date"
                             value={form.data.expected_delivery_date}

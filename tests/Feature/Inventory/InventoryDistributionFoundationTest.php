@@ -571,8 +571,10 @@ class InventoryDistributionFoundationTest extends TestCase
             ]));
 
         $created = PurchaseRequest::query()->latest('purchase_request_id')->firstOrFail();
+        $createdSupplyRequest = SupplyRequest::query()->latest('supply_request_id')->firstOrFail();
 
         $this->assertSame('OPEN', (string) $created->status);
+        $this->assertStringStartsWith('SR-'.$this->gsoOfficer->office?->code.'-'.now()->format('Ym').'-', (string) $createdSupplyRequest->request_code);
         $this->assertStringContainsString('LOW_STOCK_SIGNAL:inventory:'.$inventoryId, (string) $created->remarks);
 
         $this->assertDatabaseHas('purchase_request_items', [

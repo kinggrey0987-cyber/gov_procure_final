@@ -1,7 +1,4 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import AttachmentsPanel from '@/Components/AttachmentsPanel';
-import ApprovalHistoryTimeline from '@/Components/ApprovalHistoryTimeline';
-import StatusHistoryTimeline from '@/Components/StatusHistoryTimeline';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEvent } from 'react';
 
@@ -46,17 +43,6 @@ type PurchaseOrder = {
 
 type Props = {
     purchaseOrder: PurchaseOrder;
-    attachments: Array<{
-        document_id: number;
-        title: string;
-        file_name: string;
-        uploaded_at?: string | null;
-        uploader_name?: string | null;
-    }>;
-    attachmentPermissions: {
-        upload: boolean;
-        delete: boolean;
-    };
     statusHistory: Array<{
         id: number;
         old_status?: string | null;
@@ -76,8 +62,7 @@ type Props = {
         place?: boolean;
     };
 };
-
-export default function PurchaseOrdersShow({ purchaseOrder, attachments, attachmentPermissions, statusHistory, approvalHistory, permissions }: Props) {
+export default function PurchaseOrdersShow({ purchaseOrder, statusHistory, approvalHistory, permissions }: Props) {
     const placeForm = useForm({ remarks: '' });
 
     const placeOrder = (event: FormEvent) => {
@@ -175,30 +160,24 @@ export default function PurchaseOrdersShow({ purchaseOrder, attachments, attachm
                     ) : null}
 
                     <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <h3 className="text-lg font-semibold text-slate-900">Purchase Order Attachments</h3>
+                        <h3 className="text-lg font-semibold text-slate-900">Purchase Order Documents</h3>
                         <p className="mt-1 text-sm text-slate-600">
-                            Upload procurement files linked to this PO (e.g., supplier quotation, canvass, NOA, signed PO, delivery/inspection docs).
-                            These remain internal unless explicitly published via Executive Public Disclosures.
+                            PO-related files are managed in the central procurement document registry to avoid duplicating workflow documents on this page.
                         </p>
 
-                        <div className="mt-4">
-                            <AttachmentsPanel
-                                title="PO Attachment Registry"
-                                attachments={attachments}
-                                uploadRoute={route('documents.store', {
-                                    related_module: 'purchase_orders',
-                                    related_reference_id: purchaseOrder.purchase_order_id,
-                                })}
-                                canUpload={attachmentPermissions.upload}
-                                canDelete={attachmentPermissions.delete}
-                                downloadRouteFor={(documentId: number) => route('documents.show', documentId)}
-                                deleteRouteFor={(documentId: number) => route('documents.destroy', documentId)}
-                            />
+                        <div className="mt-4 flex flex-wrap items-center gap-3">
+                            <Link
+                                href={route('procurement.documents.index', { module: 'purchase_orders' })}
+                                className="rounded border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
+                            >
+                                Open Procurement Documents
+                            </Link>
+                            <p className="text-sm text-slate-500">
+                                This keeps purchase-order files searchable from one registry instead of a separate attachment panel.
+                            </p>
                         </div>
                     </section>
 
-                    <StatusHistoryTimeline entries={statusHistory} />
-                    <ApprovalHistoryTimeline entries={approvalHistory} />
                 </div>
             </div>
         </AuthenticatedLayout>

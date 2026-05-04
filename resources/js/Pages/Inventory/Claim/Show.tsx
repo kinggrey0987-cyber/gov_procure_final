@@ -1,7 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import AttachmentsPanel from '@/Components/AttachmentsPanel';
-import ApprovalHistoryTimeline from '@/Components/ApprovalHistoryTimeline';
-import StatusHistoryTimeline from '@/Components/StatusHistoryTimeline';
 import { humanizeEnum } from '@/lib/displayLabels';
 import { Head, Link } from '@inertiajs/react';
 import { useState } from 'react';
@@ -169,9 +167,14 @@ export default function ClaimShow({ claim, linkedDistribution, attachments, atta
                     />
                 ) : null}
 
-                {activeTab === 'status' ? <StatusHistoryTimeline entries={statusHistory} /> : null}
-
-                {activeTab === 'status' ? <ApprovalHistoryTimeline entries={approvalHistory} /> : null}
+                {activeTab === 'status' ? (
+                    <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Workflow History</h3>
+                        <p className="mt-2 text-sm text-slate-600">
+                            Detailed status and approval history is intentionally omitted from this tab to keep claim review focused.
+                        </p>
+                    </section>
+                ) : null}
 
                 {activeTab === 'items' ? (
                     <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">

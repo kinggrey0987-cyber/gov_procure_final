@@ -1,14 +1,12 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import ApprovalHistoryTimeline from '@/Components/ApprovalHistoryTimeline';
-import StatusHistoryTimeline from '@/Components/StatusHistoryTimeline';
 import { Head, Link, useForm } from '@inertiajs/react';
+import { getFundSourceLabel } from '@/constants/fundSources';
 
 type PpmpItem = {
     ppmp_item_id: number;
     quantity: number;
     unit_cost: number;
     procurement_schedule: string;
-    fund_source: string;
     remarks?: string | null;
     item?: { item_name?: string | null } | null;
 };
@@ -17,6 +15,7 @@ type Props = {
     ppmp: {
         ppmp_id: number;
         fiscal_year: number;
+        fund_source: string;
         status: string;
         date_prepared: string;
         remarks: string | null;
@@ -77,6 +76,11 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
                     </div>
 
                     <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Fund Source</p>
+                        <p className="mt-1 text-sm text-slate-700">{getFundSourceLabel(ppmp.fund_source) || '-'}</p>
+                    </div>
+
+                    <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Remarks</p>
                         <p className="mt-1 text-sm text-slate-700">{ppmp.remarks ?? '-'}</p>
                     </div>
@@ -110,7 +114,7 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
                                             <td className="px-4 py-3 text-slate-700">{formatMoney(item.unit_cost)}</td>
                                             <td className="px-4 py-3 text-slate-700">{formatMoney(item.quantity * item.unit_cost)}</td>
                                             <td className="px-4 py-3 text-slate-700">{item.procurement_schedule}</td>
-                                            <td className="px-4 py-3 text-slate-700">{item.fund_source}</td>
+                                            <td className="px-4 py-3"><span className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-800">{getFundSourceLabel(ppmp.fund_source)}</span></td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -133,8 +137,6 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
                     </div>
                 </section>
 
-                <StatusHistoryTimeline entries={statusHistory} />
-                <ApprovalHistoryTimeline entries={approvalHistory} />
             </div>
         </AuthenticatedLayout>
     );

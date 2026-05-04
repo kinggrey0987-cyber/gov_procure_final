@@ -1,7 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import AttachmentsPanel from '@/Components/AttachmentsPanel';
-import ApprovalHistoryTimeline from '@/Components/ApprovalHistoryTimeline';
-import StatusHistoryTimeline from '@/Components/StatusHistoryTimeline';
 import { Head, Link, useForm } from '@inertiajs/react';
 
 type Props = {
@@ -125,8 +123,6 @@ export default function DisclosureShow({ disclosure, attachments, attachmentPerm
                         deleteRouteFor={(documentId: number) => route('documents.destroy', documentId)}
                     />
 
-                    <StatusHistoryTimeline entries={statusHistory} />
-                    <ApprovalHistoryTimeline entries={approvalHistory} />
                 </div>
             </div>
         </AuthenticatedLayout>

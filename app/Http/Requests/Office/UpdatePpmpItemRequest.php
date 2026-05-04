@@ -24,7 +24,7 @@ class UpdatePpmpItemRequest extends FormRequest
             'quantity' => ['required', 'numeric', 'gt:0'],
             'unit_cost' => ['required', 'numeric', 'gte:0'],
             'procurement_schedule' => ['required', 'string', Rule::in(['Q1', 'Q2', 'Q3', 'Q4'])],
-            'fund_source' => ['required', 'string', 'max:100'],
+            'fund_source' => ['nullable', 'string', 'max:100'],
             'remarks' => ['nullable', 'string', 'max:1000'],
         ];
     }

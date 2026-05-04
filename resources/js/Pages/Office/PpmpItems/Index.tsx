@@ -12,7 +12,6 @@ type Props = {
             unit_cost: string;
             estimated_budget: string;
             procurement_schedule: string;
-            fund_source: string;
             remarks: string | null;
         }>;
     };
@@ -25,7 +24,6 @@ export default function PpmpItemsIndex({ ppmp, items }: Props) {
         quantity: 1,
         unit_cost: 0,
         procurement_schedule: '',
-        fund_source: '',
         remarks: '',
     });
 
@@ -47,7 +45,6 @@ export default function PpmpItemsIndex({ ppmp, items }: Props) {
                         <input type="number" className="rounded border px-2 py-1" placeholder="Quantity" onChange={(e) => form.setData('quantity', Number(e.target.value))} />
                         <input type="number" className="rounded border px-2 py-1" placeholder="Unit Cost" onChange={(e) => form.setData('unit_cost', Number(e.target.value))} />
                         <input className="rounded border px-2 py-1" placeholder="Schedule" onChange={(e) => form.setData('procurement_schedule', e.target.value)} />
-                        <input className="rounded border px-2 py-1" placeholder="Fund Source" onChange={(e) => form.setData('fund_source', e.target.value)} />
                         <input className="rounded border px-2 py-1 sm:col-span-2" placeholder="Remarks" onChange={(e) => form.setData('remarks', e.target.value)} />
                         <button type="submit" className="rounded bg-indigo-600 px-3 py-2 text-white">Add Item</button>
                     </form>

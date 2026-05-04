@@ -1,6 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEvent, useMemo, useEffect } from 'react';
+import { PROCUREMENT_METHODS, DEFAULT_PROCUREMENT_METHOD } from '@/constants/procurementMethods';
 
 type PurchaseRequestOption = {
     purchase_request_id: number;
@@ -45,7 +46,7 @@ export default function PurchaseOrdersCreate({ eligiblePurchaseRequests, supplie
     const form = useForm({
         purchase_request_id: firstPurchaseRequest?.purchase_request_id ?? 0,
         supplier_id: suppliers[0]?.supplier_id ?? 0,
-        procurement_method: '',
+        procurement_method: DEFAULT_PROCUREMENT_METHOD,
         expected_delivery_date: '',
         terms_notes: '',
         remarks: '',
@@ -217,14 +218,22 @@ export default function PurchaseOrdersCreate({ eligiblePurchaseRequests, supplie
                             </div>
                         </section>
 
-                        <input
-                            type="text"
-                            placeholder="Procurement Method"
-                            value={form.data.procurement_method}
-                            onChange={(event) => form.setData('procurement_method', event.target.value)}
-                            className="rounded-lg border-gray-300 text-sm"
-                            required
-                        />
+                        <div>
+                            <label className="text-sm font-semibold text-slate-700">Procurement Method</label>
+                            <p className="text-xs text-slate-500 mt-1">This field records the declared mode of procurement used externally (e.g., PhilGEPS) for compliance and audit purposes.</p>
+                            <select
+                                value={form.data.procurement_method}
+                                onChange={(event) => form.setData('procurement_method', event.target.value)}
+                                className="mt-2 rounded-lg border-gray-300 text-sm"
+                                required
+                            >
+                                {PROCUREMENT_METHODS.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
                         <input
                             type="date"
                             value={form.data.expected_delivery_date}
