@@ -47,12 +47,12 @@ class DomainDashboardController extends Controller
             })
             ->latest('created_at');
 
-        // Paginate with 5 records per page
-        $activitiesPaginator = $query
-            ->paginate(perPage: 5, page: $filters['page'] ?? 1)
-            ->only(['data', 'current_page', 'last_page', 'prev_page_url', 'next_page_url', 'total']);
+        // Paginate with 5 records per page. Keep the paginator instance for
+        // metadata and read activity rows from its collection; paginator
+        // only() may omit the data key in some Laravel contexts.
+        $activitiesPaginator = $query->paginate(perPage: 5, page: $filters['page'] ?? 1);
 
-        $activities = collect($activitiesPaginator['data'])
+        $activities = $activitiesPaginator->getCollection()
             ->map(fn (AuditLog $log): array => [
                 'id' => (int) $log->id,
                 'title' => ucfirst(strtolower((string) $log->action_type)).' on '.str_replace('_', ' ', (string) $log->module_name),
@@ -71,11 +71,11 @@ class DomainDashboardController extends Controller
             ],
             'activities' => $activities,
             'pagination' => [
-                'current_page' => $activitiesPaginator['current_page'],
-                'last_page' => $activitiesPaginator['last_page'],
-                'prev_page_url' => $activitiesPaginator['prev_page_url'],
-                'next_page_url' => $activitiesPaginator['next_page_url'],
-                'total' => $activitiesPaginator['total'],
+                'current_page' => $activitiesPaginator->currentPage(),
+                'last_page' => $activitiesPaginator->lastPage(),
+                'prev_page_url' => $activitiesPaginator->previousPageUrl(),
+                'next_page_url' => $activitiesPaginator->nextPageUrl(),
+                'total' => $activitiesPaginator->total(),
             ],
             'filters' => [
                 'search' => $filters['search'] ?? null,
