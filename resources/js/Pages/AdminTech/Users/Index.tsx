@@ -171,6 +171,8 @@ export default function UserIndex({ users, filters, roles }: Props) {
                         </div>
                     </div>
                 </form>
+
+                <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-slate-50">
                             <tr>
@@ -288,3 +290,7 @@ export default function UserIndex({ users, filters, roles }: Props) {
                         )}
                     </div>
                 </div>
+            </section>
+        </AuthenticatedLayout>
+    );
+}
