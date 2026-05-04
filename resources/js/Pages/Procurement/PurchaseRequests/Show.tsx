@@ -139,7 +139,7 @@ export default function PurchaseRequestsShow({ purchaseRequest, reviewMode = fal
                         </Link>
                     </div>
 
-                    {(purchaseRequest.status === 'OPEN' || purchaseRequest.status === 'RETURNED_FOR_REVISION') && permissions?.process && reviewMode ? (
+                    {(purchaseRequest.status === 'OPEN' || purchaseRequest.status === 'PROCESSING' || purchaseRequest.status === 'RETURNED_FOR_REVISION') && permissions?.process && reviewMode ? (
                         <form onSubmit={processRequest} className="space-y-3 rounded-lg border bg-white p-6">
                             <label className="mb-1 block text-sm text-gray-700">Review Decision Remarks</label>
                             <textarea
@@ -151,9 +151,11 @@ export default function PurchaseRequestsShow({ purchaseRequest, reviewMode = fal
                             />
                             {processForm.errors.remarks ? <p className="text-xs text-rose-600">{processForm.errors.remarks}</p> : null}
                             <div className="flex flex-wrap gap-2">
-                                <button type="button" onClick={() => submitReviewAction('process')} className="rounded bg-amber-600 px-4 py-2 text-sm text-white">
-                                    Move to Processing
-                                </button>
+                                {(purchaseRequest.status === 'OPEN' || purchaseRequest.status === 'RETURNED_FOR_REVISION') && (
+                                    <button type="button" onClick={() => submitReviewAction('process')} className="rounded bg-amber-600 px-4 py-2 text-sm text-white">
+                                        Move to Processing
+                                    </button>
+                                )}
                                 <button type="button" onClick={() => submitReviewAction('return')} className="rounded bg-violet-600 px-4 py-2 text-sm text-white">
                                     Return for Revision
                                 </button>

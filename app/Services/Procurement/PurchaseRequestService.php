@@ -401,9 +401,9 @@ class PurchaseRequestService
     {
         $this->assertProcurementActor($actor);
 
-        if (! in_array((string) $purchaseRequest->status, ['OPEN', 'RETURNED_FOR_REVISION'], true)) {
+        if (! in_array((string) $purchaseRequest->status, ['OPEN', 'PROCESSING', 'RETURNED_FOR_REVISION'], true)) {
             throw ValidationException::withMessages([
-                'status' => 'Only OPEN or RETURNED_FOR_REVISION purchase requests can be returned for revision.',
+                'status' => 'Only OPEN, PROCESSING, or RETURNED_FOR_REVISION purchase requests can be returned for revision.',
             ]);
         }
 
@@ -443,9 +443,9 @@ class PurchaseRequestService
     {
         $this->assertProcurementActor($actor);
 
-        if (! in_array((string) $purchaseRequest->status, ['OPEN', 'RETURNED_FOR_REVISION'], true)) {
+        if (! in_array((string) $purchaseRequest->status, ['OPEN', 'PROCESSING', 'RETURNED_FOR_REVISION'], true)) {
             throw ValidationException::withMessages([
-                'status' => 'Only OPEN or RETURNED_FOR_REVISION purchase requests can be rejected.',
+                'status' => 'Only OPEN, PROCESSING, or RETURNED_FOR_REVISION purchase requests can be rejected.',
             ]);
         }
 
