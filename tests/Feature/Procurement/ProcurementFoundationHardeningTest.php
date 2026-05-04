@@ -42,7 +42,7 @@ class ProcurementFoundationHardeningTest extends TestCase
             'purchase_request_id' => $purchaseRequest->purchase_request_id,
             'supplier_id' => $supplier->supplier_id,
             'po_number' => 'PO-HARD-0001',
-            'procurement_method' => 'SHOPPING',
+            'procurement_method' => 'SMALL_VALUE_PROCUREMENT',
             'expected_delivery_date' => now()->addDays(3)->toDateString(),
             'terms_notes' => 'Net 30',
             'remarks' => 'first',
@@ -75,6 +75,7 @@ class ProcurementFoundationHardeningTest extends TestCase
 
         $this->actingAs($procurementOfficer)
             ->post(route('procurement.purchase-requests.process', $purchaseRequest->purchase_request_id), [
+                'action' => 'process',
                 'remarks' => 'repeat process',
             ])
             ->assertForbidden();
@@ -87,7 +88,7 @@ class ProcurementFoundationHardeningTest extends TestCase
                 'supply_request_id' => $context['supplyRequest']->supply_request_id,
                 'supplier_id' => $supplier->supplier_id,
                 'po_number' => 'PO-STATUS-0001',
-                'procurement_method' => 'SHOPPING',
+                'procurement_method' => 'SMALL_VALUE_PROCUREMENT',
                 'expected_delivery_date' => now()->addDays(5)->toDateString(),
                 'terms_notes' => 'Net 30',
             ])
@@ -171,10 +172,11 @@ class ProcurementFoundationHardeningTest extends TestCase
                 'purchase_request_id' => $purchaseRequest->purchase_request_id,
                 'supply_request_id' => $otherContext['supplyRequest']->supply_request_id,
                 'supplier_id' => $inactiveSupplier->supplier_id,
-                'po_number' => 'PO-LINK-0001',
-                'procurement_method' => 'SHOPPING',
-            ])
-            ->assertSessionHasErrors('supplier_id');
+            'po_number' => 'PO-LINK-0001',
+            'procurement_method' => 'SMALL_VALUE_PROCUREMENT',
+            'expected_delivery_date' => now()->addDays(5)->toDateString(),
+        ])
+        ->assertSessionHasErrors('supplier_id');
 
         $activeSupplier = $this->createSupplier($procurementOfficer, 'ACTIVE');
 
@@ -183,10 +185,11 @@ class ProcurementFoundationHardeningTest extends TestCase
                 'purchase_request_id' => $purchaseRequest->purchase_request_id,
                 'supply_request_id' => $otherContext['supplyRequest']->supply_request_id,
                 'supplier_id' => $activeSupplier->supplier_id,
-                'po_number' => 'PO-LINK-0002',
-                'procurement_method' => 'SHOPPING',
-            ])
-            ->assertRedirect();
+            'po_number' => 'PO-LINK-0002',
+            'procurement_method' => 'SMALL_VALUE_PROCUREMENT',
+            'expected_delivery_date' => now()->addDays(5)->toDateString(),
+        ])
+        ->assertRedirect();
 
         $purchaseOrder = PurchaseOrder::query()->firstOrFail();
         $this->assertSame((int) $primaryContext['supplyRequest']->supply_request_id, (int) $purchaseOrder->supply_request_id);
@@ -210,10 +213,11 @@ class ProcurementFoundationHardeningTest extends TestCase
                 'purchase_request_id' => $purchaseRequest->purchase_request_id,
                 'supply_request_id' => $primaryContext['supplyRequest']->supply_request_id,
                 'supplier_id' => $supplier->supplier_id,
-                'po_number' => 'PO-ITEM-LINK-0001',
-                'procurement_method' => 'SHOPPING',
-            ])
-            ->assertRedirect();
+            'po_number' => 'PO-ITEM-LINK-0001',
+            'procurement_method' => 'SMALL_VALUE_PROCUREMENT',
+            'expected_delivery_date' => now()->addDays(5)->toDateString(),
+        ])
+        ->assertRedirect();
 
         $purchaseOrder = PurchaseOrder::query()->firstOrFail();
 
@@ -246,10 +250,11 @@ class ProcurementFoundationHardeningTest extends TestCase
                 'purchase_request_id' => $purchaseRequest->purchase_request_id,
                 'supply_request_id' => $context['supplyRequest']->supply_request_id,
                 'supplier_id' => $supplier->supplier_id,
-                'po_number' => 'PO-TOTALS-0001',
-                'procurement_method' => 'SHOPPING',
-            ])
-            ->assertRedirect();
+            'po_number' => 'PO-TOTALS-0001',
+            'procurement_method' => 'SMALL_VALUE_PROCUREMENT',
+            'expected_delivery_date' => now()->addDays(5)->toDateString(),
+        ])
+        ->assertRedirect();
 
         $purchaseOrder = PurchaseOrder::query()->firstOrFail();
 
@@ -348,7 +353,6 @@ class ProcurementFoundationHardeningTest extends TestCase
             'unit_cost' => 100,
             'estimated_budget' => 1000,
             'procurement_schedule' => 'Q2',
-            'fund_source' => 'General Fund',
             'remarks' => null,
         ]);
 
@@ -396,6 +400,7 @@ class ProcurementFoundationHardeningTest extends TestCase
 
         $this->actingAs($procurementOfficer)
             ->post(route('procurement.purchase-requests.process', $purchaseRequest->purchase_request_id), [
+                'action' => 'process',
                 'remarks' => 'Move to processing',
             ])
             ->assertRedirect();

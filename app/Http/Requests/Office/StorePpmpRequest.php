@@ -26,7 +26,6 @@ class StorePpmpRequest extends FormRequest
             'items.*.quantity' => ['required_with:items', 'numeric', 'gt:0'],
             'items.*.unit_cost' => ['required_with:items', 'numeric', 'gte:0'],
             'items.*.procurement_schedule' => ['required_with:items', 'string', Rule::in(['Q1', 'Q2', 'Q3', 'Q4'])],
-            'items.*.fund_source' => ['nullable', 'string', 'max:100'],
             'items.*.remarks' => ['nullable', 'string', 'max:1000'],
         ];
     }

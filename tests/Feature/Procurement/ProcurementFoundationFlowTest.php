@@ -56,7 +56,6 @@ class ProcurementFoundationFlowTest extends TestCase
             'unit_cost' => 100,
             'estimated_budget' => 1000,
             'procurement_schedule' => 'Q2',
-            'fund_source' => 'General Fund',
             'remarks' => null,
         ]);
 
@@ -123,7 +122,7 @@ class ProcurementFoundationFlowTest extends TestCase
             'supply_request_id' => $supplyRequest->supply_request_id,
             'supplier_id' => $supplier->supplier_id,
             'po_number' => 'PO-2026-0001',
-            'procurement_method' => 'SHOPPING',
+            'procurement_method' => 'SMALL_VALUE_PROCUREMENT',
             'expected_delivery_date' => now()->addDays(10)->toDateString(),
             'terms_notes' => 'Net 30',
             'remarks' => 'Draft PO',

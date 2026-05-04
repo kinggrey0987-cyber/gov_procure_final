@@ -253,7 +253,6 @@ class PpmpAnomalyIntegrationTest extends TestCase
             'unit_cost' => 50,
             'estimated_budget' => $plannedQuantity * 50,
             'procurement_schedule' => 'Q1',
-            'fund_source' => 'General Fund',
             'remarks' => null,
         ]);
 
@@ -339,7 +338,7 @@ class PpmpAnomalyIntegrationTest extends TestCase
                 'supplier_id' => $supplier->supplier_id,
                 'created_by' => $this->procurementUser->id,
                 'po_number' => 'PO-PPA-'.$itemId.'-'.$index,
-                'procurement_method' => 'SHOPPING',
+                'procurement_method' => 'SMALL_VALUE_PROCUREMENT',
                 'status' => 'PLACED',
                 'expected_delivery_date' => now()->addDays(7)->toDateString(),
                 'total_amount' => (float) $unitPrice,
@@ -413,7 +412,6 @@ class PpmpAnomalyIntegrationTest extends TestCase
             'unit_cost' => 50,
             'estimated_budget' => $plannedQuantity * 50,
             'procurement_schedule' => 'Q1',
-            'fund_source' => 'General Fund',
             'remarks' => null,
         ]);
 

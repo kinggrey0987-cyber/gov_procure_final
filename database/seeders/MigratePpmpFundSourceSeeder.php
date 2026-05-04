@@ -9,10 +9,7 @@ use Illuminate\Database\Seeder;
 class MigratePpmpFundSourceSeeder extends Seeder
 {
     /**
-     * Run the seeder to migrate existing PPMPs with the most common fund_source from their items.
-     *
-     * This seeder is designed for demo/development environments where data can be modified.
-     * For production data, a data migration command would be more appropriate.
+     * Ensure existing demo/development PPMP headers have a fund source default.
      */
     public function run(): void
     {
@@ -20,18 +17,7 @@ class MigratePpmpFundSourceSeeder extends Seeder
         $defaultsApplied = 0;
 
         foreach (Ppmp::all() as $ppmp) {
-            $fundSources = $ppmp->items()
-                ->pluck('fund_source')
-                ->filter()
-                ->countBy()
-                ->sortDesc();
-
-            if ($fundSources->isNotEmpty()) {
-                // Use the most common fund_source from items
-                $mostCommon = $fundSources->keys()->first();
-                $ppmp->update(['fund_source' => $mostCommon]);
-            } else {
-                // Default to GAA_CURRENT if no items or all items have null fund_source
+            if (! $ppmp->fund_source) {
                 $ppmp->update(['fund_source' => FundSource::GAA_CURRENT->value]);
                 $defaultsApplied++;
             }

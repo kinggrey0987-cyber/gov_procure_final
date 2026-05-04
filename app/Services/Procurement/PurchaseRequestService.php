@@ -2,6 +2,7 @@
 
 namespace App\Services\Procurement;
 
+use App\Enums\FundSource;
 use App\Models\Inventory;
 use App\Models\Office;
 use App\Models\Ppmp;
@@ -249,6 +250,7 @@ class PurchaseRequestService
                 'prepared_by' => (int) $actor->id,
                 'approved_by' => null,
                 'fiscal_year' => (int) now()->format('Y'),
+                'fund_source' => FundSource::APPROPRIATION_ORDINANCE->value,
                 'status' => 'SUBMITTED',
                 'total_estimated_budget' => 0,
                 'date_prepared' => now()->toDateString(),
@@ -264,7 +266,6 @@ class PurchaseRequestService
                 'unit_cost' => 0,
                 'estimated_budget' => 0,
                 'procurement_schedule' => 'IMMEDIATE',
-                'fund_source' => 'General Fund',
                 'remarks' => $governanceLabel,
             ]);
 

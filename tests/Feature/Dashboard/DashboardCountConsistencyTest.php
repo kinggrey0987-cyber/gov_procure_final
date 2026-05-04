@@ -174,7 +174,7 @@ class DashboardCountConsistencyTest extends TestCase
             'supplier_id' => (int) $supplier->supplier_id,
             'created_by' => (int) $procUser->id,
             'po_number' => $this->nextCode('PO'),
-            'procurement_method' => 'PUBLIC_BIDDING',
+            'procurement_method' => 'COMPETITIVE_BIDDING',
             'status' => 'COMPLETED',
             'expected_delivery_date' => now()->addDays(15)->toDateString(),
             'total_amount' => 7500,

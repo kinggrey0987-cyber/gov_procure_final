@@ -3,6 +3,7 @@
 namespace App\Services\Office;
 
 use App\Models\ApprovalHistory;
+use App\Enums\FundSource;
 use App\Models\Ppmp;
 use App\Models\PpmpItem;
 use App\Models\StatusHistory;
@@ -55,8 +56,10 @@ class PpmpService
 
         return DB::transaction(function () use ($ppmp, $actor, $payload): Ppmp {
             $oldStatus = (string) $ppmp->status;
-            $oldFundSource = (string) $ppmp->fund_source;
-            $newFundSource = $payload['fund_source'] ?? $ppmp->fund_source;
+            $oldFundSource = $ppmp->fund_source instanceof FundSource
+                ? $ppmp->fund_source->value
+                : (string) $ppmp->fund_source;
+            $newFundSource = $payload['fund_source'] ?? $oldFundSource;
 
             $ppmp->fill([
                 'fiscal_year' => (int) $payload['fiscal_year'],
@@ -130,7 +133,6 @@ class PpmpService
                 'unit_cost' => $unitCost,
                 'estimated_budget' => $estimatedBudget,
                 'procurement_schedule' => $payload['procurement_schedule'],
-                'fund_source' => $ppmp->fund_source,
                 'remarks' => $payload['remarks'] ?? null,
             ]);
 
@@ -166,7 +168,6 @@ class PpmpService
                 'unit_cost' => $unitCost,
                 'estimated_budget' => round($quantity * $unitCost, 2),
                 'procurement_schedule' => $payload['procurement_schedule'],
-                'fund_source' => $ppmp->fund_source,
                 'remarks' => $payload['remarks'] ?? null,
             ])->save();
 

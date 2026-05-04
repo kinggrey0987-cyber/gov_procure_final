@@ -35,6 +35,7 @@ class OfficeTransactionalAccessTest extends TestCase
             'prepared_by' => $owner->id,
             'approved_by' => null,
             'fiscal_year' => 2026,
+            'fund_source' => 'GAA_CURRENT',
             'status' => 'DRAFT',
             'total_estimated_budget' => 0,
             'date_prepared' => now()->toDateString(),
@@ -120,7 +121,6 @@ class OfficeTransactionalAccessTest extends TestCase
             'unit_cost' => 100,
             'estimated_budget' => 200,
             'procurement_schedule' => 'Q1',
-            'fund_source' => 'General Fund',
             'remarks' => null,
         ]);
 
@@ -131,7 +131,6 @@ class OfficeTransactionalAccessTest extends TestCase
                 'quantity' => 4,
                 'unit_cost' => 100,
                 'procurement_schedule' => 'Q2',
-                'fund_source' => 'MOOE',
                 'remarks' => 'Unauthorized update attempt',
             ])
             ->assertForbidden();

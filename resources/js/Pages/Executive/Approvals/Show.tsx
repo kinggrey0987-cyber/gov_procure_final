@@ -1,6 +1,7 @@
 import AttachmentsPanel from '@/Components/AttachmentsPanel';
 import PpmpDecisionModal from '@/Components/PpmpDecisionModal';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import { getFundSourceLabel } from '@/constants/fundSources';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 
@@ -30,6 +31,7 @@ type Props = {
         approver?: { id: number; name: string } | null;
         status: string;
         fiscal_year: number;
+        fund_source: string;
         date_prepared?: string | null;
         submitted_at?: string | null;
         date_approved?: string | null;
@@ -149,6 +151,7 @@ export default function ExecutiveApprovalShow({
                         <p><span className="font-semibold">Prepared By:</span> {ppmp.preparer?.name ?? '-'}</p>
                         <p><span className="font-semibold">Current Approver:</span> {ppmp.approver?.name ?? '-'}</p>
                         <p><span className="font-semibold">Fiscal Year:</span> {ppmp.fiscal_year}</p>
+                        <p><span className="font-semibold">Fund Source:</span> {getFundSourceLabel(ppmp.fund_source) || '-'}</p>
                         <p><span className="font-semibold">Date Prepared:</span> {formatDate(ppmp.date_prepared)}</p>
                         <p><span className="font-semibold">Submission Date:</span> {formatDate(ppmp.submitted_at)}</p>
                         <p><span className="font-semibold">Approval Date:</span> {formatDate(ppmp.date_approved)}</p>

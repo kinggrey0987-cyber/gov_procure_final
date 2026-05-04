@@ -35,6 +35,7 @@ class OfficeTransactionalFlowTest extends TestCase
 
         $create = $this->actingAs($officeUser)->post(route('office.ppmp.store'), [
             'fiscal_year' => 2026,
+            'fund_source' => 'GAA_CURRENT',
             'date_prepared' => now()->toDateString(),
             'remarks' => 'Initial',
         ]);
@@ -48,12 +49,12 @@ class OfficeTransactionalFlowTest extends TestCase
             'quantity' => 2,
             'unit_cost' => 150,
             'procurement_schedule' => 'Q1',
-            'fund_source' => 'General Fund',
             'remarks' => 'Item row',
         ])->assertRedirect();
 
         $this->actingAs($officeUser)->put(route('office.ppmp.update', $ppmp->ppmp_id), [
             'fiscal_year' => 2027,
+            'fund_source' => 'GAA_CONTINUING',
             'date_prepared' => now()->toDateString(),
             'remarks' => 'Updated',
         ])->assertRedirect();
@@ -85,6 +86,7 @@ class OfficeTransactionalFlowTest extends TestCase
             'prepared_by' => $officeUser->id,
             'approved_by' => null,
             'fiscal_year' => 2026,
+            'fund_source' => 'GAA_CURRENT',
             'status' => 'DRAFT',
             'total_estimated_budget' => 400,
             'date_prepared' => now()->toDateString(),
@@ -100,7 +102,6 @@ class OfficeTransactionalFlowTest extends TestCase
             'unit_cost' => 200,
             'estimated_budget' => 400,
             'procurement_schedule' => 'Q1',
-            'fund_source' => 'MOOE',
             'remarks' => 'Existing line',
         ]);
 
@@ -115,7 +116,6 @@ class OfficeTransactionalFlowTest extends TestCase
                 ->where('ppmp.items.0.unit_cost', '200.00')
                 ->where('ppmp.items.0.estimated_budget', '400.00')
                 ->where('ppmp.items.0.procurement_schedule', 'Q1')
-                ->where('ppmp.items.0.fund_source', 'MOOE')
             );
     }
 
@@ -129,6 +129,7 @@ class OfficeTransactionalFlowTest extends TestCase
             'prepared_by' => $officeUser->id,
             'approved_by' => null,
             'fiscal_year' => 2026,
+            'fund_source' => 'GAA_CURRENT',
             'status' => 'DRAFT',
             'total_estimated_budget' => 150,
             'date_prepared' => now()->toDateString(),
@@ -144,7 +145,6 @@ class OfficeTransactionalFlowTest extends TestCase
             'unit_cost' => 50,
             'estimated_budget' => 150,
             'procurement_schedule' => 'Q2',
-            'fund_source' => 'General Fund',
             'remarks' => null,
         ]);
 
@@ -155,7 +155,6 @@ class OfficeTransactionalFlowTest extends TestCase
                 'quantity' => 4,
                 'unit_cost' => 75,
                 'procurement_schedule' => 'Q3',
-                'fund_source' => 'MOOE',
                 'remarks' => 'Updated row',
             ])
             ->assertRedirect(route('office.ppmp.edit', $ppmp->ppmp_id));
@@ -166,7 +165,6 @@ class OfficeTransactionalFlowTest extends TestCase
             'unit_cost' => 75,
             'estimated_budget' => 300,
             'procurement_schedule' => 'Q3',
-            'fund_source' => 'MOOE',
             'remarks' => 'Updated row',
         ]);
 
@@ -189,6 +187,7 @@ class OfficeTransactionalFlowTest extends TestCase
             'prepared_by' => $officeUser->id,
             'approved_by' => null,
             'fiscal_year' => 2026,
+            'fund_source' => 'GAA_CURRENT',
             'status' => 'DRAFT',
             'total_estimated_budget' => 0,
             'date_prepared' => now()->toDateString(),
@@ -203,7 +202,6 @@ class OfficeTransactionalFlowTest extends TestCase
                 'quantity' => 5,
                 'unit_cost' => 20,
                 'procurement_schedule' => 'Q2',
-                'fund_source' => 'General Fund',
                 'remarks' => 'Added from edit',
             ]);
 
@@ -218,7 +216,6 @@ class OfficeTransactionalFlowTest extends TestCase
             'unit_cost' => 20,
             'estimated_budget' => 100,
             'procurement_schedule' => 'Q2',
-            'fund_source' => 'General Fund',
             'remarks' => 'Added from edit',
         ]);
     }
@@ -233,6 +230,7 @@ class OfficeTransactionalFlowTest extends TestCase
             'prepared_by' => $officeUser->id,
             'approved_by' => null,
             'fiscal_year' => 2026,
+            'fund_source' => 'GAA_CURRENT',
             'status' => 'DRAFT',
             'total_estimated_budget' => 0,
             'date_prepared' => now()->toDateString(),
@@ -248,11 +246,10 @@ class OfficeTransactionalFlowTest extends TestCase
                 'quantity' => 0,
                 'unit_cost' => -1,
                 'procurement_schedule' => '',
-                'fund_source' => '',
             ]);
 
         $response->assertRedirect(route('office.ppmp.edit', $ppmp->ppmp_id));
-        $response->assertSessionHasErrors(['quantity', 'unit_cost', 'procurement_schedule', 'fund_source']);
+        $response->assertSessionHasErrors(['quantity', 'unit_cost', 'procurement_schedule']);
     }
 
     public function test_office_user_can_view_return_or_reject_reasons_in_ppmp_history(): void
@@ -341,6 +338,7 @@ class OfficeTransactionalFlowTest extends TestCase
             'prepared_by' => $officeUser->id,
             'approved_by' => null,
             'fiscal_year' => 2026,
+            'fund_source' => 'GAA_CURRENT',
             'status' => 'DRAFT',
             'total_estimated_budget' => 0,
             'date_prepared' => now()->toDateString(),
@@ -356,7 +354,6 @@ class OfficeTransactionalFlowTest extends TestCase
                     'quantity' => 2,
                     'unit_cost' => 10,
                     'procurement_schedule' => $quarter,
-                    'fund_source' => 'General Fund',
                     'remarks' => 'Quarter '.$quarter,
                 ])
                 ->assertRedirect(route('office.ppmp.edit', $ppmp->ppmp_id));
@@ -378,6 +375,7 @@ class OfficeTransactionalFlowTest extends TestCase
             'prepared_by' => $officeUser->id,
             'approved_by' => null,
             'fiscal_year' => 2026,
+            'fund_source' => 'GAA_CURRENT',
             'status' => 'DRAFT',
             'total_estimated_budget' => 0,
             'date_prepared' => now()->toDateString(),
@@ -393,7 +391,6 @@ class OfficeTransactionalFlowTest extends TestCase
                 'quantity' => 2,
                 'unit_cost' => 10,
                 'procurement_schedule' => 'First Quarter',
-                'fund_source' => 'General Fund',
                 'remarks' => null,
             ]);
 
@@ -414,6 +411,7 @@ class OfficeTransactionalFlowTest extends TestCase
             'prepared_by' => $officeUser->id,
             'approved_by' => null,
             'fiscal_year' => 2026,
+            'fund_source' => 'GAA_CURRENT',
             'status' => 'DRAFT',
             'total_estimated_budget' => 150,
             'date_prepared' => now()->toDateString(),
@@ -429,7 +427,6 @@ class OfficeTransactionalFlowTest extends TestCase
             'unit_cost' => 50,
             'estimated_budget' => 150,
             'procurement_schedule' => 'Q2',
-            'fund_source' => 'General Fund',
             'remarks' => null,
         ]);
 
@@ -441,7 +438,6 @@ class OfficeTransactionalFlowTest extends TestCase
                 'quantity' => 4,
                 'unit_cost' => 75,
                 'procurement_schedule' => 'Quarter 3',
-                'fund_source' => 'MOOE',
                 'remarks' => 'Invalid quarter update',
             ]);
 
@@ -462,6 +458,7 @@ class OfficeTransactionalFlowTest extends TestCase
             'prepared_by' => $officeUser->id,
             'approved_by' => $officeUser->id,
             'fiscal_year' => 2026,
+            'fund_source' => 'GAA_CURRENT',
             'status' => 'APPROVED',
             'total_estimated_budget' => 0,
             'date_prepared' => now()->toDateString(),
@@ -477,7 +474,6 @@ class OfficeTransactionalFlowTest extends TestCase
             'unit_cost' => 100,
             'estimated_budget' => 5000,
             'procurement_schedule' => 'Q2',
-            'fund_source' => 'General Fund',
             'remarks' => null,
         ]);
 
@@ -553,6 +549,7 @@ class OfficeTransactionalFlowTest extends TestCase
             'prepared_by' => $officeUser->id,
             'approved_by' => $officeUser->id,
             'fiscal_year' => 2026,
+            'fund_source' => 'GAA_CURRENT',
             'status' => 'APPROVED',
             'total_estimated_budget' => 0,
             'date_prepared' => now()->toDateString(),
@@ -568,7 +565,6 @@ class OfficeTransactionalFlowTest extends TestCase
             'unit_cost' => 35,
             'estimated_budget' => 700,
             'procurement_schedule' => 'Q1',
-            'fund_source' => 'General Fund',
             'remarks' => null,
         ]);
 
@@ -632,6 +628,7 @@ class OfficeTransactionalFlowTest extends TestCase
             'prepared_by' => $officeUser->id,
             'approved_by' => $officeUser->id,
             'fiscal_year' => 2026,
+            'fund_source' => 'GAA_CURRENT',
             'status' => 'APPROVED',
             'total_estimated_budget' => 0,
             'date_prepared' => now()->toDateString(),
@@ -644,6 +641,7 @@ class OfficeTransactionalFlowTest extends TestCase
             'prepared_by' => $officeUser->id,
             'approved_by' => null,
             'fiscal_year' => 2026,
+            'fund_source' => 'GAA_CURRENT',
             'status' => 'SUBMITTED',
             'total_estimated_budget' => 0,
             'date_prepared' => now()->toDateString(),
@@ -656,6 +654,7 @@ class OfficeTransactionalFlowTest extends TestCase
             'prepared_by' => $officeUser->id,
             'approved_by' => null,
             'fiscal_year' => 2026,
+            'fund_source' => 'GAA_CURRENT',
             'status' => 'DRAFT',
             'total_estimated_budget' => 0,
             'date_prepared' => now()->toDateString(),
@@ -668,6 +667,7 @@ class OfficeTransactionalFlowTest extends TestCase
             'prepared_by' => $officeUser->id,
             'approved_by' => $officeUser->id,
             'fiscal_year' => 2026,
+            'fund_source' => 'GAA_CURRENT',
             'status' => 'APPROVED',
             'total_estimated_budget' => 0,
             'date_prepared' => now()->toDateString(),
@@ -696,6 +696,7 @@ class OfficeTransactionalFlowTest extends TestCase
             'prepared_by' => $officeUser->id,
             'approved_by' => null,
             'fiscal_year' => 2026,
+            'fund_source' => 'GAA_CURRENT',
             'status' => 'SUBMITTED',
             'total_estimated_budget' => 0,
             'date_prepared' => now()->toDateString(),
@@ -728,6 +729,7 @@ class OfficeTransactionalFlowTest extends TestCase
             'prepared_by' => $officeUser->id,
             'approved_by' => null,
             'fiscal_year' => 2026,
+            'fund_source' => 'GAA_CURRENT',
             'status' => 'SUBMITTED',
             'total_estimated_budget' => 0,
             'date_prepared' => now()->toDateString(),
@@ -740,6 +742,7 @@ class OfficeTransactionalFlowTest extends TestCase
             'prepared_by' => $officeUser->id,
             'approved_by' => $officeUser->id,
             'fiscal_year' => 2026,
+            'fund_source' => 'GAA_CURRENT',
             'status' => 'APPROVED',
             'total_estimated_budget' => 0,
             'date_prepared' => now()->toDateString(),
@@ -798,6 +801,7 @@ class OfficeTransactionalFlowTest extends TestCase
             'prepared_by' => $officeUser->id,
             'approved_by' => null,
             'fiscal_year' => 2026,
+            'fund_source' => 'GAA_CURRENT',
             'status' => 'SUBMITTED',
             'total_estimated_budget' => 0,
             'date_prepared' => now()->toDateString(),
@@ -843,6 +847,7 @@ class OfficeTransactionalFlowTest extends TestCase
             'prepared_by' => $officeUser->id,
             'approved_by' => $officeUser->id,
             'fiscal_year' => 2026,
+            'fund_source' => 'GAA_CURRENT',
             'status' => 'APPROVED',
             'total_estimated_budget' => 0,
             'date_prepared' => now()->toDateString(),
@@ -858,7 +863,6 @@ class OfficeTransactionalFlowTest extends TestCase
             'unit_cost' => 100,
             'estimated_budget' => 1000,
             'procurement_schedule' => 'Q1',
-            'fund_source' => 'General Fund',
             'remarks' => null,
         ]);
 
@@ -889,6 +893,7 @@ class OfficeTransactionalFlowTest extends TestCase
             'prepared_by' => $officeUser->id,
             'approved_by' => $officeUser->id,
             'fiscal_year' => 2026,
+            'fund_source' => 'GAA_CURRENT',
             'status' => 'APPROVED',
             'total_estimated_budget' => 0,
             'date_prepared' => now()->toDateString(),
@@ -901,6 +906,7 @@ class OfficeTransactionalFlowTest extends TestCase
             'prepared_by' => $officeUser->id,
             'approved_by' => $officeUser->id,
             'fiscal_year' => 2026,
+            'fund_source' => 'GAA_CURRENT',
             'status' => 'APPROVED',
             'total_estimated_budget' => 0,
             'date_prepared' => now()->toDateString(),
@@ -916,7 +922,6 @@ class OfficeTransactionalFlowTest extends TestCase
             'unit_cost' => 100,
             'estimated_budget' => 500,
             'procurement_schedule' => 'Q2',
-            'fund_source' => 'General Fund',
             'remarks' => null,
         ]);
 
@@ -948,6 +953,7 @@ class OfficeTransactionalFlowTest extends TestCase
             'prepared_by' => $officeUser->id,
             'approved_by' => $officeUser->id,
             'fiscal_year' => 2026,
+            'fund_source' => 'GAA_CURRENT',
             'status' => 'APPROVED',
             'total_estimated_budget' => 0,
             'date_prepared' => now()->toDateString(),
@@ -963,7 +969,6 @@ class OfficeTransactionalFlowTest extends TestCase
             'unit_cost' => 100,
             'estimated_budget' => 500,
             'procurement_schedule' => 'Q2',
-            'fund_source' => 'General Fund',
             'remarks' => null,
         ]);
 

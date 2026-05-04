@@ -181,7 +181,7 @@ class PpmpApprovalController extends Controller
             'office:id,name',
             'preparer:id,name',
             'approver:id,name',
-            'items:ppmp_item_id,ppmp_id,item_id,item_category_id,quantity,unit_cost,estimated_budget,procurement_schedule,fund_source,remarks',
+            'items:ppmp_item_id,ppmp_id,item_id,item_category_id,quantity,unit_cost,estimated_budget,procurement_schedule,remarks',
         ]);
 
         $history = $this->historyTimelineService->forRecord($request->user(), $ppmp);
@@ -208,6 +208,7 @@ class PpmpApprovalController extends Controller
                 ] : null,
                 'status' => (string) $ppmp->status,
                 'fiscal_year' => (int) $ppmp->fiscal_year,
+                'fund_source' => (string) $ppmp->fund_source,
                 'date_prepared' => optional($ppmp->date_prepared)?->toDateString(),
                 'submitted_at' => $submittedAt,
                 'date_approved' => optional($ppmp->date_approved)?->toDateString(),

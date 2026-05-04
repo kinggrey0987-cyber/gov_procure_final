@@ -22,7 +22,7 @@ class UpdatePpmpRequest extends FormRequest
         return [
             'fiscal_year' => ['required', 'integer', 'min:2000', 'max:3000'],
             'date_prepared' => ['required', 'date'],
-            'fund_source' => ['nullable', 'string', Rule::in(FundSource::values())],
+            'fund_source' => ['required', 'string', Rule::in(FundSource::values())],
             'remarks' => ['nullable', 'string', 'max:2000'],
         ];
     }

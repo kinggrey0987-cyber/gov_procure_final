@@ -71,7 +71,7 @@ class DeliveryFeatureTest extends TestCase
             'supplier_id' => $this->supplier->supplier_id,
             'created_by' => $this->procurementOfficer->id,
             'po_number' => 'PO-DEL-0001',
-            'procurement_method' => 'SHOPPING',
+            'procurement_method' => 'SMALL_VALUE_PROCUREMENT',
             'status' => 'PLACED',
             'expected_delivery_date' => now()->addDays(3)->toDateString(),
             'total_amount' => 500,
@@ -304,7 +304,7 @@ class DeliveryFeatureTest extends TestCase
             'supplier_id' => $otherSupplier->supplier_id,
             'created_by' => $this->procurementOfficer->id,
             'po_number' => 'PO-DEL-0002',
-            'procurement_method' => 'SHOPPING',
+            'procurement_method' => 'SMALL_VALUE_PROCUREMENT',
             'status' => 'PLACED',
             'expected_delivery_date' => now()->addDays(2)->toDateString(),
             'total_amount' => 100,
@@ -446,7 +446,6 @@ class DeliveryFeatureTest extends TestCase
             'unit_cost' => 100,
             'estimated_budget' => 1000,
             'procurement_schedule' => 'Q2',
-            'fund_source' => 'General Fund',
             'remarks' => null,
         ]);
 

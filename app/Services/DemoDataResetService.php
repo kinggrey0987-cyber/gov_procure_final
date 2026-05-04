@@ -8,6 +8,69 @@ use Illuminate\Support\Facades\Storage;
 
 class DemoDataResetService
 {
+    /**
+     * Workflow/transactional tables that this reset is allowed to delete.
+     *
+     * Auth, users, roles, offices, permissions, item catalog, suppliers,
+     * system backups, and technical audit setup are intentionally excluded.
+     *
+     * @return array<int, string>
+     */
+    public function workflowTablesInDeletionOrder(): array
+    {
+        return [
+            'documents',
+            'public_disclosures',
+            'record_archives',
+            'notifications',
+            'approval_history',
+            'status_history',
+            'alerts',
+            'anomalies',
+            'claims',
+            'delivery_verifications',
+            'distribution_items',
+            'distribution_records',
+            'delivery_items',
+            'deliveries',
+            'inventory_movements',
+            'purchase_order_items',
+            'purchase_orders',
+            'purchase_request_items',
+            'purchase_requests',
+            'supply_request_items',
+            'supply_requests',
+            'ppmp_items',
+            'ppmp',
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function preservedTables(): array
+    {
+        return [
+            'users',
+            'roles',
+            'offices',
+            'password_reset_tokens',
+            'sessions',
+            'two_factor_challenges',
+            'item_categories',
+            'items',
+            'suppliers',
+            'inventory',
+            'audit_logs',
+            'system_backups',
+            'cache',
+            'cache_locks',
+            'jobs',
+            'job_batches',
+            'failed_jobs',
+        ];
+    }
+
     private function publicDisk(): string
     {
         return (string) config('filesystems.public_disk', 'public');
@@ -18,51 +81,15 @@ class DemoDataResetService
      */
     public function resetTransactionalData(): array
     {
-        // Child-first delete order for non-PostgreSQL drivers; PostgreSQL uses CASCADE truncate.
-        $tables = [
-            'delivery_verifications',
-            'delivery_items',
-            'distribution_items',
-            'distribution_records',
-            'deliveries',
-            'purchase_order_items',
-            'purchase_orders',
-            'purchase_request_items',
-            'purchase_requests',
-            'supply_request_items',
-            'supply_requests',
-            'ppmp_items',
-            'ppmp',
-            'claims',
-            'inventory_movements',
-            'inventory',
-            'anomalies',
-            'alerts',
-            'documents',
-            'public_disclosures',
-            'notifications',
-            'approval_history',
-            'status_history',
-            'audit_logs',
-            'record_archives',
-            'system_backups',
-        ];
-
-        $existingTables = array_values(array_filter($tables, static fn (string $table): bool => Schema::hasTable($table)));
+        $existingTables = array_values(array_filter($this->workflowTablesInDeletionOrder(), static fn (string $table): bool => Schema::hasTable($table)));
 
         DB::transaction(function () use ($existingTables): void {
             if ($existingTables === []) {
                 return;
             }
 
-            $driver = DB::getDriverName();
-
-            if ($driver === 'pgsql') {
-                DB::statement('TRUNCATE TABLE '.implode(', ', $existingTables).' RESTART IDENTITY CASCADE');
-            } else {
-                foreach ($existingTables as $table) {
-                    DB::table($table)->delete();
-                }
+            foreach ($existingTables as $table) {
+                DB::table($table)->delete();
             }
         });
 

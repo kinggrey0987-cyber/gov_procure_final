@@ -331,7 +331,7 @@ class AuditHistoryUiFoundationTest extends TestCase
             'supplier_id' => $supplier->supplier_id,
             'created_by' => $procurementUser->id,
             'po_number' => 'PO-AUD-'.uniqid(),
-            'procurement_method' => 'SHOPPING',
+            'procurement_method' => 'SMALL_VALUE_PROCUREMENT',
             'status' => 'DRAFT',
             'expected_delivery_date' => now()->addDays(3)->toDateString(),
             'total_amount' => 1000,

@@ -789,7 +789,6 @@ class InventoryDistributionFoundationTest extends TestCase
             'unit_cost' => 10,
             'estimated_budget' => $quantityRequested * 10,
             'procurement_schedule' => 'Q1',
-            'fund_source' => 'General Fund',
             'remarks' => null,
         ]);
 
@@ -852,7 +851,6 @@ class InventoryDistributionFoundationTest extends TestCase
             'unit_cost' => 100,
             'estimated_budget' => 500,
             'procurement_schedule' => 'Q1',
-            'fund_source' => 'General Fund',
             'remarks' => null,
         ]);
 
@@ -902,7 +900,7 @@ class InventoryDistributionFoundationTest extends TestCase
             'supplier_id' => $supplier->supplier_id,
             'created_by' => $procurementOfficer->id,
             'po_number' => 'PO-INV-'.uniqid(),
-            'procurement_method' => 'SHOPPING',
+            'procurement_method' => 'SMALL_VALUE_PROCUREMENT',
             'status' => 'PLACED',
             'expected_delivery_date' => now()->addDays(2)->toDateString(),
             'total_amount' => 500,
