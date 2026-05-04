@@ -61,6 +61,9 @@ class AlertController
 
         return Inertia::render('Executive/Alerts/Index', [
             'alerts' => $alerts,
+            'permissions' => [
+                'review' => auth()->user()->isExecutive(),
+            ],
             'filters' => [
                 ...$request->only(['status', 'severity', 'month']),
                 'year' => $year,

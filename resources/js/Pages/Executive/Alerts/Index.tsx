@@ -28,9 +28,13 @@ type Props = {
     filter_options?: {
         years: number[];
     };
+    permissions?: {
+        review: boolean;
+    };
 };
 
-export default function ExecutiveAlertIndex({ alerts, filters, filter_options }: Props) {
+export default function ExecutiveAlertIndex({ alerts, filters, filter_options, permissions }: Props) {
+    const canReview = permissions?.review === true;
     const [status, setStatus] = useState(filters.status ?? '');
     const [severity, setSeverity] = useState(filters.severity ?? '');
     const [year, setYear] = useState(filters.year ?? '');
@@ -129,9 +133,15 @@ export default function ExecutiveAlertIndex({ alerts, filters, filter_options }:
                                         <td className="px-4 py-2">{row.status}</td>
                                         <td className="px-4 py-2">{row.detected_at}</td>
                                         <td className="px-4 py-2">
-                                            <Link href={route('executive.alerts.show', row.alerts_id)} className="rounded bg-indigo-600 px-3 py-1 text-xs text-white">
-                                                Open Executive Review
-                                            </Link>
+                                            {canReview ? (
+                                                <Link href={route('executive.alerts.show', row.alerts_id)} className="rounded bg-indigo-600 px-3 py-1 text-xs text-white">
+                                                    Open Executive Review
+                                                </Link>
+                                            ) : (
+                                                <span className="rounded bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                                                    Queue visibility only
+                                                </span>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}

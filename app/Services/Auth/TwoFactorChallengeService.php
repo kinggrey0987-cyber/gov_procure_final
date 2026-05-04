@@ -161,7 +161,7 @@ class TwoFactorChallengeService
             return ['ok' => false, 'reason' => 'expired'];
         }
 
-        if ($challenge->attempts >= $maxAttempts) {
+        if ($challenge->attempts > $maxAttempts) {
             $challenge->forceFill(['consumed_at' => now()])->save();
             $this->logFailure($user, '2FA_VERIFY_FAILED_LOCKED', (int) $challenge->id);
 
@@ -173,7 +173,7 @@ class TwoFactorChallengeService
 
             $challenge->refresh();
 
-            if ($challenge->attempts >= $maxAttempts) {
+            if ($challenge->attempts > $maxAttempts) {
                 $challenge->forceFill(['consumed_at' => now()])->save();
                 $this->logFailure($user, '2FA_VERIFY_FAILED_LOCKED', (int) $challenge->id);
 

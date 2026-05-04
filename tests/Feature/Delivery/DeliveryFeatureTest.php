@@ -108,6 +108,12 @@ class DeliveryFeatureTest extends TestCase
             'supplier_id' => $this->supplier->supplier_id,
             'receipt_status' => 'PENDING',
         ]);
+
+        $this->assertDatabaseHas('delivery_items', [
+            'purchase_order_item_id' => $this->purchaseOrderItem->purchase_order_item_id,
+            'expected_quantity' => 5,
+            'received_quantity' => 0,
+        ]);
     }
 
     public function test_non_gso_officer_cannot_create_delivery(): void
@@ -159,21 +165,54 @@ class DeliveryFeatureTest extends TestCase
         ]);
     }
 
-    public function test_receiving_empty_delivery_marks_status_received_and_locks_editing(): void
+    public function test_receiving_requires_actual_date_and_delivery_items(): void
     {
         $delivery = $this->createDelivery();
 
-        $response = $this->actingAs($this->gsoOfficer)->put(route('inventory.deliveries.update', $delivery->delivery_id), [
-            'actual_delivery_date' => now()->toDateString(),
-            'remarks' => 'No item lines were encoded for this delivery intake.',
-            'items' => [],
+        $this->actingAs($this->gsoOfficer)
+            ->put(route('inventory.deliveries.update', $delivery->delivery_id), [
+                'remarks' => 'No date and no items.',
+                'items' => [],
+            ])
+            ->assertSessionHasErrors(['actual_delivery_date', 'items']);
+    }
+
+    public function test_receiving_updates_item_quantities_marks_received_and_locks_editing(): void
+    {
+        $delivery = $this->createDelivery();
+        $item = DeliveryItem::query()->create([
+            'delivery_id' => $delivery->delivery_id,
+            'purchase_order_item_id' => $this->purchaseOrderItem->purchase_order_item_id,
+            'expected_quantity' => 5,
+            'received_quantity' => 0,
+            'damaged_quantity' => 0,
+            'missing_quantity' => 0,
+            'item_condition' => 'PENDING_RECEIPT',
         ]);
 
-        $response->assertRedirect(route('inventory.deliveries.show', $delivery->delivery_id));
+        $this->actingAs($this->gsoOfficer)
+            ->put(route('inventory.deliveries.update', $delivery->delivery_id), [
+                'actual_delivery_date' => now()->toDateString(),
+                'remarks' => 'Received with one damaged item.',
+                'items' => [[
+                    'delivery_item_id' => $item->delivery_item_id,
+                    'received_quantity' => 4,
+                    'damaged_quantity' => 1,
+                    'item_condition' => 'DAMAGED',
+                ]],
+            ])
+            ->assertRedirect(route('inventory.deliveries.show', $delivery->delivery_id));
 
         $this->assertDatabaseHas('deliveries', [
             'delivery_id' => $delivery->delivery_id,
             'receipt_status' => 'RECEIVED',
+        ]);
+
+        $this->assertDatabaseHas('delivery_items', [
+            'delivery_item_id' => $item->delivery_item_id,
+            'received_quantity' => 4,
+            'damaged_quantity' => 1,
+            'missing_quantity' => 0,
         ]);
 
         $this->actingAs($this->gsoOfficer)
@@ -190,6 +229,15 @@ class DeliveryFeatureTest extends TestCase
     public function test_gso_officer_can_mark_delivery_as_received(): void
     {
         $delivery = $this->createDelivery();
+        DeliveryItem::query()->create([
+            'delivery_id' => $delivery->delivery_id,
+            'purchase_order_item_id' => $this->purchaseOrderItem->purchase_order_item_id,
+            'expected_quantity' => 5,
+            'received_quantity' => 5,
+            'damaged_quantity' => 0,
+            'missing_quantity' => 0,
+            'item_condition' => 'GOOD',
+        ]);
 
         $service = app(DeliveryService::class);
         $service->markReceived($delivery, $this->gsoOfficer, 'Item received in good condition');
@@ -216,6 +264,15 @@ class DeliveryFeatureTest extends TestCase
     public function test_gso_officer_can_verify_delivery(): void
     {
         $delivery = $this->createDelivery(status: 'RECEIVED');
+        DeliveryItem::query()->create([
+            'delivery_id' => $delivery->delivery_id,
+            'purchase_order_item_id' => $this->purchaseOrderItem->purchase_order_item_id,
+            'expected_quantity' => 5,
+            'received_quantity' => 5,
+            'damaged_quantity' => 0,
+            'missing_quantity' => 0,
+            'item_condition' => 'GOOD',
+        ]);
 
         $response = $this->actingAs($this->gsoOfficer)->post(route('inventory.delivery-verifications.store', $delivery->delivery_id), [
             'verification_date' => now()->toDateString(),
@@ -227,6 +284,37 @@ class DeliveryFeatureTest extends TestCase
         $this->assertDatabaseHas('delivery_verifications', [
             'delivery_id' => $delivery->delivery_id,
             'verification_status' => 'APPROVED',
+        ]);
+    }
+
+    public function test_verification_rejects_approval_when_received_items_have_discrepancy(): void
+    {
+        $delivery = $this->createDelivery(status: 'RECEIVED');
+        DeliveryItem::query()->create([
+            'delivery_id' => $delivery->delivery_id,
+            'purchase_order_item_id' => $this->purchaseOrderItem->purchase_order_item_id,
+            'expected_quantity' => 5,
+            'received_quantity' => 3,
+            'damaged_quantity' => 1,
+            'missing_quantity' => 1,
+            'item_condition' => 'DAMAGED',
+        ]);
+
+        $this->actingAs($this->gsoOfficer)->post(route('inventory.delivery-verifications.store', $delivery->delivery_id), [
+            'verification_date' => now()->toDateString(),
+            'verification_status' => 'APPROVED',
+            'discrepancy_notes' => 'Should be rejected due discrepancy.',
+        ])->assertSessionHasErrors('verification_status');
+
+        $this->actingAs($this->gsoOfficer)->post(route('inventory.delivery-verifications.store', $delivery->delivery_id), [
+            'verification_date' => now()->toDateString(),
+            'verification_status' => 'REJECTED',
+            'discrepancy_notes' => 'One damaged and one missing item for BAC/procurement follow-up.',
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('deliveries', [
+            'delivery_id' => $delivery->delivery_id,
+            'receipt_status' => 'PARTIALLY_RECEIVED',
         ]);
     }
 
@@ -366,6 +454,15 @@ class DeliveryFeatureTest extends TestCase
     public function test_verification_rejects_repeated_verification_attempts(): void
     {
         $delivery = $this->createDelivery(status: 'RECEIVED');
+        DeliveryItem::query()->create([
+            'delivery_id' => $delivery->delivery_id,
+            'purchase_order_item_id' => $this->purchaseOrderItem->purchase_order_item_id,
+            'expected_quantity' => 5,
+            'received_quantity' => 5,
+            'damaged_quantity' => 0,
+            'missing_quantity' => 0,
+            'item_condition' => 'GOOD',
+        ]);
 
         $verificationService = app(DeliveryVerificationService::class);
         $verificationService->create($delivery, $this->gsoOfficer, [

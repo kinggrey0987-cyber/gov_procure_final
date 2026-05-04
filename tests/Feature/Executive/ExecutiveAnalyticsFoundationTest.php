@@ -93,7 +93,10 @@ class ExecutiveAnalyticsFoundationTest extends TestCase
         $this->actingAs($this->gsoUser)
             ->get(route('inventory.alerts.index'))
             ->assertOk()
-            ->assertInertia(fn ($page) => $page->has('alerts.data', 1));
+            ->assertInertia(fn ($page) => $page
+                ->has('alerts.data', 1)
+                ->where('permissions.review', false)
+            );
 
         $this->actingAs($this->procurementUser)
             ->get(route('procurement.alerts.index'))

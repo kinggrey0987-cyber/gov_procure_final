@@ -10,6 +10,13 @@ type Delivery = {
         delivery_item_id: number;
         expected_quantity: number | string;
         received_quantity: number | string;
+        damaged_quantity?: number | string;
+        missing_quantity?: number | string;
+        purchase_order_item?: {
+            item?: {
+                item_name?: string;
+            } | null;
+        } | null;
         item?: {
             item_name?: string;
         };
@@ -55,14 +62,18 @@ export default function DeliveryVerificationCreate({ delivery }: Props) {
                                         <th className="px-4 py-2 text-left font-semibold text-slate-700">Item</th>
                                         <th className="px-4 py-2 text-right font-semibold text-slate-700">Expected</th>
                                         <th className="px-4 py-2 text-right font-semibold text-slate-700">Received</th>
+                                        <th className="px-4 py-2 text-right font-semibold text-slate-700">Damaged</th>
+                                        <th className="px-4 py-2 text-right font-semibold text-slate-700">Missing</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {delivery.items.map((item) => (
                                         <tr key={item.delivery_item_id}>
-                                            <td className="px-4 py-2 text-slate-700">{item.item?.item_name ?? '-'}</td>
+                                            <td className="px-4 py-2 text-slate-700">{item.purchase_order_item?.item?.item_name ?? item.item?.item_name ?? '-'}</td>
                                             <td className="px-4 py-2 text-right text-slate-700">{item.expected_quantity}</td>
                                             <td className="px-4 py-2 text-right text-slate-800">{item.received_quantity}</td>
+                                            <td className="px-4 py-2 text-right text-rose-700">{item.damaged_quantity ?? 0}</td>
+                                            <td className="px-4 py-2 text-right text-amber-700">{item.missing_quantity ?? 0}</td>
                                         </tr>
                                     ))}
                                 </tbody>

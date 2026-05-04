@@ -20,7 +20,7 @@ class DeliveryVerificationController
     {
         abort_unless(auth()->user()->can('delivery-verification.create', $delivery), 403);
 
-        $delivery->load('items.item', 'verifications');
+        $delivery->load('items.purchaseOrderItem.item', 'verifications');
 
         return Inertia::render('Inventory/DeliveryVerification/Create', [
             'delivery' => $delivery,

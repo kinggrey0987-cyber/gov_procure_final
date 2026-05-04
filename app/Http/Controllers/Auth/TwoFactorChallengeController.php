@@ -79,6 +79,7 @@ class TwoFactorChallengeController extends Controller
         }
 
         $this->ensureNotRateLimited($request, 'verify', (int) config('auth.two_factor.rate_limit.verify_max_attempts', 10), (int) config('auth.two_factor.rate_limit.verify_decay_seconds', 60));
+        $this->ensureNotRateLimited($request, 'failed-code', (int) config('auth.two_factor.rate_limit.failed_code_max_attempts', 5), (int) config('auth.two_factor.rate_limit.failed_code_decay_seconds', 300));
         RateLimiter::hit($this->rateLimitKey($request, 'verify'), (int) config('auth.two_factor.rate_limit.verify_decay_seconds', 60));
 
         $pendingUserId = (int) $request->session()->get('two_factor.user_id', 0);
@@ -95,6 +96,10 @@ class TwoFactorChallengeController extends Controller
                 return $this->expirePendingSession($request);
             }
 
+            if ((string) $result['reason'] === 'invalid') {
+                RateLimiter::hit($this->rateLimitKey($request, 'failed-code'), (int) config('auth.two_factor.rate_limit.failed_code_decay_seconds', 300));
+            }
+
             $message = match ($result['reason']) {
                 'expired' => 'Your verification code has expired. Please request a new code.',
                 'locked' => 'Maximum verification attempts reached. Please request a new code.',
@@ -108,6 +113,7 @@ class TwoFactorChallengeController extends Controller
         }
 
         RateLimiter::clear($this->rateLimitKey($request, 'verify'));
+        RateLimiter::clear($this->rateLimitKey($request, 'failed-code'));
 
         $remember = (bool) $request->session()->get('two_factor.remember', false);
 
@@ -220,8 +226,12 @@ class TwoFactorChallengeController extends Controller
 
         $seconds = RateLimiter::availableIn($key);
 
+        $message = $operation === 'failed-code'
+            ? "Too many incorrect verification codes. Please wait {$seconds} seconds before trying to sign in again."
+            : "Too many {$operation} requests. Please try again in {$seconds} seconds.";
+
         throw ValidationException::withMessages([
-            'code' => "Too many {$operation} requests. Please try again in {$seconds} seconds.",
+            'code' => $message,
         ]);
     }
 

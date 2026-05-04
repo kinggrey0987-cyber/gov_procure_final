@@ -6,6 +6,7 @@ type DeliveryItem = {
     delivery_item_id: number;
     expected_quantity: number;
     received_quantity: number;
+    damaged_quantity?: number;
     item_condition: string;
     item?: {
         item_name: string;
@@ -35,6 +36,7 @@ type ReceiveFormData = {
     items: Array<{
         delivery_item_id: number;
         received_quantity: number | string;
+        damaged_quantity: number | string;
         item_condition: string;
     }>;
 };
@@ -50,14 +52,15 @@ export default function DeliveryReceive({ delivery }: Props) {
         items: delivery.items.map(item => ({
             delivery_item_id: item.delivery_item_id,
             received_quantity: item.received_quantity || 0,
+            damaged_quantity: item.damaged_quantity || 0,
             item_condition: item.item_condition || 'GOOD',
         })),
     });
 
-    const handleItemChange = (index: number, field: 'received_quantity' | 'item_condition', value: string | number) => {
+    const handleItemChange = (index: number, field: 'received_quantity' | 'damaged_quantity' | 'item_condition', value: string | number) => {
         const updatedItems = [...data.items];
-        if (field === 'received_quantity') {
-            updatedItems[index].received_quantity = value === '' ? 0 : parseFloat(String(value));
+        if (field === 'received_quantity' || field === 'damaged_quantity') {
+            updatedItems[index][field] = value === '' ? 0 : parseFloat(String(value));
         } else {
             updatedItems[index].item_condition = String(value);
         }
@@ -99,6 +102,7 @@ export default function DeliveryReceive({ delivery }: Props) {
                                         <th className="px-6 py-3 text-left font-semibold text-slate-700">Item</th>
                                         <th className="px-6 py-3 text-center font-semibold text-slate-700">Expected Qty</th>
                                         <th className="px-6 py-3 text-center font-semibold text-slate-700">Received Qty</th>
+                                        <th className="px-6 py-3 text-center font-semibold text-slate-700">Damaged Qty</th>
                                         <th className="px-6 py-3 text-left font-semibold text-slate-700">Condition</th>
                                     </tr>
                                 </thead>
@@ -114,6 +118,16 @@ export default function DeliveryReceive({ delivery }: Props) {
                                                     min="0"
                                                     value={data.items[index].received_quantity}
                                                     onChange={(e) => handleItemChange(index, 'received_quantity', e.target.value)}
+                                                    className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-center text-sm focus:border-blue-500 focus:outline-none"
+                                                />
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    min="0"
+                                                    value={data.items[index].damaged_quantity ?? 0}
+                                                    onChange={(e) => handleItemChange(index, 'damaged_quantity', e.target.value)}
                                                     className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-center text-sm focus:border-blue-500 focus:outline-none"
                                                 />
                                             </td>

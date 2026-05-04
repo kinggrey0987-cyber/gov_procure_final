@@ -188,7 +188,7 @@ class TwoFactorAuthenticationTest extends TestCase
             'code_hash' => Hash::make('222222'),
             'expires_at' => now()->addMinutes(10),
             'consumed_at' => null,
-            'attempts' => 4,
+            'attempts' => 5,
             'ip_address' => '127.0.0.1',
             'user_agent' => 'phpunit',
         ]);
@@ -235,6 +235,43 @@ class TwoFactorAuthenticationTest extends TestCase
 
         $this->post(route('two-factor.challenge.verify'), ['code' => '000000'])
             ->assertSessionHasErrors('code');
+    }
+
+    public function test_five_invalid_two_factor_codes_trigger_short_lockout(): void
+    {
+        config([
+            'auth.two_factor.rate_limit.failed_code_max_attempts' => 5,
+            'auth.two_factor.rate_limit.failed_code_decay_seconds' => 300,
+            'auth.two_factor.rate_limit.verify_max_attempts' => 20,
+        ]);
+
+        $user = $this->createUser(UserRole::OFFICE_USER, 'failed.codes@gsc.local');
+
+        TwoFactorChallenge::query()->create([
+            'user_id' => $user->id,
+            'code_hash' => Hash::make('999999'),
+            'expires_at' => now()->addMinutes(10),
+            'consumed_at' => null,
+            'attempts' => 0,
+            'ip_address' => '127.0.0.1',
+            'user_agent' => 'phpunit',
+        ]);
+
+        $this->actingAs($user)->withSession([
+            'two_factor.pending' => true,
+            'two_factor.verified' => false,
+            'two_factor.user_id' => $user->id,
+        ]);
+
+        for ($attempt = 1; $attempt <= 5; $attempt++) {
+            $this->post(route('two-factor.challenge.verify'), ['code' => '000000'])
+                ->assertSessionHasErrors('code');
+        }
+
+        $this->post(route('two-factor.challenge.verify'), ['code' => '999999'])
+            ->assertSessionHasErrors('code');
+
+        $this->assertAuthenticatedAs($user);
     }
 
     public function test_resend_works_within_allowed_rules(): void

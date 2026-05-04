@@ -5,6 +5,7 @@ namespace App\Services\Delivery;
 use App\Models\Delivery;
 use App\Models\DeliveryItem;
 use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderItem;
 use App\Models\StatusHistory;
 use App\Models\User;
 use App\Services\AuditLogService;
@@ -58,6 +59,18 @@ class DeliveryService
                 'remarks' => $payload['remarks'] ?? null,
             ]);
 
+            $purchaseOrder->items()->each(function (PurchaseOrderItem $purchaseOrderItem) use ($delivery): void {
+                $delivery->items()->create([
+                    'purchase_order_item_id' => (int) $purchaseOrderItem->purchase_order_item_id,
+                    'expected_quantity' => (float) $purchaseOrderItem->quantity_ordered,
+                    'received_quantity' => 0,
+                    'damaged_quantity' => 0,
+                    'missing_quantity' => 0,
+                    'item_condition' => 'PENDING_RECEIPT',
+                    'remarks' => 'Auto-populated from purchase order line for receiving inspection.',
+                ]);
+            });
+
             $this->recordStatus($delivery, null, 'PENDING', $actor, 'Delivery created.');
             $this->recordAudit($actor, 'CREATE', $delivery);
 
@@ -85,7 +98,52 @@ class DeliveryService
     {
         $this->assertGsoOfficer($actor);
 
+        if (array_key_exists('items', $payload)) {
+            if (! array_key_exists('actual_delivery_date', $payload) || empty($payload['actual_delivery_date'])) {
+                throw ValidationException::withMessages([
+                    'actual_delivery_date' => 'Actual delivery date is required before completing receipt.',
+                ]);
+            }
+
+            if ($delivery->items()->count() === 0) {
+                throw ValidationException::withMessages([
+                    'items' => 'Delivery cannot be received without purchase order item lines.',
+                ]);
+            }
+        }
+
         return DB::transaction(function () use ($delivery, $actor, $payload): Delivery {
+            if (array_key_exists('items', $payload)) {
+                foreach ((array) $payload['items'] as $itemPayload) {
+                    $item = DeliveryItem::query()
+                        ->where('delivery_id', (int) $delivery->delivery_id)
+                        ->where('delivery_item_id', (int) ($itemPayload['delivery_item_id'] ?? 0))
+                        ->first();
+
+                    if (! $item instanceof DeliveryItem) {
+                        continue;
+                    }
+
+                    $receivedQuantity = (float) ($itemPayload['received_quantity'] ?? 0);
+                    $damagedQuantity = (float) ($itemPayload['damaged_quantity'] ?? 0);
+                    $expectedQuantity = (float) $item->expected_quantity;
+                    $missingQuantity = max($expectedQuantity - $receivedQuantity - $damagedQuantity, 0);
+
+                    if ($receivedQuantity < 0 || $damagedQuantity < 0 || ($receivedQuantity + $damagedQuantity) > $expectedQuantity) {
+                        throw ValidationException::withMessages([
+                            'items' => 'Received and damaged quantities must be non-negative and cannot exceed expected quantity.',
+                        ]);
+                    }
+
+                    $item->forceFill([
+                        'received_quantity' => $receivedQuantity,
+                        'damaged_quantity' => $damagedQuantity,
+                        'missing_quantity' => $missingQuantity,
+                        'item_condition' => (string) ($itemPayload['item_condition'] ?? ($missingQuantity > 0 || $damagedQuantity > 0 ? 'DISCREPANCY' : 'GOOD')),
+                    ])->save();
+                }
+            }
+
             $delivery->fill([
                 'actual_delivery_date' => $payload['actual_delivery_date'] ?? $delivery->actual_delivery_date,
                 'expected_arrival_date' => $payload['expected_arrival_date'] ?? $delivery->expected_arrival_date,
@@ -106,6 +164,18 @@ class DeliveryService
         if ((string) $delivery->receipt_status !== 'PENDING') {
             throw ValidationException::withMessages([
                 'receipt_status' => 'Only PENDING deliveries can be marked as received.',
+            ]);
+        }
+
+        if (! $delivery->actual_delivery_date) {
+            throw ValidationException::withMessages([
+                'actual_delivery_date' => 'Actual delivery date is required before completing receipt.',
+            ]);
+        }
+
+        if ($delivery->items()->count() === 0) {
+            throw ValidationException::withMessages([
+                'items' => 'Delivery cannot be received without purchase order item lines.',
             ]);
         }
 

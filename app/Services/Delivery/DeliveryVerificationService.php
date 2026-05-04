@@ -35,6 +35,31 @@ class DeliveryVerificationService
             ]);
         }
 
+        if ($delivery->items()->count() === 0) {
+            throw ValidationException::withMessages([
+                'items' => 'Delivery cannot be verified without received item lines.',
+            ]);
+        }
+
+        $hasDiscrepancy = $delivery->items()
+            ->where(function ($query): void {
+                $query->where('damaged_quantity', '>', 0)
+                    ->orWhere('missing_quantity', '>', 0);
+            })
+            ->exists();
+
+        if ((string) $payload['verification_status'] === 'APPROVED' && $hasDiscrepancy) {
+            throw ValidationException::withMessages([
+                'verification_status' => 'Deliveries with damaged or missing quantities must be rejected for BAC/procurement follow-up.',
+            ]);
+        }
+
+        if ((string) $payload['verification_status'] === 'REJECTED' && ! $hasDiscrepancy && empty($payload['discrepancy_notes'])) {
+            throw ValidationException::withMessages([
+                'discrepancy_notes' => 'Discrepancy notes are required when rejecting a delivery without item quantity discrepancies.',
+            ]);
+        }
+
         return DB::transaction(function () use ($delivery, $actor, $payload): DeliveryVerification {
             $verification = DeliveryVerification::query()->create([
                 'delivery_id' => (int) $delivery->delivery_id,
@@ -52,6 +77,10 @@ class DeliveryVerificationService
 
             $this->recordStatus($delivery, $oldStatus, $newStatus, $actor, 'Delivery verified.');
             $this->recordAudit($actor, 'CREATE_VERIFICATION', $delivery);
+
+            if ($newStatus === 'PARTIALLY_RECEIVED') {
+                $this->recordAudit($actor, 'DISCREPANCY_FOR_BAC_FOLLOW_UP', $delivery);
+            }
 
             return $verification;
         });
