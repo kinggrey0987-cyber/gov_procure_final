@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Inventory;
 
 use App\Http\Requests\DeliveryVerification\StoreDeliveryVerificationRequest;
 use App\Models\Delivery;
+use App\Services\Delivery\DeliveryService;
 use App\Services\Delivery\DeliveryVerificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Redirect;
@@ -12,14 +13,17 @@ use Inertia\Response;
 
 class DeliveryVerificationController
 {
-    public function __construct(private readonly DeliveryVerificationService $verificationService)
-    {
+    public function __construct(
+        private readonly DeliveryVerificationService $verificationService,
+        private readonly DeliveryService $deliveryService,
+    ) {
     }
 
     public function create(Delivery $delivery): Response
     {
         abort_unless(auth()->user()->can('delivery-verification.create', $delivery), 403);
 
+        $delivery = $this->deliveryService->ensureItemsFromPurchaseOrder($delivery);
         $delivery->load('purchaseOrder', 'supplier', 'items.purchaseOrderItem.item', 'verifications');
 
         $items = $delivery->items->map(function ($item): array {

@@ -159,6 +159,7 @@ class DeliveryController
             abort(403, 'Only PENDING deliveries can be received.');
         }
 
+        $delivery = $this->deliveryService->ensureItemsFromPurchaseOrder($delivery);
         $delivery->load(['purchaseOrder', 'supplier', 'items.purchaseOrderItem.item']);
 
         $items = collect();

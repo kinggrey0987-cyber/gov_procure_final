@@ -188,6 +188,25 @@ class PurchaseOrderService
                 }
             }
 
+            $purchaseOrder->loadMissing('items');
+            foreach ($purchaseOrder->items as $purchaseOrderItem) {
+                if (! $purchaseOrderItem instanceof PurchaseOrderItem) {
+                    continue;
+                }
+
+                $delivery->items()->firstOrCreate(
+                    ['purchase_order_item_id' => (int) $purchaseOrderItem->purchase_order_item_id],
+                    [
+                        'expected_quantity' => (float) $purchaseOrderItem->quantity_ordered,
+                        'received_quantity' => 0,
+                        'damaged_quantity' => 0,
+                        'missing_quantity' => 0,
+                        'item_condition' => 'PENDING_RECEIPT',
+                        'remarks' => 'Auto-populated from purchase order line for receiving inspection.',
+                    ],
+                );
+            }
+
             return $purchaseOrder->fresh(['supplier', 'creator', 'purchaseRequest', 'supplyRequest', 'items']) ?? $purchaseOrder;
         });
     }
