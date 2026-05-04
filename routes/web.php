@@ -600,6 +600,9 @@ Route::middleware(['auth', 'twofactor', 'must-change-password'])->group(function
                 Route::get('/{delivery}', [DeliveryController::class, 'show'])
                     ->middleware('can:delivery.view,delivery')
                     ->name('show');
+                Route::get('/{delivery}/receive', [DeliveryController::class, 'receive'])
+                    ->middleware('can:delivery.update,delivery')
+                    ->name('receive');
                 Route::get('/{delivery}/edit', [DeliveryController::class, 'edit'])
                     ->middleware('can:delivery.update,delivery')
                     ->name('edit');

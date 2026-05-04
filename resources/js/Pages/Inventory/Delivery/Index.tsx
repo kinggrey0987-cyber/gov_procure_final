@@ -182,7 +182,7 @@ export default function DeliveryIndex({ deliveries, filters, filter_options }: P
                                     <td className="px-4 py-3 text-right">
                                         <div className="flex justify-end gap-3">
                                             {delivery.receipt_status === 'PENDING' && (
-                                                <Link href={route('inventory.deliveries.edit', delivery.delivery_id)} className="text-sm font-semibold text-amber-700 hover:text-amber-900">
+                                                <Link href={route('inventory.deliveries.receive', delivery.delivery_id)} className="text-sm font-semibold text-amber-700 hover:text-amber-900">
                                                     Open Receiving
                                                 </Link>
                                             )}

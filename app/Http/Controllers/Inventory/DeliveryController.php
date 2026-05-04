@@ -151,6 +151,50 @@ class DeliveryController
         ]);
     }
 
+    public function receive(Delivery $delivery): Response
+    {
+        abort_unless(request()->user()->can('delivery.update', $delivery), 403);
+
+        if ((string) $delivery->receipt_status !== 'PENDING') {
+            abort(403, 'Only PENDING deliveries can be received.');
+        }
+
+        $delivery->load(['purchaseOrder', 'supplier', 'items.purchaseOrderItem.item']);
+
+        $items = collect();
+        if ($delivery->relationLoaded('items') && $delivery->items instanceof \Illuminate\Database\Eloquent\Collection) {
+            $items = $delivery->items->map(fn ($item): array => [
+                'delivery_item_id' => (int) $item->delivery_item_id,
+                'expected_quantity' => (float) $item->expected_quantity,
+                'received_quantity' => (float) $item->received_quantity,
+                'item_condition' => (string) ($item->item_condition ?? 'GOOD'),
+                'item' => ($item->relationLoaded('purchaseOrderItem') && $item->purchaseOrderItem && $item->purchaseOrderItem->relationLoaded('item') && $item->purchaseOrderItem->item) ? [
+                    'item_name' => (string) $item->purchaseOrderItem->item->item_name,
+                    'item_id' => (int) $item->purchaseOrderItem->item->item_id,
+                ] : null,
+            ])->values();
+        }
+
+        return Inertia::render('Inventory/Delivery/Receive', [
+            'delivery' => [
+                'delivery_id' => (int) $delivery->delivery_id,
+                'delivery_code' => (string) $delivery->delivery_code,
+                'receipt_status' => (string) $delivery->receipt_status,
+                'actual_delivery_date' => optional($delivery->actual_delivery_date)?->toDateString(),
+                'expected_arrival_date' => optional($delivery->expected_arrival_date)?->toDateString(),
+                'remarks' => $delivery->remarks,
+                'purchase_order' => $delivery->purchaseOrder ? [
+                    'purchase_order_id' => (int) $delivery->purchaseOrder->purchase_order_id,
+                    'po_number' => (string) ($delivery->purchaseOrder->po_number ?? ''),
+                ] : null,
+                'supplier' => $delivery->supplier ? [
+                    'supplier_name' => (string) ($delivery->supplier->supplier_name ?? ''),
+                ] : null,
+                'items' => $items->values(),
+            ],
+        ]);
+    }
+
     public function edit(Delivery $delivery): Response
     {
         abort_unless(request()->user()->can('delivery.update', $delivery), 403);
