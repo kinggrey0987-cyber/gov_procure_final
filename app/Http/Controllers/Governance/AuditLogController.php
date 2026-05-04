@@ -26,7 +26,7 @@ class AuditLogController extends Controller
             'to_date' => ['nullable', 'date'],
         ]);
 
-        $logs = $this->service->technical($request->user(), $filters);
+        $logs = $this->service->technical($request->user(), $filters, 5);
 
         return Inertia::render('AdminTech/Audit/Technical', [
             'auditLogs' => $logs,

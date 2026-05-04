@@ -47,7 +47,7 @@ class OfficeManagementController extends Controller
 
         $offices = $query
             ->orderBy('name')
-            ->paginate(perPage: 20, page: $filters['page'] ?? 1)
+            ->paginate(perPage: 5, page: $filters['page'] ?? 1)
             ->withQueryString()
             ->through(function (Office $office): array {
                 $linkedCount =

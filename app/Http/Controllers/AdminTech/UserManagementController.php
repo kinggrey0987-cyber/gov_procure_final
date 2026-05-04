@@ -65,7 +65,7 @@ class UserManagementController extends Controller
         // Get paginated users
         $users = $query
             ->orderBy('name')
-            ->paginate(perPage: 20, page: $filters['page'] ?? 1)
+            ->paginate(perPage: 5, page: $filters['page'] ?? 1)
             ->withQueryString()
             ->through(function (User $user) use ($actingUserId, $adminCount): array {
                 $isSelf = $actingUserId === $user->id;
