@@ -6,21 +6,33 @@ type Delivery = {
     delivery_id: number;
     delivery_code: string;
     receipt_status: string;
+    actual_delivery_date?: string | null;
+    expected_arrival_date?: string | null;
+    purchase_order?: {
+        po_number?: string | null;
+    } | null;
+    supplier?: {
+        supplier_name?: string | null;
+    } | null;
     items?: Array<{
         delivery_item_id: number;
-        expected_quantity: number | string;
-        received_quantity: number | string;
-        damaged_quantity?: number | string;
-        missing_quantity?: number | string;
-        purchase_order_item?: {
-            item?: {
-                item_name?: string;
-            } | null;
-        } | null;
-        item?: {
-            item_name?: string;
-        };
+        item_name: string;
+        unit?: string | null;
+        expected_quantity: number;
+        received_quantity: number;
+        damaged_quantity: number;
+        missing_quantity: number;
+        accepted_quantity: number;
+        item_condition: string;
+        has_discrepancy: boolean;
+        remarks?: string | null;
     }>;
+    verification_summary?: {
+        item_count: number;
+        has_discrepancy: boolean;
+        recommended_status: 'APPROVED' | 'REJECTED';
+        message: string;
+    };
 };
 
 type VerificationForm = {
@@ -37,7 +49,7 @@ type Props = {
 export default function DeliveryVerificationCreate({ delivery }: Props) {
     const { data, setData, post, processing, errors } = useForm<VerificationForm>({
         verification_date: new Date().toISOString().split('T')[0] || '',
-        verification_status: '',
+        verification_status: delivery.verification_summary?.recommended_status ?? '',
         discrepancy_notes: '',
         remarks: '',
     });
@@ -52,9 +64,25 @@ export default function DeliveryVerificationCreate({ delivery }: Props) {
             <Head title={`Verify ${delivery.delivery_code}`} />
 
             <div className="space-y-6 py-8">
+                <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <div className="grid gap-4 md:grid-cols-4">
+                        <Info label="Delivery Code" value={delivery.delivery_code} />
+                        <Info label="Purchase Order" value={delivery.purchase_order?.po_number ?? '-'} />
+                        <Info label="Supplier" value={delivery.supplier?.supplier_name ?? '-'} />
+                        <Info label="Actual Delivery Date" value={delivery.actual_delivery_date ?? '-'} />
+                    </div>
+                    {delivery.verification_summary ? (
+                        <div className={`mt-4 rounded-lg border px-4 py-3 text-sm ${delivery.verification_summary.has_discrepancy ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>
+                            <p className="font-semibold">Recommended Status: {delivery.verification_summary.recommended_status}</p>
+                            <p className="mt-1">{delivery.verification_summary.message}</p>
+                        </div>
+                    ) : null}
+                </section>
+
                 {delivery.items && delivery.items.length > 0 ? (
                     <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <h3 className="mb-3 text-sm font-semibold text-slate-900">Received Item Snapshot</h3>
+                        <h3 className="mb-1 text-sm font-semibold text-slate-900">Item Reconciliation</h3>
+                        <p className="mb-3 text-sm text-slate-600">Compare purchase order quantity against actual received, damaged, and missing quantities before verification.</p>
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-slate-200 text-sm">
                                 <thead className="bg-slate-50">
@@ -64,16 +92,24 @@ export default function DeliveryVerificationCreate({ delivery }: Props) {
                                         <th className="px-4 py-2 text-right font-semibold text-slate-700">Received</th>
                                         <th className="px-4 py-2 text-right font-semibold text-slate-700">Damaged</th>
                                         <th className="px-4 py-2 text-right font-semibold text-slate-700">Missing</th>
+                                        <th className="px-4 py-2 text-right font-semibold text-slate-700">Accepted</th>
+                                        <th className="px-4 py-2 text-left font-semibold text-slate-700">Decision Signal</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {delivery.items.map((item) => (
-                                        <tr key={item.delivery_item_id}>
-                                            <td className="px-4 py-2 text-slate-700">{item.purchase_order_item?.item?.item_name ?? item.item?.item_name ?? '-'}</td>
-                                            <td className="px-4 py-2 text-right text-slate-700">{item.expected_quantity}</td>
-                                            <td className="px-4 py-2 text-right text-slate-800">{item.received_quantity}</td>
-                                            <td className="px-4 py-2 text-right text-rose-700">{item.damaged_quantity ?? 0}</td>
-                                            <td className="px-4 py-2 text-right text-amber-700">{item.missing_quantity ?? 0}</td>
+                                        <tr key={item.delivery_item_id} className={item.has_discrepancy ? 'bg-amber-50/60' : ''}>
+                                            <td className="px-4 py-2 text-slate-700">{item.item_name}</td>
+                                            <td className="px-4 py-2 text-right text-slate-700">{formatQty(item.expected_quantity, item.unit)}</td>
+                                            <td className="px-4 py-2 text-right text-slate-800">{formatQty(item.received_quantity, item.unit)}</td>
+                                            <td className="px-4 py-2 text-right text-rose-700">{formatQty(item.damaged_quantity, item.unit)}</td>
+                                            <td className="px-4 py-2 text-right text-amber-700">{formatQty(item.missing_quantity, item.unit)}</td>
+                                            <td className="px-4 py-2 text-right font-semibold text-slate-800">{formatQty(item.accepted_quantity, item.unit)}</td>
+                                            <td className="px-4 py-2">
+                                                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.has_discrepancy ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-700'}`}>
+                                                    {item.has_discrepancy ? 'Discrepancy' : 'Matches PO'}
+                                                </span>
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -104,6 +140,7 @@ export default function DeliveryVerificationCreate({ delivery }: Props) {
                                     <option value="APPROVED">Approved</option>
                                     <option value="REJECTED">Rejected</option>
                                 </select>
+                                <p className="mt-1 text-xs text-slate-500">Use Approved only when all item lines match. Use Rejected when damaged or missing quantities need BAC/procurement follow-up.</p>
                             </FormField>
                         </div>
 
@@ -143,6 +180,19 @@ export default function DeliveryVerificationCreate({ delivery }: Props) {
             </div>
         </AuthenticatedLayout>
     );
+}
+
+function Info({ label, value }: { label: string; value: string }) {
+    return (
+        <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+            <p className="mt-1 text-sm font-semibold text-slate-800">{value}</p>
+        </div>
+    );
+}
+
+function formatQty(value: number, unit?: string | null): string {
+    return `${Number(value).toFixed(2)}${unit ? ` ${unit}` : ''}`;
 }
 
 function FormField({
