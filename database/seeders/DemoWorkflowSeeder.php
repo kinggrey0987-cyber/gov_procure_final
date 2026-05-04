@@ -1175,6 +1175,12 @@ class DemoWorkflowSeeder extends Seeder
         }
 
         if ((string) $delivery->receipt_status === 'PENDING') {
+            if (! $delivery->actual_delivery_date) {
+                $delivery->forceFill([
+                    'actual_delivery_date' => now()->toDateString(),
+                ])->save();
+            }
+
             $delivery = $deliveryService->markReceived($delivery, $gsoUser, 'Received at the GSO receiving area.');
         }
 
