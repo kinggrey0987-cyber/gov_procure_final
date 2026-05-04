@@ -434,9 +434,9 @@ export default function Authenticated({
                 active: route().current('office.supply-requests.index') || route().current('office.supply-requests.show'),
             },
             {
-                label: 'Supplies Ready for Claim',
-                href: route('office.supplies-ready.index'),
-                active: route().current('office.supplies-ready.*'),
+                label: 'Claims and Adjustments',
+                href: route('office.claims.index'),
+                active: route().current('office.claims.*') || route().current('office.supplies-ready.*'),
             },
             {
                 label: 'Notifications',
@@ -771,7 +771,7 @@ export default function Authenticated({
                     route().current('inventory.distribution-records.items.manage'),
             },
             {
-                label: 'Claims and Adjustments',
+                label: 'Claims Review',
                 href: route('inventory.claims.index'),
                 active: route().current('inventory.claims.*'),
             },

@@ -199,6 +199,10 @@ class DeliveryController
     {
         abort_unless(request()->user()->can('delivery.update', $delivery), 403);
 
+        if ((string) $delivery->receipt_status !== 'PENDING') {
+            abort(403, 'Only PENDING deliveries can be edited.');
+        }
+
         return Inertia::render('Inventory/Delivery/Edit', [
             'delivery' => $delivery,
         ]);
@@ -208,11 +212,23 @@ class DeliveryController
     {
         abort_unless(request()->user()->can('delivery.update', $delivery), 403);
 
-        $this->deliveryService->updateReceipt(
+        if ((string) $delivery->receipt_status !== 'PENDING') {
+            abort(403, 'Only PENDING deliveries can be updated.');
+        }
+
+        $delivery = $this->deliveryService->updateReceipt(
             delivery: $delivery,
             actor: request()->user(),
             payload: $request->validated(),
         );
+
+        if ($request->has('items')) {
+            $delivery = $this->deliveryService->markReceived(
+                delivery: $delivery,
+                actor: request()->user(),
+                remarks: $request->validated('remarks'),
+            );
+        }
 
         return Redirect::route('inventory.deliveries.show', $delivery->delivery_id)
             ->with('success', 'Delivery updated successfully.');

@@ -161,7 +161,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Gate::define('claim.view-any', fn (User $user): bool => $user->isGsoOfficer() || $user->isOfficeUser());
-        Gate::define('claim.create', fn (User $user): bool => $user->isGsoOfficer() || $user->isOfficeUser());
+        Gate::define('claim.create', fn (User $user): bool => $user->isOfficeUser());
         Gate::define('claim.view', function (User $user, Claim $claim): bool {
             return $user->isGsoOfficer() || ($user->isOfficeUser() && (int) $claim->office_id === (int) $user->office_id);
         });

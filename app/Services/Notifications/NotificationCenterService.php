@@ -136,7 +136,7 @@ class NotificationCenterService
         if ($referenceType === Alert::class) {
             $record = Alert::query()->where('alerts_id', $referenceId)->first();
 
-            if (! $record || ! $user->can('alert.view', $record)) {
+            if (! $record || ! $user->can('alert.view-any')) {
                 return null;
             }
 
@@ -145,11 +145,17 @@ class NotificationCenterService
             }
 
             if ($user->can('domain.procurement.access')) {
-                return route('procurement.alerts.show', $record->alerts_id);
+                return route('procurement.alerts.index', [
+                    'search' => (string) $record->alert_type,
+                    'status' => (string) $record->status,
+                ]);
             }
 
             if ($user->can('domain.inventory.access')) {
-                return route('inventory.alerts.show', $record->alerts_id);
+                return route('inventory.alerts.index', [
+                    'search' => (string) $record->alert_type,
+                    'status' => (string) $record->status,
+                ]);
             }
 
             return null;

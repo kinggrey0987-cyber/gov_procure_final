@@ -3,6 +3,7 @@
 namespace Tests\Feature\Notifications;
 
 use App\Enums\UserRole;
+use App\Models\Alert;
 use App\Models\Notification;
 use App\Models\Office;
 use App\Models\PublicDisclosure;
@@ -19,6 +20,7 @@ class NotificationCenterFeatureTest extends TestCase
     protected Office $office;
     protected User $officeUserA;
     protected User $officeUserB;
+    protected User $gsoOfficer;
     protected User $adminUser;
     protected User $publicUser;
 
@@ -37,6 +39,7 @@ class NotificationCenterFeatureTest extends TestCase
 
         $this->officeUserA = $this->createUser(UserRole::OFFICE_USER);
         $this->officeUserB = $this->createUser(UserRole::OFFICE_USER);
+        $this->gsoOfficer = $this->createUser(UserRole::GSO_OFFICER);
         $this->adminUser = $this->createUser(UserRole::ADMIN);
         $this->publicUser = $this->createUser(UserRole::PUBLIC);
     }
@@ -185,6 +188,51 @@ class NotificationCenterFeatureTest extends TestCase
                 ->where('notifications.data.0.reference_type', PublicDisclosure::class)
                 ->where('notifications.data.0.reference_id', $disclosure->disclosure_id)
             );
+    }
+
+    public function test_gso_alert_notification_has_accessible_dashboard_target(): void
+    {
+        $alert = Alert::query()->create([
+            'alert_type' => 'LOW_STOCK',
+            'severity' => 'MEDIUM',
+            'status' => 'OPEN',
+            'alert_message' => 'Printer ink is at low stock and needs replenishment soon.',
+            'detected_at' => now(),
+        ]);
+
+        $notification = Notification::query()->create([
+            'user_id' => $this->gsoOfficer->id,
+            'title' => 'Operational Alert',
+            'message' => 'Printer ink is at low stock and needs replenishment soon.',
+            'notification_type' => 'OPERATIONAL_ALERT',
+            'reference_type' => Alert::class,
+            'reference_id' => $alert->alerts_id,
+            'is_read' => false,
+        ]);
+
+        $this->actingAs($this->gsoOfficer)
+            ->get(route('notifications.index'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('notifications.data.0.reference_label', 'Alert #'.$alert->alerts_id)
+                ->where('notifications.data.0.target_label', 'View Alert Queue')
+                ->where('notifications.data.0.target_url', route('inventory.alerts.index', [
+                    'search' => 'LOW_STOCK',
+                    'status' => 'OPEN',
+                ]))
+            );
+
+        $this->actingAs($this->gsoOfficer)
+            ->get(route('notifications.show', $notification->notification_id))
+            ->assertRedirect(route('inventory.alerts.index', [
+                'search' => 'LOW_STOCK',
+                'status' => 'OPEN',
+            ]));
+
+        $this->assertDatabaseHas('notifications', [
+            'notification_id' => $notification->notification_id,
+            'is_read' => true,
+        ]);
     }
 
     public function test_public_cannot_access_internal_notification_pages(): void

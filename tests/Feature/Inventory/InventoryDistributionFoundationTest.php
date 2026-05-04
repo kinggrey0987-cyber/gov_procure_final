@@ -369,12 +369,22 @@ class InventoryDistributionFoundationTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_claim_creation_rejects_distribution_and_office_mismatch_even_for_gso(): void
+    public function test_claim_creation_rejects_distribution_and_office_mismatch_and_gso_filing(): void
     {
         $recordA = $this->createReleasedDistributionRecordForOffice($this->officeA, 9011);
 
         $this->actingAs($this->gsoOfficer)
             ->post(route('inventory.claims.store'), [
+                'distribution_record_id' => $recordA->distribution_record_id,
+                'office_id' => $this->officeA->id,
+                'claim_type' => 'DAMAGED_ITEM',
+                'claim_date' => now()->toDateString(),
+                'claim_location' => 'GSO Filing Test',
+            ])
+            ->assertForbidden();
+
+        $this->actingAs($this->officeUserA)
+            ->post(route('office.claims.store'), [
                 'distribution_record_id' => $recordA->distribution_record_id,
                 'office_id' => $this->officeB->id,
                 'claim_type' => 'DAMAGED_ITEM',

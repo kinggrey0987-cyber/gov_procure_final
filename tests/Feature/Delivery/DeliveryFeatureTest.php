@@ -159,6 +159,34 @@ class DeliveryFeatureTest extends TestCase
         ]);
     }
 
+    public function test_receiving_empty_delivery_marks_status_received_and_locks_editing(): void
+    {
+        $delivery = $this->createDelivery();
+
+        $response = $this->actingAs($this->gsoOfficer)->put(route('inventory.deliveries.update', $delivery->delivery_id), [
+            'actual_delivery_date' => now()->toDateString(),
+            'remarks' => 'No item lines were encoded for this delivery intake.',
+            'items' => [],
+        ]);
+
+        $response->assertRedirect(route('inventory.deliveries.show', $delivery->delivery_id));
+
+        $this->assertDatabaseHas('deliveries', [
+            'delivery_id' => $delivery->delivery_id,
+            'receipt_status' => 'RECEIVED',
+        ]);
+
+        $this->actingAs($this->gsoOfficer)
+            ->get(route('inventory.deliveries.edit', $delivery->delivery_id))
+            ->assertForbidden();
+
+        $this->actingAs($this->gsoOfficer)
+            ->put(route('inventory.deliveries.update', $delivery->delivery_id), [
+                'remarks' => 'Blocked after receipt.',
+            ])
+            ->assertForbidden();
+    }
+
     public function test_gso_officer_can_mark_delivery_as_received(): void
     {
         $delivery = $this->createDelivery();

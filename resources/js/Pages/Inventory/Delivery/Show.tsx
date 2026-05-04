@@ -53,7 +53,7 @@ type Props = {
 
 export default function DeliveryShow({ delivery }: Props) {
     const canVerify = delivery.receipt_status === 'RECEIVED';
-    const canEdit = delivery.receipt_status !== 'VERIFIED';
+    const canEdit = delivery.receipt_status === 'PENDING';
     const [activeTab, setActiveTab] = useState<'overview' | 'items' | 'status' | 'related' | 'notes'>('overview');
 
     return (

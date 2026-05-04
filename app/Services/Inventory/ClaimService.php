@@ -24,6 +24,12 @@ class ClaimService
      */
     public function createClaim(User $actor, array $payload): Claim
     {
+        if (!$actor->isOfficeUser()) {
+            throw ValidationException::withMessages([
+                'role' => 'Only office users can file claims for their own distributed supplies.',
+            ]);
+        }
+
         $distributionRecord = $payload['distribution_record'];
 
         if (!$distributionRecord instanceof \App\Models\DistributionRecord) {
@@ -38,7 +44,7 @@ class ClaimService
             ]);
         }
 
-        if ($actor->isOfficeUser() && (int) $actor->office_id !== (int) $payload['office_id']) {
+        if ((int) $actor->office_id !== (int) $payload['office_id']) {
             throw ValidationException::withMessages([
                 'office_id' => 'Office users can only file claims for their own office.',
             ]);

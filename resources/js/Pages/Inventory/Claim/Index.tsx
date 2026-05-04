@@ -28,9 +28,25 @@ type Props = {
     filter_options?: {
         years: number[];
     };
+    routes?: {
+        index: string;
+        create: string;
+        show: string;
+    };
+    permissions?: {
+        create: boolean;
+        process: boolean;
+    };
 };
 
-export default function ClaimIndex({ claims, filters, filter_options }: Props) {
+export default function ClaimIndex({ claims, filters, filter_options, routes, permissions }: Props) {
+    const routeNames = routes ?? {
+        index: 'inventory.claims.index',
+        create: 'inventory.claims.create',
+        show: 'inventory.claims.show',
+    };
+    const canCreate = permissions?.create ?? false;
+    const canProcess = permissions?.process ?? false;
     const [status, setStatus] = useState(filters?.status ?? '');
     const [year, setYear] = useState(filters?.year ?? '');
     const [month, setMonth] = useState(filters?.month ?? '');
@@ -62,7 +78,7 @@ export default function ClaimIndex({ claims, filters, filter_options }: Props) {
             return;
         }
 
-        router.get(route('inventory.claims.index'), activeFilters, {
+        router.get(route(routeNames.index), activeFilters, {
             preserveState: true,
             replace: true,
             only: ['claims', 'filters'],
@@ -73,10 +89,17 @@ export default function ClaimIndex({ claims, filters, filter_options }: Props) {
         <AuthenticatedLayout
             header={
                 <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-semibold leading-tight text-gray-800">Claims and Adjustments</h2>
-                    <Link href={route('inventory.claims.create')} className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
-                        File Claim
-                    </Link>
+                    <div>
+                        <h2 className="text-xl font-semibold leading-tight text-gray-800">{canProcess ? 'Claims Review' : 'Claims and Adjustments'}</h2>
+                        <p className="mt-1 text-xs font-normal text-slate-500">
+                            {canProcess ? 'GSO reviews and resolves claims filed by offices.' : 'Office users file claims for issues found after distribution release or receipt.'}
+                        </p>
+                    </div>
+                    {canCreate ? (
+                        <Link href={route(routeNames.create)} className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
+                            File Claim
+                        </Link>
+                    ) : null}
                 </div>
             }
         >
@@ -134,7 +157,7 @@ export default function ClaimIndex({ claims, filters, filter_options }: Props) {
                     />
                     <button
                         type="button"
-                        onClick={() => router.get(route('inventory.claims.index'))}
+                        onClick={() => router.get(route(routeNames.index))}
                         className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                     >
                         Reset
@@ -143,7 +166,9 @@ export default function ClaimIndex({ claims, filters, filter_options }: Props) {
 
                 <div className="mb-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                     <p className="text-sm text-slate-600">
-                        Use this page only for exception handling after release: damaged, missing, or disputed distributed supplies.
+                        {canProcess
+                            ? 'Review office-filed post-distribution claims and record GSO resolution decisions.'
+                            : 'Use this page to file and track post-distribution issues for supplies released or received by your office.'}
                     </p>
                 </div>
 
@@ -168,7 +193,7 @@ export default function ClaimIndex({ claims, filters, filter_options }: Props) {
                                     </td>
                                     <td className="px-4 py-3 text-slate-600">{row.office?.name ?? row.office_id ?? '-'}</td>
                                     <td className="px-4 py-3 text-right">
-                                        <Link href={route('inventory.claims.show', row.claims_id)} className="text-sm font-semibold text-red-700 hover:text-red-900">
+                                        <Link href={route(routeNames.show, row.claims_id)} className="text-sm font-semibold text-red-700 hover:text-red-900">
                                             View
                                         </Link>
                                     </td>

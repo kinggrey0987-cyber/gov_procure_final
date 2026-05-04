@@ -278,7 +278,7 @@ export default function DistributionShow({ record }: Props) {
                                     <td className="px-4 py-3 text-slate-700">{displayClaimStatus(claim.status)}</td>
                                     <td className="px-4 py-3 text-slate-600">{claim.claim_date ?? '-'}</td>
                                     <td className="px-4 py-3 text-right">
-                                        <Link href={route('inventory.claims.show', claim.claims_id)} className="text-sm font-semibold text-red-700 hover:text-red-900">
+                                        <Link href={route(isOfficeUser ? 'office.claims.show' : 'inventory.claims.show', claim.claims_id)} className="text-sm font-semibold text-red-700 hover:text-red-900">
                                             View Claim
                                         </Link>
                                     </td>

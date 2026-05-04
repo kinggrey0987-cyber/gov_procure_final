@@ -26,7 +26,9 @@ class ClaimController
 
     public function index(Request $request): Response
     {
-        abort_unless(request()->user()->can('claim.view-any'), 403);
+        $user = request()->user();
+
+        abort_unless($user->can('claim.view-any'), 403);
 
         $status = strtoupper(trim((string) $request->input('status', '')));
         $year = trim((string) $request->input('year', ''));
@@ -43,9 +45,11 @@ class ClaimController
 
         $query = Claim::query()->with(['distributionRecord', 'claimant', 'office']);
 
-        if (request()->user()->isOfficeUser()) {
-            $query->where('office_id', (int) request()->user()->office_id);
+        if ($user->isOfficeUser()) {
+            $query->where('office_id', (int) $user->office_id);
         }
+
+        $routePrefix = $user->isOfficeUser() ? 'office.claims' : 'inventory.claims';
 
         $claims = $query
             ->when($status !== '', fn ($builder) => $builder->where('status', $status))
@@ -73,15 +77,26 @@ class ClaimController
             'filter_options' => [
                 'years' => $yearOptions,
             ],
+            'routes' => [
+                'index' => $routePrefix.'.index',
+                'create' => $routePrefix.'.create',
+                'show' => $routePrefix.'.show',
+            ],
+            'permissions' => [
+                'create' => $user->can('claim.create'),
+                'process' => $user->isGsoOfficer(),
+            ],
         ]);
     }
 
     public function create(Request $request): Response
     {
-        abort_unless(request()->user()->can('claim.create'), 403);
+        $user = request()->user();
+
+        abort_unless($user->can('claim.create'), 403);
 
         $distributionRecords = DistributionRecord::query()
-            ->when(request()->user()->isOfficeUser(), fn ($query) => $query->where('office_id', request()->user()->office_id))
+            ->where('office_id', (int) $user->office_id)
             ->whereIn('status', ['RELEASED', 'RECEIVED'])
             ->with(['office', 'supplyRequest'])
             ->orderByDesc('release_date')
