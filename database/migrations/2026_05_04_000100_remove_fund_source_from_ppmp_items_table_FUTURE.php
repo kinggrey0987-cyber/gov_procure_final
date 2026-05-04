@@ -17,6 +17,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (! Schema::hasColumn('ppmp_items', 'fund_source')) {
+            return;
+        }
+
         Schema::table('ppmp_items', function (Blueprint $table) {
             // Remove the fund_source column from ppmp_items
             $table->dropColumn('fund_source');
@@ -25,6 +29,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (Schema::hasColumn('ppmp_items', 'fund_source')) {
+            return;
+        }
+
         Schema::table('ppmp_items', function (Blueprint $table) {
             // Restore the fund_source column if rollback is needed
             $table->string('fund_source', 100)->nullable();

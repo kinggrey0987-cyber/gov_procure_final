@@ -39,13 +39,19 @@ class ExecutiveDisclosureDemoSeeder extends Seeder
             ->get();
 
         $purchaseOrders = PurchaseOrder::query()
-            ->whereIn('status', ['COMPLETED', 'PLACED'])
+            ->where(function ($query): void {
+                $query->where('status', 'COMPLETED')
+                    ->orWhere('status', 'PLACED');
+            })
             ->latest('updated_at')
             ->take(4)
             ->get();
 
         $receivedDistributions = DistributionRecord::query()
-            ->whereIn('status', ['RECEIVED', 'RELEASED'])
+            ->where(function ($query): void {
+                $query->where('status', 'RECEIVED')
+                    ->orWhere('status', 'RELEASED');
+            })
             ->latest('updated_at')
             ->take(4)
             ->get();
@@ -298,6 +304,7 @@ class ExecutiveDisclosureDemoSeeder extends Seeder
                 [
                     'uploaded_by' => (int) $actor->id,
                     'file_name' => basename($path),
+                    'document_kind' => 'PUBLIC_DISCLOSURE_ATTACHMENT',
                     'file_path' => $path,
                     'uploaded_at' => now(),
                 ],

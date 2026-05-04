@@ -195,7 +195,10 @@ class DocumentService
                 officeId: $actor->office_id,
             );
 
-            Document::query()->whereKey((int) $document->document_id)->delete();
+            DB::delete(
+                'delete from documents where document_id = ?',
+                [(int) $document->getKey()],
+            );
         });
     }
 }

@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\FundSource;
 use App\Models\Alert;
 use App\Models\Claim;
 use App\Models\Delivery;
@@ -33,6 +34,7 @@ use App\Services\Office\SupplyRequestService;
 use App\Services\Procurement\PurchaseOrderService;
 use App\Services\Procurement\PurchaseRequestService;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -48,17 +50,17 @@ class DemoWorkflowSeeder extends Seeder
         try {
             DB::transaction(function () use ($beforeCounts): void {
                 $users = User::query()
-                    ->whereIn('email', [
-                        'rienz6977@gmail.com',
-                        'rienz123123@gmail.com',
-                        'rienyhulleza1022@gmail.com',
-                        'jayrossrusselherbias@gmail.com',
-                        'jeronopjer.chmsu@gmail.com',
-                        'jeronopjer@gmail.com',
-                        'govprocure86@gmail.com',
-                        'kinggrey0987@gmail.com',
-                        'roengwapo09@gmail.com',
-                    ])
+                    ->where(function ($query): void {
+                        $query->where('email', 'rienz6977@gmail.com')
+                            ->orWhere('email', 'rienz123123@gmail.com')
+                            ->orWhere('email', 'rienyhulleza1022@gmail.com')
+                            ->orWhere('email', 'jayrossrusselherbias@gmail.com')
+                            ->orWhere('email', 'jeronopjer.chmsu@gmail.com')
+                            ->orWhere('email', 'jeronopjer@gmail.com')
+                            ->orWhere('email', 'govprocure86@gmail.com')
+                            ->orWhere('email', 'kinggrey0987@gmail.com')
+                            ->orWhere('email', 'roengwapo09@gmail.com');
+                    })
                     ->get()
                     ->keyBy('email');
 
@@ -360,6 +362,7 @@ class DemoWorkflowSeeder extends Seeder
             [
                 'prepared_by' => (int) $officeUser->id,
                 'approved_by' => null,
+                'fund_source' => FundSource::GAA_CURRENT->value,
                 'status' => 'APPROVED',
                 'total_estimated_budget' => 100,
                 'date_prepared' => now()->toDateString(),
@@ -379,7 +382,6 @@ class DemoWorkflowSeeder extends Seeder
                 'unit_cost' => 20,
                 'estimated_budget' => 100,
                 'procurement_schedule' => now()->addDays(5)->toDateString(),
-                'fund_source' => 'General Fund',
                 'remarks' => 'Proof PPMP item.',
             ],
         );
@@ -450,6 +452,7 @@ class DemoWorkflowSeeder extends Seeder
     /**
      * @param  array<string, Ppmp>  $approvedPpmpsByOffice
      */
+    // @disregard PHP6613 Intelephense cannot fully infer this large deterministic presentation-data builder.
     private function seedPresentationTopUp(
         User $execUser,
         User $mpdoUser,
@@ -499,6 +502,7 @@ class DemoWorkflowSeeder extends Seeder
             [
                 'prepared_by' => (int) $engUser->id,
                 'approved_by' => null,
+                'fund_source' => FundSource::GAA_CURRENT->value,
                 'status' => 'SUBMITTED',
                 'total_estimated_budget' => 0,
                 'date_prepared' => now()->toDateString(),
@@ -515,7 +519,6 @@ class DemoWorkflowSeeder extends Seeder
                 'unit_cost' => 860,
                 'estimated_budget' => 13760,
                 'procurement_schedule' => now()->addDays(30)->toDateString(),
-                'fund_source' => 'General Fund',
                 'remarks' => 'Submitted PPMP line for engineering consumables.',
             ],
         );
@@ -528,7 +531,6 @@ class DemoWorkflowSeeder extends Seeder
                 'unit_cost' => 330,
                 'estimated_budget' => 13200,
                 'procurement_schedule' => now()->addDays(30)->toDateString(),
-                'fund_source' => 'General Fund',
                 'remarks' => 'Submitted PPMP line for engineering workstation supplies.',
             ],
         );
@@ -741,7 +743,10 @@ class DemoWorkflowSeeder extends Seeder
         $deliveryCount = (int) DB::table('deliveries')->count();
         if ($deliveryCount < 4) {
             $candidateOrder = PurchaseOrder::query()
-                ->whereIn('status', ['PLACED', 'COMPLETED'])
+                ->where(function ($query): void {
+                    $query->where('status', 'PLACED')
+                        ->orWhere('status', 'COMPLETED');
+                })
                 ->with(['items'])
                 ->orderBy('purchase_order_id')
                 ->first();
@@ -842,7 +847,6 @@ class DemoWorkflowSeeder extends Seeder
                     'unit_cost' => 50,
                     'estimated_budget' => max((float) $line['quantity'] * 100, 500),
                     'procurement_schedule' => now()->addDays(20)->toDateString(),
-                    'fund_source' => 'General Fund',
                     'remarks' => 'Auto-created PPMP line for scenario request.',
                 ],
             );
@@ -891,7 +895,10 @@ class DemoWorkflowSeeder extends Seeder
         }
     }
 
-    private function seedInventory($items): void
+    /**
+     * @param  Collection<string, int>  $items
+     */
+    private function seedInventory(Collection $items): void
     {
         $inventoryRows = [
             'Bond Paper' => [220, 200, 25],
@@ -937,11 +944,12 @@ class DemoWorkflowSeeder extends Seeder
                 'office_id' => $officeId,
                 'fiscal_year' => $fiscalYear,
             ],
-            [
-                'prepared_by' => (int) $preparer->id,
-                'status' => 'SUBMITTED',
-                'total_estimated_budget' => 0,
-                'date_prepared' => now()->toDateString(),
+                [
+                    'prepared_by' => (int) $preparer->id,
+                    'fund_source' => FundSource::GAA_CURRENT->value,
+                    'status' => 'SUBMITTED',
+                    'total_estimated_budget' => 0,
+                    'date_prepared' => now()->toDateString(),
                 'date_approved' => null,
                 'remarks' => $remarks,
             ],
@@ -970,7 +978,6 @@ class DemoWorkflowSeeder extends Seeder
                     'unit_cost' => $unitCost,
                     'estimated_budget' => $estimatedBudget,
                     'procurement_schedule' => now()->addWeeks(2)->toDateString(),
-                    'fund_source' => 'General Fund',
                     'remarks' => 'Seeded demo PPMP line item.',
                 ],
             );
@@ -1284,7 +1291,10 @@ class DemoWorkflowSeeder extends Seeder
 
         $records = DistributionRecord::query()
             ->with(['supplyRequest.items', 'items', 'claims'])
-            ->whereIn('status', ['RELEASED', 'RECEIVED'])
+            ->where(function ($query): void {
+                $query->where('status', 'RELEASED')
+                    ->orWhere('status', 'RECEIVED');
+            })
             ->orderBy('distribution_record_id')
             ->get();
 
@@ -1330,7 +1340,10 @@ class DemoWorkflowSeeder extends Seeder
 
         $claimTarget = DistributionRecord::query()
             ->with(['items'])
-            ->whereIn('status', ['RELEASED', 'RECEIVED'])
+            ->where(function ($query): void {
+                $query->where('status', 'RELEASED')
+                    ->orWhere('status', 'RECEIVED');
+            })
             ->whereHas('items')
             ->whereDoesntHave('claims')
             ->orderByDesc('distribution_record_id')

@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\FundSource;
 use App\Models\Alert;
 use App\Models\Claim;
 use App\Models\Delivery;
@@ -34,6 +35,7 @@ use App\Services\Procurement\PurchaseOrderService;
 use App\Services\Procurement\PurchaseRequestService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -49,17 +51,17 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
         try {
             $this->outputLine('Stage: actor lookup and baseline context started.');
             $users = User::query()
-                ->whereIn('email', [
-                    'rienz6977@gmail.com',
-                    'rienz123123@gmail.com',
-                    'rienyhulleza1022@gmail.com',
-                    'jayrossrusselherbias@gmail.com',
-                    'jeronopjer.chmsu@gmail.com',
-                    'jeronopjer@gmail.com',
-                    'govprocure86@gmail.com',
-                    'kinggrey0987@gmail.com',
-                    'roengwapo09@gmail.com',
-                ])
+                ->where(function ($query): void {
+                    $query->where('email', 'rienz6977@gmail.com')
+                        ->orWhere('email', 'rienz123123@gmail.com')
+                        ->orWhere('email', 'rienyhulleza1022@gmail.com')
+                        ->orWhere('email', 'jayrossrusselherbias@gmail.com')
+                        ->orWhere('email', 'jeronopjer.chmsu@gmail.com')
+                        ->orWhere('email', 'jeronopjer@gmail.com')
+                        ->orWhere('email', 'govprocure86@gmail.com')
+                        ->orWhere('email', 'kinggrey0987@gmail.com')
+                        ->orWhere('email', 'roengwapo09@gmail.com');
+                })
                 ->get()
                 ->keyBy('email');
 
@@ -903,11 +905,12 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                 'office_id' => $officeId,
                 'fiscal_year' => $fiscalYear,
             ],
-            [
-                'prepared_by' => (int) $preparer->id,
-                'status' => 'SUBMITTED',
-                'total_estimated_budget' => 0,
-                'date_prepared' => now()->toDateString(),
+                [
+                    'prepared_by' => (int) $preparer->id,
+                    'fund_source' => FundSource::GAA_CURRENT->value,
+                    'status' => 'SUBMITTED',
+                    'total_estimated_budget' => 0,
+                    'date_prepared' => now()->toDateString(),
                 'date_approved' => null,
                 'remarks' => $remarks,
             ],
@@ -936,7 +939,6 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                     'unit_cost' => $unitCost,
                     'estimated_budget' => $estimatedBudget,
                     'procurement_schedule' => now()->addWeeks(2)->toDateString(),
-                    'fund_source' => 'General Fund',
                     'remarks' => 'Seeded demo PPMP line item.',
                 ],
             );
@@ -1390,7 +1392,10 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
         }
     }
 
-    private function seedInventory($items): void
+    /**
+     * @param  Collection<string, int>  $items
+     */
+    private function seedInventory(Collection $items): void
     {
         $inventoryRows = [
             'Bond Paper' => [220, 200, 25],
@@ -1432,7 +1437,10 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
 
         $records = DistributionRecord::query()
             ->with(['supplyRequest.items', 'items', 'claims'])
-            ->whereIn('status', ['RELEASED', 'RECEIVED'])
+            ->where(function ($query): void {
+                $query->where('status', 'RELEASED')
+                    ->orWhere('status', 'RECEIVED');
+            })
             ->orderBy('distribution_record_id')
             ->get();
 
