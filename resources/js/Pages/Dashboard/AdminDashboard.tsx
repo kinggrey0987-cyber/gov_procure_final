@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
+import { Head, Link, router } from '@inertiajs/react';
+import { useState, useEffect } from 'react';
 
 type Props = {
     summary: {
@@ -15,6 +15,17 @@ type Props = {
         actor: string;
         occurred_at: string | null;
     }>;
+    pagination: {
+        current_page: number;
+        last_page: number;
+        prev_page_url: string | null;
+        next_page_url: string | null;
+        total: number;
+    };
+    filters: {
+        search: string | null;
+        actor: string | null;
+    };
 };
 
 function formatRelativeDate(value: string | null): string {
@@ -31,31 +42,39 @@ function formatRelativeDate(value: string | null): string {
     return date.toLocaleString();
 }
 
-export default function AdminDashboard({ summary, activities }: Props) {
-    const [activitySearch, setActivitySearch] = useState('');
-    const [activityActor, setActivityActor] = useState('ALL');
+export default function AdminDashboard({ summary, activities, pagination, filters }: Props) {
+    const [formData, setFormData] = useState({
+        search: filters.search ?? '',
+        actor: filters.actor ?? '',
+    });
 
-    const actorOptions = useMemo(
-        () => ['ALL', ...Array.from(new Set(activities.map((activity) => activity.actor))).sort((a, b) => a.localeCompare(b))],
-        [activities],
-    );
-
-    const filteredActivities = useMemo(() => {
-        const keyword = activitySearch.trim().toLowerCase();
-
-        return activities.filter((activity) => {
-            const matchesActor = activityActor === 'ALL' || activity.actor === activityActor;
-            if (!matchesActor) {
-                return false;
-            }
-
-            if (keyword.length === 0) {
-                return true;
-            }
-
-            return [activity.title, activity.actor, formatRelativeDate(activity.occurred_at)].join(' ').toLowerCase().includes(keyword);
+    const handleFilterSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        router.get(route('dashboard'), {
+            search: formData.search || undefined,
+            actor: formData.actor || undefined,
+        }, {
+            preserveState: true,
+            replace: true,
         });
-    }, [activities, activityActor, activitySearch]);
+    };
+
+    const handleClearFilters = () => {
+        setFormData({ search: '', actor: '' });
+        router.get(route('dashboard'), {}, {
+            preserveState: true,
+            replace: true,
+        });
+    };
+
+    const handlePaginationLink = (url: string | null) => {
+        if (url) {
+            router.get(url, {}, {
+                preserveState: true,
+                replace: true,
+            });
+        }
+    };
 
     const statCards = [
         {
@@ -149,7 +168,7 @@ export default function AdminDashboard({ summary, activities }: Props) {
                         <p className="mt-1 text-lg text-slate-500">Recent technical administration events</p>
                     </header>
                     <div className="p-6">
-                        <div className="mb-4 grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-5">
+                        <form onSubmit={handleFilterSubmit} className="mb-4 grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-5">
                             <div className="md:col-span-3">
                                 <label htmlFor="admin-activity-search" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
                                     Search activity
@@ -157,9 +176,9 @@ export default function AdminDashboard({ summary, activities }: Props) {
                                 <input
                                     id="admin-activity-search"
                                     type="text"
-                                    value={activitySearch}
-                                    onChange={(event) => setActivitySearch(event.target.value)}
-                                    placeholder="Search title, actor, or timestamp"
+                                    value={formData.search}
+                                    onChange={(event) => setFormData(prev => ({ ...prev, search: event.target.value }))}
+                                    placeholder="Search module name"
                                     className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                                 />
                             </div>
@@ -167,60 +186,88 @@ export default function AdminDashboard({ summary, activities }: Props) {
                                 <label htmlFor="admin-activity-actor" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
                                     Actor
                                 </label>
-                                <select
+                                <input
                                     id="admin-activity-actor"
-                                    value={activityActor}
-                                    onChange={(event) => setActivityActor(event.target.value)}
+                                    type="text"
+                                    value={formData.actor}
+                                    onChange={(event) => setFormData(prev => ({ ...prev, actor: event.target.value }))}
+                                    placeholder="Actor name"
                                     className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                                >
-                                    {actorOptions.map((actor) => (
-                                        <option key={actor} value={actor}>
-                                            {actor === 'ALL' ? 'All actors' : actor}
-                                        </option>
-                                    ))}
-                                </select>
+                                />
                             </div>
-                            <div className="flex items-end">
+                            <div className="flex items-end gap-2">
+                                <button
+                                    type="submit"
+                                    className="flex-1 rounded-lg border border-blue-300 bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+                                >
+                                    Filter
+                                </button>
                                 <button
                                     type="button"
-                                    onClick={() => {
-                                        setActivitySearch('');
-                                        setActivityActor('ALL');
-                                    }}
-                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                                    onClick={handleClearFilters}
+                                    className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
                                 >
-                                    Clear Filters
+                                    Clear
                                 </button>
                             </div>
-                            <p className="md:col-span-5 text-xs text-slate-500">
-                                Showing {filteredActivities.length} of {activities.length} activity record(s).
-                            </p>
-                        </div>
+                        </form>
 
-                        {filteredActivities.length === 0 && (
+                        {activities.length === 0 && (
                             <p className="rounded-xl border border-dashed border-slate-300 px-4 py-8 text-center text-slate-500">
                                 No activity records matched the selected filters.
                             </p>
                         )}
 
-                        {filteredActivities.length > 0 && (
-                            <ul className="space-y-4">
-                                {filteredActivities.map((activity) => (
-                                    <li key={activity.id} className="flex items-start gap-3 rounded-xl border border-slate-200 px-4 py-3">
-                                        <span className="mt-1 inline-flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-500">
-                                            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                <path d="M12 8v4l3 2" />
-                                                <circle cx="12" cy="12" r="9" />
+                        {activities.length > 0 && (
+                            <>
+                                <ul className="mb-4 space-y-4">
+                                    {activities.map((activity) => (
+                                        <li key={activity.id} className="flex items-start gap-3 rounded-xl border border-slate-200 px-4 py-3">
+                                            <span className="mt-1 inline-flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+                                                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                    <path d="M12 8v4l3 2" />
+                                                    <circle cx="12" cy="12" r="9" />
+                                                </svg>
+                                            </span>
+                                            <div>
+                                                <p className="text-lg font-semibold text-slate-800">{activity.title}</p>
+                                                <p className="text-sm text-slate-600">{activity.actor}</p>
+                                                <p className="text-sm text-slate-500">{formatRelativeDate(activity.occurred_at)}</p>
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
+
+                                <div className="border-t border-slate-200 pt-4">
+                                    <div className="mb-4 flex items-center justify-between">
+                                        <p className="text-sm text-slate-600">
+                                            Page <span className="font-semibold">{pagination.current_page}</span> of <span className="font-semibold">{pagination.last_page}</span> • Showing <span className="font-semibold">{activities.length}</span> of <span className="font-semibold">{pagination.total}</span>
+                                        </p>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => handlePaginationLink(pagination.prev_page_url)}
+                                            disabled={!pagination.prev_page_url}
+                                            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                                        >
+                                            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                <path d="M15 19l-7-7 7-7" />
                                             </svg>
-                                        </span>
-                                        <div>
-                                            <p className="text-lg font-semibold text-slate-800">{activity.title}</p>
-                                            <p className="text-sm text-slate-600">{activity.actor}</p>
-                                            <p className="text-sm text-slate-500">{formatRelativeDate(activity.occurred_at)}</p>
-                                        </div>
-                                    </li>
-                                ))}
-                            </ul>
+                                            Previous
+                                        </button>
+                                        <button
+                                            onClick={() => handlePaginationLink(pagination.next_page_url)}
+                                            disabled={!pagination.next_page_url}
+                                            className="ml-auto inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                                        >
+                                            Next
+                                            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                <path d="M9 5l7 7-7 7" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </>
                         )}
                     </div>
                 </section>

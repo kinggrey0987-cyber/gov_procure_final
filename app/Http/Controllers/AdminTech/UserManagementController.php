@@ -24,21 +24,49 @@ class UserManagementController extends Controller
 
     private const TECHNICAL_OFFICE_DESCRIPTION = 'Reserved technical office for system administrator accounts.';
 
-    public function index(): Response
+    public function index(Request $request): Response
     {
+        // Validate filter parameters
+        $filters = $request->validate([
+            'search' => ['nullable', 'string', 'max:100'],
+            'role_id' => ['nullable', 'integer'],
+            'page' => ['nullable', 'integer', 'min:1'],
+        ]);
+
         $actingUserId = auth()->id();
-        $adminCount = User::query()
-            ->whereHas('role', fn ($query) => $query->where('code', UserRole::ADMIN->value))
+
+        // Build base query
+        $query = User::query()
+            ->with(['role:id,code,name', 'office:id,code,name'])
+            ->where(function ($q): void {
+                $q->whereHas('role', fn ($roleQuery) => $roleQuery->where('code', '!=', UserRole::PUBLIC->value))
+                    ->orWhereNull('role_id');
+            });
+
+        // Apply search filter
+        if ($filters['search'] ?? null) {
+            $search = $filters['search'];
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        // Apply role filter
+        if ($filters['role_id'] ?? null) {
+            $query->where('role_id', $filters['role_id']);
+        }
+
+        // Count admins for deletion checks
+        $adminCount = (clone $query)
+            ->whereHas('role', fn ($q) => $q->where('code', UserRole::ADMIN->value))
             ->count();
 
-        $users = User::query()
-            ->with(['role:id,code,name', 'office:id,code,name'])
-            ->where(function ($query): void {
-                $query->whereHas('role', fn ($roleQuery) => $roleQuery->where('code', '!=', UserRole::PUBLIC->value))
-                    ->orWhereNull('role_id');
-            })
+        // Get paginated users
+        $users = $query
             ->orderBy('name')
-            ->paginate(20)
+            ->paginate(perPage: 20, page: $filters['page'] ?? 1)
+            ->withQueryString()
             ->through(function (User $user) use ($actingUserId, $adminCount): array {
                 $isSelf = $actingUserId === $user->id;
                 $isLastAdmin = $user->role?->code === UserRole::ADMIN->value && $adminCount <= 1;
@@ -65,6 +93,11 @@ class UserManagementController extends Controller
 
         return Inertia::render('AdminTech/Users/Index', [
             'users' => $users,
+            'filters' => [
+                'search' => $filters['search'] ?? null,
+                'role_id' => $filters['role_id'] ?? null,
+            ],
+            'roles' => $this->manageableRoles(),
         ]);
     }
 

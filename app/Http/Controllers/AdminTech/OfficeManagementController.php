@@ -8,14 +8,23 @@ use App\Http\Requests\Governance\UpdateOfficeRequest;
 use App\Models\Office;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class OfficeManagementController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
-        $offices = Office::query()
+        // Validate filter parameters
+        $filters = $request->validate([
+            'search' => ['nullable', 'string', 'max:100'],
+            'status' => ['nullable', 'in:active,inactive'],
+            'page' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        // Build query with optional filters
+        $query = Office::query()
             ->withCount([
                 'users',
                 'ppmps',
@@ -25,8 +34,21 @@ class OfficeManagementController extends Controller
                 'claims',
                 'auditLogs',
             ])
+            ->when($filters['search'] ?? null, function ($q, $search) {
+                $q->where(function ($query) use ($search) {
+                    $query->where('name', 'like', "%{$search}%")
+                        ->orWhere('code', 'like', "%{$search}%");
+                });
+            })
+            ->when($filters['status'] ?? null, function ($q, $status) {
+                $isActive = $status === 'active';
+                $q->where('is_active', $isActive);
+            });
+
+        $offices = $query
             ->orderBy('name')
-            ->paginate(20)
+            ->paginate(perPage: 20, page: $filters['page'] ?? 1)
+            ->withQueryString()
             ->through(function (Office $office): array {
                 $linkedCount =
                     $office->users_count +
@@ -56,6 +78,10 @@ class OfficeManagementController extends Controller
 
         return Inertia::render('AdminTech/Offices/Index', [
             'offices' => $offices,
+            'filters' => [
+                'search' => $filters['search'] ?? null,
+                'status' => $filters['status'] ?? null,
+            ],
         ]);
     }
 

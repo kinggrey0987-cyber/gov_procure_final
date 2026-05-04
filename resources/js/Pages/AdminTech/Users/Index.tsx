@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
+import { useState } from 'react';
 
 type UserRow = {
     id: number;
@@ -11,13 +12,31 @@ type UserRow = {
     delete_reason: string | null;
 };
 
+type Role = {
+    id: number;
+    code: string;
+    name: string;
+};
+
 type Props = {
     users: {
         data: UserRow[];
+        current_page: number;
+        last_page: number;
+        prev_page_url: string | null;
+        next_page_url: string | null;
+        from: number;
+        to: number;
+        total: number;
     };
+    filters: {
+        search: string | null;
+        role_id: number | null;
+    };
+    roles: Role[];
 };
 
-export default function UserIndex({ users }: Props) {
+export default function UserIndex({ users, filters, roles }: Props) {
     const page = usePage().props as {
         auth: {
             user: {
@@ -31,6 +50,11 @@ export default function UserIndex({ users }: Props) {
             delete?: string;
         };
     };
+
+    const [formData, setFormData] = useState({
+        search: filters.search ?? '',
+        role_id: filters.role_id ? String(filters.role_id) : '',
+    });
 
     const deleteError = page.errors?.delete;
     const successMessage = page.flash?.success;
@@ -47,6 +71,23 @@ export default function UserIndex({ users }: Props) {
                     window.alert(errors.delete);
                 }
             },
+        });
+    };
+
+    const handleFilterSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        router.get(route('admin-tech.users.index'), {
+            search: formData.search || undefined,
+            role_id: formData.role_id || undefined,
+        }, {
+            preserveScroll: true,
+        });
+    };
+
+    const handleClearFilters = () => {
+        setFormData({ search: '', role_id: '' });
+        router.get(route('admin-tech.users.index'), {}, {
+            preserveScroll: true,
         });
     };
 
@@ -80,7 +121,56 @@ export default function UserIndex({ users }: Props) {
                     </div>
                 )}
 
-                <div className="overflow-x-auto">
+                <form onSubmit={handleFilterSubmit} className="border-b border-slate-200 bg-slate-50 px-6 py-4">
+                    <div className="flex gap-3">
+                        <div className="flex-1">
+                            <label htmlFor="search-input" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                Search
+                            </label>
+                            <input
+                                id="search-input"
+                                type="text"
+                                value={formData.search}
+                                onChange={(e) => setFormData(prev => ({ ...prev, search: e.target.value }))}
+                                placeholder="Search by name or email..."
+                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                            />
+                        </div>
+                        <div className="w-48">
+                            <label htmlFor="role-select" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                Role
+                            </label>
+                            <select
+                                id="role-select"
+                                value={formData.role_id}
+                                onChange={(e) => setFormData(prev => ({ ...prev, role_id: e.target.value }))}
+                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                            >
+                                <option value="">All Roles</option>
+                                {roles.map(role => (
+                                    <option key={role.id} value={role.id}>
+                                        {role.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="flex items-end gap-2">
+                            <button
+                                type="submit"
+                                className="rounded-lg border border-blue-300 bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                            >
+                                Filter
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleClearFilters}
+                                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                            >
+                                Clear
+                            </button>
+                        </div>
+                    </div>
+                </form>
                     <table className="min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-slate-50">
                             <tr>
@@ -143,7 +233,58 @@ export default function UserIndex({ users }: Props) {
                         </tbody>
                     </table>
                 </div>
-            </section>
-        </AuthenticatedLayout>
-    );
-}
+
+                <div className="border-t border-slate-200 bg-slate-50 px-6 py-4">
+                    <div className="mb-4 flex items-center justify-between">
+                        <p className="text-sm text-slate-600">
+                            Showing <span className="font-semibold">{users.from}</span> to <span className="font-semibold">{users.to}</span> of <span className="font-semibold">{users.total}</span> user(s)
+                        </p>
+                        <p className="text-sm text-slate-600">
+                            Page <span className="font-semibold">{users.current_page}</span> of <span className="font-semibold">{users.last_page}</span>
+                        </p>
+                    </div>
+                    <div className="flex gap-2">
+                        {users.prev_page_url ? (
+                            <Link
+                                href={users.prev_page_url}
+                                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                            >
+                                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M15 19l-7-7 7-7" />
+                                </svg>
+                                Previous
+                            </Link>
+                        ) : (
+                            <button
+                                disabled
+                                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-400 cursor-not-allowed"
+                            >
+                                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M15 19l-7-7 7-7" />
+                                </svg>
+                                Previous
+                            </button>
+                        )}
+                        {users.next_page_url ? (
+                            <Link
+                                href={users.next_page_url}
+                                className="ml-auto inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                            >
+                                Next
+                                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M9 5l7 7-7 7" />
+                                </svg>
+                            </Link>
+                        ) : (
+                            <button
+                                disabled
+                                className="ml-auto inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-400 cursor-not-allowed"
+                            >
+                                Next
+                                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M9 5l7 7-7 7" />
+                                </svg>
+                            </button>
+                        )}
+                    </div>
+                </div>

@@ -28,12 +28,31 @@ class DomainDashboardController extends Controller
         $startedAt = microtime(true);
         $user = $request->user();
 
-        $activities = AuditLog::query()
+        // Validate and get filter parameters
+        $filters = $request->validate([
+            'search' => ['nullable', 'string', 'max:100'],
+            'actor' => ['nullable', 'string', 'max:100'],
+            'page' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        // Build query with optional filters
+        $query = AuditLog::query()
             ->technical()
             ->with('user:id,name')
-            ->latest('created_at')
-            ->limit(5)
-            ->get(['id', 'module_name', 'action_type', 'user_id', 'created_at'])
+            ->when($filters['search'] ?? null, function ($q, $search) {
+                $q->where('module_name', 'like', "%{$search}%");
+            })
+            ->when($filters['actor'] ?? null, function ($q, $actor) {
+                $q->whereHas('user', fn ($userQuery) => $userQuery->where('name', 'like', "%{$actor}%"));
+            })
+            ->latest('created_at');
+
+        // Paginate with 5 records per page
+        $activitiesPaginator = $query
+            ->paginate(perPage: 5, page: $filters['page'] ?? 1)
+            ->only(['data', 'current_page', 'last_page', 'prev_page_url', 'next_page_url', 'total']);
+
+        $activities = collect($activitiesPaginator['data'])
             ->map(fn (AuditLog $log): array => [
                 'id' => (int) $log->id,
                 'title' => ucfirst(strtolower((string) $log->action_type)).' on '.str_replace('_', ' ', (string) $log->module_name),
@@ -51,6 +70,17 @@ class DomainDashboardController extends Controller
                     : 0,
             ],
             'activities' => $activities,
+            'pagination' => [
+                'current_page' => $activitiesPaginator['current_page'],
+                'last_page' => $activitiesPaginator['last_page'],
+                'prev_page_url' => $activitiesPaginator['prev_page_url'],
+                'next_page_url' => $activitiesPaginator['next_page_url'],
+                'total' => $activitiesPaginator['total'],
+            ],
+            'filters' => [
+                'search' => $filters['search'] ?? null,
+                'actor' => $filters['actor'] ?? null,
+            ],
         ]);
 
         $this->logIfSlow('admin-tech', $startedAt, (int) ($user?->id ?? 0));
