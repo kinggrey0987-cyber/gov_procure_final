@@ -76,13 +76,26 @@ export default function BusinessAudit({ auditLogs, filters, analytics, filter_op
         };
     }, [filter_options.users, form.action_type, form.from_date, form.module_name, form.to_date, form.user_query]);
 
+    const activeFiltersKey = useMemo(() => serializeAuditFilters(activeFilters), [activeFilters]);
+    const currentFiltersKey = useMemo(() => serializeAuditFilters({
+        module_name: filters.module_name ?? '',
+        action_type: filters.action_type ?? '',
+        user_id: filters.user_id ?? '',
+        from_date: filters.from_date ?? '',
+        to_date: filters.to_date ?? '',
+    }), [filters.action_type, filters.from_date, filters.module_name, filters.to_date, filters.user_id]);
+
     useEffect(() => {
+        if (activeFiltersKey === currentFiltersKey) {
+            return;
+        }
+
         router.get(route('executive.audit.business'), activeFilters, {
             preserveState: true,
             replace: true,
             only: ['auditLogs', 'filters', 'analytics', 'filter_options'],
         });
-    }, [activeFilters]);
+    }, [activeFilters, activeFiltersKey, currentFiltersKey]);
 
     const moduleSummary = analytics.module_summary
         .map((row) => ({
@@ -336,6 +349,22 @@ function formatActionLabel(value: string): string {
 
     const raw = aliases[value] ?? value;
     return raw.replaceAll('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function serializeAuditFilters(filters: {
+    module_name?: string;
+    action_type?: string;
+    user_id?: number | string;
+    from_date?: string;
+    to_date?: string;
+}): string {
+    return JSON.stringify({
+        module_name: filters.module_name ?? '',
+        action_type: filters.action_type ?? '',
+        user_id: String(filters.user_id ?? ''),
+        from_date: filters.from_date ?? '',
+        to_date: filters.to_date ?? '',
+    });
 }
 
 function getDateRange(range: string): { from_date: string; to_date: string } {
