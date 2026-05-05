@@ -53,7 +53,6 @@ type Props = {
 
 export default function DeliveryShow({ delivery }: Props) {
     const canVerify = delivery.receipt_status === 'RECEIVED';
-    const canEdit = delivery.receipt_status === 'PENDING';
     const [activeTab, setActiveTab] = useState<'overview' | 'items' | 'status' | 'related' | 'notes'>('overview');
 
     return (
@@ -66,11 +65,6 @@ export default function DeliveryShow({ delivery }: Props) {
                             {canVerify ? (
                                 <Link href={route('inventory.delivery-verifications.create', delivery.delivery_id)} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
                                     Verify Delivery
-                                </Link>
-                            ) : null}
-                            {canEdit ? (
-                                <Link href={route('inventory.deliveries.edit', delivery.delivery_id)} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
-                                    Edit
                                 </Link>
                             ) : null}
                         </div>
