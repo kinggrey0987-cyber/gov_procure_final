@@ -20,6 +20,17 @@ type Props = {
         }>;
         links: Array<{ url: string | null; label: string; active: boolean }>;
     };
+    auditLogsExport: Array<{
+        id: number;
+        log_domain: string;
+        module_name: string;
+        action_type: string;
+        reference_type: string;
+        reference_id: number;
+        created_at: string;
+        user?: { id: number; name: string } | null;
+        office?: { id: number; name: string } | null;
+    }>;
     filters: {
         module_name?: string;
         action_type?: string;
@@ -39,8 +50,9 @@ type Props = {
     };
 };
 
-export default function BusinessAudit({ auditLogs, filters, analytics, filter_options }: Props) {
+export default function BusinessAudit({ auditLogs, auditLogsExport, filters, analytics, filter_options }: Props) {
     const printSectionId = 'governance-logs-print-section';
+    const exportSectionId = 'governance-logs-export-section';
 
     const selectedUser = filter_options.users.find((user) => String(user.id) === String(filters.user_id ?? ''));
 
@@ -116,11 +128,21 @@ export default function BusinessAudit({ auditLogs, filters, analytics, filter_op
     const totalEvents = analytics.daily_trend.reduce((sum, row) => sum + row.total, 0);
     const activeModules = moduleSummary.length;
     const activeActions = actionSummary.length;
+    const auditLogsExportPages = useMemo(() => {
+        const pageSize = 14;
+        const pages: typeof auditLogsExport[] = [];
+
+        for (let index = 0; index < auditLogsExport.length; index += pageSize) {
+            pages.push(auditLogsExport.slice(index, index + pageSize));
+        }
+
+        return pages;
+    }, [auditLogsExport]);
 
     const exportCsv = () => {
         const rows = [
             ['timestamp', 'user', 'module', 'action', 'reference', 'office'],
-            ...auditLogs.data.map((log) => [
+            ...auditLogsExport.map((log) => [
                 new Date(log.created_at).toISOString(),
                 log.user?.name ?? 'System',
                 log.module_name,
@@ -143,10 +165,15 @@ export default function BusinessAudit({ auditLogs, filters, analytics, filter_op
     };
 
     const exportPdf = async () => {
-        await downloadSectionAsPdfById(printSectionId, {
+        await downloadSectionAsPdfById(exportSectionId, {
             title: 'Governance Logs',
             fileName: 'governance-logs.pdf',
+            marginMm: 5,
+            paperWidthPx: 760,
+            orientation: 'portrait',
             excludeSelectors: ['.print-hide', 'nav', 'aside', '[role="navigation"]'],
+            revealSelectors: ['.pdf-export-content'],
+            pageBreakSelectors: ['.pdf-page'],
         });
     };
 
@@ -308,6 +335,78 @@ export default function BusinessAudit({ auditLogs, filters, analytics, filter_op
                         <PaginationNav links={auditLogs.links} preserveState={false} />
                     </div>
                 </section>
+
+                <div id={exportSectionId} className="pdf-export-content hidden space-y-4 text-slate-900">
+                    <section className="pdf-page rounded-xl border border-red-100 bg-white p-4">
+                        <h2 className="text-xl font-semibold text-slate-900">Governance Logs Summary</h2>
+                        <p className="mt-1 text-xs text-slate-600">Summary charts followed by all filtered governance activity records.</p>
+                        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                            <KpiCard label="Events in Scope" value={totalEvents} />
+                            <KpiCard label="Modules Involved" value={activeModules} />
+                            <KpiCard label="Action Types" value={activeActions} />
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-2 gap-3 [&_.truncate]:whitespace-normal [&_.truncate]:overflow-visible [&_.truncate]:text-clip [&_[class*='space-y-3.5']]:space-y-4">
+                            <section className="rounded-xl border border-red-100 bg-white p-3">
+                                <h3 className="text-sm font-semibold text-slate-900">Module Summary</h3>
+                                <p className="mt-1 text-xs text-slate-600">Most active governance modules in current filters.</p>
+                                <div className="mt-4">
+                                    <HorizontalBarChart data={moduleSummary} emptyText="No data in current filter scope" />
+                                </div>
+                            </section>
+
+                            <section className="rounded-xl border border-red-100 bg-white p-3">
+                                <h3 className="text-sm font-semibold text-slate-900">Action Summary</h3>
+                                <p className="mt-1 text-xs text-slate-600">Most common governance actions in current filters.</p>
+                                <div className="mt-4">
+                                    <HorizontalBarChart data={actionSummary} emptyText="No data in current filter scope" />
+                                </div>
+                            </section>
+                        </div>
+                    </section>
+
+                    {auditLogsExportPages.map((pageRows, pageIndex) => (
+                        <section key={`governance-export-page-${pageIndex + 1}`} className="pdf-page overflow-hidden rounded-xl border border-red-100 bg-white">
+                            <div className="border-b border-slate-200 px-3 py-2.5">
+                                <h3 className="text-lg font-semibold text-slate-800">All Filtered Governance Activity Records</h3>
+                                <p className="mt-1 text-xs text-slate-600">
+                                    {pageIndex === 0 ? 'Includes all governance records in the current filter scope.' : `Continuation page ${pageIndex + 2}.`}
+                                </p>
+                            </div>
+
+                            {pageRows.length === 0 ? (
+                                <p className="px-6 py-8 text-sm text-slate-500">No data in current filter scope</p>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full table-fixed divide-y divide-slate-200 text-[11px]">
+                                        <thead className="bg-slate-50">
+                                            <tr>
+                                                <th className="w-[18%] px-2 py-2 text-left">Timestamp</th>
+                                                <th className="w-[16%] px-2 py-2 text-left">User</th>
+                                                <th className="w-[20%] px-2 py-2 text-left">Module</th>
+                                                <th className="w-[14%] px-2 py-2 text-left">Action</th>
+                                                <th className="w-[15%] px-2 py-2 text-left">Reference</th>
+                                                <th className="w-[17%] px-2 py-2 text-left">Office</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {pageRows.map((log) => (
+                                                <tr key={`${pageIndex}-${log.id}`}>
+                                                    <td className="px-2 py-1.5 align-top leading-snug">{new Date(log.created_at).toLocaleString()}</td>
+                                                    <td className="px-2 py-1.5 align-top leading-snug">{log.user?.name ?? 'System'}</td>
+                                                    <td className="px-2 py-1.5 align-top leading-snug">{formatModuleLabel(log.module_name)}</td>
+                                                    <td className="px-2 py-1.5 align-top leading-snug">{formatActionLabel(log.action_type)}</td>
+                                                    <td className="px-2 py-1.5 align-top leading-snug">{formatReferenceLabel(log.reference_type)} #{log.reference_id}</td>
+                                                    <td className="px-2 py-1.5 align-top leading-snug">{log.office?.name ?? 'N/A'}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </section>
+                    ))}
+                </div>
             </div>
         </AuthenticatedLayout>
     );

@@ -107,22 +107,41 @@ class ExecutiveMonitoringService
                     ->latest('detected_at')
                     ->limit(5)
                     ->get(),
+                'recent_anomalies_export' => Anomaly::query()
+                    ->select(['anomaly_id', 'anomaly_type', 'severity', 'status', 'office_id', 'detected_at', 'created_at', 'reference_type', 'reference_id', 'item_id'])
+                    ->with('office:id,name')
+                    ->latest('detected_at')
+                    ->get(),
                 'recent_alerts' => Alert::query()
                     ->select(['alerts_id', 'alert_type', 'severity', 'status', 'office_id', 'detected_at', 'created_at'])
                     ->with('office:id,name')
                     ->latest('detected_at')
                     ->limit(5)
                     ->get(),
+                'recent_alerts_export' => Alert::query()
+                    ->select(['alerts_id', 'alert_type', 'severity', 'status', 'office_id', 'detected_at', 'created_at'])
+                    ->with('office:id,name')
+                    ->latest('detected_at')
+                    ->get(),
                 'recent_disclosures' => PublicDisclosure::query()
                     ->select(['disclosure_id', 'title', 'type', 'status', 'published_at', 'created_at'])
                     ->latest('published_at')
                     ->limit(5)
+                    ->get(),
+                'recent_disclosures_export' => PublicDisclosure::query()
+                    ->select(['disclosure_id', 'title', 'type', 'status', 'published_at', 'created_at'])
+                    ->latest('published_at')
                     ->get(),
                 'recent_business_logs' => AuditLog::query()
                     ->business()
                     ->with(['user:id,name', 'office:id,name'])
                     ->latest('created_at')
                     ->limit(5)
+                    ->get(['id', 'user_id', 'office_id', 'module_name', 'action_type', 'created_at']),
+                'recent_business_logs_export' => AuditLog::query()
+                    ->business()
+                    ->with(['user:id,name', 'office:id,name'])
+                    ->latest('created_at')
                     ->get(['id', 'user_id', 'office_id', 'module_name', 'action_type', 'created_at']),
             ];
         } catch (Throwable $throwable) {
@@ -580,6 +599,9 @@ class ExecutiveMonitoringService
                 ->latest('published_at')
                 ->limit(10)
                 ->get(['disclosure_id', 'title', 'type', 'status', 'published_at', 'published_by', 'created_at']),
+            'disclosures_export' => (clone $base)
+                ->latest('published_at')
+                ->get(['disclosure_id', 'title', 'type', 'status', 'published_at', 'published_by', 'created_at', 'updated_at', 'file_path']),
             'published_disclosures' => PublicDisclosure::query()
                 ->with('publisher:id,name')
                 ->published()
@@ -608,17 +630,31 @@ class ExecutiveMonitoringService
 
     private function applyMonth(Builder $query, mixed $monthValue, string $column): void
     {
-        if (empty($monthValue) || ! is_string($monthValue)) {
+        if (empty($monthValue)) {
             return;
         }
 
-        if (preg_match('/^\d{4}-\d{2}$/', $monthValue) !== 1) {
+        if (! is_string($monthValue)) {
             return;
         }
 
-        [$year, $month] = array_map('intval', explode('-', $monthValue));
+        $normalizedMonthValue = trim($monthValue);
 
-        $query->whereYear($column, $year)->whereMonth($column, $month);
+        if ($normalizedMonthValue === '') {
+            return;
+        }
+
+        if (preg_match('/^\d{4}-\d{2}$/', $normalizedMonthValue) === 1) {
+            [$year, $month] = array_map('intval', explode('-', $normalizedMonthValue));
+
+            $query->whereYear($column, $year)->whereMonth($column, $month);
+
+            return;
+        }
+
+        if (preg_match('/^(?:0?[1-9]|1[0-2])$/', $normalizedMonthValue) === 1) {
+            $query->whereMonth($column, (int) $normalizedMonthValue);
+        }
     }
 
     private function applyYear(Builder $query, mixed $yearValue, string $column): void

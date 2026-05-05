@@ -33,7 +33,7 @@ class PpmpApprovalController extends Controller
             'office_id' => ['nullable', 'integer', 'exists:offices,id'],
             'status' => ['nullable', 'string', 'max:60'],
             'year' => ['nullable', 'digits:4'],
-            'month' => ['nullable', 'date_format:Y-m'],
+            'month' => ['nullable', 'string', 'regex:/^(?:0?[1-9]|1[0-2]|\d{4}-\d{2})$/'],
             'from_date' => ['nullable', 'date'],
             'to_date' => ['nullable', 'date', 'after_or_equal:from_date'],
             'search' => ['nullable', 'string', 'max:80'],
@@ -124,8 +124,7 @@ class PpmpApprovalController extends Controller
             ->limit(10)
             ->get();
 
-        $records = $query->latest('ppmp_id')->paginate(5)->withQueryString();
-        $records->through(function (Ppmp $record) use ($request): array {
+        $mapApprovalRecord = function (Ppmp $record) use ($request): array {
             return [
                 'ppmp_id' => (int) $record->ppmp_id,
                 'office' => $record->office ? [
@@ -144,10 +143,20 @@ class PpmpApprovalController extends Controller
                 'items_count' => (int) $record->items_count,
                 'can_signoff' => $request->user()?->can('executive.ppmp-approval.signoff', $record) ?? false,
             ];
-        });
+        };
+
+        $records = $query->latest('ppmp_id')->paginate(5)->withQueryString();
+        $records->through($mapApprovalRecord);
+
+        $recordsExport = (clone $query)
+            ->latest('ppmp_id')
+            ->get()
+            ->map($mapApprovalRecord)
+            ->values();
 
         return Inertia::render('Executive/Approvals/Index', [
             'records' => $records,
+            'recordsExport' => $recordsExport,
             'summary' => $summary,
             'filters' => [
                 'office_id' => $filters['office_id'] ?? null,

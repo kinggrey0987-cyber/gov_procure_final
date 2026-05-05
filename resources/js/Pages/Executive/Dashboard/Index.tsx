@@ -56,12 +56,55 @@ type Props = {
         reference_id?: number | null;
         item_id?: number | null;
     }>;
+    recent_anomalies_export: Array<{
+        anomaly_id: number;
+        anomaly_type: string;
+        severity: string;
+        status: string;
+        detected_at?: string | null;
+        office?: { id: number; name: string } | null;
+        reference_type?: string | null;
+        reference_id?: number | null;
+        item_id?: number | null;
+    }>;
     recent_alerts: Array<{
         alerts_id: number;
         alert_type: string;
         severity: string;
         status: string;
         detected_at?: string | null;
+        office?: { id: number; name: string } | null;
+    }>;
+    recent_alerts_export: Array<{
+        alerts_id: number;
+        alert_type: string;
+        severity: string;
+        status: string;
+        detected_at?: string | null;
+        office?: { id: number; name: string } | null;
+    }>;
+    recent_disclosures: Array<{
+        disclosure_id: number;
+        title: string;
+        type: string;
+        status: string;
+        published_at?: string | null;
+        created_at?: string | null;
+    }>;
+    recent_disclosures_export: Array<{
+        disclosure_id: number;
+        title: string;
+        type: string;
+        status: string;
+        published_at?: string | null;
+        created_at?: string | null;
+    }>;
+    recent_business_logs_export: Array<{
+        id: number;
+        module_name: string;
+        action_type: string;
+        created_at: string;
+        user?: { id: number; name: string } | null;
         office?: { id: number; name: string } | null;
     }>;
 };
@@ -74,9 +117,15 @@ export default function ExecutiveDashboardIndex({
     anomaly_type_breakdown,
     alert_severity_breakdown,
     recent_anomalies,
+    recent_anomalies_export,
     recent_alerts,
+    recent_alerts_export,
+    recent_disclosures,
+    recent_disclosures_export,
+    recent_business_logs_export,
 }: Props) {
     const printSectionId = 'executive-dashboard-print-section';
+    const exportSectionId = 'executive-dashboard-export-section';
     const [anomalySearch, setAnomalySearch] = useState('');
     const [anomalySeverity, setAnomalySeverity] = useState('ALL');
     const [alertSearch, setAlertSearch] = useState('');
@@ -204,6 +253,10 @@ export default function ExecutiveDashboardIndex({
 
     const anomalyPreviewRows = useMemo(() => filteredAnomalyGroups.slice(0, 5), [filteredAnomalyGroups]);
     const alertPreviewRows = useMemo(() => filteredAlerts.slice(0, 5), [filteredAlerts]);
+    const anomalyExportPages = useMemo(() => chunkRows(recent_anomalies_export, 12), [recent_anomalies_export]);
+    const alertExportPages = useMemo(() => chunkRows(recent_alerts_export, 12), [recent_alerts_export]);
+    const disclosureExportPages = useMemo(() => chunkRows(recent_disclosures_export, 12), [recent_disclosures_export]);
+    const businessLogExportPages = useMemo(() => chunkRows(recent_business_logs_export, 12), [recent_business_logs_export]);
 
     const exportCsv = () => {
         const lines = [
@@ -214,6 +267,45 @@ export default function ExecutiveDashboardIndex({
             ['active_anomalies', String(activeAnomalies)],
             ['active_alerts', String(activeAlerts)],
             ['published_disclosures', String(transparency.published_disclosure_count)],
+            [''],
+            ['anomaly_id', 'anomaly_type', 'severity', 'status', 'office', 'detected_at'],
+            ...recent_anomalies_export.map((row) => [
+                String(row.anomaly_id),
+                formatAnomalyType(row.anomaly_type),
+                formatStatusLabel(row.severity),
+                formatStatusLabel(row.status),
+                row.office?.name ?? 'N/A',
+                row.detected_at ?? '',
+            ]),
+            [''],
+            ['alert_id', 'alert_type', 'severity', 'status', 'office', 'detected_at'],
+            ...recent_alerts_export.map((row) => [
+                String(row.alerts_id),
+                formatStatusLabel(row.alert_type),
+                formatStatusLabel(row.severity),
+                formatStatusLabel(row.status),
+                row.office?.name ?? 'N/A',
+                row.detected_at ?? '',
+            ]),
+            [''],
+            ['disclosure_id', 'title', 'type', 'status', 'published_at'],
+            ...recent_disclosures_export.map((row) => [
+                String(row.disclosure_id),
+                row.title,
+                row.type,
+                row.status,
+                row.published_at ?? '',
+            ]),
+            [''],
+            ['log_id', 'timestamp', 'module', 'action', 'user', 'office'],
+            ...recent_business_logs_export.map((row) => [
+                String(row.id),
+                row.created_at,
+                row.module_name,
+                row.action_type,
+                row.user?.name ?? 'System',
+                row.office?.name ?? 'N/A',
+            ]),
         ];
 
         const csv = lines.map((row) => row.map(csvValue).join(',')).join('\n');
@@ -221,10 +313,15 @@ export default function ExecutiveDashboardIndex({
     };
 
     const exportPdf = async () => {
-        await downloadSectionAsPdfById(printSectionId, {
+        await downloadSectionAsPdfById(exportSectionId, {
             title: 'Executive Dashboard',
             fileName: 'executive-dashboard.pdf',
+            marginMm: 5,
+            paperWidthPx: 760,
+            orientation: 'portrait',
             excludeSelectors: ['.print-hide', 'nav', 'aside', '[role="navigation"]'],
+            revealSelectors: ['.pdf-export-content'],
+            pageBreakSelectors: ['.pdf-page'],
         });
     };
 
@@ -544,9 +641,106 @@ export default function ExecutiveDashboardIndex({
                         )}
                     </section>
                 </div>
+
+                <div id={exportSectionId} className="pdf-export-content hidden space-y-4 text-slate-900">
+                    <section className="pdf-page rounded-xl border border-red-100 bg-white p-4">
+                        <h2 className="text-xl font-semibold text-slate-900">Executive Dashboard Summary</h2>
+                        <p className="mt-1 text-xs text-slate-600">Summary and charts first, detailed records on the following pages.</p>
+
+                        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                            <MetricCard label="Purchase Requests" value={procurement.purchase_request_count} />
+                            <MetricCard label="Purchase Orders" value={procurement.purchase_order_count} />
+                            <MetricCard label="Published Disclosures" value={transparency.published_disclosure_count} />
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-2 gap-3 [&_.truncate]:whitespace-normal [&_.truncate]:overflow-visible [&_.truncate]:text-clip [&_[class*='space-y-3.5']]:space-y-4">
+                            <section className="rounded-xl border border-red-100 bg-white p-3">
+                                <h3 className="text-sm font-semibold text-slate-900">Risk Summary</h3>
+                                <div className="mt-3 space-y-3">
+                                    <RiskStrip label="Active Anomalies" value={activeAnomalies} max={Math.max(activeAnomalies, activeAlerts, highSeverityTotal, 1)} tone="rose" />
+                                    <RiskStrip label="Active Alerts" value={activeAlerts} max={Math.max(activeAnomalies, activeAlerts, highSeverityTotal, 1)} tone="amber" />
+                                    <RiskStrip label="High Severity Total" value={highSeverityTotal} max={Math.max(activeAnomalies, activeAlerts, highSeverityTotal, 1)} tone="slate" />
+                                </div>
+                            </section>
+                            <section className="rounded-xl border border-red-100 bg-white p-3">
+                                <h3 className="text-sm font-semibold text-slate-900">Office Oversight Comparison</h3>
+                                <div className="mt-3">
+                                    <HorizontalBarChart data={officeRanking} emptyText="No data in current filter scope" />
+                                </div>
+                            </section>
+                        </div>
+                    </section>
+
+                    {anomalyExportPages.map((rows, pageIndex) => (
+                        <section key={`dashboard-anomalies-${pageIndex + 1}`} className="pdf-page overflow-hidden rounded-xl border border-red-100 bg-white">
+                            <ExportPageHeader title="Executive Anomaly Records" subtitle={pageIndex === 0 ? 'All exported anomaly records.' : `Continuation page ${pageIndex + 2}.`} />
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full table-fixed divide-y divide-slate-200 text-[11px]">
+                                    <thead className="bg-slate-50"><tr><th className="w-[26%] px-2 py-2 text-left">Type</th><th className="w-[14%] px-2 py-2 text-left">Severity</th><th className="w-[14%] px-2 py-2 text-left">Status</th><th className="w-[24%] px-2 py-2 text-left">Office</th><th className="w-[22%] px-2 py-2 text-left">Detected</th></tr></thead>
+                                    <tbody className="divide-y divide-slate-100">{rows.map((row) => <tr key={`anomaly-${row.anomaly_id}`}><td className="px-2 py-1.5 align-top leading-snug">{formatAnomalyType(row.anomaly_type)}</td><td className="px-2 py-1.5 align-top leading-snug">{formatStatusLabel(row.severity)}</td><td className="px-2 py-1.5 align-top leading-snug">{formatStatusLabel(row.status)}</td><td className="px-2 py-1.5 align-top leading-snug">{row.office?.name ?? 'N/A'}</td><td className="px-2 py-1.5 align-top leading-snug">{row.detected_at ?? 'N/A'}</td></tr>)}</tbody>
+                                </table>
+                            </div>
+                        </section>
+                    ))}
+
+                    {alertExportPages.map((rows, pageIndex) => (
+                        <section key={`dashboard-alerts-${pageIndex + 1}`} className="pdf-page overflow-hidden rounded-xl border border-red-100 bg-white">
+                            <ExportPageHeader title="Executive Alert Records" subtitle={pageIndex === 0 ? 'All exported alert records.' : `Continuation page ${pageIndex + 2}.`} />
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full table-fixed divide-y divide-slate-200 text-[11px]">
+                                    <thead className="bg-slate-50"><tr><th className="w-[30%] px-2 py-2 text-left">Type</th><th className="w-[14%] px-2 py-2 text-left">Severity</th><th className="w-[14%] px-2 py-2 text-left">Status</th><th className="w-[24%] px-2 py-2 text-left">Office</th><th className="w-[18%] px-2 py-2 text-left">Detected</th></tr></thead>
+                                    <tbody className="divide-y divide-slate-100">{rows.map((row) => <tr key={`alert-${row.alerts_id}`}><td className="px-2 py-1.5 align-top leading-snug">{formatStatusLabel(row.alert_type)}</td><td className="px-2 py-1.5 align-top leading-snug">{formatStatusLabel(row.severity)}</td><td className="px-2 py-1.5 align-top leading-snug">{formatStatusLabel(row.status)}</td><td className="px-2 py-1.5 align-top leading-snug">{row.office?.name ?? 'N/A'}</td><td className="px-2 py-1.5 align-top leading-snug">{row.detected_at ?? 'N/A'}</td></tr>)}</tbody>
+                                </table>
+                            </div>
+                        </section>
+                    ))}
+
+                    {disclosureExportPages.map((rows, pageIndex) => (
+                        <section key={`dashboard-disclosures-${pageIndex + 1}`} className="pdf-page overflow-hidden rounded-xl border border-red-100 bg-white">
+                            <ExportPageHeader title="Executive Disclosure Records" subtitle={pageIndex === 0 ? 'All exported disclosure records.' : `Continuation page ${pageIndex + 2}.`} />
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full table-fixed divide-y divide-slate-200 text-[11px]">
+                                    <thead className="bg-slate-50"><tr><th className="w-[34%] px-2 py-2 text-left">Title</th><th className="w-[18%] px-2 py-2 text-left">Type</th><th className="w-[16%] px-2 py-2 text-left">Status</th><th className="w-[16%] px-2 py-2 text-left">Published</th><th className="w-[16%] px-2 py-2 text-left">Created</th></tr></thead>
+                                    <tbody className="divide-y divide-slate-100">{rows.map((row) => <tr key={`disclosure-${row.disclosure_id}`}><td className="px-2 py-1.5 align-top leading-snug">{row.title}</td><td className="px-2 py-1.5 align-top leading-snug">{row.type}</td><td className="px-2 py-1.5 align-top leading-snug">{row.status}</td><td className="px-2 py-1.5 align-top leading-snug">{row.published_at ?? 'N/A'}</td><td className="px-2 py-1.5 align-top leading-snug">{row.created_at ?? 'N/A'}</td></tr>)}</tbody>
+                                </table>
+                            </div>
+                        </section>
+                    ))}
+
+                    {businessLogExportPages.map((rows, pageIndex) => (
+                        <section key={`dashboard-logs-${pageIndex + 1}`} className="pdf-page overflow-hidden rounded-xl border border-red-100 bg-white">
+                            <ExportPageHeader title="Executive Governance Activity Records" subtitle={pageIndex === 0 ? 'All exported governance activity records.' : `Continuation page ${pageIndex + 2}.`} />
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full table-fixed divide-y divide-slate-200 text-[11px]">
+                                    <thead className="bg-slate-50"><tr><th className="w-[18%] px-2 py-2 text-left">Timestamp</th><th className="w-[20%] px-2 py-2 text-left">Module</th><th className="w-[18%] px-2 py-2 text-left">Action</th><th className="w-[22%] px-2 py-2 text-left">User</th><th className="w-[22%] px-2 py-2 text-left">Office</th></tr></thead>
+                                    <tbody className="divide-y divide-slate-100">{rows.map((row) => <tr key={`log-${row.id}`}><td className="px-2 py-1.5 align-top leading-snug">{row.created_at}</td><td className="px-2 py-1.5 align-top leading-snug">{row.module_name}</td><td className="px-2 py-1.5 align-top leading-snug">{row.action_type}</td><td className="px-2 py-1.5 align-top leading-snug">{row.user?.name ?? 'System'}</td><td className="px-2 py-1.5 align-top leading-snug">{row.office?.name ?? 'N/A'}</td></tr>)}</tbody>
+                                </table>
+                            </div>
+                        </section>
+                    ))}
+                </div>
             </div>
         </AuthenticatedLayout>
     );
+}
+
+function ExportPageHeader({ title, subtitle }: { title: string; subtitle: string }) {
+    return (
+        <div className="border-b border-slate-200 px-3 py-2.5">
+            <h3 className="text-lg font-semibold text-slate-800">{title}</h3>
+            <p className="mt-1 text-xs text-slate-600">{subtitle}</p>
+        </div>
+    );
+}
+
+function chunkRows<T>(rows: T[], pageSize: number): T[][] {
+    const pages: T[][] = [];
+
+    for (let index = 0; index < rows.length; index += pageSize) {
+        pages.push(rows.slice(index, index + pageSize));
+    }
+
+    return pages;
 }
 
 function mergeGroupedTrend(

@@ -4,8 +4,9 @@ import MonthFilterSelect from '@/Components/MonthFilterSelect';
 import PaginationNav from '@/Components/PaginationNav';
 import PpmpDecisionModal from '@/Components/PpmpDecisionModal';
 import useSmartRefresh from '@/hooks/useSmartRefresh';
+import { downloadSectionAsPdfById } from '@/lib/printSection';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 type DecisionStatus = 'APPROVED' | 'REJECTED' | 'RETURNED_FOR_REVISION';
 
@@ -29,6 +30,7 @@ type Props = {
         data: ApprovalRow[];
         links: Array<{ url: string | null; label: string; active: boolean }>;
     };
+    recordsExport: ApprovalRow[];
     summary: {
         pending_ppmp_approvals: number;
         returned_for_revision: number;
@@ -52,7 +54,9 @@ type Props = {
     office_breakdown: Array<{ office_id: number; office_name: string; total: number }>;
 };
 
-export default function ExecutiveApprovalsIndex({ records, summary, filters, filter_options, office_breakdown }: Props) {
+export default function ExecutiveApprovalsIndex({ records, recordsExport, summary, filters, filter_options, office_breakdown }: Props) {
+    const printSectionId = 'executive-approvals-print-section';
+    const exportSectionId = 'executive-approvals-export-section';
     const { isRefreshing, lastRefreshedAt } = useSmartRefresh({
         only: ['records', 'summary', 'filters', 'filter_options'],
         refreshOnFocus: true,
@@ -159,21 +163,70 @@ export default function ExecutiveApprovalsIndex({ records, summary, filters, fil
         { label: 'Rejected', value: summary.rejected },
     ];
 
+    const recordsExportPages = useMemo(() => chunkRows(recordsExport, 12), [recordsExport]);
+
+    const exportCsv = () => {
+        const lines = [
+            ['metric', 'value'],
+            ['pending_ppmp_approvals', String(summary.pending_ppmp_approvals)],
+            ['returned_for_revision', String(summary.returned_for_revision)],
+            ['recently_approved', String(summary.recently_approved)],
+            ['rejected', String(summary.rejected)],
+            [''],
+            ['ppmp_id', 'office', 'preparer', 'fiscal_year', 'status', 'date_prepared', 'submitted_at', 'items_count', 'total_estimated_budget'],
+            ...recordsExport.map((row) => [
+                String(row.ppmp_id),
+                row.office?.name ?? 'Unassigned Office',
+                row.preparer?.name ?? 'Unknown',
+                String(row.fiscal_year),
+                row.status,
+                row.date_prepared ?? '',
+                row.submitted_at ?? '',
+                String(row.items_count),
+                String(row.total_estimated_budget),
+            ]),
+        ];
+
+        const csv = lines.map((row) => row.map(csvValue).join(',')).join('\n');
+        downloadFile(csv, 'executive-approvals.csv', 'text/csv;charset=utf-8;');
+    };
+
+    const exportPdf = async () => {
+        await downloadSectionAsPdfById(exportSectionId, {
+            title: 'Executive Approvals',
+            fileName: 'executive-approvals.pdf',
+            marginMm: 5,
+            paperWidthPx: 760,
+            orientation: 'portrait',
+            excludeSelectors: ['.print-hide', 'nav', 'aside', '[role="navigation"]'],
+            revealSelectors: ['.pdf-export-content'],
+            pageBreakSelectors: ['.pdf-page'],
+        });
+    };
+
     return (
         <AuthenticatedLayout header="Executive Approvals">
             <Head title="Executive Approvals" />
 
-            <div className="space-y-6 py-8">
+            <div id={printSectionId} className="space-y-6 py-8">
                 <section className="rounded-2xl border border-red-200 bg-white p-5 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-700">Executive Approval Desk</p>
-                    <h3 className="mt-1 text-2xl font-semibold text-slate-900">PPMP Final Signoff</h3>
-                    <p className="mt-2 text-xs text-slate-500">
-                        {isRefreshing
-                            ? 'Refreshing approvals queue...'
-                            : lastRefreshedAt
-                            ? `Updated ${lastRefreshedAt.toLocaleTimeString()}`
-                            : 'Auto-refresh when this tab regains focus'}
-                    </p>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-700">Executive Approval Desk</p>
+                            <h3 className="mt-1 text-2xl font-semibold text-slate-900">PPMP Final Signoff</h3>
+                            <p className="mt-2 text-xs text-slate-500">
+                                {isRefreshing
+                                    ? 'Refreshing approvals queue...'
+                                    : lastRefreshedAt
+                                    ? `Updated ${lastRefreshedAt.toLocaleTimeString()}`
+                                    : 'Auto-refresh when this tab regains focus'}
+                            </p>
+                        </div>
+                        <div className="print-hide flex items-center gap-2">
+                            <button type="button" onClick={exportPdf} className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">Export PDF</button>
+                            <button type="button" onClick={exportCsv} className="rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white hover:bg-red-800">Export CSV</button>
+                        </div>
+                    </div>
                 </section>
 
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -343,6 +396,79 @@ export default function ExecutiveApprovalsIndex({ records, summary, filters, fil
 
                     {records.data.length > 0 ? <PaginationNav links={records.links} preserveState={false} /> : null}
                 </section>
+
+                <div id={exportSectionId} className="pdf-export-content hidden space-y-4 text-slate-900">
+                    <section className="pdf-page rounded-xl border border-red-100 bg-white p-4">
+                        <h2 className="text-xl font-semibold text-slate-900">Executive Approvals Summary</h2>
+                        <p className="mt-1 text-xs text-slate-600">Summary first, then full approval records on following pages.</p>
+
+                        <div className="mt-3 grid gap-3 sm:grid-cols-4">
+                            <SummaryCard label="Pending PPMP Approvals" value={summary.pending_ppmp_approvals} tone="amber" />
+                            <SummaryCard label="Returned for Revision" value={summary.returned_for_revision} tone="blue" />
+                            <SummaryCard label="Recently Approved" value={summary.recently_approved} tone="emerald" />
+                            <SummaryCard label="Rejected" value={summary.rejected} tone="rose" />
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-2 gap-3 [&_.truncate]:whitespace-normal [&_.truncate]:overflow-visible [&_.truncate]:text-clip [&_[class*='space-y-3.5']]:space-y-4">
+                            <section className="rounded-xl border border-red-100 bg-white p-3">
+                                <h3 className="text-sm font-semibold text-slate-900">Approval Status Mix</h3>
+                                <p className="mt-1 text-xs text-slate-600">Current decision state.</p>
+                                <div className="mt-4">
+                                    <DonutChart data={statusMix} centerLabel="Queue" emptyText="No approval status metrics are available." />
+                                </div>
+                            </section>
+                            <section className="rounded-xl border border-red-100 bg-white p-3">
+                                <h3 className="text-sm font-semibold text-slate-900">Office Queue Distribution</h3>
+                                <p className="mt-1 text-xs text-slate-600">Workflow records by office.</p>
+                                <div className="mt-4">
+                                    <HorizontalBarChart
+                                        data={office_breakdown.map((row) => ({ label: row.office_name, value: row.total }))}
+                                        emptyText="No office-level queue data is available."
+                                    />
+                                </div>
+                            </section>
+                        </div>
+                    </section>
+
+                    {recordsExportPages.map((rows, pageIndex) => (
+                        <section key={`executive-approvals-export-${pageIndex + 1}`} className="pdf-page overflow-hidden rounded-xl border border-red-100 bg-white">
+                            <ExportPageHeader
+                                title="Executive Approval Records"
+                                subtitle={pageIndex === 0 ? 'All approval records in the current filter scope.' : `Continuation page ${pageIndex + 2}.`}
+                            />
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full table-fixed divide-y divide-slate-200 text-[11px]">
+                                    <thead className="bg-slate-50">
+                                        <tr>
+                                            <th className="w-[12%] px-2 py-2 text-left">PPMP</th>
+                                            <th className="w-[20%] px-2 py-2 text-left">Office</th>
+                                            <th className="w-[16%] px-2 py-2 text-left">Preparer</th>
+                                            <th className="w-[8%] px-2 py-2 text-left">Year</th>
+                                            <th className="w-[14%] px-2 py-2 text-left">Status</th>
+                                            <th className="w-[12%] px-2 py-2 text-left">Prepared</th>
+                                            <th className="w-[10%] px-2 py-2 text-left">Items</th>
+                                            <th className="w-[18%] px-2 py-2 text-left">Budget</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {rows.map((row) => (
+                                            <tr key={`approval-${row.ppmp_id}`}>
+                                                <td className="px-2 py-1.5 align-top leading-snug">PPMP-{row.ppmp_id}</td>
+                                                <td className="px-2 py-1.5 align-top leading-snug">{row.office?.name ?? 'Unassigned Office'}</td>
+                                                <td className="px-2 py-1.5 align-top leading-snug">{row.preparer?.name ?? 'Unknown'}</td>
+                                                <td className="px-2 py-1.5 align-top leading-snug">{row.fiscal_year}</td>
+                                                <td className="px-2 py-1.5 align-top leading-snug">{row.status}</td>
+                                                <td className="px-2 py-1.5 align-top leading-snug">{row.date_prepared ?? '-'}</td>
+                                                <td className="px-2 py-1.5 align-top leading-snug">{row.items_count}</td>
+                                                <td className="px-2 py-1.5 align-top leading-snug">{formatCurrency(row.total_estimated_budget)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+                    ))}
+                </div>
             </div>
 
             <PpmpDecisionModal
@@ -364,6 +490,39 @@ export default function ExecutiveApprovalsIndex({ records, summary, filters, fil
             />
         </AuthenticatedLayout>
     );
+}
+
+function ExportPageHeader({ title, subtitle }: { title: string; subtitle: string }) {
+    return (
+        <div className="border-b border-slate-200 px-3 py-2.5">
+            <h3 className="text-lg font-semibold text-slate-800">{title}</h3>
+            <p className="mt-1 text-xs text-slate-600">{subtitle}</p>
+        </div>
+    );
+}
+
+function chunkRows<T>(rows: T[], pageSize: number): T[][] {
+    const pages: T[][] = [];
+    for (let index = 0; index < rows.length; index += pageSize) {
+        pages.push(rows.slice(index, index + pageSize));
+    }
+    return pages;
+}
+
+function csvValue(value: string): string {
+    return `"${value.replaceAll('"', '""')}"`;
+}
+
+function downloadFile(content: string, fileName: string, mimeType: string): void {
+    const blob = new Blob([content], { type: mimeType });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
 }
 
 function SummaryCard({ label, value, tone }: { label: string; value: number; tone: 'amber' | 'blue' | 'emerald' | 'rose' }) {

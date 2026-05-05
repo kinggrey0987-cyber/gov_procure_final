@@ -127,13 +127,25 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
         [form.month, form.office_id, form.status, form.year],
     );
 
+    const activeFiltersKey = useMemo(() => serializeRiskFilters(activeFilters), [activeFilters]);
+    const currentFiltersKey = useMemo(() => serializeRiskFilters({
+        office_id: filters.office_id ? String(filters.office_id) : '',
+        status: filters.status ?? '',
+        year: filters.year ?? '',
+        month: filters.month ?? '',
+    }), [filters.month, filters.office_id, filters.status, filters.year]);
+
     useEffect(() => {
+        if (activeFiltersKey === currentFiltersKey) {
+            return;
+        }
+
         router.get(route('executive.anomalies-monitoring'), activeFilters, {
             preserveState: true,
             replace: true,
             only: ['filters', 'filter_options', 'totals', 'status_breakdown', 'anomaly_type_breakdown', 'anomaly_severity_breakdown', 'alert_severity_breakdown', 'office_comparison', 'monthly_trends', 'recent'],
         });
-    }, [activeFilters]);
+    }, [activeFilters, activeFiltersKey, currentFiltersKey]);
 
     const trendData = mergeMonthlyTrends(monthly_trends.anomalies, monthly_trends.alerts);
     const officeRisk = office_comparison
@@ -187,11 +199,16 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
         downloadCsv(rows, 'risk-and-alerts.csv');
     };
 
+    const exportSectionId = 'risk-alerts-export-section';
+
     const exportPdf = async () => {
-        await downloadSectionAsPdfById(printSectionId, {
+        await downloadSectionAsPdfById(exportSectionId, {
             title: 'Risk & Alerts',
             fileName: 'risk-and-alerts.pdf',
+            marginMm: 6,
+            paperWidthPx: 900,
             excludeSelectors: ['.print-hide', 'nav', 'aside', '[role="navigation"]'],
+            revealSelectors: ['.pdf-export-content'],
         });
     };
 
@@ -417,6 +434,135 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                                     pageSize={pageSize}
                                 />
                             </>
+                        )}
+                    </section>
+                </div>
+
+                <div id={exportSectionId} className="pdf-export-content hidden space-y-5 text-slate-900">
+                    <section className="rounded-xl border border-red-100 bg-white p-4">
+                        <h2 className="text-2xl font-semibold text-slate-900">Risk & Alerts Graphs</h2>
+                        <p className="mt-1 text-sm text-slate-600">Graphs only, followed by all filtered anomaly and alert records.</p>
+                    </section>
+
+                    <div className="grid grid-cols-2 gap-4 [&_.truncate]:whitespace-normal [&_.truncate]:overflow-visible [&_.truncate]:text-clip [&_[class*='h-52']]:h-40 [&_[class*='h-56']]:h-40 [&_[class*='space-y-3.5']]:space-y-5">
+                        <div className="col-span-2">
+                            <ExecutiveChartCard title="Incident Trend" subtitle="Anomaly and alert movement" tone="critical">
+                                {trendData.length === 0 ? (
+                                    <CompactEmpty text="No incident trend data in current filter scope." />
+                                ) : trendData.length === 1 ? (
+                                    <div className="grid gap-3 md:grid-cols-3">
+                                        <MiniStat label="Month" value={trendData[0].label} />
+                                        <MiniStat label="Anomalies" value={trendData[0].first} />
+                                        <MiniStat label="Alerts" value={trendData[0].second} />
+                                    </div>
+                                ) : (
+                                    <TrendGroupedBarChart
+                                        data={trendData}
+                                        firstLabel="Anomalies"
+                                        secondLabel="Alerts"
+                                        emptyText="No data in current filter scope"
+                                    />
+                                )}
+                            </ExecutiveChartCard>
+                        </div>
+
+                        <div className="col-span-2">
+                            <ExecutiveChartCard title="Office Risk Ranking" subtitle="Total incidents by office" tone="neutral">
+                                <HorizontalBarChart data={officeRisk} emptyText="No data in current filter scope" />
+                            </ExecutiveChartCard>
+                        </div>
+
+                        <div>
+                            <ExecutiveChartCard title="Top Anomaly Categories" subtitle="Most frequent anomaly types" tone="warning">
+                                <HorizontalBarChart data={anomalyTypeMix} emptyText="No data in current filter scope" />
+                            </ExecutiveChartCard>
+                        </div>
+
+                        <div>
+                            <ExecutiveChartCard title="Severity and Status Snapshot" subtitle="Compact comparison" tone="default">
+                                <div className="grid gap-4">
+                                    <div>
+                                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">Severity</p>
+                                        <HorizontalBarChart data={severityMix} emptyText="No data in current filter scope" />
+                                    </div>
+                                    <div>
+                                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">Status</p>
+                                        <HorizontalBarChart data={statusMix} emptyText="No data in current filter scope" />
+                                    </div>
+                                </div>
+                            </ExecutiveChartCard>
+                        </div>
+                    </div>
+
+                    <div className="h-[420px]" aria-hidden="true" />
+
+                    <section className="overflow-hidden rounded-xl border border-red-100 bg-white">
+                        <div className="border-b border-slate-200 px-4 py-3">
+                            <h3 className="text-xl font-semibold text-slate-800">All Filtered Anomaly Records</h3>
+                            <p className="mt-1 text-sm text-slate-600">Includes all anomaly records in the current filter scope.</p>
+                        </div>
+                        {recent.anomalies.length === 0 ? (
+                            <p className="px-6 py-8 text-sm text-slate-500">No anomalies found for the selected filters.</p>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full table-fixed divide-y divide-slate-200 text-xs">
+                                    <thead className="bg-slate-50">
+                                        <tr>
+                                            <th className="w-[28%] px-3 py-2 text-left">Type</th>
+                                            <th className="w-[14%] px-3 py-2 text-left">Severity</th>
+                                            <th className="w-[28%] px-3 py-2 text-left">Office</th>
+                                            <th className="w-[18%] px-3 py-2 text-left">Detected</th>
+                                            <th className="w-[12%] px-3 py-2 text-left">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {recent.anomalies.map((row) => (
+                                            <tr key={row.anomaly_id}>
+                                                <td className="px-3 py-2 align-top leading-snug">{formatAnomalyType(row.anomaly_type)}</td>
+                                                <td className="px-3 py-2 align-top">{formatStatus(row.severity)}</td>
+                                                <td className="px-3 py-2 align-top leading-snug">{row.office?.name ?? 'N/A'}</td>
+                                                <td className="px-3 py-2 align-top">{formatDate(row.detected_at)}</td>
+                                                <td className="px-3 py-2 align-top">{formatStatus(row.status)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </section>
+
+                    <section className="overflow-hidden rounded-xl border border-red-100 bg-white">
+                        <div className="border-b border-slate-200 px-4 py-3">
+                            <h3 className="text-xl font-semibold text-slate-800">All Filtered Alert Records</h3>
+                            <p className="mt-1 text-sm text-slate-600">Includes all alert records in the current filter scope.</p>
+                        </div>
+                        {recent.alerts.length === 0 ? (
+                            <p className="px-6 py-8 text-sm text-slate-500">No alerts found for the selected filters.</p>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full table-fixed divide-y divide-slate-200 text-xs">
+                                    <thead className="bg-slate-50">
+                                        <tr>
+                                            <th className="w-[28%] px-3 py-2 text-left">Alert Type</th>
+                                            <th className="w-[14%] px-3 py-2 text-left">Severity</th>
+                                            <th className="w-[28%] px-3 py-2 text-left">Office</th>
+                                            <th className="w-[18%] px-3 py-2 text-left">Detected</th>
+                                            <th className="w-[12%] px-3 py-2 text-left">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {recent.alerts.map((row) => (
+                                            <tr key={row.alerts_id}>
+                                                <td className="px-3 py-2 align-top leading-snug">{formatAlertType(row.alert_type)}</td>
+                                                <td className="px-3 py-2 align-top">{formatStatus(row.severity)}</td>
+                                                <td className="px-3 py-2 align-top leading-snug">{row.office?.name ?? 'N/A'}</td>
+                                                <td className="px-3 py-2 align-top">{formatDate(row.detected_at)}</td>
+                                                <td className="px-3 py-2 align-top">{formatStatus(row.status)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         )}
                     </section>
                 </div>
@@ -798,7 +944,16 @@ function downloadCsv(rows: string[][], fileName: string): void {
     window.URL.revokeObjectURL(url);
 }
 
-
-
-
-
+function serializeRiskFilters(filters: {
+    office_id?: number | string | null;
+    status?: string | null;
+    year?: string | null;
+    month?: string | null;
+}): string {
+    return JSON.stringify({
+        office_id: String(filters.office_id ?? ''),
+        status: filters.status ?? '',
+        year: filters.year ?? '',
+        month: filters.month ?? '',
+    });
+}

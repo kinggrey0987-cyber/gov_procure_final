@@ -43,6 +43,7 @@ type Props = {
     office_publication_mix: Array<{ label: string; total: number }>;
     monthly_publication_trend: Array<{ month: string; total: number }>;
     recent_disclosures: DisclosureRow[];
+    disclosures_export: Array<DisclosureRow & { file_path?: string | null; updated_at?: string | null }>;
     published_disclosures: Array<DisclosureRow & { file_path?: string | null }>;
     draft_disclosures: Array<DisclosureRow & { file_path?: string | null; updated_at?: string | null }>;
 };
@@ -53,10 +54,12 @@ export default function TransparencyMonitoringIndex({
     totals,
     type_breakdown,
     recent_disclosures,
+    disclosures_export,
     published_disclosures,
     draft_disclosures,
 }: Props) {
     const printSectionId = 'transparency-monitoring-print-section';
+    const exportSectionId = 'transparency-monitoring-export-section';
 
     const [form, setForm] = useState({
         office_id: filters.office_id ? String(filters.office_id) : '',
@@ -83,6 +86,16 @@ export default function TransparencyMonitoringIndex({
     const recentActivityPerPage = 5;
     const recentActivityTotalPages = Math.max(Math.ceil(recent_disclosures.length / recentActivityPerPage), 1);
     const recentActivityRows = recent_disclosures.slice((recentActivityPage - 1) * recentActivityPerPage, recentActivityPage * recentActivityPerPage);
+    const disclosureExportPages = useMemo(() => {
+        const pageSize = 14;
+        const pages: typeof disclosures_export[] = [];
+
+        for (let index = 0; index < disclosures_export.length; index += pageSize) {
+            pages.push(disclosures_export.slice(index, index + pageSize));
+        }
+
+        return pages;
+    }, [disclosures_export]);
 
     useEffect(() => {
         setForm({
@@ -139,7 +152,7 @@ export default function TransparencyMonitoringIndex({
     const exportCsv = () => {
         const lines = [
             ['disclosure_id', 'title', 'type', 'status', 'published_at'],
-            ...recent_disclosures.map((row) => [
+            ...disclosures_export.map((row) => [
                 String(row.disclosure_id),
                 row.title,
                 row.type,
@@ -161,10 +174,15 @@ export default function TransparencyMonitoringIndex({
     };
 
     const exportPdf = async () => {
-        await downloadSectionAsPdfById(printSectionId, {
+        await downloadSectionAsPdfById(exportSectionId, {
             title: 'Transparency & Disclosures',
             fileName: 'transparency-and-disclosures.pdf',
+            marginMm: 5,
+            paperWidthPx: 760,
+            orientation: 'portrait',
             excludeSelectors: ['.print-hide', 'nav', 'aside', '[role="navigation"]'],
+            revealSelectors: ['.pdf-export-content'],
+            pageBreakSelectors: ['.pdf-page'],
         });
     };
 
@@ -429,6 +447,77 @@ export default function TransparencyMonitoringIndex({
                         )}
                     </section>
                 )}
+
+                <div id={exportSectionId} className="pdf-export-content hidden space-y-4 text-slate-900">
+                    <section className="pdf-page rounded-xl border border-red-100 bg-white p-4">
+                        <h2 className="text-xl font-semibold text-slate-900">Transparency & Disclosures Summary</h2>
+                        <p className="mt-1 text-xs text-slate-600">Summary charts first, then all filtered disclosure records.</p>
+
+                        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                            <Card label="Published" value={totals.published_count} />
+                            <Card label="Drafts" value={totals.draft_count} />
+                            <Card label="Pending / Review" value={pendingOrOtherCount} />
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-2 gap-3 [&_.truncate]:whitespace-normal [&_.truncate]:overflow-visible [&_.truncate]:text-clip [&_[class*='space-y-3.5']]:space-y-4">
+                            <section className="rounded-xl border border-red-100 bg-white p-3">
+                                <h3 className="text-sm font-semibold text-slate-900">Publication Snapshot</h3>
+                                <p className="mt-1 text-xs text-slate-600">Disclosure state totals.</p>
+                                <div className="mt-4">
+                                    <HorizontalBarChart data={publicationStateSnapshot} emptyText="No data in current filter scope" />
+                                </div>
+                            </section>
+
+                            <section className="rounded-xl border border-red-100 bg-white p-3">
+                                <h3 className="text-sm font-semibold text-slate-900">Type Distribution</h3>
+                                <p className="mt-1 text-xs text-slate-600">Most common disclosure types.</p>
+                                <div className="mt-4">
+                                    <HorizontalBarChart data={typeMix} emptyText="No data in current filter scope" />
+                                </div>
+                            </section>
+                        </div>
+                    </section>
+
+                    {disclosureExportPages.map((pageRows, pageIndex) => (
+                        <section key={`transparency-export-page-${pageIndex + 1}`} className="pdf-page overflow-hidden rounded-xl border border-red-100 bg-white">
+                            <div className="border-b border-slate-200 px-3 py-2.5">
+                                <h3 className="text-lg font-semibold text-slate-800">All Filtered Disclosure Records</h3>
+                                <p className="mt-1 text-xs text-slate-600">
+                                    {pageIndex === 0 ? 'Includes all disclosure records in the current filter scope.' : `Continuation page ${pageIndex + 2}.`}
+                                </p>
+                            </div>
+
+                            {pageRows.length === 0 ? (
+                                <p className="px-6 py-8 text-sm text-slate-500">No data in current filter scope</p>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full table-fixed divide-y divide-slate-200 text-[11px]">
+                                        <thead className="bg-slate-50">
+                                            <tr>
+                                                <th className="w-[30%] px-2 py-2 text-left">Title</th>
+                                                <th className="w-[16%] px-2 py-2 text-left">Type</th>
+                                                <th className="w-[14%] px-2 py-2 text-left">Status</th>
+                                                <th className="w-[18%] px-2 py-2 text-left">Published</th>
+                                                <th className="w-[22%] px-2 py-2 text-left">Publisher</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {pageRows.map((row) => (
+                                                <tr key={`${pageIndex}-${row.disclosure_id}`}>
+                                                    <td className="px-2 py-1.5 align-top leading-snug">{row.title}</td>
+                                                    <td className="px-2 py-1.5 align-top leading-snug">{formatLabel(row.type)}</td>
+                                                    <td className="px-2 py-1.5 align-top leading-snug">{formatLabel(row.status)}</td>
+                                                    <td className="px-2 py-1.5 align-top leading-snug">{formatDate(row.published_at)}</td>
+                                                    <td className="px-2 py-1.5 align-top leading-snug">{row.publisher?.name ?? 'N/A'}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </section>
+                    ))}
+                </div>
             </div>
         </AuthenticatedLayout>
     );

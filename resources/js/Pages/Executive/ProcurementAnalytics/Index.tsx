@@ -123,13 +123,28 @@ export default function ProcurementAnalyticsIndex({
         [form.from_date, form.month, form.office_id, form.po_page, form.status, form.to_date, form.year],
     );
 
+    const activeFiltersKey = useMemo(() => serializeProcurementFilters(activeFilters), [activeFilters]);
+    const currentFiltersKey = useMemo(() => serializeProcurementFilters({
+        office_id: filters.office_id ? String(filters.office_id) : '',
+        status: filters.status ?? '',
+        year: filters.year ?? '',
+        month: filters.month ?? '',
+        from_date: filters.from_date ?? '',
+        to_date: filters.to_date ?? '',
+        po_page: filters.po_page ? String(filters.po_page) : '',
+    }), [filters.from_date, filters.month, filters.office_id, filters.po_page, filters.status, filters.to_date, filters.year]);
+
     useEffect(() => {
+        if (activeFiltersKey === currentFiltersKey) {
+            return;
+        }
+
         router.get(route('executive.procurement-analytics'), activeFilters, {
             preserveState: true,
             replace: true,
             only: ['filters', 'filter_options', 'totals', 'status_breakdown', 'monthly_trends', 'office_comparison', 'recent'],
         });
-    }, [activeFilters]);
+    }, [activeFilters, activeFiltersKey, currentFiltersKey]);
 
     const monthlyMerged = mergeTrend(monthly_trends.purchase_requests, monthly_trends.purchase_orders);
     const officeValueBreakdown = office_comparison
@@ -173,7 +188,10 @@ export default function ProcurementAnalyticsIndex({
         await downloadSectionAsPdfById(exportSectionId, {
             title: 'Procurement Insights',
             fileName: 'procurement-insights.pdf',
+            marginMm: 6,
+            paperWidthPx: 900,
             excludeSelectors: ['.print-hide', 'nav', 'aside', '[role="navigation"]'],
+            revealSelectors: ['.pdf-export-content'],
         });
     };
 
@@ -196,64 +214,6 @@ export default function ProcurementAnalyticsIndex({
                         </button>
                     </div>
                 </section>
-
-                <div id={exportSectionId} className="space-y-6">
-                    <div className="grid gap-6 xl:grid-cols-12">
-                        <div className="xl:col-span-8">
-                            <ExecutiveChartCard title="PR vs PO Trend" subtitle="Monthly movement" tone="critical">
-                                <TrendGroupedBarChart data={monthlyMerged} firstLabel="Purchase Requests" secondLabel="Purchase Orders" emptyText="No data in current filter scope" />
-                            </ExecutiveChartCard>
-                        </div>
-                        <div className="xl:col-span-4">
-                            <ExecutiveChartCard title="Top Procurement Concentration" subtitle="Office spending ranking" tone="neutral">
-                                <HorizontalBarChart data={officeValueBreakdown} valueFormatter={formatCurrency} emptyText="No data in current filter scope" />
-                            </ExecutiveChartCard>
-                        </div>
-                        <div className="xl:col-span-6">
-                            <ExecutiveChartCard title="PR Status Mix" subtitle="Request lifecycle" tone="default">
-                                <DonutChart data={statusMixPr} centerLabel="PR" emptyText="No data in current filter scope" />
-                            </ExecutiveChartCard>
-                        </div>
-                        <div className="xl:col-span-6">
-                            <ExecutiveChartCard title="PO Status Mix" subtitle="Order progression" tone="default">
-                                <DonutChart data={statusMixPo} centerLabel="PO" emptyText="No data in current filter scope" />
-                            </ExecutiveChartCard>
-                        </div>
-                    </div>
-
-                    <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-                        <div className="border-b border-slate-200 px-6 py-5">
-                            <h3 className="text-xl font-semibold text-slate-800">All Filtered Procurement Records</h3>
-                            <p className="mt-1 text-sm text-slate-600">Includes all purchase orders in the current filter scope, not only the visible page.</p>
-                        </div>
-                        {exportPurchaseOrders.length === 0 ? (
-                            <p className="px-6 py-8 text-sm text-slate-500">No data in current filter scope</p>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-slate-200 text-sm">
-                                    <thead className="bg-slate-50">
-                                        <tr>
-                                            <th className="px-4 py-2 text-left">PO</th>
-                                            <th className="px-4 py-2 text-left">Office</th>
-                                            <th className="px-4 py-2 text-left">Status</th>
-                                            <th className="px-4 py-2 text-left">Amount</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {exportPurchaseOrders.map((row) => (
-                                            <tr key={row.purchase_order_id}>
-                                                <td className="px-4 py-2">PO-{row.purchase_order_id}</td>
-                                                <td className="px-4 py-2">{row.purchase_request?.office?.name ?? 'N/A'}</td>
-                                                <td className="px-4 py-2">{row.status}</td>
-                                                <td className="px-4 py-2">{formatCurrency(row.total_amount)}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </section>
-                </div>
 
                 <section className="rounded-2xl border border-red-200 bg-white p-5 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
                     <div className="flex flex-wrap items-end gap-3">
@@ -394,6 +354,91 @@ export default function ProcurementAnalyticsIndex({
                         </div>
                     )}
                 </section>
+
+                <div id={exportSectionId} className="pdf-export-content hidden space-y-5 text-slate-900">
+                    <section className="rounded-xl border border-red-100 bg-white p-4">
+                        <h2 className="text-2xl font-semibold text-slate-900">Procurement Insights Graphs</h2>
+                        <p className="mt-1 text-sm text-slate-600">Graphs only, followed by all filtered procurement records.</p>
+                    </section>
+
+                    <div className="grid grid-cols-2 gap-4 [&_.truncate]:whitespace-normal [&_.truncate]:overflow-visible [&_.truncate]:text-clip [&_[class*='h-52']]:h-40 [&_[class*='h-56']]:h-40 [&_[class*='space-y-3.5']]:space-y-5">
+                        <div className="col-span-2">
+                            <ExecutiveChartCard title="PR vs PO Trend" subtitle="Monthly movement" tone="critical">
+                                <TrendGroupedBarChart
+                                    data={monthlyMerged}
+                                    firstLabel="Purchase Requests"
+                                    secondLabel="Purchase Orders"
+                                    emptyText="No data in current filter scope"
+                                />
+                            </ExecutiveChartCard>
+                        </div>
+
+                        <div className="col-span-2">
+                            <ExecutiveChartCard title="Top Procurement Concentration" subtitle="Office spending ranking" tone="neutral">
+                                <HorizontalBarChart
+                                    data={officeValueBreakdown}
+                                    valueFormatter={formatCurrency}
+                                    emptyText="No data in current filter scope"
+                                />
+                            </ExecutiveChartCard>
+                        </div>
+
+                        <div>
+                            <ExecutiveChartCard title="PR Status Mix" subtitle="Request lifecycle" tone="default">
+                                <DonutChart
+                                    data={statusMixPr}
+                                    centerLabel="PR"
+                                    emptyText="No data in current filter scope"
+                                />
+                            </ExecutiveChartCard>
+                        </div>
+
+                        <div>
+                            <ExecutiveChartCard title="PO Status Mix" subtitle="Order progression" tone="default">
+                                <DonutChart
+                                    data={statusMixPo}
+                                    centerLabel="PO"
+                                    emptyText="No data in current filter scope"
+                                />
+                            </ExecutiveChartCard>
+                        </div>
+                    </div>
+
+                    <div className="h-[420px]" aria-hidden="true" />
+
+                    <section className="overflow-hidden rounded-xl border border-red-100 bg-white">
+                        <div className="border-b border-slate-200 px-4 py-3">
+                            <h3 className="text-xl font-semibold text-slate-800">All Filtered Procurement Records</h3>
+                            <p className="mt-1 text-sm text-slate-600">Includes all purchase orders in the current filter scope, not only the visible page.</p>
+                        </div>
+                        {exportPurchaseOrders.length === 0 ? (
+                            <p className="px-6 py-8 text-sm text-slate-500">No data in current filter scope</p>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full table-fixed divide-y divide-slate-200 text-xs">
+                                    <thead className="bg-slate-50">
+                                        <tr>
+                                            <th className="w-[14%] px-3 py-2 text-left">PO</th>
+                                            <th className="w-[46%] px-3 py-2 text-left">Office</th>
+                                            <th className="w-[20%] px-3 py-2 text-left">Status</th>
+                                            <th className="w-[20%] px-3 py-2 text-left">Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {exportPurchaseOrders.map((row) => (
+                                            <tr key={row.purchase_order_id}>
+                                                <td className="px-3 py-2 align-top">PO-{row.purchase_order_id}</td>
+                                                <td className="px-3 py-2 align-top leading-snug">{row.purchase_request?.office?.name ?? 'N/A'}</td>
+                                                <td className="px-3 py-2 align-top">{row.status}</td>
+                                                <td className="px-3 py-2 align-top">{formatCurrency(row.total_amount)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </section>
+                </div>
             </div>
         </AuthenticatedLayout>
     );
@@ -467,7 +512,22 @@ function downloadCsv(rows: string[][], fileName: string): void {
     window.URL.revokeObjectURL(url);
 }
 
-
-
-
-
+function serializeProcurementFilters(filters: {
+    office_id?: number | string | null;
+    status?: string | null;
+    year?: string | null;
+    month?: string | null;
+    from_date?: string | null;
+    to_date?: string | null;
+    po_page?: number | string | null;
+}): string {
+    return JSON.stringify({
+        office_id: String(filters.office_id ?? ''),
+        status: filters.status ?? '',
+        year: filters.year ?? '',
+        month: filters.month ?? '',
+        from_date: filters.from_date ?? '',
+        to_date: filters.to_date ?? '',
+        po_page: String(filters.po_page ?? ''),
+    });
+}

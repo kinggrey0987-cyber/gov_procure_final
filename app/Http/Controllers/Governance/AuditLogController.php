@@ -47,11 +47,13 @@ class AuditLogController extends Controller
         ]);
 
         $logs = $this->service->business($request->user(), $filters, 5);
+        $logsExport = $this->service->businessExportRecords($request->user(), $filters);
         $analytics = $this->service->businessAnalytics($request->user(), $filters);
         $filterOptions = $this->service->businessFilterOptions($request->user());
 
         return Inertia::render('Executive/Audit/Business', [
             'auditLogs' => $logs,
+            'auditLogsExport' => $logsExport,
             'filters' => $filters,
             'analytics' => $analytics,
             'filter_options' => $filterOptions,

@@ -9,8 +9,10 @@ type ExportSectionPdfOptions = {
     scale?: number;
     marginMm?: number;
     paperWidthPx?: number;
+    orientation?: 'portrait' | 'landscape';
     excludeSelectors?: string[];
     revealSelectors?: string[];
+    pageBreakSelectors?: string[];
 };
 
 export function printSectionById(sectionId: string, options: PrintSectionOptions = {}): void {
@@ -97,8 +99,10 @@ export async function downloadSectionAsPdfById(sectionId: string, options: Expor
     const scale = options.scale ?? 2;
     const marginMm = options.marginMm ?? 10;
     const paperWidthPx = options.paperWidthPx ?? 1120;
+    const forcedOrientation = options.orientation;
     const excludeSelectors = options.excludeSelectors ?? ['.print-hide'];
     const revealSelectors = options.revealSelectors ?? [];
+    const pageBreakSelectors = options.pageBreakSelectors ?? [];
 
     const captureRoot = createPdfCaptureRoot(source, {
         title,
@@ -111,16 +115,12 @@ export async function downloadSectionAsPdfById(sectionId: string, options: Expor
         await waitForRenderableAssets(captureRoot);
 
         const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')]);
+        const pageNodes = pageBreakSelectors.length > 0
+            ? pageBreakSelectors.flatMap((selector) => Array.from(captureRoot.querySelectorAll<HTMLElement>(selector)))
+            : [captureRoot];
 
-        const canvas = await html2canvas(captureRoot, {
-            backgroundColor: '#ffffff',
-            scale,
-            useCORS: true,
-            windowWidth: paperWidthPx,
-            logging: false,
-        });
-
-        const orientation = canvas.width > canvas.height ? 'landscape' : 'portrait';
+        const firstCanvas = await renderPdfCanvas(html2canvas, pageNodes[0] ?? captureRoot, scale, paperWidthPx);
+        const orientation = forcedOrientation ?? (firstCanvas.width > firstCanvas.height ? 'landscape' : 'portrait');
         const pdf = new jsPDF({
             orientation,
             unit: 'mm',
@@ -132,23 +132,51 @@ export async function downloadSectionAsPdfById(sectionId: string, options: Expor
         const pageHeight = pdf.internal.pageSize.getHeight();
         const usablePageHeight = pageHeight - marginMm * 2;
         const contentWidth = pageWidth - marginMm * 2;
-        const contentHeight = (canvas.height * contentWidth) / canvas.width;
-        const image = canvas.toDataURL('image/png');
+        let isFirstPage = true;
 
-        pdf.addImage(image, 'PNG', marginMm, marginMm, contentWidth, contentHeight, undefined, 'FAST');
+        for (const node of pageNodes) {
+            const canvas = node === pageNodes[0]
+                ? firstCanvas
+                : await renderPdfCanvas(html2canvas, node, scale, paperWidthPx);
+            const contentHeight = (canvas.height * contentWidth) / canvas.width;
+            const image = canvas.toDataURL('image/png');
 
-        let renderedHeight = usablePageHeight;
-        while (renderedHeight < contentHeight) {
-            pdf.addPage();
-            const offsetY = marginMm - renderedHeight;
-            pdf.addImage(image, 'PNG', marginMm, offsetY, contentWidth, contentHeight, undefined, 'FAST');
-            renderedHeight += usablePageHeight;
+            if (!isFirstPage) {
+                pdf.addPage();
+            }
+
+            pdf.addImage(image, 'PNG', marginMm, marginMm, contentWidth, contentHeight, undefined, 'FAST');
+
+            let renderedHeight = usablePageHeight;
+            while (renderedHeight < contentHeight) {
+                pdf.addPage();
+                const offsetY = marginMm - renderedHeight;
+                pdf.addImage(image, 'PNG', marginMm, offsetY, contentWidth, contentHeight, undefined, 'FAST');
+                renderedHeight += usablePageHeight;
+            }
+
+            isFirstPage = false;
         }
 
         pdf.save(fileName);
     } finally {
         captureRoot.remove();
     }
+}
+
+async function renderPdfCanvas(
+    html2canvas: typeof import('html2canvas').default,
+    source: HTMLElement,
+    scale: number,
+    paperWidthPx: number,
+): Promise<HTMLCanvasElement> {
+    return html2canvas(source, {
+        backgroundColor: '#ffffff',
+        scale,
+        useCORS: true,
+        windowWidth: paperWidthPx,
+        logging: false,
+    });
 }
 
 function createPdfCaptureRoot(source: HTMLElement, options: { title: string; paperWidthPx: number; excludeSelectors: string[]; revealSelectors: string[] }): HTMLDivElement {

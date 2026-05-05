@@ -50,6 +50,24 @@ class AuditLogViewerService
 
     /**
      * @param  array<string, mixed>  $filters
+     * @return Collection<int, AuditLog>
+     */
+    public function businessExportRecords(User $actor, array $filters): Collection
+    {
+        if (! $actor->can('audit.business.view')) {
+            throw ValidationException::withMessages([
+                'authorization' => 'Not authorized for business audit logs export.',
+            ]);
+        }
+
+        return $this->buildBaseQuery($filters)
+            ->business()
+            ->latest('id')
+            ->get();
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
      * @return array<string, Collection>
      */
     public function businessAnalytics(User $actor, array $filters): array
