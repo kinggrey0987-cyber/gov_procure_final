@@ -1173,12 +1173,12 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
         if ($delivery->verifications()->doesntExist()) {
             $verificationService->create($delivery, $gsoUser, [
                 'verification_date' => now()->toDateString(),
-                'verification_status' => 'APPROVED',
+                'verification_status' => $withDiscrepancy ? 'REJECTED' : 'APPROVED',
                 'discrepancy_notes' => $withDiscrepancy
                     ? 'Discrepancy noted: partial quantity received compared to purchase order quantities.'
                     : null,
                 'remarks' => $withDiscrepancy
-                    ? 'Verified with discrepancy notes for claim traceability in demo workflow.'
+                    ? 'Rejected with discrepancy notes for BAC/procurement follow-up in the demo workflow.'
                     : 'Verified and cleared for inventory sync in the demo workflow.',
             ]);
         }
@@ -1187,6 +1187,10 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
 
         if ((string) $delivery->receipt_status === 'VERIFIED') {
             $inventoryService->updateFromVerifiedDelivery($delivery, $gsoUser);
+        }
+
+        if ((string) $delivery->receipt_status !== 'VERIFIED') {
+            return $delivery->fresh(['purchaseOrder', 'supplier', 'receiver', 'items']) ?? $delivery;
         }
 
         $distributionRecord = DistributionRecord::query()->where('delivery_id', (int) $delivery->delivery_id)->first();
