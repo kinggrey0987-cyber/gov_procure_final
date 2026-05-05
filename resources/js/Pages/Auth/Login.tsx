@@ -1,9 +1,10 @@
 import Checkbox from '@/Components/Checkbox';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
+import PasswordInput from '@/Components/PasswordInput';
 import TextInput from '@/Components/TextInput';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
-import { FormEventHandler, useState } from 'react';
+import { FormEventHandler } from 'react';
 import { PageProps as AppPageProps } from '@/types';
 
 type PageProps = AppPageProps & {
@@ -30,7 +31,6 @@ export default function Login({
     const { flash } = usePage<PageProps>().props;
     const visibleStatus = status ?? flash?.success ?? null;
     const visibleError = error ?? flash?.error ?? null;
-    const [showPassword, setShowPassword] = useState(false);
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
@@ -106,38 +106,15 @@ export default function Login({
                         <div>
                             <InputLabel htmlFor="password" value="Password" />
 
-                            <div className="relative mt-2">
-                                <TextInput
-                                    id="password"
-                                    type={showPassword ? 'text' : 'password'}
-                                    name="password"
-                                    value={data.password}
-                                    className="block h-11 w-full rounded-xl border-slate-300 pr-12 text-sm shadow-sm focus:border-red-500 focus:ring-red-500"
-                                    autoComplete="current-password"
-                                    onChange={(e) => setData('password', e.target.value)}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword((current) => !current)}
-                                    className="absolute inset-y-0 right-0 inline-flex w-11 items-center justify-center rounded-r-xl text-slate-500 transition hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
-                                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                                    title={showPassword ? 'Hide password' : 'Show password'}
-                                >
-                                    {showPassword ? (
-                                        <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                            <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C7 20 2.73 16.89 1 12a18.45 18.45 0 0 1 5.06-6.94" />
-                                            <path d="M9.9 4.24A10.78 10.78 0 0 1 12 4c5 0 9.27 3.11 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-                                            <path d="M14.12 14.12a3 3 0 0 1-4.24-4.24" />
-                                            <path d="M1 1l22 22" />
-                                        </svg>
-                                    ) : (
-                                        <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z" />
-                                            <circle cx="12" cy="12" r="3" />
-                                        </svg>
-                                    )}
-                                </button>
-                            </div>
+                            <PasswordInput
+                                id="password"
+                                name="password"
+                                value={data.password}
+                                className="mt-2 block h-11 w-full rounded-xl border-slate-300 text-sm shadow-sm focus:border-red-500 focus:ring-red-500"
+                                wrapperClassName="mt-2"
+                                autoComplete="current-password"
+                                onChange={(e) => setData('password', e.target.value)}
+                            />
 
                             <InputError message={errors.password} className="mt-2" />
                         </div>

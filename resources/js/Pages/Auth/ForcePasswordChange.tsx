@@ -1,6 +1,6 @@
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
-import TextInput from '@/Components/TextInput';
+import PasswordInput from '@/Components/PasswordInput';
 import { normalizePasswordValidationMessage } from '@/lib/passwordValidationMessage';
 import { Head, useForm } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
@@ -44,12 +44,12 @@ export default function ForcePasswordChange({ email }: Props) {
                     <form onSubmit={submit} className="mt-6 space-y-5">
                         <div>
                             <InputLabel htmlFor="current_password" value="Temporary Password" />
-                            <TextInput
+                            <PasswordInput
                                 id="current_password"
-                                type="password"
                                 value={data.current_password}
                                 onChange={(event) => setData('current_password', event.target.value)}
                                 className="mt-2 block h-11 w-full rounded-xl border-slate-300 shadow-sm focus:border-red-500 focus:ring-red-500"
+                                wrapperClassName="mt-2"
                                 required
                             />
                             <InputError message={errors.current_password} className="mt-2" />
@@ -57,12 +57,12 @@ export default function ForcePasswordChange({ email }: Props) {
 
                         <div>
                             <InputLabel htmlFor="password" value="New Password" />
-                            <TextInput
+                            <PasswordInput
                                 id="password"
-                                type="password"
                                 value={data.password}
                                 onChange={(event) => setData('password', event.target.value)}
                                 className="mt-2 block h-11 w-full rounded-xl border-slate-300 shadow-sm focus:border-red-500 focus:ring-red-500"
+                                wrapperClassName="mt-2"
                                 required
                             />
                             <InputError message={passwordError} className="mt-2" />
@@ -70,12 +70,12 @@ export default function ForcePasswordChange({ email }: Props) {
 
                         <div>
                             <InputLabel htmlFor="password_confirmation" value="Confirm New Password" />
-                            <TextInput
+                            <PasswordInput
                                 id="password_confirmation"
-                                type="password"
                                 value={data.password_confirmation}
                                 onChange={(event) => setData('password_confirmation', event.target.value)}
                                 className="mt-2 block h-11 w-full rounded-xl border-slate-300 shadow-sm focus:border-red-500 focus:ring-red-500"
+                                wrapperClassName="mt-2"
                                 required
                             />
                         </div>

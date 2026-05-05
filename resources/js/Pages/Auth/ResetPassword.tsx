@@ -1,5 +1,6 @@
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
+import PasswordInput from '@/Components/PasswordInput';
 import TextInput from '@/Components/TextInput';
 import { normalizePasswordValidationMessage } from '@/lib/passwordValidationMessage';
 import { Head, Link, useForm } from '@inertiajs/react';
@@ -71,12 +72,12 @@ export default function ResetPassword({
                         <div>
                             <InputLabel htmlFor="password" value="New Password" />
 
-                            <TextInput
+                            <PasswordInput
                                 id="password"
-                                type="password"
                                 name="password"
                                 value={data.password}
                                 className="mt-2 block h-11 w-full rounded-xl border-slate-300 text-sm shadow-sm focus:border-red-500 focus:ring-red-500"
+                                wrapperClassName="mt-2"
                                 autoComplete="new-password"
                                 isFocused={true}
                                 onChange={(e) => setData('password', e.target.value)}
@@ -91,12 +92,12 @@ export default function ResetPassword({
                                 value="Confirm New Password"
                             />
 
-                            <TextInput
+                            <PasswordInput
                                 id="password_confirmation"
-                                type="password"
                                 name="password_confirmation"
                                 value={data.password_confirmation}
                                 className="mt-2 block h-11 w-full rounded-xl border-slate-300 text-sm shadow-sm focus:border-red-500 focus:ring-red-500"
+                                wrapperClassName="mt-2"
                                 autoComplete="new-password"
                                 onChange={(e) =>
                                     setData('password_confirmation', e.target.value)

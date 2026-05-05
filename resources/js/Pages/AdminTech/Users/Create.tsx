@@ -1,5 +1,6 @@
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
+import PasswordInput from '@/Components/PasswordInput';
 import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
@@ -115,12 +116,12 @@ export default function CreateUser({ roles, offices }: Props) {
                     <div className="grid gap-5 sm:grid-cols-2">
                         <div>
                             <InputLabel htmlFor="password" value="Temporary Password" />
-                            <TextInput
+                            <PasswordInput
                                 id="password"
-                                type="password"
                                 value={form.data.password}
                                 onChange={(event) => form.setData('password', event.target.value)}
                                 className="mt-1 block w-full"
+                                wrapperClassName="mt-1"
                                 required
                             />
                             <InputError message={passwordError} className="mt-2" />
@@ -131,12 +132,12 @@ export default function CreateUser({ roles, offices }: Props) {
 
                         <div>
                             <InputLabel htmlFor="password_confirmation" value="Confirm Temporary Password" />
-                            <TextInput
+                            <PasswordInput
                                 id="password_confirmation"
-                                type="password"
                                 value={form.data.password_confirmation}
                                 onChange={(event) => form.setData('password_confirmation', event.target.value)}
                                 className="mt-1 block w-full"
+                                wrapperClassName="mt-1"
                                 required
                             />
                         </div>
