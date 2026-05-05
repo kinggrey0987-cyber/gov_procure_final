@@ -123,8 +123,8 @@ export default function ExecutiveAnomalyIndex({ anomalies, filters, filter_optio
                         </button>
                     </div>
 
-                    <div className="overflow-hidden rounded border bg-white">
-                        <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <div className="responsive-table-wrap rounded border bg-white">
+                    <table className="min-w-full divide-y divide-gray-200 text-sm">
                             <thead className="bg-gray-50">
                                 <tr>
                                     <th className="px-4 py-2 text-left">Type</th>
@@ -180,3 +180,8 @@ function formatAnomalyType(value: string): string {
 
     return value.replaceAll('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase());
 }
+
+
+
+
+

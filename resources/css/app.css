@@ -1,3 +1,26 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+    html,
+    body,
+    #app {
+        min-width: 0;
+        overflow-x: hidden;
+    }
+
+    table {
+        width: 100%;
+    }
+}
+
+@layer components {
+    .responsive-table-wrap {
+        @apply w-full overflow-x-auto;
+    }
+
+    .responsive-table-wrap > table {
+        @apply min-w-[720px] md:min-w-full;
+    }
+}

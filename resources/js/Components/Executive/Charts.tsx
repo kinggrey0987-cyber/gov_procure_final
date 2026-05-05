@@ -430,3 +430,8 @@ function CompactTrendBars({
         </div>
     );
 }
+
+
+
+
+

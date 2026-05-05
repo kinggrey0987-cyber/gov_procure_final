@@ -50,8 +50,8 @@ export default function ExecutiveMonitoringSummary({ summary }: Props) {
                 </div>
 
                 <div className="mx-auto mt-6 max-w-6xl px-4 sm:px-6 lg:px-8">
-                    <div className="overflow-hidden rounded border bg-white">
-                        <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <div className="responsive-table-wrap rounded border bg-white">
+                    <table className="min-w-full divide-y divide-gray-200 text-sm">
                             <thead className="bg-gray-50">
                                 <tr>
                                     <th className="px-4 py-2 text-left">Office</th>
@@ -84,3 +84,8 @@ function Card({ label, value }: { label: string; value: number }) {
         </div>
     );
 }
+
+
+
+
+

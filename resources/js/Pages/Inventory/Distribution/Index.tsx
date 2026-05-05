@@ -218,7 +218,7 @@ export default function DistributionIndex({ records, filters, filter_options }: 
                     </p>
                 </div>
 
-                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="responsive-table-wrap rounded-xl border border-slate-200 bg-white shadow-sm">
                     <table className="min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-slate-50">
                             <tr>
@@ -289,3 +289,8 @@ function displayDistributionStatus(status: string): string {
 
     return map[status] ?? status;
 }
+
+
+
+
+

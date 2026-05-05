@@ -52,3 +52,8 @@ export default function AuditLogTable({ logs }: Props) {
         </div>
     );
 }
+
+
+
+
+

@@ -95,8 +95,8 @@ export default function PurchaseRequestsShow({ purchaseRequest, reviewMode = fal
                         </p>
                     </section>
 
-                    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                        <table className="min-w-full divide-y divide-slate-200 text-sm">
+                    <section className="responsive-table-wrap rounded-xl border border-slate-200 bg-white shadow-sm">
+                    <table className="min-w-full divide-y divide-slate-200 text-sm">
                             <thead className="bg-slate-50">
                                 <tr>
                                     <th className="px-4 py-3 text-left font-semibold text-slate-700">Item</th>
@@ -217,3 +217,8 @@ function formatRequestRemarks(remarks?: string | null) {
 
     return cleaned;
 }
+
+
+
+
+

@@ -77,3 +77,8 @@ export default function DisclosureIndex({ disclosures }: Props) {
         </AuthenticatedLayout>
     );
 }
+
+
+
+
+

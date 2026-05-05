@@ -200,12 +200,12 @@ export default function Authenticated({
 
                 <div className="flex-1">
                     <header className="border-b border-slate-200 bg-white">
-                        <div className="mx-auto flex h-20 w-full max-w-[1300px] items-center justify-between px-4 sm:px-6">
+                        <div className="mx-auto flex min-h-16 w-full max-w-[1300px] items-center justify-between gap-3 px-4 py-3 sm:min-h-20 sm:px-6">
                             <div className="flex items-center gap-3 md:hidden">
-                                <img src="/logo.jpg" alt="GovSupply Connect" className="h-10 w-10 rounded-full border border-slate-300 bg-white object-cover" />
-                                <p className="font-bold text-red-700">GovSupply Connect</p>
+                                <img src="/logo.jpg" alt="GovSupply Connect" className="h-9 w-9 rounded-full border border-slate-300 bg-white object-cover sm:h-10 sm:w-10" />
+                                <p className="text-sm font-bold leading-tight text-red-700 sm:text-base">GovSupply Connect</p>
                             </div>
-                            <div className="ms-auto flex items-center gap-5">
+                            <div className="ms-auto flex shrink-0 items-center gap-3 sm:gap-5">
                                 <BellPanel unreadCount={notifications.unread_count} recent={notifications.recent} />
 
                                 <div className="flex items-center gap-3">
@@ -249,11 +249,29 @@ export default function Authenticated({
                         </div>
                     </header>
 
-                    <div className="mx-auto w-full max-w-[1300px] px-4 py-6 sm:px-6">
+                    <nav className="border-b border-slate-200 bg-white md:hidden">
+                        <div className="flex gap-2 overflow-x-auto px-4 py-3 [scrollbar-width:none] sm:px-6">
+                            {adminLinks.map((item) => (
+                                <Link
+                                    key={item.label}
+                                    href={item.href}
+                                    className={`shrink-0 rounded-full border px-3 py-2 text-xs font-semibold transition ${
+                                        item.active
+                                            ? 'border-red-600 bg-red-600 text-white shadow-sm'
+                                            : 'border-slate-200 bg-white text-slate-700 hover:border-red-200 hover:bg-red-50'
+                                    }`}
+                                >
+                                    {item.label}
+                                </Link>
+                            ))}
+                        </div>
+                    </nav>
+
+                    <div className="mx-auto w-full max-w-[1300px] px-3 py-4 sm:px-6 sm:py-6">
                         {header && (
                             <header className="mb-6">
-                                <p className="mt-1 text-xl text-slate-500">Municipality of E.B. Magalona - {roleLabel}</p>
-                                <div className="mt-3 text-4xl font-bold text-slate-800">{header}</div>
+                                <p className="mt-1 text-sm text-slate-500 sm:text-xl">Municipality of E.B. Magalona - {roleLabel}</p>
+                                <div className="mt-2 text-2xl font-bold text-slate-800 sm:mt-3 sm:text-4xl">{header}</div>
                             </header>
                         )}
 
@@ -345,16 +363,16 @@ export default function Authenticated({
 
                 <div className="flex-1">
                     <header className="border-b border-slate-200 bg-white">
-                        <div className="mx-auto flex h-20 w-full max-w-[1400px] items-center justify-between px-4 sm:px-6">
+                        <div className="mx-auto flex min-h-16 w-full max-w-[1400px] items-center justify-between gap-3 px-4 py-3 sm:min-h-20 sm:px-6">
                             <div className="flex items-center gap-3">
-                                <img src="/logo.jpg" alt="GovSupply Connect" className="h-11 w-11 rounded-full border border-slate-300 bg-white object-cover" />
-                                <div>
-                                    <p className="text-2xl font-bold leading-tight text-red-700">GovSupply Connect</p>
-                                    <p className="text-sm text-slate-500">Municipality of E.B. Magalona</p>
+                                <img src="/logo.jpg" alt="GovSupply Connect" className="h-9 w-9 rounded-full border border-slate-300 bg-white object-cover sm:h-11 sm:w-11" />
+                                <div className="min-w-0">
+                                    <p className="truncate text-sm font-bold leading-tight text-red-700 sm:text-2xl">GovSupply Connect</p>
+                                    <p className="hidden text-sm text-slate-500 sm:block">Municipality of E.B. Magalona</p>
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-5">
+                            <div className="flex shrink-0 items-center gap-3 sm:gap-5">
                                 <BellPanel unreadCount={notifications.unread_count} recent={notifications.recent} />
 
                                 <div className="flex items-center gap-3">
@@ -396,11 +414,29 @@ export default function Authenticated({
                         </div>
                     </header>
 
-                    <div className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6">
+                    <nav className="border-b border-slate-200 bg-white md:hidden">
+                        <div className="flex gap-2 overflow-x-auto px-4 py-3 [scrollbar-width:none] sm:px-6">
+                            {procurementLinks.map((item) => (
+                                <Link
+                                    key={item.label}
+                                    href={item.href}
+                                    className={`shrink-0 rounded-full border px-3 py-2 text-xs font-semibold transition ${
+                                        item.active
+                                            ? 'border-red-600 bg-red-600 text-white shadow-sm'
+                                            : 'border-slate-200 bg-white text-slate-700 hover:border-red-200 hover:bg-red-50'
+                                    }`}
+                                >
+                                    {item.label}
+                                </Link>
+                            ))}
+                        </div>
+                    </nav>
+
+                    <div className="mx-auto w-full max-w-[1400px] px-3 py-4 sm:px-6 sm:py-6">
                         {header && (
                             <header className="mb-6 border-b border-slate-200 pb-4">
-                                <p className="mt-1 text-xl text-slate-500">Municipality of E.B. Magalona - Procurement / BAC Staff</p>
-                                <div className="mt-3 text-4xl font-bold text-slate-800">{header}</div>
+                                <p className="mt-1 text-sm text-slate-500 sm:text-xl">Municipality of E.B. Magalona - Procurement / BAC Staff</p>
+                                <div className="mt-2 text-2xl font-bold text-slate-800 sm:mt-3 sm:text-4xl">{header}</div>
                             </header>
                         )}
 
@@ -500,16 +536,16 @@ export default function Authenticated({
 
                 <div className="flex-1">
                     <header className="border-b border-slate-200 bg-white">
-                        <div className="mx-auto flex h-20 w-full max-w-[1400px] items-center justify-between px-4 sm:px-6">
+                        <div className="mx-auto flex min-h-16 w-full max-w-[1400px] items-center justify-between gap-3 px-4 py-3 sm:min-h-20 sm:px-6">
                             <div className="flex items-center gap-3">
-                                <img src="/logo.jpg" alt="GovSupply Connect" className="h-11 w-11 rounded-full border border-slate-300 bg-white object-cover" />
-                                <div>
-                                    <p className="text-2xl font-bold leading-tight text-red-700">GovSupply Connect</p>
-                                    <p className="text-sm text-slate-500">Municipality of E.B. Magalona</p>
+                                <img src="/logo.jpg" alt="GovSupply Connect" className="h-9 w-9 rounded-full border border-slate-300 bg-white object-cover sm:h-11 sm:w-11" />
+                                <div className="min-w-0">
+                                    <p className="truncate text-sm font-bold leading-tight text-red-700 sm:text-2xl">GovSupply Connect</p>
+                                    <p className="hidden text-sm text-slate-500 sm:block">Municipality of E.B. Magalona</p>
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-5">
+                            <div className="flex shrink-0 items-center gap-3 sm:gap-5">
                                 <BellPanel unreadCount={notifications.unread_count} recent={notifications.recent} />
 
                                 <div className="flex items-center gap-3">
@@ -551,11 +587,29 @@ export default function Authenticated({
                         </div>
                     </header>
 
-                    <div className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6">
+                    <nav className="border-b border-slate-200 bg-white md:hidden">
+                        <div className="flex gap-2 overflow-x-auto px-4 py-3 [scrollbar-width:none] sm:px-6">
+                            {officeLinks.map((item) => (
+                                <Link
+                                    key={item.label}
+                                    href={item.href}
+                                    className={`shrink-0 rounded-full border px-3 py-2 text-xs font-semibold transition ${
+                                        item.active
+                                            ? 'border-red-600 bg-red-600 text-white shadow-sm'
+                                            : 'border-slate-200 bg-white text-slate-700 hover:border-red-200 hover:bg-red-50'
+                                    }`}
+                                >
+                                    {item.label}
+                                </Link>
+                            ))}
+                        </div>
+                    </nav>
+
+                    <div className="mx-auto w-full max-w-[1400px] px-3 py-4 sm:px-6 sm:py-6">
                         {header && (
                             <header className="mb-6 border-b border-slate-200 pb-4">
-                                <p className="mt-1 text-xl text-slate-500">Municipality of E.B. Magalona - {officeLabel}</p>
-                                <div className="mt-3 text-4xl font-bold text-slate-800">{header}</div>
+                                <p className="mt-1 text-sm text-slate-500 sm:text-xl">Municipality of E.B. Magalona - {officeLabel}</p>
+                                <div className="mt-2 text-2xl font-bold text-slate-800 sm:mt-3 sm:text-4xl">{header}</div>
                             </header>
                         )}
 
@@ -656,16 +710,16 @@ export default function Authenticated({
 
                 <div className="flex-1">
                     <header className="border-b border-slate-200 bg-white">
-                        <div className="mx-auto flex h-20 w-full max-w-[1400px] items-center justify-between px-4 sm:px-6">
+                        <div className="mx-auto flex min-h-16 w-full max-w-[1400px] items-center justify-between gap-3 px-4 py-3 sm:min-h-20 sm:px-6">
                             <div className="flex items-center gap-3">
-                                <img src="/logo.jpg" alt="GovSupply Connect" className="h-11 w-11 rounded-full border border-slate-300 bg-white object-cover" />
-                                <div>
-                                    <p className="text-2xl font-bold leading-tight text-red-700">GovSupply Connect</p>
-                                    <p className="text-sm text-slate-500">Municipality of E.B. Magalona</p>
+                                <img src="/logo.jpg" alt="GovSupply Connect" className="h-9 w-9 rounded-full border border-slate-300 bg-white object-cover sm:h-11 sm:w-11" />
+                                <div className="min-w-0">
+                                    <p className="truncate text-sm font-bold leading-tight text-red-700 sm:text-2xl">GovSupply Connect</p>
+                                    <p className="hidden text-sm text-slate-500 sm:block">Municipality of E.B. Magalona</p>
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-5">
+                            <div className="flex shrink-0 items-center gap-3 sm:gap-5">
                                 <BellPanel unreadCount={notifications.unread_count} recent={notifications.recent} />
 
                                 <div className="flex items-center gap-3">
@@ -707,11 +761,29 @@ export default function Authenticated({
                         </div>
                     </header>
 
-                    <div className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6">
+                    <nav className="border-b border-slate-200 bg-white md:hidden">
+                        <div className="flex gap-2 overflow-x-auto px-4 py-3 [scrollbar-width:none] sm:px-6">
+                            {executiveLinks.map((item) => (
+                                <Link
+                                    key={item.label}
+                                    href={item.href}
+                                    className={`shrink-0 rounded-full border px-3 py-2 text-xs font-semibold transition ${
+                                        item.active
+                                            ? 'border-red-600 bg-red-600 text-white shadow-sm'
+                                            : 'border-slate-200 bg-white text-slate-700 hover:border-red-200 hover:bg-red-50'
+                                    }`}
+                                >
+                                    {item.label}
+                                </Link>
+                            ))}
+                        </div>
+                    </nav>
+
+                    <div className="mx-auto w-full max-w-[1400px] px-3 py-4 sm:px-6 sm:py-6">
                         {header && (
                             <header className="mb-6 border-b border-slate-200 pb-4">
-                                <p className="mt-1 text-xl text-slate-500">Municipality of E.B. Magalona - Executive Oversight</p>
-                                <div className="mt-3 text-4xl font-bold text-slate-800">{header}</div>
+                                <p className="mt-1 text-sm text-slate-500 sm:text-xl">Municipality of E.B. Magalona - Executive Oversight</p>
+                                <div className="mt-2 text-2xl font-bold text-slate-800 sm:mt-3 sm:text-4xl">{header}</div>
                             </header>
                         )}
 
@@ -834,16 +906,16 @@ export default function Authenticated({
 
                 <div className="flex-1">
                     <header className="border-b border-slate-200 bg-white">
-                        <div className="mx-auto flex h-20 w-full max-w-[1400px] items-center justify-between px-4 sm:px-6">
+                        <div className="mx-auto flex min-h-16 w-full max-w-[1400px] items-center justify-between gap-3 px-4 py-3 sm:min-h-20 sm:px-6">
                             <div className="flex items-center gap-3">
-                                <img src="/logo.jpg" alt="GovSupply Connect" className="h-11 w-11 rounded-full border border-slate-300 bg-white object-cover" />
-                                <div>
-                                    <p className="text-2xl font-bold leading-tight text-red-700">GovSupply Connect</p>
-                                    <p className="text-sm text-slate-500">Municipality of E.B. Magalona</p>
+                                <img src="/logo.jpg" alt="GovSupply Connect" className="h-9 w-9 rounded-full border border-slate-300 bg-white object-cover sm:h-11 sm:w-11" />
+                                <div className="min-w-0">
+                                    <p className="truncate text-sm font-bold leading-tight text-red-700 sm:text-2xl">GovSupply Connect</p>
+                                    <p className="hidden text-sm text-slate-500 sm:block">Municipality of E.B. Magalona</p>
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-5">
+                            <div className="flex shrink-0 items-center gap-3 sm:gap-5">
                                 <BellPanel unreadCount={notifications.unread_count} recent={notifications.recent} />
 
                                 <div className="flex items-center gap-3">
@@ -885,11 +957,29 @@ export default function Authenticated({
                         </div>
                     </header>
 
-                    <div className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6">
+                    <nav className="border-b border-slate-200 bg-white md:hidden">
+                        <div className="flex gap-2 overflow-x-auto px-4 py-3 [scrollbar-width:none] sm:px-6">
+                            {inventoryLinks.map((item) => (
+                                <Link
+                                    key={item.label}
+                                    href={item.href}
+                                    className={`shrink-0 rounded-full border px-3 py-2 text-xs font-semibold transition ${
+                                        item.active
+                                            ? 'border-red-600 bg-red-600 text-white shadow-sm'
+                                            : 'border-slate-200 bg-white text-slate-700 hover:border-red-200 hover:bg-red-50'
+                                    }`}
+                                >
+                                    {item.label}
+                                </Link>
+                            ))}
+                        </div>
+                    </nav>
+
+                    <div className="mx-auto w-full max-w-[1400px] px-3 py-4 sm:px-6 sm:py-6">
                         {header && (
                             <header className="mb-6 border-b border-slate-200 pb-4">
-                                <p className="mt-1 text-xl text-slate-500">Municipality of E.B. Magalona - Inventory and Logistics</p>
-                                <div className="mt-3 text-4xl font-bold text-slate-800">{header}</div>
+                                <p className="mt-1 text-sm text-slate-500 sm:text-xl">Municipality of E.B. Magalona - Inventory and Logistics</p>
+                                <div className="mt-2 text-2xl font-bold text-slate-800 sm:mt-3 sm:text-4xl">{header}</div>
                             </header>
                         )}
 
@@ -1133,3 +1223,7 @@ export default function Authenticated({
         </div>
     );
 }
+
+
+
+

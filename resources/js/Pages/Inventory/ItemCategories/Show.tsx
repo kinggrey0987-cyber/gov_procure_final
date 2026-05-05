@@ -62,3 +62,8 @@ export default function ShowItemCategory({ category, canManage }: Props) {
         </AuthenticatedLayout>
     );
 }
+
+
+
+
+

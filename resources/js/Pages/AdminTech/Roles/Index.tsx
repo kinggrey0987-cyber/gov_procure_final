@@ -97,3 +97,8 @@ export default function RoleIndex({ roles }: Props) {
         </AuthenticatedLayout>
     );
 }
+
+
+
+
+

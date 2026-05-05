@@ -123,7 +123,7 @@ export default function InventoryIndex({ inventories, categories, filters }: Pro
                     Low Stock Threshold is the reorder point. Items strictly below this level are active low-stock cases for procurement initiation; items equal to threshold are advisory only.
                 </div>
 
-                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="responsive-table-wrap rounded-xl border border-slate-200 bg-white shadow-sm">
                     <table className="min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-slate-50">
                             <tr>
@@ -205,3 +205,8 @@ export default function InventoryIndex({ inventories, categories, filters }: Pro
         </AuthenticatedLayout>
     );
 }
+
+
+
+
+

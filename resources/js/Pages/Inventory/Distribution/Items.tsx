@@ -43,8 +43,8 @@ export default function DistributionItems({ record }: Props) {
                         <button type="submit" className="rounded bg-indigo-600 px-4 py-2 text-sm text-white">Add</button>
                     </form>
 
-                    <div className="overflow-hidden rounded border bg-white">
-                        <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <div className="responsive-table-wrap rounded border bg-white">
+                    <table className="min-w-full divide-y divide-gray-200 text-sm">
                             <thead className="bg-gray-50">
                                 <tr>
                                     <th className="px-4 py-2 text-left">Item ID</th>
@@ -70,3 +70,8 @@ export default function DistributionItems({ record }: Props) {
         </AuthenticatedLayout>
     );
 }
+
+
+
+
+

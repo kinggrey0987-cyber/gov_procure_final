@@ -124,3 +124,8 @@ export default function EditItem({ item, categories }: Props) {
         </AuthenticatedLayout>
     );
 }
+
+
+
+
+

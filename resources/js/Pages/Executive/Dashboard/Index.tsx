@@ -739,3 +739,8 @@ function downloadFile(content: string, fileName: string, mimeType: string): void
     anchor.remove();
     window.URL.revokeObjectURL(url);
 }
+
+
+
+
+

@@ -132,3 +132,8 @@ export default function NotificationIndex({ notifications }: Props) {
 function formatType(value: string): string {
     return value.replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
 }
+
+
+
+
+

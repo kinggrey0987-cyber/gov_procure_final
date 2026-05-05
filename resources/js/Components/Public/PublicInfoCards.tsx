@@ -103,3 +103,8 @@ function formatDisclosureType(value: string): string {
         .toLowerCase()
         .replace(/\b\w/g, (char) => char.toUpperCase());
 }
+
+
+
+
+

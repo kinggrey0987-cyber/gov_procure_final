@@ -23,3 +23,8 @@ export default function DomainPlaceholder({ title, description }: Props) {
         </AuthenticatedLayout>
     );
 }
+
+
+
+
+

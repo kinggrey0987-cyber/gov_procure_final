@@ -49,8 +49,8 @@ export default function PpmpItemsIndex({ ppmp, items }: Props) {
                         <button type="submit" className="rounded bg-indigo-600 px-3 py-2 text-white">Add Item</button>
                     </form>
 
-                    <div className="overflow-hidden rounded-lg border bg-white">
-                        <table className="min-w-full text-sm">
+                    <div className="responsive-table-wrap rounded-lg border bg-white">
+                    <table className="min-w-full text-sm">
                             <thead className="bg-gray-50">
                                 <tr>
                                     <th className="px-3 py-2 text-left">ID</th>
@@ -76,3 +76,8 @@ export default function PpmpItemsIndex({ ppmp, items }: Props) {
         </AuthenticatedLayout>
     );
 }
+
+
+
+
+

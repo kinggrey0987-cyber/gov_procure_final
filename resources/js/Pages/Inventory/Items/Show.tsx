@@ -66,3 +66,8 @@ export default function ShowItem({ item, canManage }: Props) {
         </AuthenticatedLayout>
     );
 }
+
+
+
+
+

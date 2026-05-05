@@ -58,3 +58,8 @@ export default function DistributionEdit({ record }: Props) {
         </AuthenticatedLayout>
     );
 }
+
+
+
+
+

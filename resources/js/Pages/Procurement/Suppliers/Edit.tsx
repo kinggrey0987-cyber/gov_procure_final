@@ -86,3 +86,8 @@ export default function SuppliersEdit({ supplier }: Props) {
         </AuthenticatedLayout>
     );
 }
+
+
+
+
+

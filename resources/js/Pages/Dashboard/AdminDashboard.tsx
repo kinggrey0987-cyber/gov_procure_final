@@ -275,3 +275,8 @@ export default function AdminDashboard({ summary, activities, pagination, filter
         </AuthenticatedLayout>
     );
 }
+
+
+
+
+

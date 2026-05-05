@@ -76,3 +76,8 @@ export default function HowItWorks({ canLogin = true }: Props) {
         </>
     );
 }
+
+
+
+
+

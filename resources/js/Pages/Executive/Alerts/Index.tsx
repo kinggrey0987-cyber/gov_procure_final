@@ -114,8 +114,8 @@ export default function ExecutiveAlertIndex({ alerts, filters, filter_options, p
                         />
                     </div>
 
-                    <div className="overflow-hidden rounded border bg-white">
-                        <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <div className="responsive-table-wrap rounded border bg-white">
+                    <table className="min-w-full divide-y divide-gray-200 text-sm">
                             <thead className="bg-gray-50">
                                 <tr>
                                     <th className="px-4 py-2 text-left">Type</th>
@@ -155,3 +155,8 @@ export default function ExecutiveAlertIndex({ alerts, filters, filter_options, p
         </AuthenticatedLayout>
     );
 }
+
+
+
+
+

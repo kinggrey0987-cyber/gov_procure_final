@@ -154,3 +154,8 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
         </AuthenticatedLayout>
     );
 }
+
+
+
+
+

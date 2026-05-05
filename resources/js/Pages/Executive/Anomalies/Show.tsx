@@ -305,3 +305,8 @@ function calculatePercentDelta(detected?: number | null, expected?: number | nul
 
     return ((detected - expected) / expected) * 100;
 }
+
+
+
+
+

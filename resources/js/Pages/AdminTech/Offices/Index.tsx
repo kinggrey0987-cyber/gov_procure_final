@@ -99,14 +99,14 @@ export default function OfficeIndex({ offices, filters }: Props) {
             <Head title="Office Management" />
 
             <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <header className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
+                <header className="flex flex-col gap-4 border-b border-slate-200 px-4 py-5 sm:px-6 md:flex-row md:items-center md:justify-between">
                     <div>
-                        <h3 className="text-3xl font-semibold text-slate-800">Office Management</h3>
-                        <p className="mt-1 text-lg text-slate-500">Manage municipal offices and departmental access context</p>
+                        <h3 className="text-2xl font-semibold text-slate-800 sm:text-3xl">Office Management</h3>
+                        <p className="mt-1 text-sm text-slate-500 sm:text-lg">Manage municipal offices and departmental access context</p>
                     </div>
                     <Link
                         href={route('admin-tech.offices.create')}
-                        className="inline-flex h-10 items-center justify-center rounded-xl border border-red-300 bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700"
+                        className="inline-flex h-10 w-full items-center justify-center rounded-xl border border-red-300 bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700 sm:w-auto"
                     >
                         Add Office
                     </Link>
@@ -124,9 +124,9 @@ export default function OfficeIndex({ offices, filters }: Props) {
                     </div>
                 )}
 
-                <form onSubmit={handleFilterSubmit} className="border-b border-slate-200 bg-slate-50 px-6 py-4">
-                    <div className="flex gap-3">
-                        <div className="flex-1">
+                <form onSubmit={handleFilterSubmit} className="border-b border-slate-200 bg-slate-50 px-4 py-4 sm:px-6">
+                    <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem_auto] md:items-end">
+                        <div>
                             <label htmlFor="search-input" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
                                 Search
                             </label>
@@ -139,7 +139,7 @@ export default function OfficeIndex({ offices, filters }: Props) {
                                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
                             />
                         </div>
-                        <div className="w-48">
+                        <div>
                             <label htmlFor="status-select" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
                                 Status
                             </label>
@@ -154,7 +154,7 @@ export default function OfficeIndex({ offices, filters }: Props) {
                                 <option value="inactive">Inactive</option>
                             </select>
                         </div>
-                        <div className="flex items-end gap-2">
+                        <div className="grid grid-cols-2 gap-2 sm:flex sm:items-end">
                             <button
                                 type="submit"
                                 className="rounded-lg border border-blue-300 bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
@@ -173,7 +173,7 @@ export default function OfficeIndex({ offices, filters }: Props) {
                 </form>
 
                 <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-slate-200 text-sm">
+                    <table className="min-w-[720px] divide-y divide-slate-200 text-sm md:min-w-full">
                         <thead className="bg-slate-50">
                             <tr>
                                 <th className="px-5 py-3 text-left text-sm font-semibold text-slate-700">Office Name</th>
@@ -206,7 +206,7 @@ export default function OfficeIndex({ offices, filters }: Props) {
                                         </span>
                                     </td>
                                     <td className="px-5 py-4">
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex flex-wrap items-center gap-2">
                                             <Link
                                                 href={route('admin-tech.offices.edit', office.id)}
                                                 className="inline-flex h-8 items-center rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
@@ -230,8 +230,8 @@ export default function OfficeIndex({ offices, filters }: Props) {
                     </table>
                 </div>
 
-                <div className="border-t border-slate-200 bg-slate-50 px-6 py-4">
-                    <div className="mb-4 flex items-center justify-between">
+                <div className="border-t border-slate-200 bg-slate-50 px-4 py-4 sm:px-6">
+                    <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                         <p className="text-sm text-slate-600">
                             Showing <span className="font-semibold">{offices.from}</span> to <span className="font-semibold">{offices.to}</span> of <span className="font-semibold">{offices.total}</span> office(s)
                         </p>
@@ -288,3 +288,8 @@ export default function OfficeIndex({ offices, filters }: Props) {
         </AuthenticatedLayout>
     );
 }
+
+
+
+
+

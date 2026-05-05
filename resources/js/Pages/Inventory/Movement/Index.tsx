@@ -114,7 +114,7 @@ export default function MovementIndex({ movements }: Props) {
                     <p className="mt-3 text-xs text-slate-500">Showing {filteredRows.length} of {movements.data.length} recent movement log(s) on this page.</p>
                 </div>
 
-                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="responsive-table-wrap rounded-xl border border-slate-200 bg-white shadow-sm">
                     <table className="min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-slate-50">
                             <tr>
@@ -165,3 +165,8 @@ export default function MovementIndex({ movements }: Props) {
         </AuthenticatedLayout>
     );
 }
+
+
+
+
+

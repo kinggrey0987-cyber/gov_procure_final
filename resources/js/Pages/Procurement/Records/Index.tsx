@@ -86,7 +86,7 @@ export default function ProcurementRecordsIndex({ records, filters }: Props) {
                     </div>
                 </section>
 
-                <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <section className="responsive-table-wrap rounded-xl border border-slate-200 bg-white shadow-sm">
                     <table className="min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-slate-50">
                             <tr>
@@ -157,3 +157,8 @@ function formatDate(value?: string) {
 
     return new Date(value).toLocaleDateString();
 }
+
+
+
+
+

@@ -191,3 +191,8 @@ export default function TechnicalAudit({ auditLogs, filters }: Props) {
         </AuthenticatedLayout>
     );
 }
+
+
+
+
+

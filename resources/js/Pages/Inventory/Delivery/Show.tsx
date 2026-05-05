@@ -265,3 +265,8 @@ function verificationClass(status: string) {
 
     return map[status] ?? `${base} bg-slate-100 text-slate-700`;
 }
+
+
+
+
+

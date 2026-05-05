@@ -114,3 +114,8 @@ export default function CreateItem({ categories }: Props) {
         </AuthenticatedLayout>
     );
 }
+
+
+
+
+
