@@ -10,6 +10,7 @@ type ExportSectionPdfOptions = {
     marginMm?: number;
     paperWidthPx?: number;
     excludeSelectors?: string[];
+    revealSelectors?: string[];
 };
 
 export function printSectionById(sectionId: string, options: PrintSectionOptions = {}): void {
@@ -97,11 +98,13 @@ export async function downloadSectionAsPdfById(sectionId: string, options: Expor
     const marginMm = options.marginMm ?? 10;
     const paperWidthPx = options.paperWidthPx ?? 1120;
     const excludeSelectors = options.excludeSelectors ?? ['.print-hide'];
+    const revealSelectors = options.revealSelectors ?? [];
 
     const captureRoot = createPdfCaptureRoot(source, {
         title,
         paperWidthPx,
         excludeSelectors,
+        revealSelectors,
     });
 
     try {
@@ -148,7 +151,7 @@ export async function downloadSectionAsPdfById(sectionId: string, options: Expor
     }
 }
 
-function createPdfCaptureRoot(source: HTMLElement, options: { title: string; paperWidthPx: number; excludeSelectors: string[] }): HTMLDivElement {
+function createPdfCaptureRoot(source: HTMLElement, options: { title: string; paperWidthPx: number; excludeSelectors: string[]; revealSelectors: string[] }): HTMLDivElement {
     const root = document.createElement('div');
     root.setAttribute('data-pdf-capture-root', 'true');
     root.style.position = 'fixed';
@@ -167,6 +170,20 @@ function createPdfCaptureRoot(source: HTMLElement, options: { title: string; pap
 
     options.excludeSelectors.forEach((selector) => {
         clonedSection.querySelectorAll<HTMLElement>(selector).forEach((element) => element.remove());
+    });
+
+    options.revealSelectors.forEach((selector) => {
+        const elements = [
+            ...(clonedSection.matches(selector) ? [clonedSection] : []),
+            ...Array.from(clonedSection.querySelectorAll<HTMLElement>(selector)),
+        ];
+
+        elements.forEach((element) => {
+            element.classList.remove('hidden');
+            element.style.display = 'block';
+            element.style.visibility = 'visible';
+            element.style.opacity = '1';
+        });
     });
 
     const heading = document.createElement('div');

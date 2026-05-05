@@ -233,6 +233,9 @@ class ExecutiveMonitoringService
         $purchaseOrderBase = clone $purchaseOrderQuery;
 
         $purchaseRequests = (clone $purchaseRequestBase)->latest()->limit(10)->get();
+        $exportPurchaseOrders = (clone $purchaseOrderBase)
+            ->latest('purchase_order_id')
+            ->get();
         $purchaseOrders = (clone $purchaseOrderBase)
             ->latest('purchase_order_id')
             ->paginate(5, ['*'], 'po_page', $poPage)
@@ -284,6 +287,7 @@ class ExecutiveMonitoringService
             'recent' => [
                 'purchase_requests' => $purchaseRequests,
                 'purchase_orders' => $this->toPaginatorPayload($purchaseOrders),
+                'purchase_orders_export' => $exportPurchaseOrders,
             ],
         ];
     }

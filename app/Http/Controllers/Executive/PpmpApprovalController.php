@@ -182,6 +182,8 @@ class PpmpApprovalController extends Controller
             'preparer:id,name',
             'approver:id,name',
             'items:ppmp_item_id,ppmp_id,item_id,item_category_id,quantity,unit_cost,estimated_budget,procurement_schedule,remarks',
+            'items.item:item_id,item_name',
+            'items.itemCategory:item_category_id,category_name',
         ]);
 
         $history = $this->historyTimelineService->forRecord($request->user(), $ppmp);
@@ -208,13 +210,25 @@ class PpmpApprovalController extends Controller
                 ] : null,
                 'status' => (string) $ppmp->status,
                 'fiscal_year' => (int) $ppmp->fiscal_year,
-                'fund_source' => (string) $ppmp->fund_source,
+                'fund_source' => $ppmp->fund_source instanceof \BackedEnum
+                    ? $ppmp->fund_source->value
+                    : (string) $ppmp->fund_source,
                 'date_prepared' => optional($ppmp->date_prepared)?->toDateString(),
                 'submitted_at' => $submittedAt,
                 'date_approved' => optional($ppmp->date_approved)?->toDateString(),
                 'total_estimated_budget' => (float) $ppmp->total_estimated_budget,
                 'remarks' => $ppmp->remarks,
                 'items_count' => $ppmp->items->count(),
+                'items' => $ppmp->items->map(fn ($item): array => [
+                    'ppmp_item_id' => (int) $item->ppmp_item_id,
+                    'item_name' => $item->item?->item_name ?? sprintf('Item #%d', (int) $item->item_id),
+                    'category_name' => $item->itemCategory?->category_name ?? sprintf('Category #%d', (int) $item->item_category_id),
+                    'quantity' => (float) $item->quantity,
+                    'unit_cost' => (float) $item->unit_cost,
+                    'estimated_budget' => (float) $item->estimated_budget,
+                    'procurement_schedule' => $item->procurement_schedule,
+                    'remarks' => $item->remarks,
+                ])->values(),
             ],
             'categorySummary' => $categorySummary,
             'attachments' => $attachments,
@@ -248,6 +262,7 @@ class PpmpApprovalController extends Controller
             ->groupBy('item_category_id')
             ->map(fn ($items, $categoryId): array => [
                 'item_category_id' => (int) $categoryId,
+                'category_name' => $items->first()?->itemCategory?->category_name ?? sprintf('Category #%d', (int) $categoryId),
                 'items_count' => $items->count(),
                 'estimated_budget_total' => (float) $items->sum('estimated_budget'),
             ])

@@ -73,6 +73,7 @@ type Props = {
             data: PurchaseOrderRow[];
             links: Array<{ url: string | null; label: string; active: boolean }>;
         };
+        purchase_orders_export: PurchaseOrderRow[];
     };
 };
 
@@ -165,8 +166,11 @@ export default function ProcurementAnalyticsIndex({
         downloadCsv(lines, 'procurement-insights.csv');
     };
 
+    const exportSectionId = 'procurement-insights-export-section';
+    const exportPurchaseOrders = recent.purchase_orders_export ?? recent.purchase_orders.data;
+
     const exportPdf = async () => {
-        await downloadSectionAsPdfById(printSectionId, {
+        await downloadSectionAsPdfById(exportSectionId, {
             title: 'Procurement Insights',
             fileName: 'procurement-insights.pdf',
             excludeSelectors: ['.print-hide', 'nav', 'aside', '[role="navigation"]'],
@@ -192,6 +196,64 @@ export default function ProcurementAnalyticsIndex({
                         </button>
                     </div>
                 </section>
+
+                <div id={exportSectionId} className="space-y-6">
+                    <div className="grid gap-6 xl:grid-cols-12">
+                        <div className="xl:col-span-8">
+                            <ExecutiveChartCard title="PR vs PO Trend" subtitle="Monthly movement" tone="critical">
+                                <TrendGroupedBarChart data={monthlyMerged} firstLabel="Purchase Requests" secondLabel="Purchase Orders" emptyText="No data in current filter scope" />
+                            </ExecutiveChartCard>
+                        </div>
+                        <div className="xl:col-span-4">
+                            <ExecutiveChartCard title="Top Procurement Concentration" subtitle="Office spending ranking" tone="neutral">
+                                <HorizontalBarChart data={officeValueBreakdown} valueFormatter={formatCurrency} emptyText="No data in current filter scope" />
+                            </ExecutiveChartCard>
+                        </div>
+                        <div className="xl:col-span-6">
+                            <ExecutiveChartCard title="PR Status Mix" subtitle="Request lifecycle" tone="default">
+                                <DonutChart data={statusMixPr} centerLabel="PR" emptyText="No data in current filter scope" />
+                            </ExecutiveChartCard>
+                        </div>
+                        <div className="xl:col-span-6">
+                            <ExecutiveChartCard title="PO Status Mix" subtitle="Order progression" tone="default">
+                                <DonutChart data={statusMixPo} centerLabel="PO" emptyText="No data in current filter scope" />
+                            </ExecutiveChartCard>
+                        </div>
+                    </div>
+
+                    <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+                        <div className="border-b border-slate-200 px-6 py-5">
+                            <h3 className="text-xl font-semibold text-slate-800">All Filtered Procurement Records</h3>
+                            <p className="mt-1 text-sm text-slate-600">Includes all purchase orders in the current filter scope, not only the visible page.</p>
+                        </div>
+                        {exportPurchaseOrders.length === 0 ? (
+                            <p className="px-6 py-8 text-sm text-slate-500">No data in current filter scope</p>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-slate-200 text-sm">
+                                    <thead className="bg-slate-50">
+                                        <tr>
+                                            <th className="px-4 py-2 text-left">PO</th>
+                                            <th className="px-4 py-2 text-left">Office</th>
+                                            <th className="px-4 py-2 text-left">Status</th>
+                                            <th className="px-4 py-2 text-left">Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {exportPurchaseOrders.map((row) => (
+                                            <tr key={row.purchase_order_id}>
+                                                <td className="px-4 py-2">PO-{row.purchase_order_id}</td>
+                                                <td className="px-4 py-2">{row.purchase_request?.office?.name ?? 'N/A'}</td>
+                                                <td className="px-4 py-2">{row.status}</td>
+                                                <td className="px-4 py-2">{formatCurrency(row.total_amount)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </section>
+                </div>
 
                 <section className="rounded-2xl border border-red-200 bg-white p-5 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
                     <div className="flex flex-wrap items-end gap-3">
