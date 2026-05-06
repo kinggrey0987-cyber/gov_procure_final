@@ -67,7 +67,7 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
     const { isRefreshing, lastRefreshedAt } = useSmartRefresh({
         only: ['purchaseRequests', 'shortageCandidates', 'lowStockItems', 'atReorderItems', 'focusInventoryId'],
         refreshOnFocus: true,
-        refreshOnMount: true,
+        refreshOnMount: false,
     });
 
     const initiateLowStockProcurement = (item: LowStockItem, quantityOverride?: string) => {

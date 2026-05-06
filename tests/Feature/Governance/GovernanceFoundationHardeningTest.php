@@ -3,12 +3,18 @@
 namespace Tests\Feature\Governance;
 
 use App\Enums\UserRole;
+use App\Http\Middleware\EnsureMustChangePassword;
+use App\Http\Middleware\EnsureTwoFactorVerified;
 use App\Models\AuditLog;
 use App\Models\Office;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\AuditLogService;
 use App\Services\NotificationService;
+use Database\Seeders\AdminUserSeeder;
+use Database\Seeders\DatabaseSeeder;
+use Database\Seeders\OfficeSeeder;
+use Database\Seeders\ProductionBootstrapSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
@@ -54,6 +60,75 @@ class GovernanceFoundationHardeningTest extends TestCase
         $this->expectException(\LogicException::class);
 
         $canonicalRole->delete();
+    }
+
+    public function test_admin_user_seeder_requires_explicit_credentials_outside_local_testing(): void
+    {
+        $this->seed([
+            RoleSeeder::class,
+            OfficeSeeder::class,
+        ]);
+
+        $originalAppEnv = config('app.env');
+        $originalAdminEmail = env('SEED_ADMIN_EMAIL');
+        $originalAdminPassword = env('SEED_ADMIN_PASSWORD');
+
+        config(['app.env' => 'production']);
+        putenv('SEED_ADMIN_EMAIL=admin@example.invalid');
+        putenv('SEED_ADMIN_PASSWORD');
+
+        try {
+            $this->expectException(\InvalidArgumentException::class);
+            $this->expectExceptionMessage('SEED_ADMIN_EMAIL must be set to a valid administrator email outside local/testing environments.');
+
+            $this->seed(AdminUserSeeder::class);
+        } finally {
+            config(['app.env' => $originalAppEnv]);
+            $originalAdminEmail === false ? putenv('SEED_ADMIN_EMAIL') : putenv('SEED_ADMIN_EMAIL='.$originalAdminEmail);
+            $originalAdminPassword === false ? putenv('SEED_ADMIN_PASSWORD') : putenv('SEED_ADMIN_PASSWORD='.$originalAdminPassword);
+        }
+    }
+
+    public function test_database_seeder_skips_demo_seeders_outside_local_testing(): void
+    {
+        $originalAppEnv = config('app.env');
+
+        config(['app.env' => 'production']);
+        putenv('SEED_ADMIN_EMAIL=admin@example.com');
+        putenv('SEED_ADMIN_PASSWORD=StrongPassword!234567890');
+
+        try {
+            $this->seed(DatabaseSeeder::class);
+
+            $this->assertSame(1, User::query()->count());
+            $this->assertDatabaseHas('users', [
+                'email' => 'admin@example.com',
+                'must_change_password' => true,
+            ]);
+        } finally {
+            config(['app.env' => $originalAppEnv]);
+            putenv('SEED_ADMIN_EMAIL');
+            putenv('SEED_ADMIN_PASSWORD');
+        }
+    }
+
+    public function test_production_bootstrap_seeder_only_creates_baseline_admin_bootstrap_data(): void
+    {
+        putenv('SEED_ADMIN_EMAIL=bootstrap-admin@example.com');
+        putenv('SEED_ADMIN_PASSWORD=AnotherStrongPassword!234567890');
+
+        try {
+            $this->seed(ProductionBootstrapSeeder::class);
+
+            $this->assertDatabaseHas('users', [
+                'email' => 'bootstrap-admin@example.com',
+                'must_change_password' => true,
+            ]);
+            $this->assertSame(1, User::query()->count());
+        } finally {
+            putenv('SEED_ADMIN_EMAIL');
+            putenv('SEED_ADMIN_PASSWORD');
+        }
     }
 
     public function test_no_superuser_fallback_logic_exists_in_provider(): void
@@ -159,6 +234,11 @@ class GovernanceFoundationHardeningTest extends TestCase
 
     public function test_admin_tech_subpages_are_not_reachable_by_non_admin_roles(): void
     {
+        $this->withoutMiddleware([
+            EnsureTwoFactorVerified::class,
+            EnsureMustChangePassword::class,
+        ]);
+
         $office = Office::query()->create([
             'name' => 'Main Office',
             'code' => 'MAIN_OFFICE',

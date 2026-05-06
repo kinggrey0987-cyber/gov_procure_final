@@ -18,8 +18,15 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             OfficeSeeder::class,
             AdminUserSeeder::class,
-            SampleUsersSeeder::class,
             ItemCatalogSeeder::class,
+        ]);
+
+        if (! in_array((string) config('app.env'), ['local', 'testing'], true)) {
+            return;
+        }
+
+        $this->call([
+            SampleUsersSeeder::class,
             LongitudinalDemoWorkflowSeeder::class,
             ExecutiveDisclosureDemoSeeder::class,
             GovernanceOpsDemoSeeder::class,
