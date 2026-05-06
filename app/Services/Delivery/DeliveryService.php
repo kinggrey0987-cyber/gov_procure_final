@@ -54,7 +54,7 @@ class DeliveryService
                 'supplier_id' => (int) $payload['supplier_id'],
                 'actual_delivery_date' => $payload['actual_delivery_date'] ?? null,
                 'expected_arrival_date' => $payload['expected_arrival_date'] ?? null,
-                'received_by' => (int) $actor->id,
+                'received_by' => null,
                 'receipt_status' => 'PENDING',
                 'remarks' => $payload['remarks'] ?? null,
             ]);
@@ -214,6 +214,7 @@ class DeliveryService
             $oldStatus = (string) $delivery->receipt_status;
 
             $delivery->forceFill([
+                'received_by' => (int) $actor->id,
                 'receipt_status' => 'RECEIVED',
                 'remarks' => $remarks ?? $delivery->remarks,
             ])->save();

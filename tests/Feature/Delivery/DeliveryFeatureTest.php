@@ -106,6 +106,7 @@ class DeliveryFeatureTest extends TestCase
         $this->assertDatabaseHas('deliveries', [
             'purchase_order_id' => $this->purchaseOrder->purchase_order_id,
             'supplier_id' => $this->supplier->supplier_id,
+            'received_by' => null,
             'receipt_status' => 'PENDING',
         ]);
 
@@ -205,6 +206,7 @@ class DeliveryFeatureTest extends TestCase
 
         $this->assertDatabaseHas('deliveries', [
             'delivery_id' => $delivery->delivery_id,
+            'received_by' => $this->gsoOfficer->id,
             'receipt_status' => 'RECEIVED',
         ]);
 
@@ -608,7 +610,7 @@ class DeliveryFeatureTest extends TestCase
             'supplier_id' => $this->supplier->supplier_id,
             'actual_delivery_date' => now()->toDateString(),
             'expected_arrival_date' => now()->addDay()->toDateString(),
-            'received_by' => $this->gsoOfficer->id,
+            'received_by' => $status === 'PENDING' ? null : $this->gsoOfficer->id,
             'receipt_status' => $status,
             'remarks' => 'Delivery test record',
         ]);
