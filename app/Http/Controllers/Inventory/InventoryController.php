@@ -121,6 +121,6 @@ class InventoryController
         $this->inventoryService->updateFromVerifiedDelivery($delivery, auth()->user());
 
         return Redirect::route('inventory.inventory.index')
-            ->with('success', 'Inventory updated from verified delivery.');
+            ->with('success', 'Inventory updated from accepted delivery quantity.');
     }
 }

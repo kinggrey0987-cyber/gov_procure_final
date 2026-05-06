@@ -94,6 +94,31 @@ class InventoryDistributionFoundationTest extends TestCase
         ]);
     }
 
+    public function test_partially_received_delivery_sync_updates_inventory_using_only_accepted_quantity(): void
+    {
+        $context = $this->createVerifiedDeliveryContext($this->officeA, $this->officeUserA, $this->procurementOfficer, $this->gsoOfficer, 9050);
+
+        $context['delivery']->forceFill(['receipt_status' => 'PARTIALLY_RECEIVED'])->save();
+
+        $this->actingAs($this->gsoOfficer)
+            ->post(route('inventory.inventory.sync-from-delivery'), [
+                'delivery_id' => $context['delivery']->delivery_id,
+            ])
+            ->assertRedirect();
+
+        $inventory = Inventory::query()->where('item_id', 9050)->firstOrFail();
+
+        $this->assertSame('4.00', (string) $inventory->available_stock);
+        $this->assertSame('4.00', (string) $inventory->stock_on_hand);
+
+        $this->assertSame(1, InventoryMovement::query()
+            ->where('inventory_id', $inventory->inventory_id)
+            ->where('movement_type', 'DELIVERY_RECEIPT')
+            ->where('reference_type', Delivery::class)
+            ->where('reference_id', $context['delivery']->delivery_id)
+            ->count());
+    }
+
     public function test_gso_can_release_stock_through_distribution_item_and_write_histories(): void
     {
         $context = $this->createVerifiedDeliveryContext($this->officeA, $this->officeUserA, $this->procurementOfficer, $this->gsoOfficer, 9002);

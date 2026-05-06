@@ -28,9 +28,9 @@ class InventoryService
     {
         $this->assertGsoOfficer($actor);
 
-        if ((string) $delivery->receipt_status !== 'VERIFIED') {
+        if (! in_array((string) $delivery->receipt_status, ['VERIFIED', 'PARTIALLY_RECEIVED'], true)) {
             throw ValidationException::withMessages([
-                'delivery_id' => 'Only VERIFIED deliveries can update inventory.',
+                'delivery_id' => 'Only VERIFIED or PARTIALLY_RECEIVED deliveries can update inventory.',
             ]);
         }
 
@@ -74,7 +74,9 @@ class InventoryService
                     referenceId: (int) $delivery->delivery_id,
                     quantity: $netQuantity,
                     actor: $actor,
-                    remarks: 'Inventory updated from verified delivery.',
+                    remarks: (string) $delivery->receipt_status === 'PARTIALLY_RECEIVED'
+                        ? 'Inventory updated from accepted quantity of partially received delivery.'
+                        : 'Inventory updated from verified delivery.',
                 );
 
                 $this->recordStatus(
@@ -90,6 +92,7 @@ class InventoryService
                     'delivery_id' => (int) $delivery->delivery_id,
                     'item_id' => $itemId,
                     'quantity_added' => $netQuantity,
+                    'receipt_status' => (string) $delivery->receipt_status,
                 ]);
 
                 $inventories->push($inventory->fresh());
@@ -100,7 +103,9 @@ class InventoryService
                 $this->notificationService->notifyUser(
                     user: $requester,
                     title: 'Inventory Updated',
-                    message: 'Inventory has been updated from your verified delivery context.',
+                    message: (string) $delivery->receipt_status === 'PARTIALLY_RECEIVED'
+                        ? 'Inventory has been updated from the accepted quantity of your partially received delivery.'
+                        : 'Inventory has been updated from your verified delivery context.',
                     notificationType: 'INVENTORY_UPDATED',
                     referenceType: Delivery::class,
                     referenceId: (int) $delivery->delivery_id,

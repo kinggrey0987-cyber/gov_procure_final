@@ -236,16 +236,13 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                         </table>
                     </div>
 
-                    <div className="flex flex-wrap gap-3">
-                        <Link href={route('procurement.purchase-orders.show', purchaseOrder.purchase_order_id)} className="rounded border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                            Back to Purchase Order
-                        </Link>
-                        <Link href={route('procurement.purchase-orders.index')} className="rounded border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                            Back to Purchase Orders
-                        </Link>
-                    </div>
-                </div>
-            </div>
+                     <div className="flex flex-wrap gap-3">
+                         <Link href={route('procurement.purchase-orders.show', purchaseOrder.purchase_order_id)} className="rounded border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                             Back to Purchase Order
+                         </Link>
+                     </div>
+                 </div>
+             </div>
         </AuthenticatedLayout>
     );
 }

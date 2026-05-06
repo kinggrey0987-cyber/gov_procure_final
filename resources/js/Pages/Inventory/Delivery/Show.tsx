@@ -5,12 +5,15 @@ import { useState, type ReactNode } from 'react';
 
 type DeliveryItem = {
     delivery_item_id: number;
+    accepted_quantity?: number | string;
     expected_quantity: number | string;
     received_quantity: number | string;
     damaged_quantity: number | string;
     missing_quantity: number | string;
+    inventory_synced_quantity?: number | string;
     item_condition?: string | null;
     item?: {
+        item_id?: number;
         item_name?: string;
     };
 };
@@ -36,6 +39,8 @@ type Delivery = {
     };
     discrepancy_summary?: {
         has_discrepancy: boolean;
+        total_accepted_quantity: number;
+        total_inventory_synced_quantity: number;
         total_missing_quantity: number;
         total_damaged_quantity: number;
         affected_item_count: number;
@@ -45,6 +50,17 @@ type Delivery = {
         status: string;
         source_type?: string | null;
         purchase_order_count?: number;
+        purchase_orders?: Array<{
+            purchase_order_id: number;
+            po_number?: string;
+            status?: string;
+        }>;
+        status_history?: Array<{
+            old_status?: string | null;
+            new_status?: string | null;
+            remarks?: string | null;
+            changed_at?: string | null;
+        }>;
     } | null;
     purchase_order?: {
         purchase_order_id: number;
@@ -157,8 +173,10 @@ export default function DeliveryShow({ delivery }: Props) {
                                     {delivery.discrepancy_summary?.has_discrepancy ? (
                                         <div className="grid gap-3 md:grid-cols-3">
                                             <SummaryCard label="Affected Items" value={delivery.discrepancy_summary.affected_item_count} tone="warning" />
+                                            <SummaryCard label="Accepted Quantity" value={delivery.discrepancy_summary.total_accepted_quantity} />
                                             <SummaryCard label="Missing Quantity" value={delivery.discrepancy_summary.total_missing_quantity} tone="warning" />
                                             <SummaryCard label="Damaged Quantity" value={delivery.discrepancy_summary.total_damaged_quantity} tone="warning" />
+                                            <SummaryCard label="Added to Inventory" value={delivery.discrepancy_summary.total_inventory_synced_quantity} />
                                         </div>
                                     ) : null}
 
@@ -242,8 +260,10 @@ export default function DeliveryShow({ delivery }: Props) {
                                     <th className="px-4 py-2 text-left font-semibold text-slate-700">Item</th>
                                     <th className="px-4 py-2 text-center font-semibold text-slate-700">Expected</th>
                                     <th className="px-4 py-2 text-center font-semibold text-slate-700">Received</th>
+                                    <th className="px-4 py-2 text-center font-semibold text-slate-700">Accepted</th>
                                     <th className="px-4 py-2 text-center font-semibold text-slate-700">Damaged</th>
                                     <th className="px-4 py-2 text-center font-semibold text-slate-700">Missing</th>
+                                    <th className="px-4 py-2 text-center font-semibold text-slate-700">Added to Inventory</th>
                                     <th className="px-4 py-2 text-left font-semibold text-slate-700">Condition</th>
                                 </tr>
                             </thead>
@@ -253,14 +273,16 @@ export default function DeliveryShow({ delivery }: Props) {
                                         <td className="px-4 py-2 text-slate-700">{item.item?.item_name ?? '-'}</td>
                                         <td className="px-4 py-2 text-center text-slate-700">{item.expected_quantity}</td>
                                         <td className="px-4 py-2 text-center font-semibold text-slate-800">{item.received_quantity}</td>
+                                        <td className="px-4 py-2 text-center font-semibold text-emerald-700">{item.accepted_quantity ?? 0}</td>
                                         <td className="px-4 py-2 text-center text-rose-600">{item.damaged_quantity}</td>
                                         <td className="px-4 py-2 text-center text-amber-600">{item.missing_quantity}</td>
+                                        <td className="px-4 py-2 text-center font-semibold text-sky-700">{item.inventory_synced_quantity ?? 0}</td>
                                         <td className="px-4 py-2 text-slate-700">{item.item_condition || '-'}</td>
                                     </tr>
                                 ))}
                                 {delivery.items.length === 0 ? (
                                     <tr>
-                                        <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-500">
+                                        <td colSpan={8} className="px-4 py-8 text-center text-sm text-slate-500">
                                             No delivery items are linked to this record yet.
                                         </td>
                                     </tr>
@@ -299,7 +321,42 @@ export default function DeliveryShow({ delivery }: Props) {
                         <dl className="mt-3 space-y-2 text-sm">
                             <MetaRow label="Linked Purchase Order" value={delivery.purchase_order?.po_number ?? '-'} />
                             <MetaRow label="Supplier" value={delivery.supplier?.supplier_name ?? '-'} />
+                            <MetaRow
+                                label="Follow-up Purchase Request"
+                                value={delivery.follow_up_purchase_request ? `PR-${String(delivery.follow_up_purchase_request.purchase_request_id).padStart(6, '0')}` : '-'}
+                            />
                         </dl>
+
+                        {delivery.follow_up_purchase_request?.purchase_orders?.length ? (
+                            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Follow-up Purchase Orders</p>
+                                <div className="mt-3 space-y-2">
+                                    {delivery.follow_up_purchase_request.purchase_orders.map((purchaseOrder) => (
+                                        <div key={purchaseOrder.purchase_order_id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+                                            <span className="font-semibold text-slate-800">{purchaseOrder.po_number ?? `PO #${purchaseOrder.purchase_order_id}`}</span>
+                                            <span className="text-slate-600">{purchaseOrder.status ? humanizeEnum(purchaseOrder.status) : '-'}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : null}
+
+                        {delivery.follow_up_purchase_request?.status_history?.length ? (
+                            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Follow-up PR Workflow</p>
+                                <div className="mt-3 space-y-2">
+                                    {delivery.follow_up_purchase_request.status_history.map((history, index) => (
+                                        <div key={`${history.new_status ?? 'status'}-${index}`} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+                                            <div className="flex items-center justify-between gap-3">
+                                                <span className="font-semibold text-slate-800">{history.new_status ? humanizeEnum(history.new_status) : '-'}</span>
+                                                <span className="text-xs text-slate-500">{history.changed_at ? new Date(history.changed_at).toLocaleDateString() : '-'}</span>
+                                            </div>
+                                            {history.remarks ? <p className="mt-1 text-slate-600">{history.remarks}</p> : null}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : null}
                     </section>
                 ) : null}
 

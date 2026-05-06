@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Inventory;
 use App\Http\Requests\Delivery\StoreDeliveryRequest;
 use App\Http\Requests\Delivery\UpdateDeliveryRequest;
 use App\Models\Delivery;
+use App\Models\InventoryMovement;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequest;
 use App\Services\Delivery\DeliveryService;
@@ -100,16 +101,26 @@ class DeliveryController
 
         $delivery->load(['purchaseOrder', 'supplier', 'receiver', 'items.purchaseOrderItem.item', 'verifications.verifier']);
 
+        $deliveryMovementMap = InventoryMovement::query()
+            ->where('movement_type', 'DELIVERY_RECEIPT')
+            ->where('reference_type', Delivery::class)
+            ->where('reference_id', (int) $delivery->delivery_id)
+            ->get()
+            ->keyBy('inventory_id');
+
         $items = collect();
         if ($delivery->relationLoaded('items') && $delivery->items instanceof \Illuminate\Database\Eloquent\Collection) {
             $items = $delivery->items->map(fn ($item): array => [
+                'accepted_quantity' => max((float) $item->received_quantity - (float) $item->damaged_quantity, 0),
                 'delivery_item_id' => (int) $item->delivery_item_id,
                 'expected_quantity' => (float) $item->expected_quantity,
                 'received_quantity' => (float) $item->received_quantity,
                 'damaged_quantity' => (float) $item->damaged_quantity,
                 'missing_quantity' => (float) $item->missing_quantity,
                 'item_condition' => $item->item_condition,
+                'inventory_synced_quantity' => (float) ($deliveryMovementMap->first()?->quantity ?? 0),
                 'item' => ($item->relationLoaded('purchaseOrderItem') && $item->purchaseOrderItem && $item->purchaseOrderItem->relationLoaded('item') && $item->purchaseOrderItem->item) ? [
+                    'item_id' => (int) $item->purchaseOrderItem->item->item_id,
                     'item_name' => (string) $item->purchaseOrderItem->item->item_name,
                 ] : null,
             ])->values();
@@ -131,7 +142,7 @@ class DeliveryController
         $totalMissingQuantity = round((float) $items->sum('missing_quantity'), 2);
         $totalDamagedQuantity = round((float) $items->sum('damaged_quantity'), 2);
         $followUpPurchaseRequest = PurchaseRequest::query()
-            ->with('purchaseOrders')
+            ->with(['purchaseOrders', 'statusHistory'])
             ->where('source_delivery_id', (int) $delivery->delivery_id)
             ->latest('purchase_request_id')
             ->first();
@@ -159,6 +170,8 @@ class DeliveryController
                 ],
                 'discrepancy_summary' => [
                     'has_discrepancy' => ($totalMissingQuantity + $totalDamagedQuantity) > 0,
+                    'total_accepted_quantity' => round((float) $items->sum('accepted_quantity'), 2),
+                    'total_inventory_synced_quantity' => round((float) $items->sum('inventory_synced_quantity'), 2),
                     'total_missing_quantity' => $totalMissingQuantity,
                     'total_damaged_quantity' => $totalDamagedQuantity,
                     'affected_item_count' => $items->filter(fn (array $item): bool => ((float) $item['missing_quantity'] + (float) $item['damaged_quantity']) > 0)->count(),
@@ -168,6 +181,20 @@ class DeliveryController
                     'status' => (string) $followUpPurchaseRequest->status,
                     'source_type' => (string) ($followUpPurchaseRequest->source_type ?? ''),
                     'purchase_order_count' => (int) $followUpPurchaseRequest->purchaseOrders->count(),
+                    'purchase_orders' => $followUpPurchaseRequest->purchaseOrders->map(fn ($purchaseOrder): array => [
+                        'purchase_order_id' => (int) $purchaseOrder->purchase_order_id,
+                        'po_number' => (string) ($purchaseOrder->po_number ?? ''),
+                        'status' => (string) ($purchaseOrder->status ?? ''),
+                    ])->values(),
+                    'status_history' => $followUpPurchaseRequest->statusHistory
+                        ->sortBy('changed_at')
+                        ->values()
+                        ->map(fn ($history): array => [
+                            'old_status' => $history->old_status,
+                            'new_status' => $history->new_status,
+                            'remarks' => $history->remarks,
+                            'changed_at' => optional($history->changed_at)?->toIso8601String(),
+                        ])->values(),
                 ] : null,
                 'items' => $items->values(),
                 'verifications' => $verifications->values(),
