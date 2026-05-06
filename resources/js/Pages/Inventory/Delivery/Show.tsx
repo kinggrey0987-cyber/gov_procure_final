@@ -93,7 +93,7 @@ export default function DeliveryShow({ delivery }: Props) {
                                     type="button"
                                     onClick={createFollowUpPurchaseRequest}
                                     disabled={processing}
-                                    className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                    className="inline-flex items-center rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 hover:text-red-900 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-500"
                                 >
                                     {processing ? 'Creating Follow-up PR...' : 'Create Follow-up PR'}
                                 </button>
@@ -136,33 +136,69 @@ export default function DeliveryShow({ delivery }: Props) {
                 {activeTab === 'overview' ? (
                     <>
                         {delivery.receipt_status === 'PARTIALLY_RECEIVED' ? (
-                            <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
-                                <h3 className="text-sm font-semibold text-amber-900">Partially Received Delivery</h3>
-                                <p className="mt-2 text-sm text-amber-800">
-                                    This delivery was already verified with discrepancies. Re-verification is not allowed. Missing or damaged quantities should be endorsed through a linked follow-up purchase request for BAC/procurement processing.
-                                </p>
+                            <section className="overflow-hidden rounded-xl border border-amber-200 bg-white shadow-sm">
+                                <div className="border-b border-amber-200 bg-amber-50 px-5 py-4">
+                                    <div className="flex flex-wrap items-start justify-between gap-3">
+                                        <div>
+                                            <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Discrepancy Follow-up</p>
+                                            <h3 className="mt-1 text-base font-semibold text-slate-900">Partially Received Delivery</h3>
+                                            <p className="mt-2 max-w-3xl text-sm text-slate-700">
+                                                This delivery was already verified with discrepancies. Re-verification is locked, and the next GSO step is to endorse the lacking quantities through a linked follow-up purchase request for BAC/procurement processing.
+                                            </p>
+                                        </div>
 
-                                {delivery.discrepancy_summary?.has_discrepancy ? (
-                                    <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                                        <InfoCell label="Affected Items" value={delivery.discrepancy_summary.affected_item_count} />
-                                        <InfoCell label="Missing Qty" value={delivery.discrepancy_summary.total_missing_quantity} />
-                                        <InfoCell label="Damaged Qty" value={delivery.discrepancy_summary.total_damaged_quantity} />
+                                        <span className="inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+                                            Action Required
+                                        </span>
                                     </div>
-                                ) : null}
+                                </div>
 
-                                {delivery.follow_up_purchase_request ? (
-                                    <div className="mt-4 rounded-lg border border-amber-300 bg-white p-4 text-sm text-slate-700">
-                                        <p className="font-semibold text-slate-900">
-                                            Linked Follow-up PR: PR-{String(delivery.follow_up_purchase_request.purchase_request_id).padStart(6, '0')}
-                                        </p>
-                                        <p className="mt-1">Status: {humanizeEnum(delivery.follow_up_purchase_request.status)}</p>
-                                        <p className="mt-1">Linked POs: {delivery.follow_up_purchase_request.purchase_order_count ?? 0}</p>
+                                <div className="p-5">
+                                    {delivery.discrepancy_summary?.has_discrepancy ? (
+                                        <div className="grid gap-3 md:grid-cols-3">
+                                            <SummaryCard label="Affected Items" value={delivery.discrepancy_summary.affected_item_count} tone="warning" />
+                                            <SummaryCard label="Missing Quantity" value={delivery.discrepancy_summary.total_missing_quantity} tone="warning" />
+                                            <SummaryCard label="Damaged Quantity" value={delivery.discrepancy_summary.total_damaged_quantity} tone="warning" />
+                                        </div>
+                                    ) : null}
+
+                                    <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                        {delivery.follow_up_purchase_request ? (
+                                            <div className="flex flex-wrap items-start justify-between gap-3">
+                                                <div>
+                                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Linked Follow-up Request</p>
+                                                    <p className="mt-1 text-sm font-semibold text-slate-900">
+                                                        PR-{String(delivery.follow_up_purchase_request.purchase_request_id).padStart(6, '0')}
+                                                    </p>
+                                                    <p className="mt-1 text-sm text-slate-600">
+                                                        Status: {humanizeEnum(delivery.follow_up_purchase_request.status)}
+                                                    </p>
+                                                    <p className="mt-1 text-sm text-slate-600">
+                                                        Linked POs: {delivery.follow_up_purchase_request.purchase_order_count ?? 0}
+                                                    </p>
+                                                </div>
+
+                                                <span className="inline-flex rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
+                                                    Follow-up Recorded
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-wrap items-start justify-between gap-3">
+                                                <div>
+                                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Next Step</p>
+                                                    <p className="mt-1 text-sm font-semibold text-slate-900">Create the linked follow-up purchase request</p>
+                                                    <p className="mt-1 text-sm text-slate-600">
+                                                        This will forward the missing and damaged quantities into the BAC/procurement workflow without duplicating the original delivery verification.
+                                                    </p>
+                                                </div>
+
+                                                <span className="inline-flex rounded-full bg-white px-3 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-200">
+                                                    Awaiting GSO Action
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
-                                ) : (
-                                    <p className="mt-4 text-sm text-amber-900">
-                                        No follow-up purchase request has been created yet for this discrepancy record.
-                                    </p>
-                                )}
+                                </div>
                             </section>
                         ) : null}
 
@@ -302,6 +338,27 @@ function MetaRow({ label, value }: { label: string; value: ReactNode }) {
         <div className="flex items-center justify-between gap-3">
             <dt className="text-slate-500">{label}</dt>
             <dd className="text-right text-slate-700">{value}</dd>
+        </div>
+    );
+}
+
+function SummaryCard({
+    label,
+    value,
+    tone = 'default',
+}: {
+    label: string;
+    value: ReactNode;
+    tone?: 'default' | 'warning';
+}) {
+    const toneClass = tone === 'warning'
+        ? 'border-amber-200 bg-amber-50/70 text-amber-900'
+        : 'border-slate-200 bg-white text-slate-900';
+
+    return (
+        <div className={`rounded-lg border px-4 py-3 shadow-sm ${toneClass}`}>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+            <p className="mt-2 text-lg font-semibold">{value}</p>
         </div>
     );
 }
