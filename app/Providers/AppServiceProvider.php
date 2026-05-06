@@ -135,8 +135,9 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('delivery.view', function (User $user, Delivery $delivery): bool {
             return $user->isGsoOfficer() || ($user->isProcurement());
         });
-        Gate::define('delivery.update', fn (User $user, Delivery $delivery): bool => $user->isGsoOfficer());
-        Gate::define('delivery-verification.create', fn (User $user, Delivery $delivery): bool => $user->isGsoOfficer());
+         Gate::define('delivery.update', fn (User $user, Delivery $delivery): bool => $user->isGsoOfficer());
+         Gate::define('delivery-verification.create', fn (User $user, Delivery $delivery): bool => $user->isGsoOfficer());
+         Gate::define('delivery.follow-up-pr.create', fn (User $user, Delivery $delivery): bool => $user->isGsoOfficer() && (string) $delivery->receipt_status === 'PARTIALLY_RECEIVED');
 
         Gate::define('inventory.view-any', fn (User $user): bool => $user->isGsoOfficer());
         Gate::define('inventory.view', fn (User $user, Inventory $inventory): bool => $user->isGsoOfficer());

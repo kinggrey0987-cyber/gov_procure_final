@@ -6,6 +6,7 @@ use App\Http\Requests\Delivery\StoreDeliveryRequest;
 use App\Http\Requests\Delivery\UpdateDeliveryRequest;
 use App\Models\Delivery;
 use App\Models\PurchaseOrder;
+use App\Models\PurchaseRequest;
 use App\Services\Delivery\DeliveryService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -127,6 +128,14 @@ class DeliveryController
             ])->values();
         }
 
+        $totalMissingQuantity = round((float) $items->sum('missing_quantity'), 2);
+        $totalDamagedQuantity = round((float) $items->sum('damaged_quantity'), 2);
+        $followUpPurchaseRequest = PurchaseRequest::query()
+            ->with('purchaseOrders')
+            ->where('source_delivery_id', (int) $delivery->delivery_id)
+            ->latest('purchase_request_id')
+            ->first();
+
         return Inertia::render('Inventory/Delivery/Show', [
             'delivery' => [
                 'delivery_id' => (int) $delivery->delivery_id,
@@ -144,6 +153,21 @@ class DeliveryController
                 ] : null,
                 'receiver' => $delivery->receiver ? [
                     'name' => (string) $delivery->receiver->name,
+                ] : null,
+                'permissions' => [
+                    'can_create_follow_up_purchase_request' => request()->user()->can('delivery.follow-up-pr.create', $delivery),
+                ],
+                'discrepancy_summary' => [
+                    'has_discrepancy' => ($totalMissingQuantity + $totalDamagedQuantity) > 0,
+                    'total_missing_quantity' => $totalMissingQuantity,
+                    'total_damaged_quantity' => $totalDamagedQuantity,
+                    'affected_item_count' => $items->filter(fn (array $item): bool => ((float) $item['missing_quantity'] + (float) $item['damaged_quantity']) > 0)->count(),
+                ],
+                'follow_up_purchase_request' => $followUpPurchaseRequest ? [
+                    'purchase_request_id' => (int) $followUpPurchaseRequest->purchase_request_id,
+                    'status' => (string) $followUpPurchaseRequest->status,
+                    'source_type' => (string) ($followUpPurchaseRequest->source_type ?? ''),
+                    'purchase_order_count' => (int) $followUpPurchaseRequest->purchaseOrders->count(),
                 ] : null,
                 'items' => $items->values(),
                 'verifications' => $verifications->values(),

@@ -19,6 +19,7 @@ use App\Http\Controllers\Procurement\PurchaseRequestItemController as Procuremen
 use App\Http\Controllers\Procurement\SupplierController as ProcurementSupplierController;
 use App\Http\Controllers\Inventory\ClaimController;
 use App\Http\Controllers\Inventory\DeliveryController;
+use App\Http\Controllers\Inventory\DeliveryFollowUpPurchaseRequestController;
 use App\Http\Controllers\Inventory\DeliveryItemController;
 use App\Http\Controllers\Inventory\DeliveryVerificationController;
 use App\Http\Controllers\Inventory\DistributionItemController;
@@ -609,6 +610,9 @@ Route::middleware(['auth', 'twofactor', 'must-change-password'])->group(function
                 Route::put('/{delivery}', [DeliveryController::class, 'update'])
                     ->middleware('can:delivery.update,delivery')
                     ->name('update');
+                Route::post('/{delivery}/follow-up-purchase-request', [DeliveryFollowUpPurchaseRequestController::class, 'store'])
+                    ->middleware('can:delivery.follow-up-pr.create,delivery')
+                    ->name('follow-up-purchase-request.store');
 
                 Route::post('/{delivery}/items', [DeliveryItemController::class, 'store'])
                     ->middleware('can:delivery.update,delivery')

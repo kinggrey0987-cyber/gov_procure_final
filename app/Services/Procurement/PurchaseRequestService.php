@@ -3,6 +3,9 @@
 namespace App\Services\Procurement;
 
 use App\Enums\FundSource;
+use App\Enums\UserRole;
+use App\Models\Delivery;
+use App\Models\DeliveryItem;
 use App\Models\Inventory;
 use App\Models\Office;
 use App\Models\Ppmp;
@@ -341,6 +344,171 @@ class PurchaseRequestService
             }
 
             return $purchaseRequest->fresh(['items', 'office', 'requester', 'supplyRequest']) ?? $purchaseRequest;
+        });
+    }
+
+    public function createFromPartialDelivery(Delivery $delivery, User $actor, ?string $remarks = null): PurchaseRequest
+    {
+        $this->assertGsoActor($actor);
+
+        if ((string) $delivery->receipt_status !== 'PARTIALLY_RECEIVED') {
+            throw ValidationException::withMessages([
+                'delivery_id' => 'Only PARTIALLY_RECEIVED deliveries can generate follow-up procurement requests.',
+            ]);
+        }
+
+        $delivery->loadMissing(['items.purchaseOrderItem.item.category', 'items.purchaseOrderItem.supplyRequestItem', 'purchaseOrder.supplyRequest', 'verifications']);
+
+        $existing = PurchaseRequest::query()
+            ->where('source_delivery_id', (int) $delivery->delivery_id)
+            ->whereIn('status', ['OPEN', 'PROCESSING', 'RETURNED_FOR_REVISION'])
+            ->latest('purchase_request_id')
+            ->first();
+
+        if ($existing instanceof PurchaseRequest) {
+            throw ValidationException::withMessages([
+                'delivery_id' => sprintf(
+                    'A follow-up purchase request already exists for this partially received delivery (PR-%06d).',
+                    (int) $existing->purchase_request_id
+                ),
+            ]);
+        }
+
+        $sourceSupplyRequest = $delivery->purchaseOrder?->supplyRequest;
+        if (! $sourceSupplyRequest instanceof SupplyRequest) {
+            throw ValidationException::withMessages([
+                'delivery_id' => 'The source supply request could not be resolved for this delivery.',
+            ]);
+        }
+
+        $discrepancyItems = $delivery->items
+            ->filter(function ($item): bool {
+                $missing = (float) $item->missing_quantity;
+                $damaged = (float) $item->damaged_quantity;
+
+                return ($missing + $damaged) > 0;
+            })
+            ->values();
+
+        if ($discrepancyItems->isEmpty()) {
+            throw ValidationException::withMessages([
+                'delivery_id' => 'No discrepancy quantities were found for follow-up procurement.',
+            ]);
+        }
+
+        $officeId = (int) $sourceSupplyRequest->office_id;
+        $ppmpId = (int) ($sourceSupplyRequest->ppmp_id ?? 0);
+
+        $followUpRemarks = trim((string) $remarks);
+        $verificationNotes = $delivery->verifications->last()?->discrepancy_notes;
+        $baseRemarks = $followUpRemarks !== ''
+            ? $followUpRemarks
+            : (is_string($verificationNotes) && trim($verificationNotes) !== ''
+                ? trim($verificationNotes)
+                : 'Generated from partially received delivery discrepancy.');
+
+        return DB::transaction(function () use ($actor, $delivery, $sourceSupplyRequest, $discrepancyItems, $officeId, $ppmpId, $baseRemarks): PurchaseRequest {
+            $supplyRequest = SupplyRequest::query()->create([
+                'request_code' => $this->buildRequestCode($officeId),
+                'office_id' => $officeId,
+                'requested_by' => (int) $actor->id,
+                'ppmp_id' => $ppmpId > 0 ? $ppmpId : null,
+                'request_date' => now()->toDateString(),
+                'needed_by_date' => now()->addDays(7)->toDateString(),
+                'request_category' => (string) ($sourceSupplyRequest->request_category ?? 'GENERAL'),
+                'purpose' => sprintf(
+                    'Follow-up procurement for partially received delivery %s linked to PO %s.',
+                    (string) $delivery->delivery_code,
+                    (string) ($delivery->purchaseOrder?->po_number ?? 'N/A')
+                ),
+                'priority_level' => (string) ($sourceSupplyRequest->priority_level ?? 'HIGH'),
+                'status' => 'SUBMITTED',
+                'review_notes' => sprintf(
+                    'Generated from discrepancy follow-up of delivery %s. %s',
+                    (string) $delivery->delivery_code,
+                    $baseRemarks
+                ),
+                'approved_by' => null,
+                'approved_at' => null,
+            ]);
+
+            $purchaseRequest = PurchaseRequest::query()->create([
+                'supply_request_id' => (int) $supplyRequest->supply_request_id,
+                'office_id' => $officeId,
+                'requested_by' => (int) $actor->id,
+                'source_delivery_id' => (int) $delivery->delivery_id,
+                'source_type' => 'PARTIAL_DELIVERY_FOLLOW_UP',
+                'status' => 'OPEN',
+                'remarks' => sprintf(
+                    'Follow-up procurement generated from delivery %s. %s',
+                    (string) $delivery->delivery_code,
+                    $baseRemarks
+                ),
+            ]);
+
+            foreach ($discrepancyItems as $deliveryItem) {
+                if (! $deliveryItem instanceof DeliveryItem) {
+                    continue;
+                }
+
+                $purchaseOrderItem = $deliveryItem->purchaseOrderItem;
+                $sourceSupplyRequestItem = $purchaseOrderItem?->supplyRequestItem;
+                $catalogItem = $purchaseOrderItem?->item;
+                $quantityRequested = round((float) $deliveryItem->missing_quantity + (float) $deliveryItem->damaged_quantity, 2);
+
+                if ($quantityRequested <= 0 || ! $purchaseOrderItem || ! $sourceSupplyRequestItem) {
+                    continue;
+                }
+
+                SupplyRequestItem::query()->create([
+                    'supply_request_id' => (int) $supplyRequest->supply_request_id,
+                    'item_id' => (int) $purchaseOrderItem->item_id,
+                    'ppmp_item_id' => (int) $sourceSupplyRequestItem->ppmp_item_id,
+                    'item_name_snapshot' => (string) ($catalogItem?->item_name ?? $purchaseOrderItem->item_name_snapshot ?? 'Unassigned Item'),
+                    'quantity_requested' => $quantityRequested,
+                ]);
+
+                PurchaseRequestItem::query()->create([
+                    'purchase_request_id' => (int) $purchaseRequest->purchase_request_id,
+                    'item_id' => (int) $purchaseOrderItem->item_id,
+                    'source_delivery_item_id' => (int) $deliveryItem->delivery_item_id,
+                    'quantity_requested' => $quantityRequested,
+                    'remarks' => sprintf(
+                        'Follow-up quantity from delivery %s discrepancy (missing: %.2f, damaged: %.2f).',
+                        (string) $delivery->delivery_code,
+                        (float) $deliveryItem->missing_quantity,
+                        (float) $deliveryItem->damaged_quantity,
+                    ),
+                ]);
+            }
+
+            $purchaseRequest->loadMissing(['items', 'office', 'requester', 'supplyRequest']);
+
+            if (! $purchaseRequest->items->isNotEmpty()) {
+                throw ValidationException::withMessages([
+                    'delivery_id' => 'No eligible discrepancy items were available for follow-up procurement.',
+                ]);
+            }
+
+            $this->recordStatus($purchaseRequest, null, 'OPEN', $actor, 'Follow-up purchase request created from partially received delivery discrepancy.');
+            $this->recordAudit($actor, 'CREATE_FROM_PARTIAL_DELIVERY', $purchaseRequest);
+
+            $procurementUsers = User::query()
+                ->whereHas('role', fn ($query) => $query->where('code', UserRole::PROCUREMENT_OFFICER->value))
+                ->get();
+
+            if ($procurementUsers->isNotEmpty()) {
+                $this->notificationService->notifyUsers(
+                    users: $procurementUsers,
+                    title: 'Follow-up Purchase Request Queued',
+                    message: sprintf('GSO queued a discrepancy follow-up purchase request from delivery %s.', (string) $delivery->delivery_code),
+                    notificationType: 'PROCUREMENT_PURCHASE_REQUEST_CREATED',
+                    referenceType: PurchaseRequest::class,
+                    referenceId: (int) $purchaseRequest->purchase_request_id,
+                );
+            }
+
+            return $purchaseRequest->fresh(['items', 'office', 'requester', 'supplyRequest', 'sourceDelivery']) ?? $purchaseRequest;
         });
     }
 

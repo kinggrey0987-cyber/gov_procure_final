@@ -19,14 +19,20 @@ class DeliveryVerificationService
     /**
      * @param  array<string, mixed>  $payload
      */
-    public function create(Delivery $delivery, User $actor, array $payload): DeliveryVerification
-    {
-        $this->assertGsoOfficer($actor);
+     public function create(Delivery $delivery, User $actor, array $payload): DeliveryVerification
+     {
+         $this->assertGsoOfficer($actor);
 
-        if ((string) $delivery->receipt_status !== 'RECEIVED') {
-            throw ValidationException::withMessages([
-                'receipt_status' => 'Only RECEIVED deliveries can be verified.',
-            ]);
+         if ((string) $delivery->receipt_status === 'PARTIALLY_RECEIVED') {
+             throw ValidationException::withMessages([
+                 'receipt_status' => 'This delivery was already verified with discrepancies and marked as PARTIALLY_RECEIVED. Re-verification is not allowed. Create a follow-up purchase request instead.',
+             ]);
+         }
+ 
+         if ((string) $delivery->receipt_status !== 'RECEIVED') {
+             throw ValidationException::withMessages([
+                 'receipt_status' => 'Only RECEIVED deliveries can be verified.',
+             ]);
         }
 
         if ($delivery->verifications()->exists()) {

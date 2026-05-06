@@ -2,12 +2,12 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\MorphMany;
+ use Illuminate\Database\Eloquent\Builder;
+ use Illuminate\Database\Eloquent\Factories\HasFactory;
+ use Illuminate\Database\Eloquent\Model;
+ use Illuminate\Database\Eloquent\Relations\BelongsTo;
+ use Illuminate\Database\Eloquent\Relations\HasMany;
+ use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class PurchaseRequest extends Model
 {
@@ -20,19 +20,22 @@ class PurchaseRequest extends Model
         return 'purchase_request_id';
     }
 
-    protected $fillable = [
-        'supply_request_id',
-        'office_id',
-        'requested_by',
-        'status',
-        'remarks',
-    ];
+     protected $fillable = [
+         'supply_request_id',
+         'office_id',
+         'requested_by',
+         'source_delivery_id',
+         'source_type',
+         'status',
+         'remarks',
+     ];
 
-    protected $casts = [
-        'supply_request_id' => 'integer',
-        'office_id' => 'integer',
-        'requested_by' => 'integer',
-    ];
+     protected $casts = [
+         'supply_request_id' => 'integer',
+         'office_id' => 'integer',
+         'requested_by' => 'integer',
+         'source_delivery_id' => 'integer',
+     ];
 
     public function supplyRequest(): BelongsTo
     {
@@ -44,10 +47,15 @@ class PurchaseRequest extends Model
         return $this->belongsTo(Office::class);
     }
 
-    public function requester(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'requested_by');
-    }
+     public function requester(): BelongsTo
+     {
+         return $this->belongsTo(User::class, 'requested_by');
+     }
+
+     public function sourceDelivery(): BelongsTo
+     {
+         return $this->belongsTo(Delivery::class, 'source_delivery_id', 'delivery_id');
+     }
 
     public function items(): HasMany
     {

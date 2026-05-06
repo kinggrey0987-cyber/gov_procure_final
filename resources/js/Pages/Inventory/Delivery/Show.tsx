@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { humanizeEnum } from '@/lib/displayLabels';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import { useState, type ReactNode } from 'react';
 
 type DeliveryItem = {
@@ -31,6 +31,21 @@ type Delivery = {
     delivery_code: string;
     receipt_status: string;
     created_at: string;
+    permissions?: {
+        can_create_follow_up_purchase_request?: boolean;
+    };
+    discrepancy_summary?: {
+        has_discrepancy: boolean;
+        total_missing_quantity: number;
+        total_damaged_quantity: number;
+        affected_item_count: number;
+    };
+    follow_up_purchase_request?: {
+        purchase_request_id: number;
+        status: string;
+        source_type?: string | null;
+        purchase_order_count?: number;
+    } | null;
     purchase_order?: {
         purchase_order_id: number;
         po_number?: string;
@@ -53,7 +68,13 @@ type Props = {
 
 export default function DeliveryShow({ delivery }: Props) {
     const canVerify = delivery.receipt_status === 'RECEIVED';
+    const canCreateFollowUpPurchaseRequest = delivery.permissions?.can_create_follow_up_purchase_request === true;
+    const { post, processing } = useForm({ remarks: '' });
     const [activeTab, setActiveTab] = useState<'overview' | 'items' | 'status' | 'related' | 'notes'>('overview');
+
+    const createFollowUpPurchaseRequest = () => {
+        post(route('inventory.deliveries.follow-up-purchase-request.store', delivery.delivery_id));
+    };
 
     return (
         <AuthenticatedLayout
@@ -66,6 +87,16 @@ export default function DeliveryShow({ delivery }: Props) {
                                 <Link href={route('inventory.delivery-verifications.create', delivery.delivery_id)} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
                                     Verify Delivery
                                 </Link>
+                            ) : null}
+                            {canCreateFollowUpPurchaseRequest ? (
+                                <button
+                                    type="button"
+                                    onClick={createFollowUpPurchaseRequest}
+                                    disabled={processing}
+                                    className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    {processing ? 'Creating Follow-up PR...' : 'Create Follow-up PR'}
+                                </button>
                             ) : null}
                         </div>
                     </div>
@@ -104,6 +135,37 @@ export default function DeliveryShow({ delivery }: Props) {
 
                 {activeTab === 'overview' ? (
                     <>
+                        {delivery.receipt_status === 'PARTIALLY_RECEIVED' ? (
+                            <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
+                                <h3 className="text-sm font-semibold text-amber-900">Partially Received Delivery</h3>
+                                <p className="mt-2 text-sm text-amber-800">
+                                    This delivery was already verified with discrepancies. Re-verification is not allowed. Missing or damaged quantities should be endorsed through a linked follow-up purchase request for BAC/procurement processing.
+                                </p>
+
+                                {delivery.discrepancy_summary?.has_discrepancy ? (
+                                    <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                                        <InfoCell label="Affected Items" value={delivery.discrepancy_summary.affected_item_count} />
+                                        <InfoCell label="Missing Qty" value={delivery.discrepancy_summary.total_missing_quantity} />
+                                        <InfoCell label="Damaged Qty" value={delivery.discrepancy_summary.total_damaged_quantity} />
+                                    </div>
+                                ) : null}
+
+                                {delivery.follow_up_purchase_request ? (
+                                    <div className="mt-4 rounded-lg border border-amber-300 bg-white p-4 text-sm text-slate-700">
+                                        <p className="font-semibold text-slate-900">
+                                            Linked Follow-up PR: PR-{String(delivery.follow_up_purchase_request.purchase_request_id).padStart(6, '0')}
+                                        </p>
+                                        <p className="mt-1">Status: {humanizeEnum(delivery.follow_up_purchase_request.status)}</p>
+                                        <p className="mt-1">Linked POs: {delivery.follow_up_purchase_request.purchase_order_count ?? 0}</p>
+                                    </div>
+                                ) : (
+                                    <p className="mt-4 text-sm text-amber-900">
+                                        No follow-up purchase request has been created yet for this discrepancy record.
+                                    </p>
+                                )}
+                            </section>
+                        ) : null}
+
                         <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:grid-cols-2 xl:grid-cols-4">
                             <InfoCell label="Delivery Code" value={delivery.delivery_code} mono />
                             <InfoCell label="Status" value={<span className={statusClass(delivery.receipt_status)}>{humanizeEnum(delivery.receipt_status)}</span>} />

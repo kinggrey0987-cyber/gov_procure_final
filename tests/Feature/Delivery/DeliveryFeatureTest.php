@@ -318,6 +318,71 @@ class DeliveryFeatureTest extends TestCase
         ]);
     }
 
+    public function test_gso_can_create_follow_up_purchase_request_from_partially_received_delivery(): void
+    {
+        $delivery = $this->createDelivery(status: 'PARTIALLY_RECEIVED');
+
+        $deliveryItem = DeliveryItem::query()->create([
+            'delivery_id' => $delivery->delivery_id,
+            'purchase_order_item_id' => $this->purchaseOrderItem->purchase_order_item_id,
+            'expected_quantity' => 5,
+            'received_quantity' => 3,
+            'damaged_quantity' => 1,
+            'missing_quantity' => 1,
+            'item_condition' => 'DAMAGED',
+        ]);
+
+        $response = $this->actingAs($this->gsoOfficer)->post(route('inventory.deliveries.follow-up-purchase-request.store', $delivery->delivery_id));
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+
+        $purchaseRequest = PurchaseRequest::query()->where('source_delivery_id', $delivery->delivery_id)->first();
+
+        $this->assertNotNull($purchaseRequest);
+        $this->assertSame('PARTIAL_DELIVERY_FOLLOW_UP', $purchaseRequest->source_type);
+        $this->assertSame('OPEN', $purchaseRequest->status);
+
+        $this->assertDatabaseHas('purchase_request_items', [
+            'purchase_request_id' => $purchaseRequest->purchase_request_id,
+            'source_delivery_item_id' => $deliveryItem->delivery_item_id,
+            'item_id' => $this->purchaseOrderItem->item_id,
+            'quantity_requested' => 2,
+        ]);
+    }
+
+    public function test_follow_up_purchase_request_creation_is_blocked_when_active_linked_request_exists(): void
+    {
+        $delivery = $this->createDelivery(status: 'PARTIALLY_RECEIVED');
+
+        DeliveryItem::query()->create([
+            'delivery_id' => $delivery->delivery_id,
+            'purchase_order_item_id' => $this->purchaseOrderItem->purchase_order_item_id,
+            'expected_quantity' => 5,
+            'received_quantity' => 4,
+            'damaged_quantity' => 0,
+            'missing_quantity' => 1,
+            'item_condition' => 'MISSING',
+        ]);
+
+        $existing = PurchaseRequest::query()->create([
+            'supply_request_id' => $this->purchaseOrder->supply_request_id,
+            'office_id' => $this->office->id,
+            'requested_by' => $this->gsoOfficer->id,
+            'source_delivery_id' => $delivery->delivery_id,
+            'source_type' => 'PARTIAL_DELIVERY_FOLLOW_UP',
+            'status' => 'OPEN',
+            'remarks' => 'Existing follow-up PR',
+        ]);
+
+        $this->actingAs($this->gsoOfficer)
+            ->post(route('inventory.deliveries.follow-up-purchase-request.store', $delivery->delivery_id))
+            ->assertSessionHasErrors('delivery_id');
+
+        $this->assertSame(1, PurchaseRequest::query()->where('source_delivery_id', $delivery->delivery_id)->count());
+        $this->assertSame($existing->purchase_request_id, (int) PurchaseRequest::query()->where('source_delivery_id', $delivery->delivery_id)->value('purchase_request_id'));
+    }
+
     public function test_delivery_items_can_be_added(): void
     {
         $delivery = $this->createDelivery();
@@ -578,6 +643,7 @@ class DeliveryFeatureTest extends TestCase
             'request_code' => $requestCode,
             'office_id' => $office->id,
             'requested_by' => $officeUser->id,
+            'ppmp_id' => $ppmp->ppmp_id,
             'request_date' => now()->toDateString(),
             'needed_by_date' => now()->addDays(5)->toDateString(),
             'request_category' => 'GENERAL',
