@@ -19,10 +19,12 @@ class StoreClaimRequest extends FormRequest
         return [
             'claim_code' => ['nullable', 'string', 'max:80', 'unique:claims,claim_code'],
             'distribution_record_id' => ['required', 'integer', 'exists:distribution_records,distribution_record_id'],
+            'distribution_item_id' => ['nullable', 'integer', 'exists:distribution_items,distribution_item_id'],
             'office_id' => ['required', 'integer', 'exists:offices,id'],
             'claim_type' => ['required', 'string', 'max:80'],
             'claim_date' => ['required', 'date'],
             'claim_location' => ['required', 'string', 'max:150'],
+            'quantity_disputed' => ['nullable', 'numeric', 'min:0'],
             'remarks' => ['nullable', 'string'],
             'attachment_title' => ['nullable', 'string', 'max:200'],
             'attachment_file' => ['nullable', 'file', 'max:10240', 'mimes:pdf,doc,docx,xls,xlsx,csv,png,jpg,jpeg'],

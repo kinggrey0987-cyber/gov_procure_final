@@ -382,7 +382,19 @@ class DistributionRecordController
     {
         abort_unless(request()->user()->can('distribution.receive', $distribution_record), 403);
 
-        $this->distributionService->markReceivedByOffice($distribution_record, request()->user());
+        $reconciliations = $distribution_record->items()
+            ->get()
+            ->map(fn ($item): array => [
+                'distribution_item_id' => (int) $item->distribution_item_id,
+                'quantity_received' => (float) $item->quantity_released,
+                'quantity_damaged' => 0.0,
+                'quantity_missing' => 0.0,
+                'receipt_condition' => 'GOOD',
+                'receipt_notes' => null,
+            ])
+            ->all();
+
+        $this->distributionService->reconcileOfficeReceipt($distribution_record, request()->user(), $reconciliations);
 
         $routeName = request()->user()->isOfficeUser()
             ? 'office.distribution-records.show'

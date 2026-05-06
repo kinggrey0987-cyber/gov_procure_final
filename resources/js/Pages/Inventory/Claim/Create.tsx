@@ -11,6 +11,16 @@ type DistributionRecordOption = {
     release_date?: string | null;
     status: string;
     request_code: string;
+    items?: Array<{
+        distribution_item_id: number;
+        item_id: number;
+        item_name: string;
+        quantity_released: number;
+        quantity_received: number;
+        quantity_damaged: number;
+        quantity_missing: number;
+        unit: string;
+    }>;
 };
 
 type Props = {
@@ -27,10 +37,12 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
     const first = preselectedRecord ?? distributionRecords[0];
     const form = useForm({
         distribution_record_id: first?.distribution_record_id ?? '',
+        distribution_item_id: '',
         office_id: first?.office_id ?? 0,
         claim_type: '',
         claim_date: '',
         claim_location: '',
+        quantity_disputed: '',
         remarks: '',
         attachment_title: '',
         attachment_file: null as File | null,
@@ -39,6 +51,10 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
     const selectedRecord = useMemo(
         () => distributionRecords.find((record) => record.distribution_record_id === Number(form.data.distribution_record_id)),
         [distributionRecords, form.data.distribution_record_id],
+    );
+    const selectedItem = useMemo(
+        () => selectedRecord?.items?.find((item) => item.distribution_item_id === Number(form.data.distribution_item_id)) ?? null,
+        [selectedRecord, form.data.distribution_item_id],
     );
 
     return (
@@ -67,7 +83,9 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                     const selectedRecordId = Number(e.target.value);
                                     const selected = distributionRecords.find((record) => record.distribution_record_id === selectedRecordId);
                                     form.setData('distribution_record_id', selectedRecordId);
+                                    form.setData('distribution_item_id', '');
                                     form.setData('office_id', selected?.office_id ?? 0);
+                                    form.setData('quantity_disputed', '');
                                 }}
                             >
                                 <option value="">Select Distribution Record</option>
@@ -89,6 +107,33 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                 <p><span className="font-semibold text-slate-800">Distribution Status:</span> {selectedRecord.status}</p>
                             </div>
                         ) : null}
+
+                        <div>
+                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Affected Released Item</label>
+                            <select
+                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                value={form.data.distribution_item_id}
+                                onChange={(e) => {
+                                    const distributionItemId = e.target.value;
+                                    const nextItem = selectedRecord?.items?.find((item) => item.distribution_item_id === Number(distributionItemId));
+                                    form.setData('distribution_item_id', distributionItemId);
+                                    form.setData('quantity_disputed', String((nextItem?.quantity_missing ?? 0) + (nextItem?.quantity_damaged ?? 0)));
+                                }}
+                            >
+                                <option value="">Select affected released item</option>
+                                {(selectedRecord?.items ?? []).map((item) => (
+                                    <option key={item.distribution_item_id} value={item.distribution_item_id}>
+                                        {item.item_name} - released {item.quantity_released} {item.unit}
+                                    </option>
+                                ))}
+                            </select>
+                            {form.errors.distribution_item_id ? <p className="mt-1 text-xs text-rose-600">{form.errors.distribution_item_id}</p> : null}
+                            {selectedItem ? (
+                                <p className="mt-2 text-xs text-slate-500">
+                                    Received: {selectedItem.quantity_received.toFixed(2)} {selectedItem.unit} · Damaged: {selectedItem.quantity_damaged.toFixed(2)} · Missing: {selectedItem.quantity_missing.toFixed(2)}
+                                </p>
+                            ) : null}
+                        </div>
 
                         <div>
                             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Claim Type</label>
@@ -118,6 +163,19 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                 <input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Receiving area, stock room, office desk" value={form.data.claim_location} onChange={(e) => form.setData('claim_location', e.target.value)} />
                                 {form.errors.claim_location ? <p className="mt-1 text-xs text-rose-600">{form.errors.claim_location}</p> : null}
                             </div>
+                        </div>
+
+                        <div>
+                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Disputed Quantity</label>
+                            <input
+                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={form.data.quantity_disputed}
+                                onChange={(e) => form.setData('quantity_disputed', e.target.value)}
+                            />
+                            {form.errors.quantity_disputed ? <p className="mt-1 text-xs text-rose-600">{form.errors.quantity_disputed}</p> : null}
                         </div>
 
                         <div>

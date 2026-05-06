@@ -24,6 +24,11 @@ class DistributionItem extends Model
         'received_by',
         'item_name_snapshot',
         'quantity_released',
+        'quantity_received',
+        'quantity_damaged',
+        'quantity_missing',
+        'receipt_condition',
+        'receipt_notes',
         'unit',
         'remarks',
     ];
@@ -33,6 +38,9 @@ class DistributionItem extends Model
         'item_id' => 'integer',
         'received_by' => 'integer',
         'quantity_released' => 'decimal:2',
+        'quantity_received' => 'decimal:2',
+        'quantity_damaged' => 'decimal:2',
+        'quantity_missing' => 'decimal:2',
     ];
 
     public function distributionRecord(): BelongsTo

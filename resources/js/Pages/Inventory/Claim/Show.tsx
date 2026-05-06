@@ -12,6 +12,8 @@ type Props = {
         claim_type: string;
         claim_date: string;
         claim_location: string;
+        quantity_disputed?: number;
+        resolution_type?: string | null;
         remarks?: string | null;
     };
     linkedDistribution?: {
@@ -26,6 +28,9 @@ type Props = {
             item_name: string;
             category_name: string;
             quantity_released: number;
+            quantity_received?: number;
+            quantity_damaged?: number;
+            quantity_missing?: number;
             unit: string;
         }>;
     } | null;
@@ -103,6 +108,8 @@ export default function ClaimShow({ claim, linkedDistribution, attachments, atta
                         <Info label="Issue Type" value={displayClaimType(claim.claim_type)} />
                         <Info label="Date Observed" value={claim.claim_date} />
                         <Info label="Issue Location" value={claim.claim_location} />
+                        <Info label="Disputed Quantity" value={String(claim.quantity_disputed ?? 0)} />
+                        <Info label="Resolution Type" value={claim.resolution_type ?? 'Pending review'} />
                         <Info label="Remarks" value={claim.remarks ?? 'No remarks provided.'} />
                     </div>
                     </div>
@@ -127,6 +134,9 @@ export default function ClaimShow({ claim, linkedDistribution, attachments, atta
                                         <th className="px-4 py-2 text-left font-semibold text-slate-700">Item</th>
                                         <th className="px-4 py-2 text-left font-semibold text-slate-700">Category</th>
                                         <th className="px-4 py-2 text-right font-semibold text-slate-700">Released Qty</th>
+                                        <th className="px-4 py-2 text-right font-semibold text-slate-700">Received Qty</th>
+                                        <th className="px-4 py-2 text-right font-semibold text-slate-700">Damaged Qty</th>
+                                        <th className="px-4 py-2 text-right font-semibold text-slate-700">Missing Qty</th>
                                         <th className="px-4 py-2 text-left font-semibold text-slate-700">Unit</th>
                                     </tr>
                                 </thead>
@@ -136,12 +146,15 @@ export default function ClaimShow({ claim, linkedDistribution, attachments, atta
                                             <td className="px-4 py-2 text-slate-700">{item.item_name}</td>
                                             <td className="px-4 py-2 text-slate-600">{item.category_name || '-'}</td>
                                             <td className="px-4 py-2 text-right font-semibold text-slate-700">{item.quantity_released.toFixed(2)}</td>
+                                            <td className="px-4 py-2 text-right font-semibold text-emerald-700">{(item.quantity_received ?? 0).toFixed(2)}</td>
+                                            <td className="px-4 py-2 text-right text-rose-600">{(item.quantity_damaged ?? 0).toFixed(2)}</td>
+                                            <td className="px-4 py-2 text-right text-amber-600">{(item.quantity_missing ?? 0).toFixed(2)}</td>
                                             <td className="px-4 py-2 text-slate-700">{item.unit}</td>
                                         </tr>
                                     ))}
                                     {linkedDistribution.items.length === 0 ? (
                                         <tr>
-                                            <td colSpan={4} className="px-4 py-6 text-center text-sm text-slate-500">
+                                            <td colSpan={7} className="px-4 py-6 text-center text-sm text-slate-500">
                                                 No released item lines available for this distribution record.
                                             </td>
                                         </tr>

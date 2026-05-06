@@ -98,7 +98,7 @@ class ClaimController
         $distributionRecords = DistributionRecord::query()
             ->where('office_id', (int) $user->office_id)
             ->whereIn('status', ['RELEASED', 'RECEIVED'])
-            ->with(['office', 'supplyRequest'])
+            ->with(['office', 'supplyRequest', 'items.item'])
             ->orderByDesc('release_date')
             ->orderByDesc('distribution_record_id')
             ->get();
@@ -118,6 +118,16 @@ class ClaimController
                 'release_date' => optional($record->release_date)?->toDateString(),
                 'status' => (string) $record->status,
                 'request_code' => (string) ($record->supplyRequest?->request_code ?? '-'),
+                'items' => $record->items->map(fn ($item): array => [
+                    'distribution_item_id' => (int) $item->distribution_item_id,
+                    'item_id' => (int) $item->item_id,
+                    'item_name' => (string) ($item->item?->item_name ?? $item->item_name_snapshot),
+                    'quantity_released' => (float) $item->quantity_released,
+                    'quantity_received' => (float) $item->quantity_received,
+                    'quantity_damaged' => (float) $item->quantity_damaged,
+                    'quantity_missing' => (float) $item->quantity_missing,
+                    'unit' => (string) $item->unit,
+                ])->values(),
             ])->values(),
             'preselectedDistributionRecordId' => $preselectedDistributionRecordId,
         ]);
@@ -174,7 +184,17 @@ class ClaimController
             ])->values();
 
         return Inertia::render('Inventory/Claim/Show', [
-            'claim' => $claim,
+            'claim' => [
+                'claims_id' => (int) $claim->claims_id,
+                'claim_code' => (string) $claim->claim_code,
+                'status' => (string) $claim->status,
+                'claim_type' => (string) $claim->claim_type,
+                'claim_date' => optional($claim->claim_date)?->toDateString(),
+                'claim_location' => (string) $claim->claim_location,
+                'quantity_disputed' => (float) $claim->quantity_disputed,
+                'resolution_type' => $claim->resolution_type,
+                'remarks' => $claim->remarks,
+            ],
             'linkedDistribution' => $claim->distributionRecord ? [
                 'distribution_record_id' => (int) $claim->distributionRecord->distribution_record_id,
                 'distribution_code' => (string) $claim->distributionRecord->distribution_code,
@@ -187,6 +207,9 @@ class ClaimController
                     'item_name' => (string) ($item->item?->item_name ?? $item->item_name_snapshot),
                     'category_name' => (string) ($item->item?->category?->category_name ?? ''),
                     'quantity_released' => (float) $item->quantity_released,
+                    'quantity_received' => (float) $item->quantity_received,
+                    'quantity_damaged' => (float) $item->quantity_damaged,
+                    'quantity_missing' => (float) $item->quantity_missing,
                     'unit' => (string) $item->unit,
                 ])->values(),
             ] : null,

@@ -220,8 +220,14 @@ class InventoryDistributionFoundationTest extends TestCase
             ->assertRedirect();
 
         $own->refresh();
+        $ownItem = DistributionItem::query()
+            ->where('distribution_record_id', $own->distribution_record_id)
+            ->firstOrFail();
         $this->assertSame('RECEIVED', $own->status);
         $this->assertSame($this->officeUserA->id, $own->received_by);
+        $this->assertSame('1.00', (string) $ownItem->quantity_received);
+        $this->assertSame('0.00', (string) $ownItem->quantity_damaged);
+        $this->assertSame('0.00', (string) $ownItem->quantity_missing);
 
         $this->actingAs($this->officeUserA)
             ->post(route('office.distribution-records.receive', $other->distribution_record_id))
@@ -251,10 +257,12 @@ class InventoryDistributionFoundationTest extends TestCase
         $this->actingAs($this->officeUserA)
             ->post(route('office.claims.store'), [
                 'distribution_record_id' => $recordA->distribution_record_id,
+                'distribution_item_id' => $recordA->items()->firstOrFail()->distribution_item_id,
                 'office_id' => $this->officeA->id,
                 'claim_type' => 'MISSING_ITEM',
                 'claim_date' => now()->toDateString(),
                 'claim_location' => 'Office A Storage',
+                'quantity_disputed' => 1,
                 'remarks' => 'Missing one unit',
             ])
             ->assertRedirect();
@@ -263,6 +271,8 @@ class InventoryDistributionFoundationTest extends TestCase
 
         $this->assertSame('OPEN', $claim->status);
         $this->assertSame($this->officeUserA->id, $claim->claimed_by);
+        $this->assertSame('1.00', (string) $claim->quantity_disputed);
+        $this->assertNotNull($claim->distribution_item_id);
 
         $this->assertDatabaseHas('status_history', [
             'reference_type' => Claim::class,
@@ -762,6 +772,11 @@ class InventoryDistributionFoundationTest extends TestCase
             'received_by' => null,
             'item_name_snapshot' => 'Item '.$itemId,
             'quantity_released' => 1,
+            'quantity_received' => 0,
+            'quantity_damaged' => 0,
+            'quantity_missing' => 0,
+            'receipt_condition' => null,
+            'receipt_notes' => null,
             'unit' => 'PCS',
             'remarks' => null,
         ]);

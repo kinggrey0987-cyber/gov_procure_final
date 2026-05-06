@@ -44,6 +44,19 @@ class ClaimService
             ]);
         }
 
+        $distributionItem = null;
+        if (! empty($payload['distribution_item_id'])) {
+            $distributionItem = $distributionRecord->items()
+                ->where('distribution_item_id', (int) $payload['distribution_item_id'])
+                ->first();
+
+            if (! $distributionItem) {
+                throw ValidationException::withMessages([
+                    'distribution_item_id' => 'Selected distribution item does not belong to the chosen distribution record.',
+                ]);
+            }
+        }
+
         if ((int) $actor->office_id !== (int) $payload['office_id']) {
             throw ValidationException::withMessages([
                 'office_id' => 'Office users can only file claims for their own office.',
@@ -62,13 +75,16 @@ class ClaimService
             $claim = Claim::query()->create([
                 'claim_code' => $claimCode,
                 'distribution_record_id' => (int) $payload['distribution_record_id'],
+                'distribution_item_id' => ! empty($payload['distribution_item_id']) ? (int) $payload['distribution_item_id'] : null,
                 'claimed_by' => (int) $actor->id,
                 'office_id' => (int) $payload['office_id'],
                 'claim_type' => $payload['claim_type'],
                 'claim_date' => $payload['claim_date'],
                 'claim_location' => $payload['claim_location'],
+                'quantity_disputed' => (float) ($payload['quantity_disputed'] ?? 0),
                 'remarks' => $payload['remarks'] ?? null,
                 'status' => 'OPEN',
+                'resolution_type' => null,
             ]);
 
             $this->recordStatus($claim, null, 'OPEN', $actor, 'Claim filed.');

@@ -75,6 +75,72 @@ class DistributionRecordService
     }
 
     /**
+     * @param array<int, array<string, mixed>> $reconciliations
+     */
+    public function reconcileOfficeReceipt(DistributionRecord $record, User $actor, array $reconciliations, ?string $remarks = null): DistributionRecord
+    {
+        if ($actor->isOfficeUser() && (int) $record->office_id !== (int) $actor->office_id) {
+            throw ValidationException::withMessages([
+                'office_id' => 'You can only reconcile distribution records for your own office.',
+            ]);
+        }
+
+        if (! $actor->isOfficeUser() && ! $actor->isGsoOfficer()) {
+            throw ValidationException::withMessages([
+                'role' => 'Only office users or GSO officers can reconcile office receipt discrepancies.',
+            ]);
+        }
+
+        if ((string) $record->status !== 'RELEASED') {
+            throw ValidationException::withMessages([
+                'status' => 'Only RELEASED distribution records can be reconciled during office receipt.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($record, $actor, $reconciliations, $remarks): DistributionRecord {
+            foreach ($reconciliations as $row) {
+                $item = DistributionItem::query()
+                    ->where('distribution_record_id', (int) $record->distribution_record_id)
+                    ->where('distribution_item_id', (int) $row['distribution_item_id'])
+                    ->firstOrFail();
+
+                $released = (float) $item->quantity_released;
+                $received = (float) ($row['quantity_received'] ?? 0);
+                $damaged = (float) ($row['quantity_damaged'] ?? 0);
+                $missing = (float) ($row['quantity_missing'] ?? 0);
+
+                if (round($received + $damaged + $missing, 2) !== round($released, 2)) {
+                    throw ValidationException::withMessages([
+                        'item_reconciliations' => 'Office reconciliation quantities must total the released quantity for each item.',
+                    ]);
+                }
+
+                $item->forceFill([
+                    'received_by' => (int) $actor->id,
+                    'quantity_received' => $received,
+                    'quantity_damaged' => $damaged,
+                    'quantity_missing' => $missing,
+                    'receipt_condition' => $row['receipt_condition'] ?? ($damaged > 0 || $missing > 0 ? 'DISCREPANCY' : 'GOOD'),
+                    'receipt_notes' => $row['receipt_notes'] ?? null,
+                ])->save();
+            }
+
+            $oldStatus = (string) $record->status;
+            $record->forceFill([
+                'status' => 'RECEIVED',
+                'received_by' => (int) $actor->id,
+                'notes' => $remarks ?? $record->notes,
+            ])->save();
+
+            $this->recordStatus($record, $oldStatus, 'RECEIVED', $actor, 'Distribution record reconciled and acknowledged by office.');
+            $this->recordApproval($record, $actor, 'RECEIVED', 'Office receipt reconciliation recorded.');
+            $this->recordAudit($actor, 'RECONCILE_RECEIPT', $record, []);
+
+            return $record->fresh(['office', 'receiver', 'items.item']) ?? $record;
+        });
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      */
     public function addDistributionItem(DistributionRecord $record, User $actor, array $payload): DistributionItem
