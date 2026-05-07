@@ -180,6 +180,10 @@ class ItemCatalogManagementTest extends TestCase
         ]);
 
         $this->actingAs($this->gsoOfficer)
+            ->patch(route('inventory.item-categories.toggle-status', $category->item_category_id))
+            ->assertRedirect();
+
+        $this->actingAs($this->gsoOfficer)
             ->patch(route('inventory.items.toggle-status', $item->item_id))
             ->assertRedirect();
 
@@ -249,6 +253,34 @@ class ItemCatalogManagementTest extends TestCase
 
         $this->assertDatabaseHas('items', [
             'item_id' => $alreadyInactiveItem->item_id,
+            'status' => 'inactive',
+        ]);
+    }
+
+    public function test_item_cannot_be_reactivated_while_parent_category_is_inactive(): void
+    {
+        $category = ItemCategory::query()->create([
+            'category_name' => 'Inactive Parent Category',
+            'standard_delivery_days' => 2,
+            'description' => null,
+            'status' => 'inactive',
+        ]);
+
+        $item = Item::query()->create([
+            'item_name' => 'Blocked Reactivation Item',
+            'item_category_id' => $category->item_category_id,
+            'default_unit' => 'PCS',
+            'description' => null,
+            'status' => 'inactive',
+        ]);
+
+        $this->actingAs($this->gsoOfficer)
+            ->patch(route('inventory.items.toggle-status', $item->item_id))
+            ->assertRedirect()
+            ->assertSessionHas('error', 'Reactivate the item category before reactivating items under it.');
+
+        $this->assertDatabaseHas('items', [
+            'item_id' => $item->item_id,
             'status' => 'inactive',
         ]);
     }

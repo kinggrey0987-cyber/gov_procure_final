@@ -138,8 +138,18 @@ class ItemCatalogController
     {
         abort_unless($request->user()?->can('inventory.catalog.manage'), 403);
 
+        $nextStatus = (string) $item->status === 'active' ? 'inactive' : 'active';
+
+        if ($nextStatus === 'active') {
+            $item->loadMissing('category');
+
+            if ((string) ($item->category?->status ?? '') !== 'active') {
+                return Redirect::back()->with('error', 'Reactivate the item category before reactivating items under it.');
+            }
+        }
+
         $item->forceFill([
-            'status' => (string) $item->status === 'active' ? 'inactive' : 'active',
+            'status' => $nextStatus,
         ])->save();
 
         return Redirect::back()->with('success', 'Item status updated.');
