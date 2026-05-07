@@ -2,6 +2,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PaginationNav from '@/Components/PaginationNav';
 import MonthFilterSelect from '@/Components/MonthFilterSelect';
 import useDebouncedValue from '@/hooks/useDebouncedValue';
+import { humanizeEnum } from '@/lib/displayLabels';
 import { Head, Link, router } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -100,10 +101,10 @@ export default function DeliveryIndex({ deliveries, filters, filter_options }: P
                         onChange={(event) => setStatus(event.target.value)}
                     >
                         <option value="">All statuses</option>
-                        <option value="PENDING">PENDING</option>
-                        <option value="RECEIVED">RECEIVED</option>
-                        <option value="PARTIALLY_RECEIVED">PARTIALLY_RECEIVED</option>
-                        <option value="VERIFIED">VERIFIED</option>
+                        <option value="PENDING">{humanizeEnum('PENDING')}</option>
+                        <option value="RECEIVED">{humanizeEnum('RECEIVED')}</option>
+                        <option value="PARTIALLY_RECEIVED">{humanizeEnum('PARTIALLY_RECEIVED')}</option>
+                        <option value="VERIFIED">{humanizeEnum('VERIFIED')}</option>
                     </select>
                     <select
                         className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
@@ -175,7 +176,7 @@ export default function DeliveryIndex({ deliveries, filters, filter_options }: P
                                     <td className="px-4 py-3 text-slate-700">{delivery.purchase_order?.po_number ?? '-'}</td>
                                     <td className="px-4 py-3 text-slate-700">{delivery.supplier?.supplier_name ?? '-'}</td>
                                     <td className="px-4 py-3">
-                                        <span className={statusClass(delivery.receipt_status)}>{delivery.receipt_status}</span>
+                                        <span className={statusClass(delivery.receipt_status)}>{humanizeEnum(delivery.receipt_status)}</span>
                                     </td>
                                     <td className="px-4 py-3 text-slate-700">{delivery.receiver?.name ?? '-'}</td>
                                     <td className="px-4 py-3 text-slate-600">{new Date(delivery.created_at).toLocaleDateString()}</td>
@@ -186,7 +187,7 @@ export default function DeliveryIndex({ deliveries, filters, filter_options }: P
                                                     Open Receiving
                                                 </Link>
                                             )}
-                                            {(delivery.receipt_status === 'RECEIVED' || delivery.receipt_status === 'PARTIALLY_RECEIVED') && (
+                                            {delivery.receipt_status === 'RECEIVED' && (
                                                 <Link
                                                     href={route('inventory.delivery-verifications.create', delivery.delivery_id)}
                                                     className="text-sm font-semibold text-emerald-700 hover:text-emerald-900"

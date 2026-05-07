@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import { humanizeEnum } from '@/lib/displayLabels';
 import { Head, Link, useForm } from '@inertiajs/react';
 import type { FormEvent, ReactNode } from 'react';
 
@@ -64,6 +65,13 @@ export default function DeliveryVerificationCreate({ delivery }: Props) {
             <Head title={`Verify ${delivery.delivery_code}`} />
 
             <div className="space-y-6 py-8">
+                <Link
+                    href={route('inventory.deliveries.show', delivery.delivery_id)}
+                    className="inline-flex rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-slate-50"
+                >
+                    Back to Delivery Details
+                </Link>
+
                 <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                     <div className="grid gap-4 md:grid-cols-4">
                         <Info label="Delivery Code" value={delivery.delivery_code} />
@@ -73,7 +81,7 @@ export default function DeliveryVerificationCreate({ delivery }: Props) {
                     </div>
                     {delivery.verification_summary ? (
                         <div className={`mt-4 rounded-lg border px-4 py-3 text-sm ${delivery.verification_summary.has_discrepancy ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>
-                            <p className="font-semibold">Recommended Status: {delivery.verification_summary.recommended_status}</p>
+                            <p className="font-semibold">Recommended Status: {humanizeEnum(delivery.verification_summary.recommended_status)}</p>
                             <p className="mt-1">{delivery.verification_summary.message}</p>
                         </div>
                     ) : null}

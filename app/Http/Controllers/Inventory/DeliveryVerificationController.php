@@ -19,9 +19,14 @@ class DeliveryVerificationController
     ) {
     }
 
-    public function create(Delivery $delivery): Response
+    public function create(Delivery $delivery): Response|RedirectResponse
     {
         abort_unless(auth()->user()->can('delivery-verification.create', $delivery), 403);
+
+        if ((string) $delivery->receipt_status !== 'RECEIVED' || $delivery->verifications()->exists()) {
+            return Redirect::route('inventory.deliveries.show', $delivery->delivery_id)
+                ->with('error', 'This delivery is already locked for verification. Review the delivery details or continue the follow-up process instead.');
+        }
 
         $delivery = $this->deliveryService->ensureItemsFromPurchaseOrder($delivery);
         $delivery->load('purchaseOrder', 'supplier', 'items.purchaseOrderItem.item', 'verifications');

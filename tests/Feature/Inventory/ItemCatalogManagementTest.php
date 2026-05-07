@@ -169,8 +169,53 @@ class ItemCatalogManagementTest extends TestCase
             ->patch(route('inventory.item-categories.toggle-status', $category->item_category_id))
             ->assertRedirect();
 
+        $this->assertDatabaseHas('item_categories', [
+            'item_category_id' => $category->item_category_id,
+            'status' => 'inactive',
+        ]);
+
+        $this->assertDatabaseHas('items', [
+            'item_id' => $item->item_id,
+            'status' => 'inactive',
+        ]);
+
         $this->actingAs($this->gsoOfficer)
             ->patch(route('inventory.items.toggle-status', $item->item_id))
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('items', [
+            'item_id' => $item->item_id,
+            'status' => 'active',
+        ]);
+    }
+
+    public function test_deactivating_category_also_deactivates_all_child_items_but_reactivation_does_not_restore_them(): void
+    {
+        $category = ItemCategory::query()->create([
+            'category_name' => 'Cascade Status Category',
+            'standard_delivery_days' => 4,
+            'description' => null,
+            'status' => 'active',
+        ]);
+
+        $activeItem = Item::query()->create([
+            'item_name' => 'Cascade Active Item',
+            'item_category_id' => $category->item_category_id,
+            'default_unit' => 'PCS',
+            'description' => null,
+            'status' => 'active',
+        ]);
+
+        $alreadyInactiveItem = Item::query()->create([
+            'item_name' => 'Cascade Inactive Item',
+            'item_category_id' => $category->item_category_id,
+            'default_unit' => 'PCS',
+            'description' => null,
+            'status' => 'inactive',
+        ]);
+
+        $this->actingAs($this->gsoOfficer)
+            ->patch(route('inventory.item-categories.toggle-status', $category->item_category_id))
             ->assertRedirect();
 
         $this->assertDatabaseHas('item_categories', [
@@ -179,7 +224,31 @@ class ItemCatalogManagementTest extends TestCase
         ]);
 
         $this->assertDatabaseHas('items', [
-            'item_id' => $item->item_id,
+            'item_id' => $activeItem->item_id,
+            'status' => 'inactive',
+        ]);
+
+        $this->assertDatabaseHas('items', [
+            'item_id' => $alreadyInactiveItem->item_id,
+            'status' => 'inactive',
+        ]);
+
+        $this->actingAs($this->gsoOfficer)
+            ->patch(route('inventory.item-categories.toggle-status', $category->item_category_id))
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('item_categories', [
+            'item_category_id' => $category->item_category_id,
+            'status' => 'active',
+        ]);
+
+        $this->assertDatabaseHas('items', [
+            'item_id' => $activeItem->item_id,
+            'status' => 'inactive',
+        ]);
+
+        $this->assertDatabaseHas('items', [
+            'item_id' => $alreadyInactiveItem->item_id,
             'status' => 'inactive',
         ]);
     }

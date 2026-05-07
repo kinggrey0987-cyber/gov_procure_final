@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Inventory;
 
 use App\Http\Requests\Inventory\StoreItemCategoryRequest;
 use App\Http\Requests\Inventory\UpdateItemCategoryRequest;
+use App\Models\Item;
 use App\Models\ItemCategory;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -110,9 +112,19 @@ class ItemCategoryController
     {
         abort_unless($request->user()?->can('inventory.catalog.manage'), 403);
 
-        $item_category->forceFill([
-            'status' => (string) $item_category->status === 'active' ? 'inactive' : 'active',
-        ])->save();
+        DB::transaction(function () use ($item_category): void {
+            $nextStatus = (string) $item_category->status === 'active' ? 'inactive' : 'active';
+
+            $item_category->forceFill([
+                'status' => $nextStatus,
+            ])->save();
+
+            if ($nextStatus === 'inactive') {
+                Item::query()
+                    ->where('item_category_id', (int) $item_category->item_category_id)
+                    ->update(['status' => 'inactive']);
+            }
+        });
 
         return Redirect::back()->with('success', 'Item category status updated.');
     }

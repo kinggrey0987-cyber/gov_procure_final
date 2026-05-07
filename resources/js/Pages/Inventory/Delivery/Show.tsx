@@ -84,9 +84,11 @@ type Props = {
 
 export default function DeliveryShow({ delivery }: Props) {
     const canVerify = delivery.receipt_status === 'RECEIVED';
-    const canCreateFollowUpPurchaseRequest = delivery.permissions?.can_create_follow_up_purchase_request === true;
+    const canCreateFollowUpPurchaseRequest = delivery.permissions?.can_create_follow_up_purchase_request === true
+        && !delivery.follow_up_purchase_request;
     const { post, processing } = useForm({ remarks: '' });
     const [activeTab, setActiveTab] = useState<'overview' | 'items' | 'status' | 'related' | 'notes'>('overview');
+    const inventorySyncTotal = Number(delivery.discrepancy_summary?.total_inventory_synced_quantity ?? 0);
 
     const createFollowUpPurchaseRequest = () => {
         post(route('inventory.deliveries.follow-up-purchase-request.store', delivery.delivery_id));
@@ -176,7 +178,12 @@ export default function DeliveryShow({ delivery }: Props) {
                                             <SummaryCard label="Accepted Quantity" value={delivery.discrepancy_summary.total_accepted_quantity} />
                                             <SummaryCard label="Missing Quantity" value={delivery.discrepancy_summary.total_missing_quantity} tone="warning" />
                                             <SummaryCard label="Damaged Quantity" value={delivery.discrepancy_summary.total_damaged_quantity} tone="warning" />
-                                            <SummaryCard label="Added to Inventory" value={delivery.discrepancy_summary.total_inventory_synced_quantity} />
+                                            <SummaryCard
+                                                label="Inventory Posting"
+                                                value={inventorySyncTotal > 0 ? inventorySyncTotal : 'Pending'}
+                                                tone={inventorySyncTotal > 0 ? 'default' : 'warning'}
+                                                helperText={inventorySyncTotal > 0 ? undefined : 'Inventory is not updated yet while this delivery is still under discrepancy follow-up.'}
+                                            />
                                         </div>
                                     ) : null}
 
@@ -276,7 +283,7 @@ export default function DeliveryShow({ delivery }: Props) {
                                         <td className="px-4 py-2 text-center font-semibold text-emerald-700">{item.accepted_quantity ?? 0}</td>
                                         <td className="px-4 py-2 text-center text-rose-600">{item.damaged_quantity}</td>
                                         <td className="px-4 py-2 text-center text-amber-600">{item.missing_quantity}</td>
-                                        <td className="px-4 py-2 text-center font-semibold text-sky-700">{item.inventory_synced_quantity ?? 0}</td>
+                                        <td className="px-4 py-2 text-center font-semibold text-sky-700">{formatInventorySyncValue(delivery.receipt_status, item.inventory_synced_quantity)}</td>
                                         <td className="px-4 py-2 text-slate-700">{item.item_condition || '-'}</td>
                                     </tr>
                                 ))}
@@ -403,10 +410,12 @@ function SummaryCard({
     label,
     value,
     tone = 'default',
+    helperText,
 }: {
     label: string;
     value: ReactNode;
     tone?: 'default' | 'warning';
+    helperText?: ReactNode;
 }) {
     const toneClass = tone === 'warning'
         ? 'border-amber-200 bg-amber-50/70 text-amber-900'
@@ -416,8 +425,19 @@ function SummaryCard({
         <div className={`rounded-lg border px-4 py-3 shadow-sm ${toneClass}`}>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
             <p className="mt-2 text-lg font-semibold">{value}</p>
+            {helperText ? <p className="mt-2 text-xs text-slate-600">{helperText}</p> : null}
         </div>
     );
+}
+
+function formatInventorySyncValue(receiptStatus: string, quantity: number | string | undefined): string | number {
+    const numericQuantity = Number(quantity ?? 0);
+
+    if (receiptStatus === 'PARTIALLY_RECEIVED' && numericQuantity <= 0) {
+        return 'Pending';
+    }
+
+    return numericQuantity;
 }
 
 function statusClass(status: string) {
