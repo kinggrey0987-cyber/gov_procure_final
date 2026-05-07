@@ -277,7 +277,7 @@ class ItemCatalogManagementTest extends TestCase
         $this->actingAs($this->gsoOfficer)
             ->patch(route('inventory.items.toggle-status', $item->item_id))
             ->assertRedirect()
-            ->assertSessionHas('error', 'Reactivate the item category before reactivating items under it.');
+            ->assertSessionHas('error', 'Cannot activate this item because its category is deactivated. Reactivate the category first.');
 
         $this->assertDatabaseHas('items', [
             'item_id' => $item->item_id,

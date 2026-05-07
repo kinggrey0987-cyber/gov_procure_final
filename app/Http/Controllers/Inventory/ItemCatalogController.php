@@ -144,7 +144,7 @@ class ItemCatalogController
             $item->loadMissing('category');
 
             if ((string) ($item->category?->status ?? '') !== 'active') {
-                return Redirect::back()->with('error', 'Reactivate the item category before reactivating items under it.');
+                return Redirect::back()->with('error', 'Cannot activate this item because its category is deactivated. Reactivate the category first.');
             }
         }
 
