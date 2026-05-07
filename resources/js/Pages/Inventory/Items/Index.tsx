@@ -2,7 +2,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PaginationNav from '@/Components/PaginationNav';
 import useDebouncedValue from '@/hooks/useDebouncedValue';
 import useSmartRefresh from '@/hooks/useSmartRefresh';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
 
 type ItemRow = {
@@ -42,7 +42,15 @@ type Props = {
     canManage: boolean;
 };
 
+type PageProps = Props & {
+    flash?: {
+        success?: string | null;
+        error?: string | null;
+    };
+};
+
 export default function ItemCatalogIndex({ items, categories, filters, canManage }: Props) {
+    const { flash } = usePage().props as unknown as PageProps;
     const { isRefreshing, refreshNow } = useSmartRefresh({
         only: ['items', 'categories', 'filters', 'canManage'],
         refreshOnFocus: false,
@@ -96,6 +104,18 @@ export default function ItemCatalogIndex({ items, categories, filters, canManage
             <Head title="Item Catalog" />
 
             <div className="space-y-4 py-8">
+                {flash?.success ? (
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+                        {flash.success}
+                    </div>
+                ) : null}
+
+                {flash?.error ? (
+                    <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+                        {flash.error}
+                    </div>
+                ) : null}
+
                 <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-4">
                     <input
                         value={q}
