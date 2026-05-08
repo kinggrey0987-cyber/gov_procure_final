@@ -1,7 +1,8 @@
 import AuditLogTable from '@/Components/AuditLogTable';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import useDebouncedValue from '@/hooks/useDebouncedValue';
 import { Head, Link, router } from '@inertiajs/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 type Props = {
     auditLogs: {
@@ -41,6 +42,9 @@ export default function TechnicalAudit({ auditLogs, filters }: Props) {
         from_date: filters.from_date ?? '',
         to_date: filters.to_date ?? '',
     });
+    const debouncedModuleName = useDebouncedValue(form.module_name, 400);
+    const debouncedActionType = useDebouncedValue(form.action_type, 400);
+    const debouncedUserId = useDebouncedValue(form.user_id, 400);
 
     useEffect(() => {
         setForm({
@@ -52,20 +56,34 @@ export default function TechnicalAudit({ auditLogs, filters }: Props) {
         });
     }, [filters.action_type, filters.from_date, filters.module_name, filters.to_date, filters.user_id]);
 
-    const handleFilterSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        router.get(route('admin-tech.audit.technical'), {
-            module_name: form.module_name || undefined,
-            action_type: form.action_type || undefined,
-            user_id: form.user_id || undefined,
-            from_date: form.from_date || undefined,
-            to_date: form.to_date || undefined,
-        }, {
+    const activeFilters = useMemo(() => ({
+        module_name: debouncedModuleName || undefined,
+        action_type: debouncedActionType || undefined,
+        user_id: debouncedUserId || undefined,
+        from_date: form.from_date || undefined,
+        to_date: form.to_date || undefined,
+    }), [debouncedActionType, debouncedModuleName, debouncedUserId, form.from_date, form.to_date]);
+
+    const activeFiltersKey = useMemo(() => JSON.stringify(activeFilters), [activeFilters]);
+    const currentFiltersKey = useMemo(() => JSON.stringify({
+        module_name: filters.module_name || undefined,
+        action_type: filters.action_type || undefined,
+        user_id: filters.user_id ? String(filters.user_id) : undefined,
+        from_date: filters.from_date || undefined,
+        to_date: filters.to_date || undefined,
+    }), [filters.action_type, filters.from_date, filters.module_name, filters.to_date, filters.user_id]);
+
+    useEffect(() => {
+        if (activeFiltersKey === currentFiltersKey) {
+            return;
+        }
+
+        router.get(route('admin-tech.audit.technical'), activeFilters, {
             preserveState: true,
             replace: true,
             only: ['auditLogs', 'filters'],
         });
-    };
+    }, [activeFilters, activeFiltersKey, currentFiltersKey]);
 
     const handleClearFilters = () => {
         router.get(route('admin-tech.audit.technical'), {}, {
@@ -80,7 +98,7 @@ export default function TechnicalAudit({ auditLogs, filters }: Props) {
             <Head title="Technical Audit Logs" />
             <div className="py-10">
                 <div className="mx-auto max-w-7xl space-y-4 px-4 sm:px-6 lg:px-8">
-                    <form onSubmit={handleFilterSubmit} className="grid gap-3 rounded-lg border bg-white p-4 md:grid-cols-5">
+                    <div className="grid gap-3 rounded-lg border bg-white p-4 md:grid-cols-5">
                         <input
                             className="rounded border-slate-300 text-sm"
                             placeholder="Module"
@@ -113,12 +131,6 @@ export default function TechnicalAudit({ auditLogs, filters }: Props) {
                         />
                         <div className="md:col-span-5 flex gap-2">
                             <button
-                                type="submit"
-                                className="rounded border border-blue-300 bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700"
-                            >
-                                Filter
-                            </button>
-                            <button
                                 type="button"
                                 onClick={handleClearFilters}
                                 className="rounded border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
@@ -126,7 +138,7 @@ export default function TechnicalAudit({ auditLogs, filters }: Props) {
                                 Reset
                             </button>
                         </div>
-                    </form>
+                    </div>
 
                     <AuditLogTable logs={auditLogs.data} />
 

@@ -1,6 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import useDebouncedValue from '@/hooks/useDebouncedValue';
 import { Head, Link, router } from '@inertiajs/react';
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 type Props = {
     summary: {
@@ -47,17 +48,37 @@ export default function AdminDashboard({ summary, activities, pagination, filter
         search: filters.search ?? '',
         actor: filters.actor ?? '',
     });
+    const debouncedSearch = useDebouncedValue(formData.search, 400);
+    const debouncedActor = useDebouncedValue(formData.actor, 400);
 
-    const handleFilterSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        router.get(route('dashboard'), {
-            search: formData.search || undefined,
-            actor: formData.actor || undefined,
-        }, {
+    const activeFilters = useMemo(() => ({
+        search: debouncedSearch || undefined,
+        actor: debouncedActor || undefined,
+    }), [debouncedActor, debouncedSearch]);
+
+    const activeFiltersKey = useMemo(() => JSON.stringify(activeFilters), [activeFilters]);
+    const currentFiltersKey = useMemo(() => JSON.stringify({
+        search: filters.search || undefined,
+        actor: filters.actor || undefined,
+    }), [filters.actor, filters.search]);
+
+    useEffect(() => {
+        setFormData({
+            search: filters.search ?? '',
+            actor: filters.actor ?? '',
+        });
+    }, [filters.actor, filters.search]);
+
+    useEffect(() => {
+        if (activeFiltersKey === currentFiltersKey) {
+            return;
+        }
+
+        router.get(route('dashboard'), activeFilters, {
             preserveState: true,
             replace: true,
         });
-    };
+    }, [activeFilters, activeFiltersKey, currentFiltersKey]);
 
     const handleClearFilters = () => {
         setFormData({ search: '', actor: '' });
@@ -165,10 +186,10 @@ export default function AdminDashboard({ summary, activities, pagination, filter
                 <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <header className="border-b border-slate-200 px-6 py-5">
                         <h3 className="text-3xl font-semibold text-slate-800">System Activity</h3>
-                        <p className="mt-1 text-lg text-slate-500">Recent technical administration events</p>
+                        <p className="mt-1 text-lg text-slate-500">Recent account and system activity</p>
                     </header>
                     <div className="p-6">
-                        <form onSubmit={handleFilterSubmit} className="mb-4 grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-5">
+                        <div className="mb-4 grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-5">
                             <div className="md:col-span-3">
                                 <label htmlFor="admin-activity-search" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
                                     Search activity
@@ -178,7 +199,7 @@ export default function AdminDashboard({ summary, activities, pagination, filter
                                     type="text"
                                     value={formData.search}
                                     onChange={(event) => setFormData(prev => ({ ...prev, search: event.target.value }))}
-                                    placeholder="Search module name"
+                                    placeholder="Search activity type"
                                     className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                                 />
                             </div>
@@ -197,12 +218,6 @@ export default function AdminDashboard({ summary, activities, pagination, filter
                             </div>
                             <div className="flex items-end gap-2">
                                 <button
-                                    type="submit"
-                                    className="flex-1 rounded-lg border border-blue-300 bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
-                                >
-                                    Filter
-                                </button>
-                                <button
                                     type="button"
                                     onClick={handleClearFilters}
                                     className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
@@ -210,7 +225,7 @@ export default function AdminDashboard({ summary, activities, pagination, filter
                                     Clear
                                 </button>
                             </div>
-                        </form>
+                        </div>
 
                         {activities.length === 0 && (
                             <p className="rounded-xl border border-dashed border-slate-300 px-4 py-8 text-center text-slate-500">

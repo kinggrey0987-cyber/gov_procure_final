@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 
 type Item = {
     item_id: number;
@@ -19,7 +19,22 @@ type Props = {
     canManage: boolean;
 };
 
+type PageProps = Props & {
+    flash?: {
+        success?: string | null;
+        error?: string | null;
+    };
+};
+
 export default function ShowItem({ item, canManage }: Props) {
+    const { flash } = usePage().props as unknown as PageProps;
+
+    const toggleStatus = () => {
+        router.patch(route('inventory.items.toggle-status', item.item_id), {}, {
+            preserveScroll: true,
+        });
+    };
+
     return (
         <AuthenticatedLayout
             header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Catalog Item Details</h2>}
@@ -27,6 +42,18 @@ export default function ShowItem({ item, canManage }: Props) {
             <Head title="Catalog Item Details" />
 
             <div className="space-y-4 py-8">
+                {flash?.success ? (
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+                        {flash.success}
+                    </div>
+                ) : null}
+
+                {flash?.error ? (
+                    <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+                        {flash.error}
+                    </div>
+                ) : null}
+
                 <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
                     <dl className="grid gap-4 md:grid-cols-2">
                         <div>
@@ -54,9 +81,18 @@ export default function ShowItem({ item, canManage }: Props) {
 
                 <div className="flex items-center gap-3">
                     {canManage ? (
-                        <Link href={route('inventory.items.edit', item.item_id)} className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
-                            Edit Item
-                        </Link>
+                        <>
+                            <Link href={route('inventory.items.edit', item.item_id)} className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
+                                Edit Item
+                            </Link>
+                            <button
+                                type="button"
+                                onClick={toggleStatus}
+                                className="rounded-lg border border-amber-300 px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50"
+                            >
+                                {item.status === 'active' ? 'Deactivate Item' : 'Activate Item'}
+                            </button>
+                        </>
                     ) : null}
                     <Link href={route('inventory.items.index')} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                         Back to List

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Office;
 
+use App\Models\PpmpItem;
 use App\Models\SupplyRequest;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -53,6 +54,22 @@ class UpdateSupplyRequestItemRequest extends FormRequest
 
             if (! $supplyRequest->ppmp_id) {
                 $validator->errors()->add('ppmp_id', 'Select a PPMP on the supply request before updating items.');
+                return;
+            }
+
+            $ppmpItemId = (int) $this->input('ppmp_item_id');
+            if ($ppmpItemId <= 0) {
+                return;
+            }
+
+            $isActiveCatalogItem = PpmpItem::query()
+                ->where('ppmp_item_id', $ppmpItemId)
+                ->where('ppmp_id', (int) $supplyRequest->ppmp_id)
+                ->whereHas('item', fn ($query) => $query->where('status', 'active'))
+                ->exists();
+
+            if (! $isActiveCatalogItem) {
+                $validator->errors()->add('ppmp_item_id', 'This item is currently inactive and cannot be requested.');
             }
         });
     }

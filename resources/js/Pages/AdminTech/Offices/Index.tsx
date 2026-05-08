@@ -1,6 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import useDebouncedValue from '@/hooks/useDebouncedValue';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 type OfficeRow = {
     id: number;
@@ -44,6 +45,7 @@ export default function OfficeIndex({ offices, filters }: Props) {
         search: filters.search ?? '',
         status: filters.status ?? '',
     });
+    const debouncedSearch = useDebouncedValue(formData.search, 400);
 
     const deleteError = page.errors?.delete;
     const successMessage = page.flash?.success;
@@ -77,15 +79,35 @@ export default function OfficeIndex({ offices, filters }: Props) {
         });
     };
 
-    const handleFilterSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        router.get(route('admin-tech.offices.index'), {
-            search: formData.search || undefined,
-            status: formData.status || undefined,
-        }, {
-            preserveScroll: true,
+    const activeFilters = useMemo(() => ({
+        search: debouncedSearch || undefined,
+        status: formData.status || undefined,
+    }), [debouncedSearch, formData.status]);
+
+    const activeFiltersKey = useMemo(() => JSON.stringify(activeFilters), [activeFilters]);
+    const currentFiltersKey = useMemo(() => JSON.stringify({
+        search: filters.search || undefined,
+        status: filters.status || undefined,
+    }), [filters.search, filters.status]);
+
+    useEffect(() => {
+        setFormData({
+            search: filters.search ?? '',
+            status: filters.status ?? '',
         });
-    };
+    }, [filters.search, filters.status]);
+
+    useEffect(() => {
+        if (activeFiltersKey === currentFiltersKey) {
+            return;
+        }
+
+        router.get(route('admin-tech.offices.index'), activeFilters, {
+            preserveScroll: true,
+            preserveState: true,
+            replace: true,
+        });
+    }, [activeFilters, activeFiltersKey, currentFiltersKey]);
 
     const handleClearFilters = () => {
         setFormData({ search: '', status: '' });
@@ -124,7 +146,7 @@ export default function OfficeIndex({ offices, filters }: Props) {
                     </div>
                 )}
 
-                <form onSubmit={handleFilterSubmit} className="border-b border-slate-200 bg-slate-50 px-4 py-4 sm:px-6">
+                <div className="border-b border-slate-200 bg-slate-50 px-4 py-4 sm:px-6">
                     <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem_auto] md:items-end">
                         <div>
                             <label htmlFor="search-input" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
@@ -154,13 +176,7 @@ export default function OfficeIndex({ offices, filters }: Props) {
                                 <option value="inactive">Inactive</option>
                             </select>
                         </div>
-                        <div className="grid grid-cols-2 gap-2 sm:flex sm:items-end">
-                            <button
-                                type="submit"
-                                className="rounded-lg border border-blue-300 bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-                            >
-                                Filter
-                            </button>
+                        <div className="grid gap-2 sm:flex sm:items-end">
                             <button
                                 type="button"
                                 onClick={handleClearFilters}
@@ -170,7 +186,7 @@ export default function OfficeIndex({ offices, filters }: Props) {
                             </button>
                         </div>
                     </div>
-                </form>
+                </div>
 
                 <div className="overflow-x-auto">
                     <table className="min-w-[720px] divide-y divide-slate-200 text-sm md:min-w-full">

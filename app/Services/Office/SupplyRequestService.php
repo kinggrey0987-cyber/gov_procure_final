@@ -290,8 +290,9 @@ class SupplyRequestService
         }
 
         $ppmpItems = PpmpItem::query()
-            ->with('item:item_id,item_name')
+            ->with('item:item_id,item_name,status')
             ->where('ppmp_id', $ppmpId)
+            ->whereHas('item', fn ($query) => $query->where('status', 'active'))
             ->orderBy('ppmp_item_id')
             ->get(['ppmp_item_id', 'ppmp_id', 'item_id', 'quantity', 'unit_cost']);
 
@@ -382,13 +383,19 @@ class SupplyRequestService
     private function resolvePpmpItemForRequest(SupplyRequest $supplyRequest, int $ppmpItemId): PpmpItem
     {
         $ppmpItem = PpmpItem::query()
-            ->with('item:item_id,item_name')
+            ->with('item:item_id,item_name,status')
             ->where('ppmp_item_id', $ppmpItemId)
             ->first();
 
         if (! $ppmpItem || (int) $ppmpItem->ppmp_id !== (int) $supplyRequest->ppmp_id) {
             throw ValidationException::withMessages([
                 'ppmp_item_id' => 'Selected PPMP item does not belong to the supply request PPMP.',
+            ]);
+        }
+
+        if ((string) ($ppmpItem->item?->status ?? '') !== 'active') {
+            throw ValidationException::withMessages([
+                'ppmp_item_id' => 'This item is currently inactive and cannot be requested.',
             ]);
         }
 

@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 type EligibleRow = {
     supply_request_id: number;
@@ -22,6 +22,7 @@ type Props = {
 };
 
 export default function DistributionCreate({ eligibleRows, focusSupplyRequestId = null, focusReleasableReason = null }: Props) {
+    const [processingRowKey, setProcessingRowKey] = useState<string | null>(null);
     const form = useForm({
         supply_request_id: 0,
         delivery_id: null as number | null,
@@ -33,6 +34,22 @@ export default function DistributionCreate({ eligibleRows, focusSupplyRequestId 
 
     const rows = useMemo(() => eligibleRows, [eligibleRows]);
     const focusedRowExists = focusSupplyRequestId ? rows.some((row) => row.supply_request_id === focusSupplyRequestId) : false;
+
+    const processRelease = (row: EligibleRow) => {
+        const rowKey = `${row.supply_request_id}-${row.delivery_id ?? 'inventory'}`;
+        setProcessingRowKey(rowKey);
+
+        form.transform((data) => ({
+            ...data,
+            supply_request_id: row.supply_request_id,
+            delivery_id: row.delivery_id,
+            office_id: row.office_id,
+        }));
+
+        form.post(route('inventory.distribution-records.store'), {
+            onFinish: () => setProcessingRowKey(null),
+        });
+    };
 
     return (
         <AuthenticatedLayout
@@ -83,8 +100,12 @@ export default function DistributionCreate({ eligibleRows, focusSupplyRequestId 
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {rows.map((row) => (
-                                    <tr key={`${row.supply_request_id}-${row.delivery_id}`} className={`hover:bg-slate-50/60 ${focusSupplyRequestId === row.supply_request_id ? 'bg-emerald-50/60' : ''}`}>
+                                {rows.map((row) => {
+                                    const rowKey = `${row.supply_request_id}-${row.delivery_id ?? 'inventory'}`;
+                                    const isProcessingThisRow = processingRowKey === rowKey;
+
+                                    return (
+                                    <tr key={rowKey} className={`hover:bg-slate-50/60 ${focusSupplyRequestId === row.supply_request_id ? 'bg-emerald-50/60' : ''}`}>
                                         <td className="px-4 py-3 font-semibold text-red-700">{row.request_code}</td>
                                         <td className="px-4 py-3 text-slate-700">{row.office_name}</td>
                                         <td className="px-4 py-3 text-slate-700">{row.release_basis_label}</td>
@@ -101,23 +122,16 @@ export default function DistributionCreate({ eligibleRows, focusSupplyRequestId 
                                         <td className="px-4 py-3 text-right">
                                             <button
                                                 type="button"
-                                                onClick={() => {
-                                                    form.transform((data) => ({
-                                                        ...data,
-                                                        supply_request_id: row.supply_request_id,
-                                                        delivery_id: row.delivery_id,
-                                                        office_id: row.office_id,
-                                                    }));
-                                                    form.post(route('inventory.distribution-records.store'));
-                                                }}
-                                                disabled={form.processing}
+                                                onClick={() => processRelease(row)}
+                                                disabled={isProcessingThisRow}
                                                 className="rounded-lg border border-emerald-600 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50"
                                             >
-                                                {form.processing ? 'Processing...' : 'Process Release'}
+                                                {isProcessingThisRow ? 'Processing...' : 'Process Release'}
                                             </button>
                                         </td>
                                     </tr>
-                                ))}
+                                    );
+                                })}
                                 {rows.length === 0 ? (
                                     <tr>
                                         <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-500">

@@ -127,19 +127,25 @@ class DeliveryService
                     $receivedQuantity = (float) ($itemPayload['received_quantity'] ?? 0);
                     $damagedQuantity = (float) ($itemPayload['damaged_quantity'] ?? 0);
                     $expectedQuantity = (float) $item->expected_quantity;
-                    $missingQuantity = max($expectedQuantity - $receivedQuantity - $damagedQuantity, 0);
+                    $missingQuantity = max($expectedQuantity - $receivedQuantity, 0);
 
-                    if ($receivedQuantity < 0 || $damagedQuantity < 0 || ($receivedQuantity + $damagedQuantity) > $expectedQuantity) {
+                    if ($receivedQuantity < 0 || $damagedQuantity < 0 || $receivedQuantity > $expectedQuantity || $damagedQuantity > $receivedQuantity) {
                         throw ValidationException::withMessages([
-                            'items' => 'Received and damaged quantities must be non-negative and cannot exceed expected quantity.',
+                            'items' => 'Received quantity cannot exceed expected quantity, and damaged quantity cannot exceed received quantity.',
                         ]);
                     }
+
+                    $itemCondition = match (true) {
+                        $damagedQuantity > 0 => 'DAMAGED',
+                        $missingQuantity > 0 => 'MISSING',
+                        default => 'GOOD',
+                    };
 
                     $item->forceFill([
                         'received_quantity' => $receivedQuantity,
                         'damaged_quantity' => $damagedQuantity,
                         'missing_quantity' => $missingQuantity,
-                        'item_condition' => (string) ($itemPayload['item_condition'] ?? ($missingQuantity > 0 || $damagedQuantity > 0 ? 'DISCREPANCY' : 'GOOD')),
+                        'item_condition' => $itemCondition,
                     ])->save();
                 }
             }

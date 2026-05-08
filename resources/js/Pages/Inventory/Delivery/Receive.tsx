@@ -37,7 +37,6 @@ type ReceiveFormData = {
         delivery_item_id: number;
         received_quantity: number | string;
         damaged_quantity: number | string;
-        item_condition: string;
     }>;
 };
 
@@ -53,19 +52,35 @@ export default function DeliveryReceive({ delivery }: Props) {
             delivery_item_id: item.delivery_item_id,
             received_quantity: item.received_quantity || 0,
             damaged_quantity: item.damaged_quantity || 0,
-            item_condition: item.item_condition || 'GOOD',
         })),
     });
 
-    const handleItemChange = (index: number, field: 'received_quantity' | 'damaged_quantity' | 'item_condition', value: string | number) => {
+    const handleItemChange = (index: number, field: 'received_quantity' | 'damaged_quantity', value: string | number) => {
         const updatedItems = [...data.items];
-        if (field === 'received_quantity' || field === 'damaged_quantity') {
-            updatedItems[index][field] = value === '' ? 0 : parseFloat(String(value));
-        } else {
-            updatedItems[index].item_condition = String(value);
-        }
+        updatedItems[index][field] = value === '' ? 0 : parseFloat(String(value));
         setData('items', updatedItems);
     };
+
+    const lineWarnings = data.items.flatMap((item, index) => {
+        const deliveryItem = delivery.items[index];
+        const itemName = deliveryItem?.item?.item_name ?? `Item ${index + 1}`;
+        const expectedQuantity = Number(deliveryItem?.expected_quantity ?? 0);
+        const receivedQuantity = Number(item.received_quantity || 0);
+        const damagedQuantity = Number(item.damaged_quantity || 0);
+        const warnings: string[] = [];
+
+        if (receivedQuantity > expectedQuantity) {
+            warnings.push(`${itemName}: received quantity exceeds expected quantity.`);
+        }
+
+        if (damagedQuantity > receivedQuantity) {
+            warnings.push(`${itemName}: damaged quantity cannot exceed received quantity.`);
+        }
+
+        return warnings;
+    });
+
+    const hasLineWarnings = lineWarnings.length > 0;
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
@@ -94,8 +109,17 @@ export default function DeliveryReceive({ delivery }: Props) {
                         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                             <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
                                 <h3 className="text-lg font-semibold text-slate-800">Received Items</h3>
-                                <p className="mt-1 text-sm text-slate-600">Record the actual quantities received and item condition</p>
+                                <p className="mt-1 text-sm text-slate-600">Record the actual quantities received. Item condition is calculated from damaged and missing quantities.</p>
                             </div>
+                            {hasLineWarnings ? (
+                                <div className="border-b border-amber-200 bg-amber-50 px-6 py-3 text-sm font-semibold text-amber-800">
+                                    <ul className="list-disc space-y-1 pl-5">
+                                        {lineWarnings.map((warning) => (
+                                            <li key={warning}>{warning}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            ) : null}
                             <table className="min-w-full divide-y divide-slate-200 text-sm">
                                 <thead className="bg-slate-50">
                                     <tr>
@@ -103,7 +127,6 @@ export default function DeliveryReceive({ delivery }: Props) {
                                         <th className="px-6 py-3 text-center font-semibold text-slate-700">Expected Qty</th>
                                         <th className="px-6 py-3 text-center font-semibold text-slate-700">Received Qty</th>
                                         <th className="px-6 py-3 text-center font-semibold text-slate-700">Damaged Qty</th>
-                                        <th className="px-6 py-3 text-left font-semibold text-slate-700">Condition</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
@@ -130,17 +153,6 @@ export default function DeliveryReceive({ delivery }: Props) {
                                                     onChange={(e) => handleItemChange(index, 'damaged_quantity', e.target.value)}
                                                     className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-center text-sm focus:border-blue-500 focus:outline-none"
                                                 />
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <select
-                                                    value={data.items[index].item_condition}
-                                                    onChange={(e) => handleItemChange(index, 'item_condition', e.target.value)}
-                                                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                                                >
-                                                    <option value="GOOD">Good</option>
-                                                    <option value="DAMAGED">Damaged</option>
-                                                    <option value="MISSING">Missing</option>
-                                                </select>
                                             </td>
                                         </tr>
                                     ))}
@@ -176,7 +188,7 @@ export default function DeliveryReceive({ delivery }: Props) {
                         <div className="flex flex-wrap gap-3">
                             <button
                                 type="submit"
-                                disabled={processing}
+                                disabled={processing || hasLineWarnings}
                                 className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                                 {processing ? 'Saving...' : 'Complete Receipt'}

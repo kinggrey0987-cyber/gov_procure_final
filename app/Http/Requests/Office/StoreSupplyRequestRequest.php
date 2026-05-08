@@ -85,7 +85,7 @@ class StoreSupplyRequestRequest extends FormRequest
             }
 
             $ppmpItems = PpmpItem::query()
-                ->with('item:item_id,item_name')
+                ->with('item:item_id,item_name,status')
                 ->where('ppmp_id', $ppmpId)
                 ->whereIn('ppmp_item_id', $ppmpItemIds->all())
                 ->get(['ppmp_item_id', 'ppmp_id', 'item_id', 'quantity'])
@@ -104,6 +104,10 @@ class StoreSupplyRequestRequest extends FormRequest
 
                 if ($payloadItemId !== null && $payloadItemId !== (int) $ppmpItem->item_id) {
                     $validator->errors()->add("items.$index.item_id", 'Selected item must match the chosen PPMP item.');
+                }
+
+                if ((string) ($ppmpItem->item?->status ?? '') !== 'active') {
+                    $validator->errors()->add("items.$index.ppmp_item_id", 'This item is currently inactive and cannot be requested.');
                 }
             }
         });
