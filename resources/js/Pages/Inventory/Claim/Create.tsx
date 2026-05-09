@@ -28,6 +28,13 @@ type Props = {
     preselectedDistributionRecordId?: number | null;
 };
 
+const todayDate = (): string => {
+    const date = new Date();
+    const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+
+    return offsetDate.toISOString().split('T')[0];
+};
+
 export default function ClaimCreate({ distributionRecords, preselectedDistributionRecordId = null }: Props) {
     const { auth } = usePage<PageProps>().props;
     const isOfficeUser = auth?.user?.role_code === 'OFFICE_USER';
@@ -40,7 +47,7 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
         distribution_item_id: '',
         office_id: first?.office_id ?? 0,
         claim_type: '',
-        claim_date: '',
+        claim_date: todayDate(),
         claim_location: '',
         quantity_disputed: '',
         remarks: '',
@@ -85,6 +92,7 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                     form.setData('distribution_record_id', selectedRecordId);
                                     form.setData('distribution_item_id', '');
                                     form.setData('office_id', selected?.office_id ?? 0);
+                                    form.setData('claim_date', todayDate());
                                     form.setData('quantity_disputed', '');
                                 }}
                             >
@@ -155,7 +163,15 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                         <div className="grid gap-3 sm:grid-cols-2">
                             <div>
                                 <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Date Observed</label>
-                                <input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" type="date" value={form.data.claim_date} onChange={(e) => form.setData('claim_date', e.target.value)} />
+                                <input
+                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                    type="date"
+                                    min={selectedRecord?.release_date ?? undefined}
+                                    max={todayDate()}
+                                    value={form.data.claim_date}
+                                    onChange={(e) => form.setData('claim_date', e.target.value)}
+                                />
+                                <p className="mt-1 text-xs text-slate-500">Date observed cannot be before the supply release date or after today.</p>
                                 {form.errors.claim_date ? <p className="mt-1 text-xs text-rose-600">{form.errors.claim_date}</p> : null}
                             </div>
                             <div>
