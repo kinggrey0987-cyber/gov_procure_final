@@ -105,9 +105,9 @@ class DistributionRecordService
                     ->firstOrFail();
 
                 $released = (float) $item->quantity_released;
-                $received = (float) ($row['quantity_received'] ?? 0);
-                $damaged = (float) ($row['quantity_damaged'] ?? 0);
-                $missing = (float) ($row['quantity_missing'] ?? 0);
+                $received = (int) ($row['quantity_received'] ?? 0);
+                $damaged = (int) ($row['quantity_damaged'] ?? 0);
+                $missing = (int) ($row['quantity_missing'] ?? 0);
 
                 if (round($received + $damaged + $missing, 2) !== round($released, 2)) {
                     throw ValidationException::withMessages([

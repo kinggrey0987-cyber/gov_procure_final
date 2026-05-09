@@ -214,7 +214,7 @@ class DeliveryFeatureTest extends TestCase
             'delivery_item_id' => $item->delivery_item_id,
             'received_quantity' => 4,
             'damaged_quantity' => 1,
-            'missing_quantity' => 0,
+            'missing_quantity' => 1,
         ]);
 
         $this->actingAs($this->gsoOfficer)

@@ -8,6 +8,7 @@ use App\Models\Delivery;
 use App\Models\InventoryMovement;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequest;
+use App\Models\StatusHistory;
 use App\Services\Delivery\DeliveryService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -213,6 +214,18 @@ class DeliveryController
         $delivery = $this->deliveryService->ensureItemsFromPurchaseOrder($delivery);
         $delivery->load(['purchaseOrder', 'supplier', 'items.purchaseOrderItem.item']);
 
+        $poPlacedDate = null;
+        if ($delivery->purchaseOrder instanceof PurchaseOrder) {
+            $poPlacedDate = StatusHistory::query()
+                ->where('reference_type', PurchaseOrder::class)
+                ->where('reference_id', (int) $delivery->purchaseOrder->purchase_order_id)
+                ->where('new_status', 'PLACED')
+                ->orderBy('changed_at')
+                ->value('changed_at')?->toDateString()
+                ?? optional($delivery->purchaseOrder->updated_at)?->toDateString()
+                ?? optional($delivery->purchaseOrder->created_at)?->toDateString();
+        }
+
         $items = collect();
         if ($delivery->relationLoaded('items') && $delivery->items instanceof \Illuminate\Database\Eloquent\Collection) {
             $items = $delivery->items->map(fn ($item): array => [
@@ -238,6 +251,7 @@ class DeliveryController
                 'purchase_order' => $delivery->purchaseOrder ? [
                     'purchase_order_id' => (int) $delivery->purchaseOrder->purchase_order_id,
                     'po_number' => (string) ($delivery->purchaseOrder->po_number ?? ''),
+                    'placed_date' => $poPlacedDate,
                 ] : null,
                 'supplier' => $delivery->supplier ? [
                     'supplier_name' => (string) ($delivery->supplier->supplier_name ?? ''),

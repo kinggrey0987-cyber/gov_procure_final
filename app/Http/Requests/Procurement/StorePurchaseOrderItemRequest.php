@@ -20,7 +20,7 @@ class StorePurchaseOrderItemRequest extends FormRequest
             'item_id' => ['required', 'integer'],
             'item_name_snapshot' => ['required', 'string', 'max:200'],
             'specification' => ['nullable', 'string'],
-            'quantity_ordered' => ['required', 'numeric', 'gt:0'],
+            'quantity_ordered' => ['required', 'integer', 'gt:0'],
             'unit' => ['required', 'string', 'max:50'],
             'unit_price' => ['required', 'numeric', 'gt:0'],
         ];

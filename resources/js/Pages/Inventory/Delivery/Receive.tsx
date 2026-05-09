@@ -23,6 +23,7 @@ type Delivery = {
     purchase_order?: {
         purchase_order_id: number;
         po_number: string;
+        placed_date?: string | null;
     } | null;
     supplier?: {
         supplier_name: string;
@@ -44,20 +45,35 @@ type Props = {
     delivery: Delivery;
 };
 
+const todayDate = (): string => {
+    const date = new Date();
+    const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+
+    return offsetDate.toISOString().split('T')[0];
+};
+
 export default function DeliveryReceive({ delivery }: Props) {
+    const toWholeQuantity = (value: string | number): number => {
+        if (value === '') {
+            return 0;
+        }
+
+        return Math.max(Math.trunc(Number(value) || 0), 0);
+    };
+
     const { data, setData, put, processing, errors } = useForm<ReceiveFormData>({
-        actual_delivery_date: delivery.actual_delivery_date || '',
+        actual_delivery_date: delivery.actual_delivery_date || todayDate(),
         remarks: delivery.remarks || '',
         items: delivery.items.map(item => ({
             delivery_item_id: item.delivery_item_id,
-            received_quantity: item.received_quantity || 0,
-            damaged_quantity: item.damaged_quantity || 0,
+            received_quantity: toWholeQuantity(item.received_quantity || 0),
+            damaged_quantity: toWholeQuantity(item.damaged_quantity || 0),
         })),
     });
 
     const handleItemChange = (index: number, field: 'received_quantity' | 'damaged_quantity', value: string | number) => {
         const updatedItems = [...data.items];
-        updatedItems[index][field] = value === '' ? 0 : parseFloat(String(value));
+        updatedItems[index][field] = toWholeQuantity(value);
         setData('items', updatedItems);
     };
 
@@ -133,12 +149,13 @@ export default function DeliveryReceive({ delivery }: Props) {
                                     {delivery.items.map((item, index) => (
                                         <tr key={item.delivery_item_id} className="hover:bg-slate-50/50">
                                             <td className="px-6 py-4 text-slate-800">{item.item?.item_name ?? 'Unknown Item'}</td>
-                                            <td className="px-6 py-4 text-center text-slate-700">{item.expected_quantity.toFixed(2)}</td>
+                                            <td className="px-6 py-4 text-center text-slate-700">{toWholeQuantity(item.expected_quantity)}</td>
                                             <td className="px-6 py-4 text-center">
                                                 <input
                                                     type="number"
-                                                    step="0.01"
+                                                    step="1"
                                                     min="0"
+                                                    inputMode="numeric"
                                                     value={data.items[index].received_quantity}
                                                     onChange={(e) => handleItemChange(index, 'received_quantity', e.target.value)}
                                                     className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-center text-sm focus:border-blue-500 focus:outline-none"
@@ -147,8 +164,9 @@ export default function DeliveryReceive({ delivery }: Props) {
                                             <td className="px-6 py-4 text-center">
                                                 <input
                                                     type="number"
-                                                    step="0.01"
+                                                    step="1"
                                                     min="0"
+                                                    inputMode="numeric"
                                                     value={data.items[index].damaged_quantity ?? 0}
                                                     onChange={(e) => handleItemChange(index, 'damaged_quantity', e.target.value)}
                                                     className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-center text-sm focus:border-blue-500 focus:outline-none"
@@ -165,10 +183,13 @@ export default function DeliveryReceive({ delivery }: Props) {
                             <FormField label="Actual Delivery Date" error={errors.actual_delivery_date}>
                                 <input
                                     type="date"
+                                    min={delivery.purchase_order?.placed_date ?? undefined}
+                                    max={todayDate()}
                                     value={data.actual_delivery_date}
                                     onChange={(e) => setData('actual_delivery_date', e.target.value)}
                                     className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none"
                                 />
+                                <p className="mt-1 text-xs text-slate-500">Select the real delivery date. It cannot be before the PO placed date and future dates are not allowed.</p>
                             </FormField>
 
                             <div className="mt-4">
@@ -236,8 +257,5 @@ function FormField({
         </div>
     );
 }
-
-
-
 
 

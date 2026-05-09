@@ -36,6 +36,8 @@ type Props = {
 };
 
 export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceItems }: Props) {
+    const toWholeQuantity = (value: string | number): number => Math.max(Math.trunc(Number(value) || 0), 0);
+
     const form = useForm({
         supply_request_item_id: 0,
         item_id: 0,
@@ -68,7 +70,7 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
         }
 
         if (!form.data.quantity_ordered) {
-            form.setData('quantity_ordered', String(Number(row.quantity_requested ?? 0).toFixed(2)));
+            form.setData('quantity_ordered', String(toWholeQuantity(row.quantity_requested ?? 0)));
         }
     };
 
@@ -106,7 +108,7 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                             <option value="">Select Source Request Item</option>
                             {sourceItems.map((row) => (
                                 <option key={row.supply_request_item_id} value={row.supply_request_item_id}>
-                                    {row.item_name_snapshot} · Req Qty {Number(row.quantity_requested ?? 0).toFixed(2)}
+                                    {row.item_name_snapshot} · Req Qty {toWholeQuantity(row.quantity_requested ?? 0)}
                                 </option>
                             ))}
                         </select>
@@ -143,10 +145,12 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                         />
                         <input
                             type="number"
-                            step="0.01"
+                            step="1"
+                            min="1"
+                            inputMode="numeric"
                             placeholder="Quantity Ordered"
                             value={form.data.quantity_ordered}
-                            onChange={(event) => form.setData('quantity_ordered', event.target.value)}
+                            onChange={(event) => form.setData('quantity_ordered', String(toWholeQuantity(event.target.value)))}
                             className="rounded border-gray-300 text-sm"
                             required
                         />

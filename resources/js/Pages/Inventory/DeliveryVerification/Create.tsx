@@ -47,9 +47,18 @@ type Props = {
     delivery: Delivery;
 };
 
+const todayDate = (): string => {
+    const date = new Date();
+    const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+
+    return offsetDate.toISOString().split('T')[0];
+};
+
 export default function DeliveryVerificationCreate({ delivery }: Props) {
+    const minimumVerificationDate = delivery.actual_delivery_date ?? undefined;
+
     const { data, setData, post, processing, errors } = useForm<VerificationForm>({
-        verification_date: new Date().toISOString().split('T')[0] || '',
+        verification_date: todayDate(),
         verification_status: delivery.verification_summary?.recommended_status ?? '',
         discrepancy_notes: '',
         remarks: '',
@@ -132,10 +141,13 @@ export default function DeliveryVerificationCreate({ delivery }: Props) {
                             <FormField label="Verification Date" required error={errors.verification_date}>
                                 <input
                                     type="date"
+                                    min={minimumVerificationDate}
+                                    max={todayDate()}
                                     value={data.verification_date}
                                     onChange={(e) => setData('verification_date', e.target.value)}
                                     className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none"
                                 />
+                                <p className="mt-1 text-xs text-slate-500">Verification date cannot be before the actual delivery date and cannot be future-dated.</p>
                             </FormField>
 
                             <FormField label="Verification Status" required error={errors.verification_status}>

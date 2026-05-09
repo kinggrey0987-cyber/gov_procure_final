@@ -386,9 +386,9 @@ class DistributionRecordController
             ->get()
             ->map(fn ($item): array => [
                 'distribution_item_id' => (int) $item->distribution_item_id,
-                'quantity_received' => (float) $item->quantity_released,
-                'quantity_damaged' => 0.0,
-                'quantity_missing' => 0.0,
+                'quantity_received' => (int) $item->quantity_released,
+                'quantity_damaged' => 0,
+                'quantity_missing' => 0,
                 'receipt_condition' => 'GOOD',
                 'receipt_notes' => null,
             ])

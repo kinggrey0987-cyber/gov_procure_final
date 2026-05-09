@@ -124,8 +124,8 @@ class DeliveryService
                         continue;
                     }
 
-                    $receivedQuantity = (float) ($itemPayload['received_quantity'] ?? 0);
-                    $damagedQuantity = (float) ($itemPayload['damaged_quantity'] ?? 0);
+                    $receivedQuantity = (int) ($itemPayload['received_quantity'] ?? 0);
+                    $damagedQuantity = (int) ($itemPayload['damaged_quantity'] ?? 0);
                     $expectedQuantity = (float) $item->expected_quantity;
                     $missingQuantity = max($expectedQuantity - $receivedQuantity, 0);
 

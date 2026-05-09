@@ -238,7 +238,7 @@ class PurchaseOrderService
         $this->assertItemMatchesOrderContext($purchaseOrder, $supplyRequestItem, (int) $payload['item_id']);
 
         return DB::transaction(function () use ($purchaseOrder, $actor, $payload): PurchaseOrderItem {
-            $quantity = (float) $payload['quantity_ordered'];
+            $quantity = (int) $payload['quantity_ordered'];
             $unitPrice = (float) $payload['unit_price'];
 
             $item = $purchaseOrder->items()->create([
@@ -281,7 +281,7 @@ class PurchaseOrderService
         $this->assertItemMatchesOrderContext($purchaseOrder, $supplyRequestItem, (int) $payload['item_id']);
 
         return DB::transaction(function () use ($purchaseOrder, $item, $actor, $payload): PurchaseOrderItem {
-            $quantity = (float) $payload['quantity_ordered'];
+            $quantity = (int) $payload['quantity_ordered'];
             $unitPrice = (float) $payload['unit_price'];
 
             $item->fill([
