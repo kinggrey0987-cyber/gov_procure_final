@@ -108,7 +108,7 @@ export default function SupplyRequestsIndex({ supplyRequests, filters, filter_op
                                 className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                             >
                                 <option value="">All statuses</option>
-                                {['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'RETURNED_FOR_REVISION', 'PROCESSING', 'RELEASED', 'RECEIVED'].map((option) => (
+                                {['DRAFT', 'SUBMITTED', 'IN_REVIEW', 'PROCUREMENT_PLACED', 'PROCESSING', 'RELEASED', 'RECEIVED', 'REJECTED', 'RETURNED_FOR_REVISION'].map((option) => (
                                     <option key={option} value={option}>{option.replaceAll('_', ' ')}</option>
                                 ))}
                             </select>

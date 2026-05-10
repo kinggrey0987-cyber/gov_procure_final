@@ -64,6 +64,8 @@ export default function DistributionShow({ record }: Props) {
 
     const canManageDistribution = page.auth?.can?.inventory === true;
     const isOfficeUser = page.auth?.can?.office === true;
+    const backRouteName = isOfficeUser ? 'office.supplies-ready.index' : 'inventory.distribution-records.index';
+    const backLabel = isOfficeUser ? 'Back to Ready Supplies' : 'Back to Distribution Records';
     const canConfirmReceipt = isOfficeUser && record.status === 'RELEASED';
     const canFileClaim = isOfficeUser && (record.status === 'RELEASED' || record.status === 'RECEIVED');
     const [activeTab, setActiveTab] = useState<'overview' | 'items' | 'status' | 'related' | 'notes'>('overview');
@@ -73,8 +75,8 @@ export default function DistributionShow({ record }: Props) {
             header={
                 <div className="space-y-3">
                     <h2 className="text-xl font-semibold leading-tight text-gray-800">Distribution Detail</h2>
-                    <Link href={route('inventory.distribution-records.index')} className="inline-flex rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
-                        Back to Distribution Records
+                    <Link href={route(backRouteName)} className="inline-flex rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                        {backLabel}
                     </Link>
                 </div>
             }
@@ -149,10 +151,11 @@ export default function DistributionShow({ record }: Props) {
                     </div>
                 ) : null}
 
-                {activeTab === 'items' ? (
+                {activeTab === 'items' && !isOfficeUser ? (
                     <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                     <div className="border-b border-slate-200 px-4 py-3">
                         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Requested Office Items</h3>
+                        <p className="mt-1 text-xs text-slate-500">Inventory staff can compare requested quantities, released quantities, remaining quantities, and current stock while preparing releases.</p>
                     </div>
                     <table className="min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-slate-50">

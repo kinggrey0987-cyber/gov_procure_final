@@ -30,7 +30,7 @@ class StoreClaimRequest extends FormRequest
             'claim_type' => ['required', 'string', 'max:80'],
             'claim_date' => ['required', 'date', 'after_or_equal:'.$earliestClaimDate, 'before_or_equal:today'],
             'claim_location' => ['required', 'string', 'max:150'],
-            'quantity_disputed' => ['nullable', 'numeric', 'min:0'],
+            'quantity_disputed' => ['nullable', 'integer', 'min:0'],
             'remarks' => ['nullable', 'string'],
             'attachment_title' => ['nullable', 'string', 'max:200'],
             'attachment_file' => ['nullable', 'file', 'max:10240', 'mimes:pdf,doc,docx,xls,xlsx,csv,png,jpg,jpeg'],

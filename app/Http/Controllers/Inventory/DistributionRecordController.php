@@ -89,7 +89,7 @@ class DistributionRecordController
         $focusedReason = null;
         if ($focusSupplyRequestId > 0) {
             $focusedRequest = SupplyRequest::query()
-                ->with(['items.item.inventory', 'purchaseRequests', 'distributionRecords'])
+                ->with(['items.item.inventory', 'purchaseRequests', 'distributionRecords.items'])
                 ->where('supply_request_id', $focusSupplyRequestId)
                 ->first();
 
@@ -159,8 +159,8 @@ class DistributionRecordController
         return SupplyRequest::query()
             ->submitted()
             ->whereHas('office', fn ($officeQuery) => $officeQuery->where('code', '!=', 'GSO'))
-            ->whereDoesntHave('distributionRecords')
-            ->with(['office', 'items.item.inventory'])
+            ->whereDoesntHave('distributionRecords', fn ($query) => $query->where('status', 'DRAFT'))
+            ->with(['office', 'items.item.inventory', 'distributionRecords.items'])
             ->latest('supply_request_id')
             ->get()
             ->map(fn (SupplyRequest $request): ?array => $this->releaseRowFromAvailableInventory($request))
@@ -170,6 +170,10 @@ class DistributionRecordController
 
     private function releaseRowFromAvailableInventory(SupplyRequest $request): ?array
     {
+        if (! $this->hasRemainingQuantity($request)) {
+            return null;
+        }
+
         if ($this->supplyRequestShortageTotal($request) > 0) {
             return null;
         }
@@ -191,14 +195,46 @@ class DistributionRecordController
     private function supplyRequestShortageTotal(SupplyRequest $request): float
     {
         $shortageTotal = 0.0;
+        $releasedByItemId = $this->releasedQuantityByItemId($request);
 
         foreach ($request->items as $item) {
             $requested = (float) $item->quantity_requested;
+            $released = (float) ($releasedByItemId[(int) $item->item_id] ?? 0.0);
+            $remaining = max($requested - $released, 0);
             $available = (float) ($item->item?->inventory?->available_stock ?? 0);
-            $shortageTotal += max($requested - $available, 0);
+            $shortageTotal += max($remaining - $available, 0);
         }
 
         return $shortageTotal;
+    }
+
+    private function hasRemainingQuantity(SupplyRequest $request): bool
+    {
+        $releasedByItemId = $this->releasedQuantityByItemId($request);
+
+        foreach ($request->items as $item) {
+            $requested = (float) $item->quantity_requested;
+            $released = (float) ($releasedByItemId[(int) $item->item_id] ?? 0.0);
+
+            if ($requested - $released > 0.0001) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return array<int, float>
+     */
+    private function releasedQuantityByItemId(SupplyRequest $request): array
+    {
+        return $request->distributionRecords
+            ->whereIn('status', ['RELEASED', 'RECEIVED'])
+            ->flatMap(fn ($record) => $record->items)
+            ->groupBy(fn ($item) => (int) $item->item_id)
+            ->map(fn ($items): float => (float) $items->sum('quantity_released'))
+            ->all();
     }
 
     private function resolveFocusReason(?SupplyRequest $request): ?string
@@ -211,17 +247,25 @@ class DistributionRecordController
             return 'GSO-origin supply requests are internal logistics records and are not eligible for office distribution release.';
         }
 
-        if ($request->distributionRecords->isNotEmpty()) {
-            return 'This request already has a distribution record and is no longer pending release.';
+        $existingDraftRecord = $request->distributionRecords->firstWhere('status', 'DRAFT');
+        if ($existingDraftRecord instanceof DistributionRecord) {
+            return 'This request already has a draft distribution record. Continue releasing items in that draft.';
+        }
+
+        if (! $this->hasRemainingQuantity($request)) {
+            return 'All requested quantities have already been released for this request.';
         }
 
         $hasPurchaseRequest = $request->purchaseRequests->isNotEmpty();
 
         $shortageTotal = 0.0;
+        $releasedByItemId = $this->releasedQuantityByItemId($request);
         foreach ($request->items as $item) {
             $requested = (float) $item->quantity_requested;
+            $released = (float) ($releasedByItemId[(int) $item->item_id] ?? 0.0);
+            $remaining = max($requested - $released, 0);
             $available = (float) ($item->item?->inventory?->available_stock ?? 0);
-            $shortageTotal += max($requested - $available, 0);
+            $shortageTotal += max($remaining - $available, 0);
         }
 
         if ($hasPurchaseRequest && $shortageTotal > 0) {

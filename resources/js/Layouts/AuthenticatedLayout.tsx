@@ -467,12 +467,12 @@ export default function Authenticated({
             {
                 label: 'Request Tracking',
                 href: route('office.supply-requests.index'),
-                active: route().current('office.supply-requests.index') || route().current('office.supply-requests.show'),
+                active: route().current('office.supply-requests.index') || route().current('office.supply-requests.show') || route().current('office.supplies-ready.*') || route().current('office.distribution-records.*'),
             },
             {
                 label: 'Claims and Adjustments',
                 href: route('office.claims.index'),
-                active: route().current('office.claims.*') || route().current('office.supplies-ready.*'),
+                active: route().current('office.claims.*'),
             },
             {
                 label: 'Notifications',

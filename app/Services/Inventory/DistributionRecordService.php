@@ -302,7 +302,7 @@ class DistributionRecordService
 
     private function assertContextConsistency(DistributionRecord $record): void
     {
-        $record->loadMissing('supplyRequest.office', 'supplyRequest.purchaseRequests', 'delivery.purchaseOrder');
+        $record->loadMissing('supplyRequest.office', 'supplyRequest.purchaseRequests', 'supplyRequest.distributionRecords.items', 'delivery.purchaseOrder');
 
         if ((string) ($record->supplyRequest->office?->code ?? '') === 'GSO') {
             throw ValidationException::withMessages([
@@ -313,11 +313,26 @@ class DistributionRecordService
         $isProcurementBacked = $record->supplyRequest->purchaseRequests->isNotEmpty();
         $hasDeliveryContext = $record->delivery_id !== null;
         $shortageTotal = 0.0;
+        $releasedByItemId = $record->supplyRequest->distributionRecords
+            ->whereIn('status', ['RELEASED', 'RECEIVED'])
+            ->flatMap(fn ($distributionRecord) => $distributionRecord->items)
+            ->groupBy(fn ($item) => (int) $item->item_id)
+            ->map(fn ($items): float => (float) $items->sum('quantity_released'));
+        $hasRemainingQuantity = false;
 
         foreach ($record->supplyRequest->items as $item) {
             $requested = (float) $item->quantity_requested;
+            $released = (float) ($releasedByItemId->get((int) $item->item_id) ?? 0.0);
+            $remaining = max($requested - $released, 0);
             $available = (float) ($item->item?->inventory?->available_stock ?? 0);
-            $shortageTotal += max($requested - $available, 0);
+            $shortageTotal += max($remaining - $available, 0);
+            $hasRemainingQuantity = $hasRemainingQuantity || $remaining > 0.0001;
+        }
+
+        if (! $hasRemainingQuantity) {
+            throw ValidationException::withMessages([
+                'supply_request_id' => 'All requested quantities have already been released for this request.',
+            ]);
         }
 
         if (! $hasDeliveryContext && $isProcurementBacked && $shortageTotal > 0) {

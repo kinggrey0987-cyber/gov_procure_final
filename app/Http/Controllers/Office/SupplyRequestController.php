@@ -46,7 +46,20 @@ class SupplyRequestController extends Controller
         $supplyRequests = SupplyRequest::query()
             ->with(['items.item.inventory', 'purchaseRequests', 'purchaseOrders', 'distributionRecords'])
             ->forOffice((int) $request->user()?->office_id)
-            ->when($status !== '', fn ($query) => $query->where('status', $status))
+            ->when($status !== '', function ($query) use ($status): void {
+                if (in_array($status, ['RELEASED', 'RECEIVED'], true)) {
+                    $query->whereHas('distributionRecords', fn ($distributionQuery) => $distributionQuery->where('status', $status));
+
+                    return;
+                }
+
+                $query->where('status', $status);
+            })
+            ->when($status === 'SUBMITTED', function ($query): void {
+                $query->whereDoesntHave('purchaseRequests')
+                    ->whereDoesntHave('purchaseOrders')
+                    ->whereDoesntHave('distributionRecords');
+            })
             ->when(preg_match('/^\d{4}$/', $year) === 1, fn ($query) => $query->whereYear('request_date', (int) $year))
             ->when(preg_match('/^\d{1,2}$/', $month) === 1, fn ($query) => $query->whereMonth('request_date', (int) $month))
             ->when($search !== '', function ($query) use ($search): void {
@@ -135,7 +148,7 @@ class SupplyRequestController extends Controller
             'approver',
             'purchaseRequests',
             'purchaseOrders',
-            'distributionRecords',
+            'distributionRecords.items',
         ]);
 
         $requiresProcurement = $this->requiresProcurement($supplyRequest);
@@ -213,15 +226,29 @@ class SupplyRequestController extends Controller
      */
     private function mappedSupplyRequestItems(SupplyRequest $supplyRequest, $ppmpItemContext): array
     {
+        $releasedByItemId = $supplyRequest->distributionRecords
+            ->whereIn('status', ['RELEASED', 'RECEIVED'])
+            ->flatMap(fn ($record) => $record->items)
+            ->groupBy(fn ($item) => (int) $item->item_id)
+            ->map(fn ($items): float => (float) $items->sum('quantity_released'));
+        $receivedByItemId = $supplyRequest->distributionRecords
+            ->where('status', 'RECEIVED')
+            ->flatMap(fn ($record) => $record->items)
+            ->groupBy(fn ($item) => (int) $item->item_id)
+            ->map(fn ($items): float => (float) $items->sum('quantity_received'));
+
         return $supplyRequest->items
-            ->map(function ($item) use ($ppmpItemContext): array {
+            ->map(function ($item) use ($ppmpItemContext, $releasedByItemId, $receivedByItemId): array {
                 $context = $ppmpItemContext->get((int) $item->ppmp_item_id, []);
+                $itemId = (int) $item->item_id;
 
                 return [
                     'supply_request_item_id' => (int) $item->supply_request_item_id,
                     'ppmp_item_id' => (int) $item->ppmp_item_id,
                     'item_name_snapshot' => (string) ($item->item_name_snapshot ?? ''),
                     'quantity_requested' => (float) $item->quantity_requested,
+                    'quantity_released' => (float) ($releasedByItemId->get($itemId) ?? 0.0),
+                    'quantity_received' => (float) ($receivedByItemId->get($itemId) ?? 0.0),
                     'planned_quantity' => isset($context['planned_quantity']) ? (float) $context['planned_quantity'] : null,
                     'already_requested_quantity' => isset($context['requested_quantity']) ? (float) $context['requested_quantity'] : null,
                     'remaining_quantity' => isset($context['remaining_quantity']) ? (float) $context['remaining_quantity'] : null,
@@ -276,7 +303,7 @@ class SupplyRequestController extends Controller
             ->map(fn ($status): string => strtoupper((string) $status));
 
         if ($distributionStatuses->contains('RECEIVED')) {
-            return 'COMPLETED';
+            return 'RECEIVED';
         }
 
         if ($distributionStatuses->contains('RELEASED')) {
@@ -458,7 +485,7 @@ class SupplyRequestController extends Controller
         $officeId = (int) $request->user()?->office_id;
 
         $records = DistributionRecord::query()
-            ->with(['supplyRequest.items'])
+            ->with(['items', 'supplyRequest'])
             ->forOffice($officeId)
             ->whereIn('status', ['RELEASED', 'RECEIVED'])
             ->latest('distribution_record_id')
@@ -467,8 +494,8 @@ class SupplyRequestController extends Controller
                 'distribution_record_id' => (int) $record->distribution_record_id,
                 'request_id' => (string) ($record->supplyRequest?->request_code ?? 'N/A'),
                 'request_date' => optional($record->supplyRequest?->request_date)?->toDateString(),
-                'items_summary' => (string) ($record->supplyRequest?->items->take(2)->pluck('item_name_snapshot')->implode(', ') ?: 'No items listed'),
-                'items_count' => (int) ($record->supplyRequest?->items->count() ?? 0),
+                'items_summary' => (string) ($record->items->take(2)->pluck('item_name_snapshot')->implode(', ') ?: 'No released items listed'),
+                'items_count' => (int) $record->items->count(),
                 'location' => (string) ($record->storage_location ?? 'GSO Storage'),
                 'ready_since' => optional($record->release_date)?->toDateString(),
                 'status' => (string) $record->status,
