@@ -56,13 +56,7 @@ class StoreDocumentRequest extends FormRequest
 
             $documentKind = strtolower(trim((string) $this->input('document_kind')));
 
-            if ($documentKind === '') {
-                $validator->errors()->add('document_kind', 'Select a document type before uploading.');
-
-                return;
-            }
-
-            if (! in_array($documentKind, self::PROCUREMENT_DOCUMENT_KINDS, true)) {
+            if ($documentKind !== '' && ! in_array($documentKind, self::PROCUREMENT_DOCUMENT_KINDS, true)) {
                 $validator->errors()->add('document_kind', 'Select a procurement document type that belongs to a PR or PO.');
 
                 return;

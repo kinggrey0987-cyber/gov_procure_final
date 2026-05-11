@@ -431,6 +431,9 @@ Route::middleware(['auth', 'twofactor', 'must-change-password'])->group(function
             Route::get('/', [DomainDashboardController::class, 'inventory'])
                 ->name('dashboard');
 
+            Route::get('/tracking', [DomainDashboardController::class, 'inventory'])
+                ->name('tracking');
+
             Route::prefix('inventory')->name('inventory.')->group(function () {
                 Route::get('/', [InventoryController::class, 'index'])
                     ->middleware('can:inventory.view-any')

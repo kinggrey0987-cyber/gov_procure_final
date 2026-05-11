@@ -11,6 +11,18 @@ use Illuminate\Validation\Validator;
 
 class UpdateSupplyRequestRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        /** @var SupplyRequest|null $supplyRequest */
+        $supplyRequest = $this->route('supply_request');
+
+        if (! $this->has('ppmp_id') && $supplyRequest?->ppmp_id) {
+            $this->merge([
+                'ppmp_id' => (int) $supplyRequest->ppmp_id,
+            ]);
+        }
+    }
+
     public function authorize(): bool
     {
         /** @var SupplyRequest|null $supplyRequest */

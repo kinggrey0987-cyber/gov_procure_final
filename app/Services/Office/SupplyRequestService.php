@@ -393,7 +393,8 @@ class SupplyRequestService
             ]);
         }
 
-        if ((string) ($ppmpItem->item?->status ?? '') !== 'active') {
+        $itemStatus = $ppmpItem->item?->status;
+        if ($itemStatus !== null && (string) $itemStatus !== 'active') {
             throw ValidationException::withMessages([
                 'ppmp_item_id' => 'This item is currently inactive and cannot be requested.',
             ]);

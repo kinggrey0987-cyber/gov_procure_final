@@ -106,7 +106,8 @@ class StoreSupplyRequestRequest extends FormRequest
                     $validator->errors()->add("items.$index.item_id", 'Selected item must match the chosen PPMP item.');
                 }
 
-                if ((string) ($ppmpItem->item?->status ?? '') !== 'active') {
+                $itemStatus = $ppmpItem->item?->status;
+                if ($itemStatus !== null && (string) $itemStatus !== 'active') {
                     $validator->errors()->add("items.$index.ppmp_item_id", 'This item is currently inactive and cannot be requested.');
                 }
             }

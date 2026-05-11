@@ -62,13 +62,16 @@ class StoreSupplyRequestItemRequest extends FormRequest
                 return;
             }
 
-            $isActiveCatalogItem = PpmpItem::query()
+            $isRequestableCatalogItem = PpmpItem::query()
                 ->where('ppmp_item_id', $ppmpItemId)
                 ->where('ppmp_id', (int) $supplyRequest->ppmp_id)
-                ->whereHas('item', fn ($query) => $query->where('status', 'active'))
+                ->where(function ($query): void {
+                    $query->whereDoesntHave('item')
+                        ->orWhereHas('item', fn ($itemQuery) => $itemQuery->where('status', 'active'));
+                })
                 ->exists();
 
-            if (! $isActiveCatalogItem) {
+            if (! $isRequestableCatalogItem) {
                 $validator->errors()->add('ppmp_item_id', 'This item is currently inactive and cannot be requested.');
             }
         });

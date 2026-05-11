@@ -23,7 +23,7 @@ type Props = {
 };
 
 export default function EditItem({ item, categories }: Props) {
-    const { data, setData, patch, processing, errors } = useForm({
+    const { data, setData, put, processing, errors } = useForm({
         item_name: item.item_name,
         item_category_id: String(item.item_category_id),
         default_unit: item.default_unit ?? '',
@@ -33,7 +33,7 @@ export default function EditItem({ item, categories }: Props) {
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
-        patch(route('inventory.items.update', item.item_id));
+        put(route('inventory.items.update', item.item_id));
     };
 
     return (
