@@ -51,6 +51,7 @@ export default function PurchaseRequestsShow({ purchaseRequest, reviewMode = fal
     const processForm = useForm({ action: 'process', remarks: '' });
     const totalQuantity = (purchaseRequest.items ?? []).reduce((sum, row) => sum + Number(row.quantity_requested ?? 0), 0);
     const normalizedRequestRemarks = formatRequestRemarks(purchaseRequest.remarks);
+    const reasonIsBlank = processForm.data.remarks.trim() === '';
 
     const processRequest = (event: FormEvent) => {
         event.preventDefault();
@@ -156,10 +157,10 @@ export default function PurchaseRequestsShow({ purchaseRequest, reviewMode = fal
                                         Move to Processing
                                     </button>
                                 )}
-                                <button type="button" onClick={() => submitReviewAction('return')} className="rounded bg-violet-600 px-4 py-2 text-sm text-white">
+                                <button type="button" onClick={() => submitReviewAction('return')} disabled={reasonIsBlank || processForm.processing} className="rounded bg-violet-600 px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60">
                                     Return for Revision
                                 </button>
-                                <button type="button" onClick={() => submitReviewAction('reject')} className="rounded bg-rose-600 px-4 py-2 text-sm text-white">
+                                <button type="button" onClick={() => submitReviewAction('reject')} disabled={reasonIsBlank || processForm.processing} className="rounded bg-rose-600 px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60">
                                     Reject Request
                                 </button>
                             </div>

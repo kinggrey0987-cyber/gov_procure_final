@@ -11,6 +11,7 @@ use App\Models\Ppmp;
 use App\Models\SupplyRequest;
 use App\Services\History\HistoryTimelineService;
 use App\Services\Office\SupplyRequestService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -47,13 +48,7 @@ class SupplyRequestController extends Controller
             ->with(['items.item.inventory', 'purchaseRequests', 'purchaseOrders', 'distributionRecords'])
             ->forOffice((int) $request->user()?->office_id)
             ->when($status !== '', function ($query) use ($status): void {
-                if (in_array($status, ['RELEASED', 'RECEIVED'], true)) {
-                    $query->whereHas('distributionRecords', fn ($distributionQuery) => $distributionQuery->where('status', $status));
-
-                    return;
-                }
-
-                $query->where('status', $status);
+                $this->applyTrackingStatusFilter($query, $status);
             })
             ->when($status === 'SUBMITTED', function ($query): void {
                 $query->whereDoesntHave('purchaseRequests')
@@ -99,6 +94,60 @@ class SupplyRequestController extends Controller
                 'years' => $yearOptions,
             ],
         ]);
+    }
+
+    private function applyTrackingStatusFilter(Builder $query, string $status): void
+    {
+        match ($status) {
+            'RECEIVED' => $query->whereHas('distributionRecords', fn (Builder $distributionQuery) => $distributionQuery->where('status', 'RECEIVED')),
+            'RELEASED' => $query
+                ->whereDoesntHave('distributionRecords', fn (Builder $distributionQuery) => $distributionQuery->where('status', 'RECEIVED'))
+                ->whereHas('distributionRecords', fn (Builder $distributionQuery) => $distributionQuery->where('status', 'RELEASED')),
+            'PROCUREMENT_PLACED' => $query
+                ->whereDoesntHave('distributionRecords', fn (Builder $distributionQuery) => $distributionQuery->whereIn('status', ['RELEASED', 'RECEIVED']))
+                ->whereHas('purchaseOrders', fn (Builder $purchaseOrderQuery) => $purchaseOrderQuery->where('status', 'PLACED')),
+            'PROCUREMENT_PO_DRAFT' => $query
+                ->whereDoesntHave('distributionRecords', fn (Builder $distributionQuery) => $distributionQuery->whereIn('status', ['RELEASED', 'RECEIVED']))
+                ->whereDoesntHave('purchaseOrders', fn (Builder $purchaseOrderQuery) => $purchaseOrderQuery->where('status', 'PLACED'))
+                ->whereHas('purchaseOrders', fn (Builder $purchaseOrderQuery) => $purchaseOrderQuery->where('status', 'DRAFT')),
+            'REJECTED' => $query
+                ->whereDoesntHave('distributionRecords', fn (Builder $distributionQuery) => $distributionQuery->whereIn('status', ['RELEASED', 'RECEIVED']))
+                ->whereDoesntHave('purchaseOrders', fn (Builder $purchaseOrderQuery) => $purchaseOrderQuery->whereIn('status', ['PLACED', 'DRAFT']))
+                ->whereHas('purchaseRequests', fn (Builder $purchaseRequestQuery) => $purchaseRequestQuery->where('status', 'REJECTED')),
+            'RETURNED_FOR_REVISION' => $query
+                ->whereDoesntHave('distributionRecords', fn (Builder $distributionQuery) => $distributionQuery->whereIn('status', ['RELEASED', 'RECEIVED']))
+                ->whereDoesntHave('purchaseOrders', fn (Builder $purchaseOrderQuery) => $purchaseOrderQuery->whereIn('status', ['PLACED', 'DRAFT']))
+                ->whereDoesntHave('purchaseRequests', fn (Builder $purchaseRequestQuery) => $purchaseRequestQuery->where('status', 'REJECTED'))
+                ->whereHas('purchaseRequests', fn (Builder $purchaseRequestQuery) => $purchaseRequestQuery->where('status', 'RETURNED_FOR_REVISION')),
+            'PROCESSING' => $query
+                ->whereDoesntHave('distributionRecords', fn (Builder $distributionQuery) => $distributionQuery->whereIn('status', ['RELEASED', 'RECEIVED']))
+                ->whereDoesntHave('purchaseOrders', fn (Builder $purchaseOrderQuery) => $purchaseOrderQuery->whereIn('status', ['PLACED', 'DRAFT']))
+                ->whereDoesntHave('purchaseRequests', fn (Builder $purchaseRequestQuery) => $purchaseRequestQuery->whereIn('status', ['REJECTED', 'RETURNED_FOR_REVISION']))
+                ->whereHas('purchaseRequests', fn (Builder $purchaseRequestQuery) => $purchaseRequestQuery->where('status', 'PROCESSING')),
+            'IN_REVIEW' => $query->where(function (Builder $trackingQuery): void {
+                $trackingQuery
+                    ->where(function (Builder $directStockQuery): void {
+                        $directStockQuery
+                            ->where('status', 'SUBMITTED')
+                            ->whereDoesntHave('purchaseRequests')
+                            ->whereDoesntHave('purchaseOrders')
+                            ->whereDoesntHave('distributionRecords')
+                            ->whereDoesntHave('items', function (Builder $itemQuery): void {
+                                $itemQuery->whereHas('item.inventory', function (Builder $inventoryQuery): void {
+                                    $inventoryQuery->whereColumn('supply_request_items.quantity_requested', '>', 'inventory.available_stock');
+                                });
+                            });
+                    })
+                    ->orWhere(function (Builder $procurementQuery): void {
+                        $procurementQuery
+                            ->whereDoesntHave('distributionRecords', fn (Builder $distributionQuery) => $distributionQuery->whereIn('status', ['RELEASED', 'RECEIVED']))
+                            ->whereDoesntHave('purchaseOrders', fn (Builder $purchaseOrderQuery) => $purchaseOrderQuery->whereIn('status', ['PLACED', 'DRAFT']))
+                            ->whereDoesntHave('purchaseRequests', fn (Builder $purchaseRequestQuery) => $purchaseRequestQuery->whereIn('status', ['REJECTED', 'RETURNED_FOR_REVISION', 'PROCESSING']))
+                            ->whereHas('purchaseRequests', fn (Builder $purchaseRequestQuery) => $purchaseRequestQuery->where('status', 'OPEN'));
+                    });
+            }),
+            default => $query->where('status', $status),
+        };
     }
 
     public function create(Request $request): Response
@@ -206,6 +255,17 @@ class SupplyRequestController extends Controller
             'purpose' => (string) $supplyRequest->purpose,
             'priority_level' => (string) $supplyRequest->priority_level,
             'review_notes' => $supplyRequest->review_notes,
+            'purchase_requests' => $supplyRequest->purchaseRequests
+                ->sortByDesc('purchase_request_id')
+                ->map(fn ($purchaseRequest): array => [
+                    'purchase_request_id' => (int) $purchaseRequest->purchase_request_id,
+                    'status' => (string) $purchaseRequest->status,
+                    'remarks' => $purchaseRequest->remarks,
+                    'created_at' => optional($purchaseRequest->created_at)?->toIso8601String(),
+                    'updated_at' => optional($purchaseRequest->updated_at)?->toIso8601String(),
+                ])
+                ->values()
+                ->all(),
             'items' => $this->mappedSupplyRequestItems($supplyRequest, $ppmpItemContext),
             'processing_timeline' => $this->buildProcessingTimeline($trackingStatus, $requiresProcurement),
         ];

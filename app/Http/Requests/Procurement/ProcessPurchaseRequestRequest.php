@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Procurement;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class ProcessPurchaseRequestRequest extends FormRequest
 {
@@ -19,6 +20,22 @@ class ProcessPurchaseRequestRequest extends FormRequest
             'action' => ['required', 'string', 'in:process,return,reject'],
             'remarks' => ['nullable', 'string', 'required_if:action,return,reject'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            $action = (string) $this->input('action', '');
+
+            if (! in_array($action, ['return', 'reject'], true)) {
+                return;
+            }
+
+            $remarks = trim((string) $this->input('remarks', ''));
+            if ($remarks === '') {
+                $validator->errors()->add('remarks', 'A reason is required when returning for revision or rejecting a request.');
+            }
+        });
     }
 
     /**

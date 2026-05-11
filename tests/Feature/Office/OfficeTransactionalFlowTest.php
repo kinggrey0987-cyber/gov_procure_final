@@ -9,8 +9,11 @@ use App\Models\ItemCategory;
 use App\Models\Office;
 use App\Models\Ppmp;
 use App\Models\PpmpItem;
+use App\Models\PurchaseOrder;
+use App\Models\PurchaseRequest;
 use App\Models\Role;
 use App\Models\StatusHistory;
+use App\Models\Supplier;
 use App\Models\SupplyRequest;
 use App\Models\SupplyRequestItem;
 use App\Models\User;
@@ -835,6 +838,143 @@ class OfficeTransactionalFlowTest extends TestCase
                 'review_notes' => 'Tamper',
             ])
             ->assertSessionHasErrors('ppmp_id');
+    }
+
+    public function test_request_tracking_filters_by_resolved_procurement_placed_status(): void
+    {
+        $office = $this->createOffice();
+        $officeUser = $this->createUser(UserRole::OFFICE_USER, $office);
+        $supplier = Supplier::query()->create([
+            'supplier_name' => 'Placed Supplier',
+            'status' => 'ACTIVE',
+        ]);
+
+        $placedSupplyRequest = SupplyRequest::query()->create([
+            'request_code' => 'SR-PLACED-1',
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'ppmp_id' => null,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(2)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Placed procurement status filter test',
+            'priority_level' => 'MEDIUM',
+            'status' => 'SUBMITTED',
+            'review_notes' => null,
+            'approved_by' => null,
+            'approved_at' => null,
+        ]);
+        $draftSupplyRequest = SupplyRequest::query()->create([
+            'request_code' => 'SR-DRAFT-PO-1',
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'ppmp_id' => null,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(2)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Draft PO status filter control',
+            'priority_level' => 'MEDIUM',
+            'status' => 'SUBMITTED',
+            'review_notes' => null,
+            'approved_by' => null,
+            'approved_at' => null,
+        ]);
+
+        $placedPurchaseRequest = PurchaseRequest::query()->create([
+            'supply_request_id' => $placedSupplyRequest->supply_request_id,
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'status' => 'PROCESSING',
+            'remarks' => null,
+        ]);
+        $draftPurchaseRequest = PurchaseRequest::query()->create([
+            'supply_request_id' => $draftSupplyRequest->supply_request_id,
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'status' => 'PROCESSING',
+            'remarks' => null,
+        ]);
+
+        PurchaseOrder::query()->create([
+            'purchase_request_id' => $placedPurchaseRequest->purchase_request_id,
+            'supply_request_id' => $placedSupplyRequest->supply_request_id,
+            'supplier_id' => $supplier->supplier_id,
+            'created_by' => $officeUser->id,
+            'po_number' => 'PO-PLACED-1',
+            'procurement_method' => 'SMALL_VALUE_PROCUREMENT',
+            'status' => 'PLACED',
+            'expected_delivery_date' => now()->addDays(10)->toDateString(),
+            'total_amount' => 100,
+            'terms_notes' => null,
+            'remarks' => null,
+        ]);
+        PurchaseOrder::query()->create([
+            'purchase_request_id' => $draftPurchaseRequest->purchase_request_id,
+            'supply_request_id' => $draftSupplyRequest->supply_request_id,
+            'supplier_id' => $supplier->supplier_id,
+            'created_by' => $officeUser->id,
+            'po_number' => 'PO-DRAFT-1',
+            'procurement_method' => 'SMALL_VALUE_PROCUREMENT',
+            'status' => 'DRAFT',
+            'expected_delivery_date' => now()->addDays(10)->toDateString(),
+            'total_amount' => 100,
+            'terms_notes' => null,
+            'remarks' => null,
+        ]);
+
+        $this->actingAs($officeUser)
+            ->get(route('office.supply-requests.index', ['status' => 'PROCUREMENT_PLACED']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Office/SupplyRequests/Index')
+                ->where('filters.status', 'PROCUREMENT_PLACED')
+                ->has('supplyRequests.data', 1)
+                ->where('supplyRequests.data.0.request_code', 'SR-PLACED-1')
+                ->where('supplyRequests.data.0.status', 'PROCUREMENT_PLACED')
+            );
+    }
+
+    public function test_office_supply_request_show_exposes_returned_procurement_reason(): void
+    {
+        $office = $this->createOffice();
+        $officeUser = $this->createUser(UserRole::OFFICE_USER, $office);
+        $procurementOfficer = $this->createUser(UserRole::PROCUREMENT_OFFICER, $office);
+
+        $supplyRequest = SupplyRequest::query()->create([
+            'request_code' => 'SR-RETURNED-PR-1',
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'ppmp_id' => null,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(2)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Returned PR visibility test',
+            'priority_level' => 'MEDIUM',
+            'status' => 'SUBMITTED',
+            'review_notes' => null,
+            'approved_by' => null,
+            'approved_at' => null,
+        ]);
+
+        $purchaseRequest = PurchaseRequest::query()->create([
+            'supply_request_id' => $supplyRequest->supply_request_id,
+            'office_id' => $office->id,
+            'requested_by' => $procurementOfficer->id,
+            'status' => 'RETURNED_FOR_REVISION',
+            'remarks' => 'BAC requires corrected quantities and specifications.',
+        ]);
+
+        $this->actingAs($officeUser)
+            ->get(route('office.supply-requests.show', $supplyRequest->supply_request_id))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Office/SupplyRequests/Show')
+                ->where('supplyRequest.status', 'RETURNED_FOR_REVISION')
+                ->has('supplyRequest.purchase_requests', 1)
+                ->where('supplyRequest.purchase_requests.0.purchase_request_id', $purchaseRequest->purchase_request_id)
+                ->where('supplyRequest.purchase_requests.0.status', 'RETURNED_FOR_REVISION')
+                ->where('supplyRequest.purchase_requests.0.remarks', 'BAC requires corrected quantities and specifications.')
+            );
     }
 
     public function test_supply_request_create_requires_ppmp_id_matching_line_items(): void

@@ -16,6 +16,13 @@ type Props = {
         purpose: string;
         priority_level: string;
         review_notes: string | null;
+        purchase_requests?: Array<{
+            purchase_request_id: number;
+            status: string;
+            remarks?: string | null;
+            created_at?: string | null;
+            updated_at?: string | null;
+        }>;
         items: Array<{
             supply_request_item_id: number;
             ppmp_item_id: number;
@@ -81,6 +88,9 @@ export default function SupplyRequestShow({
     const overAllocationCount = useMemo(() => {
         return supplyRequest.items.filter((item) => item.exceeds_ppmp_allocation).length;
     }, [supplyRequest.items]);
+    const procurementDecision = useMemo(() => {
+        return (supplyRequest.purchase_requests ?? []).find((request) => ['RETURNED_FOR_REVISION', 'REJECTED'].includes(request.status.toUpperCase())) ?? null;
+    }, [supplyRequest.purchase_requests]);
 
     const submitForm = useForm({ review_notes: supplyRequest.review_notes ?? '' });
     const issueForm = useForm({
@@ -172,6 +182,22 @@ export default function SupplyRequestShow({
                         <MetaItem label="Purpose" value={supplyRequest.purpose} />
                         <MetaItem label="Review Notes" value={supplyRequest.review_notes ?? '-'} />
                     </div>
+
+                    {procurementDecision ? (
+                        <div className={`mt-5 rounded-xl border px-4 py-3 text-sm ${procurementDecision.status === 'REJECTED' ? 'border-rose-300 bg-rose-50 text-rose-900' : 'border-amber-300 bg-amber-50 text-amber-900'}`}>
+                            <p className="font-semibold">
+                                Procurement decision: {procurementDecision.status.replaceAll('_', ' ')}
+                            </p>
+                            <p className="mt-1">
+                                <span className="font-semibold">BAC Reason:</span> {procurementDecision.remarks?.trim() || 'No reason recorded.'}
+                            </p>
+                            <p className="mt-1 text-xs">
+                                {procurementDecision.status === 'REJECTED'
+                                    ? 'This procurement request was rejected. Create a new supply request if the office still needs these items.'
+                                    : 'This procurement request was returned for revision. Review the BAC reason and coordinate with GSO/BAC before resubmission.'}
+                            </p>
+                        </div>
+                    ) : null}
                 </section>
 
                         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -287,18 +313,48 @@ export default function SupplyRequestShow({
                 {activeTab === 'related' ? (
                     <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                         <h4 className="text-xl font-semibold text-slate-800">Related Records</h4>
-                        {distributionRecords.length === 0 ? (
-                            <p className="mt-2 text-sm text-slate-600">No related distribution records yet.</p>
-                        ) : (
-                            <div className="mt-3 space-y-2">
-                                {distributionRecords.map((record) => (
-                                    <div key={record.distribution_record_id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2">
-                                        <p className="text-sm font-medium text-slate-800">Distribution #{record.distribution_record_id}</p>
-                                        <p className="text-xs text-slate-600">{record.status.replaceAll('_', ' ')}</p>
+                        <div className="mt-4 space-y-5">
+                            <div>
+                                <h5 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Purchase Requests</h5>
+                                {(supplyRequest.purchase_requests ?? []).length === 0 ? (
+                                    <p className="mt-2 text-sm text-slate-600">No related purchase requests yet.</p>
+                                ) : (
+                                    <div className="mt-3 space-y-2">
+                                        {(supplyRequest.purchase_requests ?? []).map((record) => (
+                                            <div key={record.purchase_request_id} className="rounded-lg border border-slate-200 px-3 py-2">
+                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                    <p className="text-sm font-medium text-slate-800">Purchase Request #{record.purchase_request_id}</p>
+                                                    <StatusBadge status={record.status} />
+                                                </div>
+                                                {['RETURNED_FOR_REVISION', 'REJECTED'].includes(record.status.toUpperCase()) ? (
+                                                    <p className="mt-2 text-sm text-slate-700">
+                                                        <span className="font-semibold">BAC Reason:</span> {record.remarks?.trim() || 'No reason recorded.'}
+                                                    </p>
+                                                ) : record.remarks ? (
+                                                    <p className="mt-2 text-sm text-slate-600">{record.remarks}</p>
+                                                ) : null}
+                                            </div>
+                                        ))}
                                     </div>
-                                ))}
+                                )}
                             </div>
-                        )}
+
+                            <div>
+                                <h5 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Distribution Records</h5>
+                                {distributionRecords.length === 0 ? (
+                                    <p className="mt-2 text-sm text-slate-600">No related distribution records yet.</p>
+                                ) : (
+                                    <div className="mt-3 space-y-2">
+                                        {distributionRecords.map((record) => (
+                                            <div key={record.distribution_record_id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2">
+                                                <p className="text-sm font-medium text-slate-800">Distribution #{record.distribution_record_id}</p>
+                                                <p className="text-xs text-slate-600">{record.status.replaceAll('_', ' ')}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </section>
                 ) : null}
 

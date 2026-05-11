@@ -182,6 +182,65 @@ class ProcurementFoundationFlowTest extends TestCase
         $this->assertContains('PLACED', $poHistory);
     }
 
+    public function test_bac_return_and_reject_decisions_require_non_empty_reason(): void
+    {
+        $office = $this->createOffice();
+        $officeUser = $this->createUser(UserRole::OFFICE_USER, $office);
+        $procurementOfficer = $this->createUser(UserRole::PROCUREMENT_OFFICER, $office);
+
+        $supplyRequest = SupplyRequest::query()->create([
+            'request_code' => 'SR-BAC-REASON-1',
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(5)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'BAC reason validation test',
+            'priority_level' => 'HIGH',
+            'status' => 'SUBMITTED',
+            'review_notes' => null,
+            'approved_by' => null,
+            'approved_at' => null,
+        ]);
+
+        $purchaseRequest = PurchaseRequest::query()->create([
+            'supply_request_id' => $supplyRequest->supply_request_id,
+            'office_id' => $office->id,
+            'requested_by' => $procurementOfficer->id,
+            'status' => 'OPEN',
+            'remarks' => null,
+        ]);
+
+        $this->actingAs($procurementOfficer)
+            ->post(route('procurement.purchase-requests.process', $purchaseRequest->purchase_request_id), [
+                'action' => 'return',
+                'remarks' => '   ',
+            ])
+            ->assertSessionHasErrors('remarks');
+
+        $this->assertSame('OPEN', (string) $purchaseRequest->fresh()?->status);
+
+        $this->actingAs($procurementOfficer)
+            ->post(route('procurement.purchase-requests.process', $purchaseRequest->purchase_request_id), [
+                'action' => 'reject',
+                'remarks' => '',
+            ])
+            ->assertSessionHasErrors('remarks');
+
+        $this->assertSame('OPEN', (string) $purchaseRequest->fresh()?->status);
+
+        $this->actingAs($procurementOfficer)
+            ->post(route('procurement.purchase-requests.process', $purchaseRequest->purchase_request_id), [
+                'action' => 'return',
+                'remarks' => 'Please clarify item specifications.',
+            ])
+            ->assertRedirect();
+
+        $purchaseRequest->refresh();
+        $this->assertSame('RETURNED_FOR_REVISION', (string) $purchaseRequest->status);
+        $this->assertSame('Please clarify item specifications.', (string) $purchaseRequest->remarks);
+    }
+
     private function createOffice(): Office
     {
         return Office::query()->create([
