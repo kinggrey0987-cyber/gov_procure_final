@@ -309,14 +309,16 @@ class ExecutiveMonitoringService
             ],
             'status_breakdown' => [
                 'purchase_requests' => (clone $purchaseRequestBase)
-                    ->selectRaw('status, COUNT(*) as total')
-                    ->groupBy('status')
-                    ->orderBy('status')
+                    ->select('purchase_requests.status')
+                    ->selectRaw('COUNT(*) as total')
+                    ->groupBy('purchase_requests.status')
+                    ->orderBy('purchase_requests.status')
                     ->get(),
                 'purchase_orders' => (clone $purchaseOrderBase)
-                    ->selectRaw('status, COUNT(*) as total')
-                    ->groupBy('status')
-                    ->orderBy('status')
+                    ->select('purchase_orders.status')
+                    ->selectRaw('COUNT(*) as total')
+                    ->groupBy('purchase_orders.status')
+                    ->orderBy('purchase_orders.status')
                     ->get(),
             ],
             'monthly_trends' => [
@@ -874,14 +876,16 @@ class ExecutiveMonitoringService
     private function buildProcurementOfficeComparison(Builder $purchaseRequestBase, Builder $purchaseOrderBase): Collection
     {
         $prByOffice = (clone $purchaseRequestBase)
-            ->selectRaw('office_id, COUNT(*) as total')
-            ->whereNotNull('office_id')
-            ->groupBy('office_id')
+            ->select('purchase_requests.office_id')
+            ->selectRaw('COUNT(*) as total')
+            ->whereNotNull('purchase_requests.office_id')
+            ->groupBy('purchase_requests.office_id')
             ->pluck('total', 'office_id');
 
         $poByOffice = (clone $purchaseOrderBase)
             ->join('purchase_requests', 'purchase_requests.purchase_request_id', '=', 'purchase_orders.purchase_request_id')
-            ->selectRaw('purchase_requests.office_id as office_id, COUNT(*) as order_total, COALESCE(SUM(purchase_orders.total_amount), 0) as amount_total')
+            ->select('purchase_requests.office_id as office_id')
+            ->selectRaw('COUNT(*) as order_total, COALESCE(SUM(purchase_orders.total_amount), 0) as amount_total')
             ->whereNotNull('purchase_requests.office_id')
             ->groupBy('purchase_requests.office_id')
             ->get()
