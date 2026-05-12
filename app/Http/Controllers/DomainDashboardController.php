@@ -200,6 +200,10 @@ class DomainDashboardController extends Controller
                 'completed_procurements' => PurchaseOrder::query()
                     ->whereIn('status', DashboardStatusGroups::procurementCompletedPurchaseOrderStatuses())
                     ->count(),
+                'total_purchase_order_amount' => (float) PurchaseOrder::query()->sum('total_amount'),
+                'draft_purchase_orders' => PurchaseOrder::query()->where('status', 'DRAFT')->count(),
+                'placed_purchase_orders' => PurchaseOrder::query()->where('status', 'PLACED')->count(),
+                'active_supplier_count' => \App\Models\Supplier::query()->where('status', 'ACTIVE')->count(),
             ],
             'recentPurchaseRequests' => $recentPurchaseRequests->map(fn (PurchaseRequest $request): array => [
                 'purchase_request_id' => (int) $request->purchase_request_id,
@@ -230,9 +234,13 @@ class DomainDashboardController extends Controller
             'summary' => [
                 'inventory_count' => Inventory::query()->count(),
                 'low_stock_count' => Inventory::query()->lowStock()->count(),
+                'out_of_stock_count' => Inventory::query()->outOfStock()->count(),
+                'total_available_stock' => (float) Inventory::query()->sum('available_stock'),
+                'reserved_quantity' => (float) Inventory::query()->sum('reserved_quantity'),
                 'movement_count' => InventoryMovement::query()->count(),
                 'released_distribution_count' => DistributionRecord::query()->released()->count(),
                 'received_distribution_count' => DistributionRecord::query()->received()->count(),
+                'pending_delivery_count' => \App\Models\Delivery::query()->where('receipt_status', 'PENDING')->count(),
                 'open_claim_count' => Claim::query()
                     ->whereIn('status', DashboardStatusGroups::claimActiveStatuses())
                     ->count(),

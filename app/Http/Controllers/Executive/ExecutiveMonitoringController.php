@@ -36,10 +36,12 @@ class ExecutiveMonitoringController
             'status' => ['nullable', 'string', 'max:60'],
             'pr_status' => ['nullable', 'string', 'max:60'],
             'po_status' => ['nullable', 'string', 'max:60'],
+            'record_type' => ['nullable', 'in:all,pr,po'],
             'year' => ['nullable', 'digits:4'],
             'month' => ['nullable', 'string', 'regex:/^(?:0?[1-9]|1[0-2]|\d{4}-\d{2})$/'],
             'from_date' => ['nullable', 'date'],
             'to_date' => ['nullable', 'date', 'after_or_equal:from_date'],
+            'records_page' => ['nullable', 'integer', 'min:1'],
             'po_page' => ['nullable', 'integer', 'min:1'],
         ]);
 

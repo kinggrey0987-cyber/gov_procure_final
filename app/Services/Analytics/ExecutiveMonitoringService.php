@@ -215,9 +215,26 @@ class ExecutiveMonitoringService
      */
     public function procurementAnalytics(array $filters = []): array
     {
-        $purchaseRequestQuery = PurchaseRequest::query()->with('office:id,name');
-        $purchaseOrderQuery = PurchaseOrder::query()->with('purchaseRequest.office:id,name');
-        $poPage = max(1, (int) ($filters['po_page'] ?? 1));
+        $purchaseRequestQuery = PurchaseRequest::query()
+            ->with([
+                'office:id,name',
+                'requester:id,name',
+                'supplyRequest:supply_request_id,request_code,requested_by',
+                'supplyRequest.requester:id,name',
+            ])
+            ->withCount('items');
+        $purchaseOrderQuery = PurchaseOrder::query()
+            ->with([
+                'purchaseRequest:purchase_request_id,office_id,supply_request_id,status,created_at',
+                'purchaseRequest.office:id,name',
+                'purchaseRequest.supplyRequest:supply_request_id,request_code',
+                'supplier:supplier_id,supplier_name',
+            ])
+            ->withCount('items');
+        $recordType = in_array($filters['record_type'] ?? 'all', ['all', 'pr', 'po'], true)
+            ? (string) ($filters['record_type'] ?? 'all')
+            : 'all';
+        $recordsPage = max(1, (int) ($filters['records_page'] ?? $filters['po_page'] ?? 1));
 
         if (! empty($filters['office_id'])) {
             $officeId = (int) $filters['office_id'];
@@ -230,35 +247,34 @@ class ExecutiveMonitoringService
         $statusFilter = $filters['status'] ?? null;
 
         if (! empty($statusFilter)) {
-            $purchaseRequestQuery->where('status', $statusFilter);
-            $purchaseOrderQuery->where('status', $statusFilter);
+            $purchaseRequestQuery->where('purchase_requests.status', $statusFilter);
+            $purchaseOrderQuery->where('purchase_orders.status', $statusFilter);
         } elseif (! empty($filters['pr_status'])) {
-            $purchaseRequestQuery->where('status', $filters['pr_status']);
+            $purchaseRequestQuery->where('purchase_requests.status', $filters['pr_status']);
         }
 
         if (empty($statusFilter) && ! empty($filters['po_status'])) {
-            $purchaseOrderQuery->where('status', $filters['po_status']);
+            $purchaseOrderQuery->where('purchase_orders.status', $filters['po_status']);
         }
 
-        $this->applyYear($purchaseRequestQuery, $filters['year'] ?? null, 'created_at');
-        $this->applyYear($purchaseOrderQuery, $filters['year'] ?? null, 'created_at');
-        $this->applyMonth($purchaseRequestQuery, $filters['month'] ?? null, 'created_at');
-        $this->applyMonth($purchaseOrderQuery, $filters['month'] ?? null, 'created_at');
+        $this->applyYear($purchaseRequestQuery, $filters['year'] ?? null, 'purchase_requests.created_at');
+        $this->applyYear($purchaseOrderQuery, $filters['year'] ?? null, 'purchase_orders.created_at');
+        $this->applyMonth($purchaseRequestQuery, $filters['month'] ?? null, 'purchase_requests.created_at');
+        $this->applyMonth($purchaseOrderQuery, $filters['month'] ?? null, 'purchase_orders.created_at');
 
-        $this->applyDateRange($purchaseRequestQuery, $filters['from_date'] ?? null, $filters['to_date'] ?? null, 'created_at');
-        $this->applyDateRange($purchaseOrderQuery, $filters['from_date'] ?? null, $filters['to_date'] ?? null, 'created_at');
+        $this->applyDateRange($purchaseRequestQuery, $filters['from_date'] ?? null, $filters['to_date'] ?? null, 'purchase_requests.created_at');
+        $this->applyDateRange($purchaseOrderQuery, $filters['from_date'] ?? null, $filters['to_date'] ?? null, 'purchase_orders.created_at');
 
         $purchaseRequestBase = clone $purchaseRequestQuery;
         $purchaseOrderBase = clone $purchaseOrderQuery;
 
-        $purchaseRequests = (clone $purchaseRequestBase)->latest()->limit(10)->get();
+        $recentRecords = $this->buildRecentProcurementRecords($purchaseRequestBase, $purchaseOrderBase, $recordType)
+            ->sortByDesc('sort_date')
+            ->values();
+        $recentRecordsPaginator = $this->paginateCollection($recentRecords, $recordsPage, 5);
         $exportPurchaseOrders = (clone $purchaseOrderBase)
             ->latest('purchase_order_id')
             ->get();
-        $purchaseOrders = (clone $purchaseOrderBase)
-            ->latest('purchase_order_id')
-            ->paginate(5, ['*'], 'po_page', $poPage)
-            ->withQueryString();
 
         return [
             'filters' => [
@@ -266,11 +282,13 @@ class ExecutiveMonitoringService
                 'status' => $statusFilter,
                 'pr_status' => $filters['pr_status'] ?? null,
                 'po_status' => $filters['po_status'] ?? null,
+                'record_type' => $recordType,
                 'year' => $filters['year'] ?? null,
                 'month' => $filters['month'] ?? null,
                 'from_date' => $filters['from_date'] ?? null,
                 'to_date' => $filters['to_date'] ?? null,
-                'po_page' => $poPage,
+                'records_page' => $recordsPage,
+                'po_page' => $recordsPage,
             ],
             'filter_options' => [
                 'offices' => Office::query()->select(['id', 'name'])->orderBy('name')->get(),
@@ -285,6 +303,9 @@ class ExecutiveMonitoringService
                 'purchase_request_count' => (clone $purchaseRequestBase)->count(),
                 'purchase_order_count' => (clone $purchaseOrderBase)->count(),
                 'purchase_order_total_amount' => (float) (clone $purchaseOrderBase)->sum('total_amount'),
+                'procurement_record_count' => (clone $purchaseRequestBase)->count() + (clone $purchaseOrderBase)->count(),
+                'purchase_request_item_count' => (int) (clone $purchaseRequestBase)->get()->sum('items_count'),
+                'purchase_order_item_count' => (int) (clone $purchaseOrderBase)->get()->sum('items_count'),
             ],
             'status_breakdown' => [
                 'purchase_requests' => (clone $purchaseRequestBase)
@@ -304,11 +325,97 @@ class ExecutiveMonitoringService
             ],
             'office_comparison' => $this->buildProcurementOfficeComparison($purchaseRequestBase, $purchaseOrderBase),
             'recent' => [
-                'purchase_requests' => $purchaseRequests,
-                'purchase_orders' => $this->toPaginatorPayload($purchaseOrders),
+                'purchase_requests' => (clone $purchaseRequestBase)->latest('purchase_request_id')->get(),
+                'purchase_orders' => $this->toPaginatorPayload($recentRecordsPaginator),
+                'procurement_records' => $this->toPaginatorPayload($recentRecordsPaginator),
+                'procurement_records_export' => $recentRecords,
                 'purchase_orders_export' => $exportPurchaseOrders,
             ],
         ];
+    }
+
+    /**
+     * @param  Builder<PurchaseRequest>  $purchaseRequestBase
+     * @param  Builder<PurchaseOrder>  $purchaseOrderBase
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function buildRecentProcurementRecords(Builder $purchaseRequestBase, Builder $purchaseOrderBase, string $recordType): Collection
+    {
+        $records = collect();
+
+        if ($recordType !== 'po') {
+            $records = $records->merge(
+                (clone $purchaseRequestBase)
+                    ->latest('purchase_request_id')
+                    ->get()
+                    ->map(fn (PurchaseRequest $request): array => [
+                        'type' => 'pr',
+                        'record_id' => $request->purchase_request_id,
+                        'reference' => 'PR-'.str_pad((string) $request->purchase_request_id, 6, '0', STR_PAD_LEFT),
+                        'route_name' => 'procurement.purchase-requests.show',
+                        'office_name' => $request->office?->name,
+                        'status' => $request->status,
+                        'amount' => null,
+                        'item_count' => (int) ($request->items_count ?? 0),
+                        'created_at' => optional($request->created_at)->toISOString(),
+                        'sort_date' => $request->created_at?->timestamp ?? 0,
+                        'details' => [
+                            'requester' => $request->supplyRequest?->requester?->name ?? $request->requester?->name,
+                            'source_reference' => $request->supplyRequest?->request_code,
+                            'remarks' => $request->remarks,
+                        ],
+                    ])
+            );
+        }
+
+        if ($recordType !== 'pr') {
+            $records = $records->merge(
+                (clone $purchaseOrderBase)
+                    ->latest('purchase_order_id')
+                    ->get()
+                    ->map(fn (PurchaseOrder $order): array => [
+                        'type' => 'po',
+                        'record_id' => $order->purchase_order_id,
+                        'reference' => 'PO-'.$order->purchase_order_id,
+                        'route_name' => 'procurement.purchase-orders.show',
+                        'office_name' => $order->purchaseRequest?->office?->name,
+                        'status' => $order->status,
+                        'amount' => (float) $order->total_amount,
+                        'item_count' => (int) ($order->items_count ?? 0),
+                        'created_at' => optional($order->created_at)->toISOString(),
+                        'sort_date' => $order->created_at?->timestamp ?? 0,
+                        'details' => [
+                            'supplier' => $order->supplier?->supplier_name,
+                            'linked_request' => $order->purchaseRequest?->purchase_request_id
+                                ? 'PR-'.str_pad((string) $order->purchaseRequest->purchase_request_id, 6, '0', STR_PAD_LEFT)
+                                : null,
+                            'source_reference' => $order->purchaseRequest?->supplyRequest?->request_code,
+                            'procurement_method' => $order->procurement_method,
+                        ],
+                    ])
+            );
+        }
+
+        return $records;
+    }
+
+    /**
+     * @param  Collection<int, mixed>  $items
+     * @return LengthAwarePaginator<mixed>
+     */
+    private function paginateCollection(Collection $items, int $page, int $perPage): LengthAwarePaginator
+    {
+        return new LengthAwarePaginator(
+            $items->forPage($page, $perPage)->values(),
+            $items->count(),
+            $perPage,
+            $page,
+            [
+                'pageName' => 'records_page',
+                'path' => request()->url(),
+                'query' => request()->query(),
+            ]
+        );
     }
 
     /**

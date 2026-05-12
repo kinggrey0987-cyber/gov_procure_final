@@ -354,12 +354,12 @@ export default function ExecutiveDashboardIndex({
                 </section>
 
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-                    <MetricCard label="Purchase Requests" value={procurement.purchase_request_count} />
-                    <MetricCard label="Purchase Orders" value={procurement.purchase_order_count} />
-                    <MetricCard label="Procurement Spend" value={formatCurrency(procurement.total_purchase_order_amount)} />
-                    <MetricCard label="Active Anomalies" value={activeAnomalies} />
-                    <MetricCard label="Active Alerts" value={activeAlerts} />
-                    <MetricCard label="Published Disclosures" value={transparency.published_disclosure_count} />
+                    <MetricCard label="Purchase Requests" value={procurement.purchase_request_count} helper="Office requests routed to BAC review" />
+                    <MetricCard label="Purchase Orders" value={procurement.purchase_order_count} helper="Supplier-backed procurement records" />
+                    <MetricCard label="Procurement Spend" value={formatCurrency(procurement.total_purchase_order_amount)} helper="Total value of seeded PO portfolio" />
+                    <MetricCard label="Active Anomalies" value={activeAnomalies} helper="Open or under-review risk signals" tone="risk" />
+                    <MetricCard label="Active Alerts" value={activeAlerts} helper="Executive attention queue" tone="warning" />
+                    <MetricCard label="Published Disclosures" value={transparency.published_disclosure_count} helper="Citizen-facing transparency records" tone="success" />
                 </div>
 
                 <div className="grid gap-6 xl:grid-cols-12">
@@ -842,11 +842,51 @@ function buildDashboardAnomalyGroups(rows: Props['recent_anomalies']): Array<{ k
         .map(({ key, label, office, count, representative }) => ({ key, label, office, count, representative }));
 }
 
-function MetricCard({ label, value }: { label: string; value: number | string }) {
+function MetricCard({
+    label,
+    value,
+    helper,
+    tone = 'default',
+}: {
+    label: string;
+    value: number | string;
+    helper?: string;
+    tone?: 'default' | 'risk' | 'warning' | 'success';
+}) {
+    const toneClasses: Record<typeof tone, { border: string; gradient: string; value: string; accent: string }> = {
+        default: {
+            border: 'border-red-200',
+            gradient: 'from-red-50 to-white',
+            value: 'text-red-700',
+            accent: 'bg-red-600',
+        },
+        risk: {
+            border: 'border-rose-200',
+            gradient: 'from-rose-50 to-white',
+            value: 'text-rose-700',
+            accent: 'bg-rose-600',
+        },
+        warning: {
+            border: 'border-amber-200',
+            gradient: 'from-amber-50 to-white',
+            value: 'text-amber-700',
+            accent: 'bg-amber-500',
+        },
+        success: {
+            border: 'border-emerald-200',
+            gradient: 'from-emerald-50 to-white',
+            value: 'text-emerald-700',
+            accent: 'bg-emerald-600',
+        },
+    };
+    const currentTone = toneClasses[tone];
+
     return (
-        <div className="rounded-2xl border border-red-200 bg-gradient-to-r from-red-50 to-white p-6 shadow-[0_8px_18px_rgba(15,23,42,0.06)]">
-            <p className="text-sm font-semibold uppercase tracking-wide text-slate-600">{label}</p>
-            <p className="mt-2 text-4xl font-bold text-red-700">{value}</p>
+        <div className={`relative overflow-hidden rounded-2xl border ${currentTone.border} bg-gradient-to-r ${currentTone.gradient} p-6 shadow-[0_8px_18px_rgba(15,23,42,0.06)]`}>
+            <span className={`absolute right-4 top-4 h-2.5 w-2.5 rounded-full ${currentTone.accent}`} aria-hidden="true" />
+            <p className="pr-5 text-sm font-semibold uppercase tracking-wide text-slate-600">{label}</p>
+            <p className={`mt-2 text-4xl font-bold ${currentTone.value}`}>{value}</p>
+            {helper ? <p className="mt-3 min-h-10 text-xs leading-5 text-slate-600">{helper}</p> : null}
         </div>
     );
 }

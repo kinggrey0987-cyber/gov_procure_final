@@ -3,7 +3,7 @@ import MonthFilterSelect from '@/Components/MonthFilterSelect';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PaginationNav from '@/Components/PaginationNav';
 import { downloadSectionAsPdfById } from '@/lib/printSection';
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
 
 type OfficeOption = { id: number; name: string };
@@ -28,6 +28,26 @@ type PurchaseOrderRow = {
     } | null;
 };
 
+type ProcurementRecordRow = {
+    type: 'pr' | 'po';
+    record_id: number;
+    reference: string;
+    route_name: 'procurement.purchase-requests.show' | 'procurement.purchase-orders.show';
+    office_name?: string | null;
+    status: string;
+    amount?: number | null;
+    item_count: number;
+    created_at?: string | null;
+    details?: {
+        requester?: string | null;
+        supplier?: string | null;
+        linked_request?: string | null;
+        source_reference?: string | null;
+        procurement_method?: string | null;
+        remarks?: string | null;
+    };
+};
+
 type Props = {
     filters: {
         office_id?: number | null;
@@ -38,6 +58,8 @@ type Props = {
         month?: string | null;
         from_date?: string | null;
         to_date?: string | null;
+        record_type?: 'all' | 'pr' | 'po' | null;
+        records_page?: number | null;
         po_page?: number | null;
     };
     filter_options: {
@@ -51,6 +73,9 @@ type Props = {
         purchase_request_count: number;
         purchase_order_count: number;
         purchase_order_total_amount: number;
+        procurement_record_count: number;
+        purchase_request_item_count: number;
+        purchase_order_item_count: number;
     };
     status_breakdown: {
         purchase_requests: BreakdownRow[];
@@ -70,9 +95,14 @@ type Props = {
     recent: {
         purchase_requests: PurchaseRequestRow[];
         purchase_orders: {
-            data: PurchaseOrderRow[];
+            data: ProcurementRecordRow[];
             links: Array<{ url: string | null; label: string; active: boolean }>;
         };
+        procurement_records?: {
+            data: ProcurementRecordRow[];
+            links: Array<{ url: string | null; label: string; active: boolean }>;
+        };
+        procurement_records_export?: ProcurementRecordRow[];
         purchase_orders_export: PurchaseOrderRow[];
     };
 };
@@ -95,7 +125,8 @@ export default function ProcurementAnalyticsIndex({
         month: filters.month ?? '',
         from_date: filters.from_date ?? '',
         to_date: filters.to_date ?? '',
-        po_page: filters.po_page ? String(filters.po_page) : '',
+        record_type: filters.record_type ?? 'all',
+        records_page: filters.records_page ? String(filters.records_page) : '',
     });
 
     useEffect(() => {
@@ -106,9 +137,10 @@ export default function ProcurementAnalyticsIndex({
             month: filters.month ?? '',
             from_date: filters.from_date ?? '',
             to_date: filters.to_date ?? '',
-            po_page: filters.po_page ? String(filters.po_page) : '',
+            record_type: filters.record_type ?? 'all',
+            records_page: filters.records_page ? String(filters.records_page) : '',
         });
-    }, [filters.from_date, filters.month, filters.office_id, filters.po_page, filters.status, filters.to_date, filters.year]);
+    }, [filters.from_date, filters.month, filters.office_id, filters.record_type, filters.records_page, filters.status, filters.to_date, filters.year]);
 
     const activeFilters = useMemo(
         () => ({
@@ -118,9 +150,10 @@ export default function ProcurementAnalyticsIndex({
             month: form.month,
             from_date: form.from_date,
             to_date: form.to_date,
-            po_page: form.po_page,
+            record_type: form.record_type,
+            records_page: form.records_page,
         }),
-        [form.from_date, form.month, form.office_id, form.po_page, form.status, form.to_date, form.year],
+        [form.from_date, form.month, form.office_id, form.record_type, form.records_page, form.status, form.to_date, form.year],
     );
 
     const activeFiltersKey = useMemo(() => serializeProcurementFilters(activeFilters), [activeFilters]);
@@ -131,8 +164,9 @@ export default function ProcurementAnalyticsIndex({
         month: filters.month ?? '',
         from_date: filters.from_date ?? '',
         to_date: filters.to_date ?? '',
-        po_page: filters.po_page ? String(filters.po_page) : '',
-    }), [filters.from_date, filters.month, filters.office_id, filters.po_page, filters.status, filters.to_date, filters.year]);
+        record_type: filters.record_type ?? 'all',
+        records_page: filters.records_page ? String(filters.records_page) : '',
+    }), [filters.from_date, filters.month, filters.office_id, filters.record_type, filters.records_page, filters.status, filters.to_date, filters.year]);
 
     useEffect(() => {
         if (activeFiltersKey === currentFiltersKey) {
@@ -182,7 +216,8 @@ export default function ProcurementAnalyticsIndex({
     };
 
     const exportSectionId = 'procurement-insights-export-section';
-    const exportPurchaseOrders = recent.purchase_orders_export ?? recent.purchase_orders.data;
+    const procurementRecords = recent.procurement_records ?? recent.purchase_orders;
+    const exportProcurementRecords = recent.procurement_records_export ?? procurementRecords.data;
 
     const exportPdf = async () => {
         await downloadSectionAsPdfById(exportSectionId, {
@@ -221,7 +256,7 @@ export default function ProcurementAnalyticsIndex({
                             <select
                                 className="h-10 rounded-lg border-slate-300 text-sm"
                                 value={form.office_id}
-                                onChange={(event) => setForm((current) => ({ ...current, office_id: event.target.value, po_page: '' }))}
+                                onChange={(event) => setForm((current) => ({ ...current, office_id: event.target.value, records_page: '' }))}
                             >
                                 <option value="">All offices</option>
                                 {filter_options.offices.map((office) => (
@@ -234,7 +269,7 @@ export default function ProcurementAnalyticsIndex({
                             <select
                                 className="h-10 rounded-lg border-slate-300 text-sm"
                                 value={form.status}
-                                onChange={(event) => setForm((current) => ({ ...current, status: event.target.value, po_page: '' }))}
+                                onChange={(event) => setForm((current) => ({ ...current, status: event.target.value, records_page: '' }))}
                             >
                                 <option value="">All statuses</option>
                                 {filter_options.statuses.map((status) => (
@@ -249,9 +284,19 @@ export default function ProcurementAnalyticsIndex({
                                 month={form.month}
                                 year={form.year}
                                 yearOptions={filter_options.years}
-                                onMonthChange={(value) => setForm((current) => ({ ...current, month: value, from_date: '', to_date: '', po_page: '' }))}
-                                onYearChange={(value) => setForm((current) => ({ ...current, year: value, from_date: '', to_date: '', po_page: '' }))}
+                                onMonthChange={(value) => setForm((current) => ({ ...current, month: value, from_date: '', to_date: '', records_page: '' }))}
+                                onYearChange={(value) => setForm((current) => ({ ...current, year: value, from_date: '', to_date: '', records_page: '' }))}
                             />
+
+                            <select
+                                className="h-10 rounded-lg border-slate-300 text-sm"
+                                value={form.record_type}
+                                onChange={(event) => setForm((current) => ({ ...current, record_type: event.target.value as 'all' | 'pr' | 'po', records_page: '' }))}
+                            >
+                                <option value="all">All PR and PO records</option>
+                                <option value="pr">Purchase Requests only</option>
+                                <option value="po">Purchase Orders only</option>
+                            </select>
                         </div>
 
                         <div className="ml-auto flex items-center gap-2">
@@ -267,10 +312,10 @@ export default function ProcurementAnalyticsIndex({
                 </section>
 
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <Card label="Purchase Requests" value={totals.purchase_request_count} tone="sky" />
-                    <Card label="Purchase Orders" value={totals.purchase_order_count} tone="emerald" />
+                    <Card label="Filtered PR Records" value={totals.purchase_request_count} tone="sky" />
+                    <Card label="Filtered PO Records" value={totals.purchase_order_count} tone="emerald" />
                     <Card label="PO Total Amount" value={formatCurrency(totals.purchase_order_total_amount)} tone="amber" />
-                    <Card label="Active Offices" value={crossOfficeActivity} tone="sky" />
+                    <Card label="PR/PO Line Items" value={totals.purchase_request_item_count + totals.purchase_order_item_count} tone="sky" />
                 </div>
 
                 <div className="grid gap-6 xl:grid-cols-12">
@@ -324,32 +369,47 @@ export default function ProcurementAnalyticsIndex({
                     <div className="border-b border-slate-200 px-6 py-5">
                         <h3 className="text-xl font-semibold text-slate-800">Latest Procurement Records</h3>
                     </div>
-                    {recent.purchase_orders.data.length === 0 ? (
+                    {procurementRecords.data.length === 0 ? (
                         <p className="px-6 py-8 text-sm text-slate-500">No data in current filter scope</p>
                     ) : (
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-slate-200 text-sm">
                                 <thead className="bg-slate-50">
                                     <tr>
-                                        <th className="px-4 py-2 text-left">PO</th>
+                                        <th className="px-4 py-2 text-left">Record</th>
+                                        <th className="px-4 py-2 text-left">Type</th>
                                         <th className="px-4 py-2 text-left">Office</th>
                                         <th className="px-4 py-2 text-left">Status</th>
+                                        <th className="px-4 py-2 text-left">Details</th>
                                         <th className="px-4 py-2 text-left">Amount</th>
+                                        <th className="px-4 py-2 text-right">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {recent.purchase_orders.data.map((row) => (
-                                        <tr key={row.purchase_order_id}>
-                                            <td className="px-4 py-2">PO-{row.purchase_order_id}</td>
-                                            <td className="px-4 py-2">{row.purchase_request?.office?.name ?? 'N/A'}</td>
-                                            <td className="px-4 py-2">{row.status}</td>
-                                            <td className="px-4 py-2">{formatCurrency(row.total_amount)}</td>
+                                    {procurementRecords.data.map((row) => (
+                                        <tr key={`${row.type}-${row.record_id}`} className="align-top">
+                                            <td className="px-4 py-3 font-semibold text-slate-900">{row.reference}</td>
+                                            <td className="px-4 py-3">
+                                                <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold uppercase text-red-700">{row.type === 'pr' ? 'PR' : 'PO'}</span>
+                                            </td>
+                                            <td className="px-4 py-3">{row.office_name ?? 'N/A'}</td>
+                                            <td className="px-4 py-3">{row.status}</td>
+                                            <td className="px-4 py-3 text-slate-600">
+                                                <p>{row.item_count} line item{row.item_count === 1 ? '' : 's'}</p>
+                                                <p className="text-xs text-slate-500">{recordDetailText(row)}</p>
+                                            </td>
+                                            <td className="px-4 py-3">{row.amount == null ? '—' : formatCurrency(row.amount)}</td>
+                                            <td className="px-4 py-3 text-right">
+                                                <Link href={route(row.route_name, row.record_id)} className="rounded border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50">
+                                                    View
+                                                </Link>
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
                             <div className="px-6 py-4">
-                                <PaginationNav links={recent.purchase_orders.links} preserveState={false} />
+                                <PaginationNav links={procurementRecords.links} preserveState={false} />
                             </div>
                         </div>
                     )}
@@ -409,28 +469,30 @@ export default function ProcurementAnalyticsIndex({
                     <section className="overflow-hidden rounded-xl border border-red-100 bg-white">
                         <div className="border-b border-slate-200 px-4 py-3">
                             <h3 className="text-xl font-semibold text-slate-800">All Filtered Procurement Records</h3>
-                            <p className="mt-1 text-sm text-slate-600">Includes all purchase orders in the current filter scope, not only the visible page.</p>
+                            <p className="mt-1 text-sm text-slate-600">Includes all purchase requests and purchase orders in the current filter scope, not only the visible page.</p>
                         </div>
-                        {exportPurchaseOrders.length === 0 ? (
+                        {exportProcurementRecords.length === 0 ? (
                             <p className="px-6 py-8 text-sm text-slate-500">No data in current filter scope</p>
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="min-w-full table-fixed divide-y divide-slate-200 text-xs">
                                     <thead className="bg-slate-50">
                                         <tr>
-                                            <th className="w-[14%] px-3 py-2 text-left">PO</th>
-                                            <th className="w-[46%] px-3 py-2 text-left">Office</th>
+                                            <th className="w-[14%] px-3 py-2 text-left">Record</th>
+                                            <th className="w-[10%] px-3 py-2 text-left">Type</th>
+                                            <th className="w-[36%] px-3 py-2 text-left">Office</th>
                                             <th className="w-[20%] px-3 py-2 text-left">Status</th>
                                             <th className="w-[20%] px-3 py-2 text-left">Amount</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {exportPurchaseOrders.map((row) => (
-                                            <tr key={row.purchase_order_id}>
-                                                <td className="px-3 py-2 align-top">PO-{row.purchase_order_id}</td>
-                                                <td className="px-3 py-2 align-top leading-snug">{row.purchase_request?.office?.name ?? 'N/A'}</td>
+                                        {exportProcurementRecords.map((row) => (
+                                            <tr key={`${row.type}-${row.record_id}`}>
+                                                <td className="px-3 py-2 align-top">{row.reference}</td>
+                                                <td className="px-3 py-2 align-top uppercase">{row.type}</td>
+                                                <td className="px-3 py-2 align-top leading-snug">{row.office_name ?? 'N/A'}</td>
                                                 <td className="px-3 py-2 align-top">{row.status}</td>
-                                                <td className="px-3 py-2 align-top">{formatCurrency(row.total_amount)}</td>
+                                                <td className="px-3 py-2 align-top">{row.amount == null ? '—' : formatCurrency(row.amount)}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -512,6 +574,18 @@ function downloadCsv(rows: string[][], fileName: string): void {
     window.URL.revokeObjectURL(url);
 }
 
+function recordDetailText(row: ProcurementRecordRow): string {
+    if (row.type === 'pr') {
+        return [row.details?.source_reference, row.details?.requester ? `Requester: ${row.details.requester}` : null]
+            .filter(Boolean)
+            .join(' · ') || 'Purchase request details available';
+    }
+
+    return [row.details?.linked_request, row.details?.supplier ? `Supplier: ${row.details.supplier}` : null]
+        .filter(Boolean)
+        .join(' · ') || 'Purchase order details available';
+}
+
 function serializeProcurementFilters(filters: {
     office_id?: number | string | null;
     status?: string | null;
@@ -519,7 +593,8 @@ function serializeProcurementFilters(filters: {
     month?: string | null;
     from_date?: string | null;
     to_date?: string | null;
-    po_page?: number | string | null;
+    record_type?: string | null;
+    records_page?: number | string | null;
 }): string {
     return JSON.stringify({
         office_id: String(filters.office_id ?? ''),
@@ -528,6 +603,7 @@ function serializeProcurementFilters(filters: {
         month: filters.month ?? '',
         from_date: filters.from_date ?? '',
         to_date: filters.to_date ?? '',
-        po_page: String(filters.po_page ?? ''),
+        record_type: filters.record_type ?? 'all',
+        records_page: String(filters.records_page ?? ''),
     });
 }

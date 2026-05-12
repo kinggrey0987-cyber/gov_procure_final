@@ -7,9 +7,13 @@ type Props = {
     summary: {
         inventory_count: number;
         low_stock_count: number;
+        out_of_stock_count: number;
+        total_available_stock: number;
+        reserved_quantity: number;
         movement_count: number;
         released_distribution_count: number;
         received_distribution_count: number;
+        pending_delivery_count: number;
         open_claim_count: number;
     };
 };
@@ -62,12 +66,19 @@ export default function InventoryTracking({ summary }: Props) {
 
             <div className="space-y-6 py-8">
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    <StatCard label="Inventory Records" value={summary.inventory_count} tone="slate" />
-                    <StatCard label="Low Stock" value={summary.low_stock_count} tone="amber" />
-                    <StatCard label="Movement Logs" value={summary.movement_count} tone="sky" />
-                    <StatCard label="Released Distribution" value={summary.released_distribution_count} tone="blue" />
-                    <StatCard label="Received Distribution" value={summary.received_distribution_count} tone="emerald" />
-                    <StatCard label="Pending Claims" value={summary.open_claim_count} tone="rose" />
+                    <StatCard label="Inventory Records" value={summary.inventory_count} tone="slate" helper="Catalog items with stock controls" />
+                    <StatCard label="Low Stock" value={summary.low_stock_count} tone="amber" helper="Items at or below threshold" />
+                    <StatCard label="Movement Logs" value={summary.movement_count} tone="sky" helper="Traceable stock movements" />
+                    <StatCard label="Released Distribution" value={summary.released_distribution_count} tone="blue" helper="Office releases awaiting receipt" />
+                    <StatCard label="Received Distribution" value={summary.received_distribution_count} tone="emerald" helper="Confirmed office handovers" />
+                    <StatCard label="Pending Claims" value={summary.open_claim_count} tone="rose" helper="Claims needing GSO review" />
+                </div>
+
+                <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 xl:grid-cols-4">
+                    <MiniKpi label="Available Units" value={formatQuantity(summary.total_available_stock)} />
+                    <MiniKpi label="Reserved Units" value={formatQuantity(summary.reserved_quantity)} />
+                    <MiniKpi label="Out of Stock" value={summary.out_of_stock_count} />
+                    <MiniKpi label="Pending Deliveries" value={summary.pending_delivery_count} />
                 </div>
 
                 <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -160,7 +171,7 @@ export default function InventoryTracking({ summary }: Props) {
     );
 }
 
-function StatCard({ label, value, tone }: { label: string; value: number; tone: 'slate' | 'amber' | 'sky' | 'blue' | 'emerald' | 'rose' }) {
+function StatCard({ label, value, tone, helper }: { label: string; value: number; tone: 'slate' | 'amber' | 'sky' | 'blue' | 'emerald' | 'rose'; helper?: string }) {
     const classes = {
         slate: 'text-slate-700 bg-slate-50',
         amber: 'text-amber-700 bg-amber-50',
@@ -174,8 +185,24 @@ function StatCard({ label, value, tone }: { label: string; value: number; tone: 
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-sm text-slate-500">{label}</p>
             <p className={`mt-2 inline-flex rounded-md px-3 py-1 text-2xl font-semibold ${classes[tone]}`}>{value}</p>
+            {helper ? <p className="mt-2 text-xs leading-5 text-slate-500">{helper}</p> : null}
         </div>
     );
+}
+
+function MiniKpi({ label, value }: { label: string; value: number | string }) {
+    return (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+            <p className="mt-1 text-xl font-bold text-slate-900">{value}</p>
+        </div>
+    );
+}
+
+function formatQuantity(value: number) {
+    return new Intl.NumberFormat('en-PH', {
+        maximumFractionDigits: 2,
+    }).format(value);
 }
 
 function ActionLink({ href, label }: { href: string; label: string }) {

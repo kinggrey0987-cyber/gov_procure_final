@@ -8,6 +8,10 @@ type Props = {
         processing_requests: number;
         ongoing_procurement: number;
         completed_procurements: number;
+        total_purchase_order_amount: number;
+        draft_purchase_orders: number;
+        placed_purchase_orders: number;
+        active_supplier_count: number;
     };
     recentPurchaseRequests: Array<{
         purchase_request_id: number;
@@ -112,10 +116,17 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
 
             <div className="space-y-6 py-8">
                 <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <SummaryCard label="Pending Requests" value={summary.pending_requests} tone="amber" />
-                    <SummaryCard label="Processing Requests" value={summary.processing_requests} tone="blue" />
-                    <SummaryCard label="Ongoing Procurement" value={summary.ongoing_procurement} tone="green" />
-                    <SummaryCard label="Completed Procurements" value={summary.completed_procurements} tone="red" />
+                    <SummaryCard label="Pending Requests" value={summary.pending_requests} tone="amber" helper="Awaiting BAC review" />
+                    <SummaryCard label="Processing Requests" value={summary.processing_requests} tone="blue" helper="Currently under procurement action" />
+                    <SummaryCard label="Ongoing Procurement" value={summary.ongoing_procurement} tone="green" helper="Active purchase order pipeline" />
+                    <SummaryCard label="Completed Procurements" value={summary.completed_procurements} tone="red" helper="Closed procurement cycles" />
+                </section>
+
+                <section className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 xl:grid-cols-4">
+                    <MiniKpi label="PO Portfolio Value" value={formatMoney(summary.total_purchase_order_amount)} />
+                    <MiniKpi label="Draft POs" value={summary.draft_purchase_orders} />
+                    <MiniKpi label="Placed POs" value={summary.placed_purchase_orders} />
+                    <MiniKpi label="Active Suppliers" value={summary.active_supplier_count} />
                 </section>
 
                 <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -293,10 +304,12 @@ function SummaryCard({
     label,
     value,
     tone,
+    helper,
 }: {
     label: string;
     value: number;
     tone: 'amber' | 'blue' | 'green' | 'red';
+    helper?: string;
 }) {
     const tones: Record<'amber' | 'blue' | 'green' | 'red', string> = {
         amber: 'border-amber-200 text-amber-700',
@@ -309,7 +322,17 @@ function SummaryCard({
         <article className={`rounded-xl border bg-white px-6 py-5 shadow-sm ${tones[tone]}`}>
             <p className="text-sm font-semibold text-slate-500">{label}</p>
             <p className="mt-2 text-4xl font-bold text-slate-900">{value}</p>
+            {helper ? <p className="mt-2 text-xs leading-5 text-slate-500">{helper}</p> : null}
         </article>
+    );
+}
+
+function MiniKpi({ label, value }: { label: string; value: number | string }) {
+    return (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+            <p className="mt-1 text-xl font-bold text-slate-900">{value}</p>
+        </div>
     );
 }
 
