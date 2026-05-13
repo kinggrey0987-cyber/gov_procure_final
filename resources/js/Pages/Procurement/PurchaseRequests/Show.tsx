@@ -45,13 +45,24 @@ type Props = {
     permissions?: {
         process?: boolean;
     };
+    backLink?: {
+        href: string;
+        label: string;
+    };
 };
 
-export default function PurchaseRequestsShow({ purchaseRequest, reviewMode = false, backFilters, permissions }: Props) {
+export default function PurchaseRequestsShow({ purchaseRequest, reviewMode = false, backFilters, permissions, backLink }: Props) {
     const processForm = useForm({ action: 'process', remarks: '' });
     const totalQuantity = (purchaseRequest.items ?? []).reduce((sum, row) => sum + Number(row.quantity_requested ?? 0), 0);
     const normalizedRequestRemarks = formatRequestRemarks(purchaseRequest.remarks);
     const reasonIsBlank = processForm.data.remarks.trim() === '';
+    const resolvedBackLink = backLink ?? {
+        href: route('procurement.purchase-requests.index', {
+            status: backFilters?.status || undefined,
+            search: backFilters?.search || undefined,
+        }),
+        label: 'Back to Request Review',
+    };
 
     const processRequest = (event: FormEvent) => {
         event.preventDefault();
@@ -130,13 +141,10 @@ export default function PurchaseRequestsShow({ purchaseRequest, reviewMode = fal
 
                     <div className="flex flex-wrap gap-3">
                         <Link
-                            href={route('procurement.purchase-requests.index', {
-                                status: backFilters?.status || undefined,
-                                search: backFilters?.search || undefined,
-                            })}
+                            href={resolvedBackLink.href}
                             className="rounded border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                         >
-                            Back to Request Review
+                            {resolvedBackLink.label}
                         </Link>
                     </div>
 

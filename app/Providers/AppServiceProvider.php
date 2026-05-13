@@ -104,7 +104,7 @@ class AppServiceProvider extends ServiceProvider
 
         Gate::define('procurement.purchase-request.view-any', fn (User $user): bool => $user->isProcurement());
         Gate::define('procurement.purchase-request.create', fn (User $user): bool => $user->isProcurement());
-        Gate::define('procurement.purchase-request.view', fn (User $user, PurchaseRequest $purchaseRequest): bool => $user->isProcurement());
+        Gate::define('procurement.purchase-request.view', fn (User $user, PurchaseRequest $purchaseRequest): bool => $user->isProcurement() || $user->isExecutive());
         Gate::define('procurement.purchase-request.update', function (User $user, PurchaseRequest $purchaseRequest): bool {
             return $user->isProcurement() && in_array((string) $purchaseRequest->status, ['OPEN', 'PROCESSING', 'RETURNED_FOR_REVISION'], true);
         });
@@ -119,7 +119,7 @@ class AppServiceProvider extends ServiceProvider
 
         Gate::define('procurement.purchase-order.view-any', fn (User $user): bool => $user->isProcurement());
         Gate::define('procurement.purchase-order.create', fn (User $user): bool => $user->isProcurement());
-        Gate::define('procurement.purchase-order.view', fn (User $user, PurchaseOrder $purchaseOrder): bool => $user->isProcurement());
+        Gate::define('procurement.purchase-order.view', fn (User $user, PurchaseOrder $purchaseOrder): bool => $user->isProcurement() || $user->isExecutive());
         Gate::define('procurement.purchase-order.update', function (User $user, PurchaseOrder $purchaseOrder): bool {
             return $user->isProcurement() && (string) $purchaseOrder->status === 'DRAFT';
         });

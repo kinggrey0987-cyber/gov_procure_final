@@ -150,6 +150,7 @@ class PurchaseOrderController extends Controller
     public function show(Request $request, PurchaseOrder $purchaseOrder): Response
     {
         abort_unless($request->user()?->can('procurement.purchase-order.view', $purchaseOrder), 403);
+        $isExecutiveRoute = $request->routeIs('executive.procurement-records.*');
 
         $history = $this->historyTimelineService->forRecord($request->user(), $purchaseOrder);
 
@@ -180,6 +181,14 @@ class PurchaseOrderController extends Controller
             'permissions' => [
                 'place' => $request->user()?->can('procurement.purchase-order.place', $purchaseOrder) ?? false,
             ],
+            'backLink' => $isExecutiveRoute ? [
+                'href' => route('executive.procurement-analytics'),
+                'label' => 'Back to Procurement Insights',
+            ] : [
+                'href' => route('procurement.purchase-orders.index'),
+                'label' => 'Back to Purchase Orders',
+            ],
+            'showProcurementDocumentsLink' => ! $isExecutiveRoute,
             'statusHistory' => $history['status']->map(fn ($entry): array => [
                 'id' => (int) $entry->id,
                 'old_status' => $entry->old_status,

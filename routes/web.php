@@ -647,6 +647,15 @@ Route::middleware(['auth', 'twofactor', 'must-change-password'])->group(function
                 ->middleware('can:executive.monitoring.view')
                 ->name('procurement-analytics');
 
+            Route::prefix('procurement-records')->name('procurement-records.')->group(function () {
+                Route::get('/purchase-requests/{purchase_request}', [ProcurementPurchaseRequestController::class, 'show'])
+                    ->middleware(['can:executive.monitoring.view', 'can:procurement.purchase-request.view,purchase_request'])
+                    ->name('purchase-requests.show');
+                Route::get('/purchase-orders/{purchase_order}', [ProcurementPurchaseOrderController::class, 'show'])
+                    ->middleware(['can:executive.monitoring.view', 'can:procurement.purchase-order.view,purchase_order'])
+                    ->name('purchase-orders.show');
+            });
+
             Route::get('/anomalies-monitoring', [ExecutiveMonitoringController::class, 'anomaliesMonitoring'])
                 ->middleware('can:executive.monitoring.view')
                 ->name('anomalies-monitoring');

@@ -59,6 +59,7 @@ class PurchaseRequestController extends Controller
 
         $mode = strtolower(trim((string) $request->input('mode', 'view')));
         $isReviewMode = $mode === 'review';
+        $isExecutiveRoute = $request->routeIs('executive.procurement-records.*');
 
         return Inertia::render('Procurement/PurchaseRequests/Show', [
             'purchaseRequest' => $purchaseRequest->load([
@@ -74,6 +75,16 @@ class PurchaseRequestController extends Controller
             ],
             'permissions' => [
                 'process' => $request->user()?->can('procurement.purchase-request.process', $purchaseRequest) ?? false,
+            ],
+            'backLink' => $isExecutiveRoute ? [
+                'href' => route('executive.procurement-analytics'),
+                'label' => 'Back to Procurement Insights',
+            ] : [
+                'href' => route('procurement.purchase-requests.index', [
+                    'status' => trim((string) $request->input('status', '')) ?: null,
+                    'search' => trim((string) $request->input('search', '')) ?: null,
+                ]),
+                'label' => 'Back to Request Review',
             ],
         ]);
     }

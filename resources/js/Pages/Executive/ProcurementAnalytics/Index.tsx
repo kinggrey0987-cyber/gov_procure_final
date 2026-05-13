@@ -32,7 +32,11 @@ type ProcurementRecordRow = {
     type: 'pr' | 'po';
     record_id: number;
     reference: string;
-    route_name: 'procurement.purchase-requests.show' | 'procurement.purchase-orders.show';
+    route_name:
+        | 'executive.procurement-records.purchase-requests.show'
+        | 'executive.procurement-records.purchase-orders.show'
+        | 'procurement.purchase-requests.show'
+        | 'procurement.purchase-orders.show';
     office_name?: string | null;
     status: string;
     amount?: number | null;

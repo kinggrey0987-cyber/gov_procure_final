@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import { humanizeEnum } from '@/lib/displayLabels';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEvent } from 'react';
 
@@ -61,9 +62,18 @@ type Props = {
     permissions?: {
         place?: boolean;
     };
+    backLink?: {
+        href: string;
+        label: string;
+    };
+    showProcurementDocumentsLink?: boolean;
 };
-export default function PurchaseOrdersShow({ purchaseOrder, statusHistory, approvalHistory, permissions }: Props) {
+export default function PurchaseOrdersShow({ purchaseOrder, statusHistory, approvalHistory, permissions, backLink, showProcurementDocumentsLink = true }: Props) {
     const placeForm = useForm({ remarks: '' });
+    const resolvedBackLink = backLink ?? {
+        href: route('procurement.purchase-orders.index'),
+        label: 'Back to Purchase Orders',
+    };
 
     const placeOrder = (event: FormEvent) => {
         event.preventDefault();
@@ -91,7 +101,7 @@ export default function PurchaseOrdersShow({ purchaseOrder, statusHistory, appro
                             <Info label="Office" value={purchaseOrder.purchase_request?.office?.name ?? '-'} />
                             <Info label="Supply Request" value={purchaseOrder.supply_request?.request_code ?? '-'} />
                             <Info label="Requester" value={purchaseOrder.supply_request?.requester?.name ?? '-'} />
-                            <Info label="Procurement Method" value={purchaseOrder.procurement_method ?? '-'} />
+                            <Info label="Procurement Method" value={humanizeEnum(purchaseOrder.procurement_method)} />
                             <Info label="Expected Delivery" value={formatDate(purchaseOrder.expected_delivery_date)} />
                             <Info label="Total Amount" value={formatMoney(Number(purchaseOrder.total_amount ?? 0))} />
                         </dl>
@@ -139,8 +149,8 @@ export default function PurchaseOrdersShow({ purchaseOrder, statusHistory, appro
                     </section>
 
                     <div className="flex flex-wrap gap-3">
-                        <Link href={route('procurement.purchase-orders.index')} className="rounded border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                            Back to Purchase Orders
+                        <Link href={resolvedBackLink.href} className="rounded border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                            {resolvedBackLink.label}
                         </Link>
                     </div>
 
@@ -159,7 +169,7 @@ export default function PurchaseOrdersShow({ purchaseOrder, statusHistory, appro
                         </form>
                     ) : null}
 
-                    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                    {showProcurementDocumentsLink ? <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                         <h3 className="text-lg font-semibold text-slate-900">Purchase Order Documents</h3>
                         <p className="mt-1 text-sm text-slate-600">
                             PO-related files are managed in the central procurement document registry to avoid duplicating workflow documents on this page.
@@ -176,7 +186,7 @@ export default function PurchaseOrdersShow({ purchaseOrder, statusHistory, appro
                                 This keeps purchase-order files searchable from one registry instead of a separate attachment panel.
                             </p>
                         </div>
-                    </section>
+                    </section> : null}
 
                 </div>
             </div>

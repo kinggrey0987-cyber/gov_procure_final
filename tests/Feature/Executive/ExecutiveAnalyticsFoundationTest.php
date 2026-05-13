@@ -132,6 +132,33 @@ class ExecutiveAnalyticsFoundationTest extends TestCase
             );
     }
 
+    public function test_executive_can_open_purchase_request_and_purchase_order_detail_links_from_procurement_analytics(): void
+    {
+        $context = $this->createSupplyAndOrderContext($this->officeA, $this->procurementUser, $this->officeUser, 9309);
+        $purchaseRequest = PurchaseRequest::query()->findOrFail($context['purchaseOrder']->purchase_request_id);
+
+        $this->actingAs($this->executive)
+            ->get(route('executive.procurement-records.purchase-requests.show', $purchaseRequest->purchase_request_id))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Procurement/PurchaseRequests/Show')
+                ->where('permissions.process', false)
+                ->where('backLink.label', 'Back to Procurement Insights')
+            );
+
+        $this->actingAs($this->executive)
+            ->get(route('executive.procurement-records.purchase-orders.show', $context['purchaseOrder']->purchase_order_id))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Procurement/PurchaseOrders/Show')
+                ->where('permissions.place', false)
+                ->where('attachmentPermissions.upload', true)
+                ->where('attachmentPermissions.delete', true)
+                ->where('backLink.label', 'Back to Procurement Insights')
+                ->where('showProcurementDocumentsLink', false)
+            );
+    }
+
     public function test_anomaly_and_alert_linkages_and_status_history_transitions_are_recorded(): void
     {
         $context = $this->createSupplyAndOrderContext($this->officeA, $this->procurementUser, $this->officeUser, 9302);
