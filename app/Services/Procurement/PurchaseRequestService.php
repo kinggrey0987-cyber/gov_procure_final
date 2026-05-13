@@ -281,7 +281,7 @@ class PurchaseRequestService
                 'needed_by_date' => now()->addDays(7)->toDateString(),
                 'request_category' => 'GENERAL',
                 'purpose' => sprintf(
-                    'GSO Replenishment Basis for %s (inventory #%d). Internal stock replenishment planning context only; BAC/procurement must still process any PR/PO.',
+                    'GSO Replenishment Basis for %s (inventory #%d). Internal stock replenishment planning context only; the Procurement Unit must still process any PR/PO.',
                     (string) ($inventory->item?->item_name ?? 'Unassigned Item'),
                     (int) $inventory->inventory_id
                 ),
@@ -316,10 +316,10 @@ class PurchaseRequestService
                 'purchase_request_id' => (int) $purchaseRequest->purchase_request_id,
                 'item_id' => (int) $inventory->item_id,
                 'quantity_requested' => round($quantityRequested, 2),
-                'remarks' => 'Quantity proposed from low-stock deficit under GSO Replenishment Basis; BAC/procurement processing remains required.',
+                'remarks' => 'Quantity proposed from low-stock deficit under GSO Replenishment Basis; Procurement Unit processing remains required.',
             ]);
 
-            $this->recordStatus($purchaseRequest, null, 'OPEN', $actor, 'Purchase request queued from GSO Replenishment Basis; BAC/procurement processing and PO creation remain required.');
+            $this->recordStatus($purchaseRequest, null, 'OPEN', $actor, 'Purchase request queued from GSO Replenishment Basis; Procurement Unit processing and PO creation remain required.');
             $this->recordAudit($actor, 'AUTO_QUEUE_LOW_STOCK', $purchaseRequest);
 
             $deficit = max((float) $inventory->low_stock_threshold - (float) $inventory->available_stock, 0);
@@ -725,7 +725,7 @@ class PurchaseRequestService
     {
         if (! $actor->isProcurement()) {
             throw ValidationException::withMessages([
-                'role' => 'Only procurement officers can perform this action.',
+                'role' => 'Only Procurement Unit users can perform this action.',
             ]);
         }
     }

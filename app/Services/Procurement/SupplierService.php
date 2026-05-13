@@ -59,7 +59,7 @@ class SupplierService
     {
         if (! $actor->isProcurement()) {
             throw ValidationException::withMessages([
-                'role' => 'Only procurement officers can perform this action.',
+                'role' => 'Only Procurement Unit users can perform this action.',
             ]);
         }
     }

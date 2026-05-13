@@ -250,51 +250,6 @@ class ExecutivePpmpApprovalTest extends TestCase
         $this->assertTrue($this->officeUser->can('office.ppmp.submit', $ppmp));
     }
 
-    public function test_executive_show_exposes_only_significant_workflow_timeline_entries(): void
-    {
-        $ppmp = $this->createSubmittedPpmp();
-
-        StatusHistory::query()->create([
-            'reference_type' => Ppmp::class,
-            'reference_id' => $ppmp->ppmp_id,
-            'old_status' => null,
-            'new_status' => 'DRAFT',
-            'changed_by' => $this->officeUser->id,
-            'remarks' => 'PPMP draft initialized.',
-            'changed_at' => now()->subDays(3),
-        ]);
-
-        StatusHistory::query()->create([
-            'reference_type' => Ppmp::class,
-            'reference_id' => $ppmp->ppmp_id,
-            'old_status' => 'DRAFT',
-            'new_status' => 'DRAFT',
-            'changed_by' => $this->officeUser->id,
-            'remarks' => 'Line item revised.',
-            'changed_at' => now()->subDays(2),
-        ]);
-
-        StatusHistory::query()->create([
-            'reference_type' => Ppmp::class,
-            'reference_id' => $ppmp->ppmp_id,
-            'old_status' => 'DRAFT',
-            'new_status' => 'SUBMITTED',
-            'changed_by' => $this->officeUser->id,
-            'remarks' => 'Submitted to executive.',
-            'changed_at' => now()->subDay(),
-        ]);
-
-        $this->actingAs($this->executive)
-            ->get(route('executive.ppmp-approvals.show', $ppmp->ppmp_id))
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('Executive/Approvals/Show')
-                ->has('workflowTimeline', 2)
-                ->where('workflowTimeline.0.new_status', 'SUBMITTED')
-                ->where('workflowTimeline.1.new_status', 'DRAFT')
-            );
-    }
-
     public function test_executive_show_falls_back_to_ppmp_created_date_when_submission_history_is_missing(): void
     {
         $ppmp = $this->createSubmittedPpmp();

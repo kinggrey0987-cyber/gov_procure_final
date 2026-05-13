@@ -160,7 +160,7 @@ export default function DeliveryVerificationCreate({ delivery }: Props) {
                                     <option value="APPROVED">Approved</option>
                                     <option value="REJECTED">Rejected</option>
                                 </select>
-                                <p className="mt-1 text-xs text-slate-500">Use Approved only when all item lines match. Use Rejected when damaged or missing quantities need BAC/procurement follow-up.</p>
+                                <p className="mt-1 text-xs text-slate-500">Use Approved only when all item lines match. Use Rejected when damaged or missing quantities need Procurement Unit follow-up.</p>
                             </FormField>
                         </div>
 

@@ -189,12 +189,12 @@ export default function SupplyRequestShow({
                                 Procurement decision: {procurementDecision.status.replaceAll('_', ' ')}
                             </p>
                             <p className="mt-1">
-                                <span className="font-semibold">BAC Reason:</span> {procurementDecision.remarks?.trim() || 'No reason recorded.'}
+                                <span className="font-semibold">Procurement Unit Reason:</span> {procurementDecision.remarks?.trim() || 'No reason recorded.'}
                             </p>
                             <p className="mt-1 text-xs">
                                 {procurementDecision.status === 'REJECTED'
                                     ? 'This procurement request was rejected. Create a new supply request if the office still needs these items.'
-                                    : 'This procurement request was returned for revision. Review the BAC reason and coordinate with GSO/BAC before resubmission.'}
+                                    : 'This procurement request was returned for revision. Review the Procurement Unit reason and coordinate with GSO/Procurement Unit before resubmission.'}
                             </p>
                         </div>
                     ) : null}
@@ -328,7 +328,7 @@ export default function SupplyRequestShow({
                                                 </div>
                                                 {['RETURNED_FOR_REVISION', 'REJECTED'].includes(record.status.toUpperCase()) ? (
                                                     <p className="mt-2 text-sm text-slate-700">
-                                                        <span className="font-semibold">BAC Reason:</span> {record.remarks?.trim() || 'No reason recorded.'}
+                                                        <span className="font-semibold">Procurement Unit Reason:</span> {record.remarks?.trim() || 'No reason recorded.'}
                                                     </p>
                                                 ) : record.remarks ? (
                                                     <p className="mt-2 text-sm text-slate-600">{record.remarks}</p>

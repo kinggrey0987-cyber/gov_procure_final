@@ -31,7 +31,7 @@ export default function SuppliersIndex({ suppliers }: Props) {
 
             <div className="space-y-4 py-8">
                 <section className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-sm text-slate-600">Maintain active supplier records used by BAC procurement processing.</p>
+                    <p className="text-sm text-slate-600">Maintain active supplier records used by Procurement Unit processing.</p>
                     <Link href={route('procurement.suppliers.create')} className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
                         Add Supplier
                     </Link>

@@ -92,7 +92,7 @@ export default function PurchaseOrdersCreate({ eligiblePurchaseRequests, supplie
 
             <div className="space-y-6 py-8">
                 <section className="overflow-hidden rounded-2xl border border-red-200 bg-gradient-to-r from-red-700 via-red-600 to-red-500 px-6 py-5 text-white shadow-[0_10px_28px_rgba(185,28,28,0.25)]">
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-100">BAC Procurement Workflow</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-100">Procurement Unit Workflow</p>
                     <h3 className="mt-1 text-2xl font-semibold">Create Purchase Order from Approved Request Source</h3>
                     <p className="mt-1 text-sm text-red-100">Select the eligible Purchase Request first, then assign the supplier and procurement execution details.</p>
                 </section>

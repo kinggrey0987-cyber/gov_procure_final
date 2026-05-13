@@ -56,7 +56,7 @@ class DeliveryVerificationService
 
         if ((string) $payload['verification_status'] === 'APPROVED' && $hasDiscrepancy) {
             throw ValidationException::withMessages([
-                'verification_status' => 'Deliveries with damaged or missing quantities must be rejected for BAC/procurement follow-up.',
+                'verification_status' => 'Deliveries with damaged or missing quantities must be rejected for Procurement Unit follow-up.',
             ]);
         }
 

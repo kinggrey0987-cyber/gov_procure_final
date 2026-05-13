@@ -152,7 +152,7 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Shortage-Based Initiation Queue</h3>
                         <p className="mt-2 text-sm text-slate-600">
                             This queue identifies office requests that cannot be fulfilled from current stock. It prepares purchase request initiation inputs and does not perform
-                            BAC approval or adjudication.
+                            Procurement Unit approval or adjudication.
                         </p>
                         <p className="mt-2 text-xs text-slate-500">Shortage values are computed against currently available stock in inventory.</p>
                         <div className="mt-4 space-y-3">
@@ -221,7 +221,7 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                     <div className="space-y-4 p-6">
                         <div>
                             <h4 className="text-base font-semibold text-slate-900">Review GSO Replenishment Basis</h4>
-                            <p className="mt-1 text-sm text-slate-600">Review low-stock details and adjust requested quantity before queuing a procurement basis. BAC/procurement must still process the PR and create any PO.</p>
+                            <p className="mt-1 text-sm text-slate-600">Review low-stock details and adjust requested quantity before queuing a procurement basis. The Procurement Unit must still process the PR and create any PO.</p>
                         </div>
 
                         {selectedLowStockItem ? (

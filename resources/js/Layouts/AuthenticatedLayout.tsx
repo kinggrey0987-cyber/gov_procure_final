@@ -321,10 +321,12 @@ export default function Authenticated({
             },
         ];
 
-        const roleLabel = (user.role_code ?? 'BAC_OFFICER')
-            .replaceAll('_', ' ')
-            .toLowerCase()
-            .replace(/\b\w/g, (char) => char.toUpperCase());
+        const roleLabel = user.role_code === 'PROC_OFFICER'
+            ? 'Procurement Unit'
+            : (user.role_code ?? 'USER')
+                .replaceAll('_', ' ')
+                .toLowerCase()
+                .replace(/\b\w/g, (char) => char.toUpperCase());
 
         return (
             <div className="min-h-screen bg-slate-100 md:flex">
@@ -357,7 +359,7 @@ export default function Authenticated({
 
                     <div className="mt-auto border-t border-slate-200 bg-slate-50 px-4 py-4">
                         <p className="text-sm font-semibold text-slate-800">Procurement Operations Suite</p>
-                        <p className="text-xs text-slate-600">BAC request review, supplier management, and PO execution.</p>
+                        <p className="text-xs text-slate-600">Procurement Unit request review, supplier management, and PO execution.</p>
                     </div>
                 </aside>
 
@@ -435,7 +437,7 @@ export default function Authenticated({
                     <div className="mx-auto w-full max-w-[1400px] px-3 py-4 sm:px-6 sm:py-6">
                         {header && (
                             <header className="mb-6 border-b border-slate-200 pb-4">
-                                <p className="mt-1 text-sm text-slate-500 sm:text-xl">Municipality of E.B. Magalona - Procurement / BAC Staff</p>
+                                <p className="mt-1 text-sm text-slate-500 sm:text-xl">Municipality of E.B. Magalona - Procurement Unit Staff</p>
                                 <div className="mt-2 text-2xl font-bold text-slate-800 sm:mt-3 sm:text-4xl">{header}</div>
                             </header>
                         )}

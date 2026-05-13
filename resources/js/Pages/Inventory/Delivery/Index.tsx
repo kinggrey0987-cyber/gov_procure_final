@@ -152,7 +152,7 @@ export default function DeliveryIndex({ deliveries, filters, filter_options }: P
 
                 <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                     <p className="text-sm text-slate-600">
-                        When a purchase order is placed by BAC, a delivery intake is created automatically in PENDING status. Use Open Receiving once items physically arrive.
+                        When a purchase order is placed by the Procurement Unit, a delivery intake is created automatically in PENDING status. Use Open Receiving once items physically arrive.
                     </p>
                 </div>
 

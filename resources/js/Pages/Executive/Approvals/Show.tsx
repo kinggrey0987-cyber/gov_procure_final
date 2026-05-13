@@ -5,15 +5,6 @@ import { getFundSourceLabel } from '@/constants/fundSources';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 
-type HistoryEntry = {
-    id: number;
-    old_status?: string | null;
-    new_status?: string;
-    remarks?: string | null;
-    changed_at?: string | null;
-    changed_by?: { id: number; name: string } | null;
-};
-
 type Attachment = {
     document_id: number;
     title: string;
@@ -60,7 +51,6 @@ type Props = {
         upload: boolean;
         delete: boolean;
     };
-    workflowTimeline: HistoryEntry[];
     canSignoff: boolean;
 };
 
@@ -69,7 +59,6 @@ export default function ExecutiveApprovalShow({
     categorySummary,
     attachments,
     attachmentPermissions,
-    workflowTimeline,
     canSignoff,
 }: Props) {
     const [decisionTarget, setDecisionTarget] = useState<{ status: 'APPROVED' | 'REJECTED' | 'RETURNED_FOR_REVISION' } | null>(null);
@@ -154,7 +143,7 @@ export default function ExecutiveApprovalShow({
                             <h3 className="mt-1 text-2xl font-semibold text-slate-900">{ppmp.reference_code}</h3>
                             <p className="mt-1 text-sm text-slate-600">Final signoff workspace for executive approval authority.</p>
                         </div>
-                        <span className={statusBadgeClass(ppmp.status)}>{ppmp.status}</span>
+                        <span className={statusBadgeClass(ppmp.status)}>{displayPpmpStatus(ppmp.status)}</span>
                     </div>
 
                     <div className="mt-4 grid gap-3 text-sm text-slate-700 md:grid-cols-2 lg:grid-cols-3">
@@ -178,9 +167,6 @@ export default function ExecutiveApprovalShow({
                     <div className="mt-4 flex flex-wrap gap-2">
                         <Link href={route('executive.ppmp-approvals.index')} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
                             Back to Executive Approvals
-                        </Link>
-                        <Link href="#history" className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
-                            View History
                         </Link>
                     </div>
                 </section>
@@ -294,21 +280,6 @@ export default function ExecutiveApprovalShow({
                     deleteRouteFor={(documentId: number) => route('documents.destroy', documentId)}
                 />
 
-                <section id="history" className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <h3 className="text-lg font-semibold text-slate-900">Workflow Timeline</h3>
-                    <p className="mt-1 text-sm text-slate-600">Executive-facing milestones only. Draft line-edit activity is intentionally omitted to reduce review noise.</p>
-
-                    <div className="mt-4 space-y-3 text-sm">
-                        {workflowTimeline.length === 0 && <p className="text-slate-500">No significant workflow events found.</p>}
-                        {workflowTimeline.map((row) => (
-                            <div key={row.id} className="rounded-lg border border-slate-200 p-3">
-                                <p className="font-semibold text-slate-900">{timelineLabel(row.old_status, row.new_status)}</p>
-                                <p className="text-slate-600">{row.remarks ?? '-'}</p>
-                                <p className="mt-1 text-xs text-slate-500">{formatDateTime(row.changed_at)} by {row.changed_by?.name ?? 'System'}</p>
-                            </div>
-                        ))}
-                    </div>
-                </section>
             </div>
 
             <PpmpDecisionModal
@@ -341,6 +312,17 @@ function statusBadgeClass(status: string): string {
     return `${base} bg-slate-100 text-slate-800`;
 }
 
+function displayPpmpStatus(status: string): string {
+    const map: Record<string, string> = {
+        SUBMITTED: 'Submitted',
+        APPROVED: 'Approved',
+        RETURNED_FOR_REVISION: 'Returned for Revision',
+        REJECTED: 'Rejected',
+    };
+
+    return map[status] ?? status.replaceAll('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 function formatCurrency(value: number): string {
     return new Intl.NumberFormat('en-PH', {
         style: 'currency',
@@ -355,26 +337,5 @@ function formatDate(value?: string | null): string {
     if (Number.isNaN(parsed.getTime())) return '-';
     return parsed.toLocaleDateString();
 }
-
-function formatDateTime(value?: string | null): string {
-    if (!value) return '-';
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return '-';
-    return parsed.toLocaleString();
-}
-
-function timelineLabel(oldStatus?: string | null, newStatus?: string): string {
-    const from = oldStatus ? oldStatus.replace(/_/g, ' ') : 'N/A';
-    const to = newStatus ? newStatus.replace(/_/g, ' ') : 'N/A';
-
-    if ((oldStatus ?? '') === '') {
-        return `Created as ${to}`;
-    }
-
-    return `${from} to ${to}`;
-}
-
-
-
 
 

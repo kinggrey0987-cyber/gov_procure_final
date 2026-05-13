@@ -19,9 +19,9 @@ class RoleSeeder extends Seeder
                 'description' => 'Technical system administrator for account, office, and access management only.',
             ],
             [
-                'name' => 'Procurement Officer',
+                'name' => 'Procurement Unit',
                 'code' => 'PROC_OFFICER',
-                'description' => 'Handles procurement workflow processing and record review.',
+                'description' => 'Represents procurement-side users handling workflow processing and record review.',
             ],
             [
                 'name' => 'GSO Officer',

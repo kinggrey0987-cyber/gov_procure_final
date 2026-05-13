@@ -289,6 +289,14 @@ export default function TransparencyMonitoringIndex({
                     </div>
                 </section>
 
+                {activeTab !== 'drafts' ? (
+                    <div className="flex justify-end">
+                        <Link href={route('executive.disclosures.create')} className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
+                            Create Disclosure
+                        </Link>
+                    </div>
+                ) : null}
+
                 {activeTab === 'overview' && (
                     <div className="space-y-6">
                         <div className="grid gap-6 xl:grid-cols-12">
@@ -412,12 +420,6 @@ export default function TransparencyMonitoringIndex({
 
                 {activeTab === 'drafts' && (
                     <section className="space-y-3">
-                        <div className="flex justify-end">
-                            <Link href={route('executive.disclosures.create')} className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
-                                New Disclosure
-                            </Link>
-                        </div>
-
                         {draft_disclosures.length === 0 ? (
                             <EmptyDisclosureState
                                 title="No draft disclosures in scope"

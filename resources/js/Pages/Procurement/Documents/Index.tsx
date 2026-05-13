@@ -184,7 +184,7 @@ export default function ProcurementDocumentsIndex({
                         <div className="border-b border-red-200 bg-gradient-to-r from-red-700 via-red-600 to-red-500 px-6 py-4 text-white">
                             <div className="flex flex-wrap items-start justify-between gap-3">
                                 <div>
-                                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-100">BAC Repository</p>
+                                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-100">Procurement Unit Repository</p>
                                     <p className="text-lg font-semibold">Procurement Documents</p>
                                     <p className="text-sm text-red-100">
                                         Upload and manage internal procurement files for purchase requests and purchase orders.
@@ -212,7 +212,7 @@ export default function ProcurementDocumentsIndex({
                                     <li>Maximum file size: 10 MB per upload.</li>
                                     <li>Good fits here include supplier quotations, canvass sheets, NOA files, signed PO copies, and other procurement-record attachments.</li>
                                     <li>Do not store delivery receipts, inspection/verification forms, or distribution records here. Those belong in the delivery workflow.</li>
-                                    <li>This BAC repository is internal. Uploaded files do not automatically become public disclosures.</li>
+                                    <li>This Procurement Unit repository is internal. Uploaded files do not automatically become public disclosures.</li>
                                     <li>Executive users can later prepare and publish public disclosures through the Executive module, then attach selected disclosure documents for public release.</li>
                                 </ul>
                             </div>

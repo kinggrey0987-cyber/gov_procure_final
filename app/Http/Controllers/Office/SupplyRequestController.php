@@ -424,7 +424,7 @@ class SupplyRequestController extends Controller
                 ['order' => 1, 'key' => 'DRAFT', 'label' => 'Stage 1: Draft Request', 'owner' => 'Office User'],
                 ['order' => 2, 'key' => 'SUBMITTED', 'label' => 'Stage 2: Submitted to GSO', 'owner' => 'GSO Officer'],
                 ['order' => 3, 'key' => 'IN_REVIEW', 'label' => 'Stage 3: GSO Validation', 'owner' => 'GSO Officer'],
-                ['order' => 4, 'key' => 'PROCESSING', 'label' => 'Stage 4: BAC / Procurement', 'owner' => 'BAC Officer'],
+                ['order' => 4, 'key' => 'PROCESSING', 'label' => 'Stage 4: Procurement Unit', 'owner' => 'Procurement Unit'],
                 ['order' => 5, 'key' => 'RELEASED', 'label' => 'Stage 5: Released for Office', 'owner' => 'GSO Officer'],
                 ['order' => 6, 'key' => 'COMPLETED', 'label' => 'Stage 6: Completed', 'owner' => 'Office User'],
             ]

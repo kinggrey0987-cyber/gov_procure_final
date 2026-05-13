@@ -109,7 +109,7 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
 
             <div className="space-y-6 py-8">
                 <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <SummaryCard label="Pending Requests" value={summary.pending_requests} tone="amber" helper="Awaiting BAC review" />
+                    <SummaryCard label="Pending Requests" value={summary.pending_requests} tone="amber" helper="Awaiting Procurement Unit review" />
                     <SummaryCard label="Processing Requests" value={summary.processing_requests} tone="blue" helper="Currently under procurement action" />
                     <SummaryCard label="Ongoing Procurement" value={summary.ongoing_procurement} tone="green" helper="Active purchase order pipeline" />
                     <SummaryCard label="Completed Procurements" value={summary.completed_procurements} tone="red" helper="Closed procurement cycles" />

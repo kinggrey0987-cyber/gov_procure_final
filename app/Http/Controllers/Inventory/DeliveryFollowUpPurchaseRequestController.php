@@ -25,6 +25,6 @@ class DeliveryFollowUpPurchaseRequestController
         );
 
         return Redirect::route('inventory.deliveries.show', $delivery->delivery_id)
-            ->with('success', sprintf('Follow-up purchase request PR-%06d created from delivery discrepancy and queued for BAC/procurement review.', (int) $purchaseRequest->purchase_request_id));
+            ->with('success', sprintf('Follow-up purchase request PR-%06d created from delivery discrepancy and queued for Procurement Unit review.', (int) $purchaseRequest->purchase_request_id));
     }
 }

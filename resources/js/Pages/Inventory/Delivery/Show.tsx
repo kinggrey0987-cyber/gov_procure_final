@@ -161,7 +161,7 @@ export default function DeliveryShow({ delivery }: Props) {
                                             <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Discrepancy Follow-up</p>
                                             <h3 className="mt-1 text-base font-semibold text-slate-900">Partially Received Delivery</h3>
                                             <p className="mt-2 max-w-3xl text-sm text-slate-700">
-                                                This delivery was already verified with discrepancies. Re-verification is locked, and the next GSO step is to endorse the lacking quantities through a linked follow-up purchase request for BAC/procurement processing.
+                                                This delivery was already verified with discrepancies. Re-verification is locked, and the next GSO step is to endorse the lacking quantities through a linked follow-up purchase request for Procurement Unit processing.
                                             </p>
                                         </div>
 
@@ -213,7 +213,7 @@ export default function DeliveryShow({ delivery }: Props) {
                                                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Next Step</p>
                                                     <p className="mt-1 text-sm font-semibold text-slate-900">Create the linked follow-up purchase request</p>
                                                     <p className="mt-1 text-sm text-slate-600">
-                                                        This will forward the missing and damaged quantities into the BAC/procurement workflow without duplicating the original delivery verification.
+                                                        This will forward the missing and damaged quantities into the Procurement Unit workflow without duplicating the original delivery verification.
                                                     </p>
                                                 </div>
 

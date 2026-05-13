@@ -260,7 +260,7 @@ export default function ExecutiveApprovalsIndex({ records, recordsExport, summar
                             <option value="">All statuses</option>
                             {filter_options.statuses.map((status) => (
                                 <option key={status} value={status}>
-                                    {status}
+                                    {displayPpmpStatus(status)}
                                 </option>
                             ))}
                         </select>
@@ -332,7 +332,7 @@ export default function ExecutiveApprovalsIndex({ records, recordsExport, summar
                                     <p className="text-base font-semibold text-slate-900">PPMP-{row.ppmp_id}</p>
                                     <p className="text-xs text-slate-600">{row.office?.name ?? 'Unassigned Office'} | Prepared by {row.preparer?.name ?? 'Unknown'}</p>
                                 </div>
-                                <span className={statusBadgeClass(row.status)}>{row.status}</span>
+                                <span className={statusBadgeClass(row.status)}>{displayPpmpStatus(row.status)}</span>
                             </div>
 
                             <div className="mt-3 grid gap-2 text-xs text-slate-700 md:grid-cols-4">
@@ -384,12 +384,6 @@ export default function ExecutiveApprovalsIndex({ records, recordsExport, summar
                                     </>
                                 )}
 
-                                <Link
-                                    href={`${route('executive.ppmp-approvals.show', row.ppmp_id)}#history`}
-                                    className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                                >
-                                    View History
-                                </Link>
                             </div>
                         </article>
                     ))}
@@ -457,7 +451,7 @@ export default function ExecutiveApprovalsIndex({ records, recordsExport, summar
                                                 <td className="px-2 py-1.5 align-top leading-snug">{row.office?.name ?? 'Unassigned Office'}</td>
                                                 <td className="px-2 py-1.5 align-top leading-snug">{row.preparer?.name ?? 'Unknown'}</td>
                                                 <td className="px-2 py-1.5 align-top leading-snug">{row.fiscal_year}</td>
-                                                <td className="px-2 py-1.5 align-top leading-snug">{row.status}</td>
+                                                <td className="px-2 py-1.5 align-top leading-snug">{displayPpmpStatus(row.status)}</td>
                                                 <td className="px-2 py-1.5 align-top leading-snug">{row.date_prepared ?? '-'}</td>
                                                 <td className="px-2 py-1.5 align-top leading-snug">{row.items_count}</td>
                                                 <td className="px-2 py-1.5 align-top leading-snug">{formatCurrency(row.total_estimated_budget)}</td>
@@ -548,6 +542,17 @@ function statusBadgeClass(status: string): string {
     if (status === 'RETURNED_FOR_REVISION') return `${base} bg-blue-100 text-blue-800`;
     if (status === 'REJECTED') return `${base} bg-rose-100 text-rose-800`;
     return `${base} bg-slate-100 text-slate-800`;
+}
+
+function displayPpmpStatus(status: string): string {
+    const map: Record<string, string> = {
+        SUBMITTED: 'Submitted',
+        APPROVED: 'Approved',
+        RETURNED_FOR_REVISION: 'Returned for Revision',
+        REJECTED: 'Rejected',
+    };
+
+    return map[status] ?? status.replaceAll('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function formatCurrency(value: number): string {

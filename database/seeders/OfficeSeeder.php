@@ -34,9 +34,9 @@ class OfficeSeeder extends Seeder
                 'description' => 'Handles inventory, deliveries, and supply distribution.',
             ],
             [
-                'name' => 'Bids and Awards Committee',
+                'name' => 'Procurement Unit',
                 'code' => 'BAC',
-                'description' => 'Oversees procurement planning, bidding, and awards.',
+                'description' => 'Represents BAC members and procurement personnel for procurement-side workflows.',
             ],
             [
                 'name' => 'Municipal Engineering Office',

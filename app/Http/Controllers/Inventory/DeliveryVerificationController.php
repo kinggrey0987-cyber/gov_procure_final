@@ -73,7 +73,7 @@ class DeliveryVerificationController
                     'has_discrepancy' => $hasDiscrepancy,
                     'recommended_status' => $hasDiscrepancy ? 'REJECTED' : 'APPROVED',
                     'message' => $hasDiscrepancy
-                        ? 'Discrepancies were found. Reject this delivery verification for BAC/procurement follow-up.'
+                        ? 'Discrepancies were found. Reject this delivery verification for Procurement Unit follow-up.'
                         : 'No quantity discrepancies found. This delivery is ready for approval.',
                 ],
             ],
