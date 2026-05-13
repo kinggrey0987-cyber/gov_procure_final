@@ -106,16 +106,16 @@ export default function PurchaseOrdersIndex({ purchaseOrders, filters }: Props) 
                             Reset
                         </button>
                     </div>
-                    <div className="grid gap-3 md:grid-cols-5">
+                    <div className="grid gap-3 lg:grid-cols-[12rem_minmax(0,1fr)_minmax(14rem,auto)]">
                         <select
                             value={status}
                             onChange={(event) => setStatus(event.target.value)}
-                            className="rounded-lg border-slate-300 text-sm"
+                            aria-label="Filter purchase orders by status"
+                            className="w-full rounded-lg border-slate-300 text-sm"
                         >
-                            <option value="">All Statuses</option>
-                            <option value="DRAFT">Draft</option>
-                            <option value="PLACED">Placed</option>
-                            <option value="COMPLETED">Completed</option>
+                            <option value="">All PO statuses</option>
+                            <option value="DRAFT">Draft PO</option>
+                            <option value="PLACED">Issued PO</option>
                         </select>
 
                         <input
@@ -123,10 +123,10 @@ export default function PurchaseOrdersIndex({ purchaseOrders, filters }: Props) 
                             value={search}
                             onChange={(event) => setSearch(event.target.value)}
                             placeholder="Search PO number, supplier, office"
-                            className="md:col-span-2 rounded-lg border-slate-300 text-sm"
+                            className="w-full rounded-lg border-slate-300 text-sm"
                         />
 
-                        <p className="flex items-center text-xs text-slate-500 md:col-span-2">Showing 5 records per page. Use pagination for the next 5.</p>
+                        <p className="flex items-center text-xs text-slate-500">Showing 5 records per page. Use pagination for the next 5.</p>
                     </div>
                 </section>
 
@@ -154,7 +154,7 @@ export default function PurchaseOrdersIndex({ purchaseOrders, filters }: Props) 
                                     </td>
                                     <td className="px-4 py-3 font-semibold text-slate-800">{formatMoney(Number(row.total_amount || 0))}</td>
                                     <td className="px-4 py-3">
-                                        <span className={statusClass(row.status)}>{row.status}</span>
+                                        <span className={statusClass(row.status)}>{displayPurchaseOrderStatus(row.status)}</span>
                                     </td>
                                     <td className="px-4 py-3 text-slate-600">{formatDate(row.created_at)}</td>
                                     <td className="px-4 py-3 text-right">
@@ -210,6 +210,15 @@ function statusClass(status: string) {
     };
 
     return map[status] ?? `${base} bg-slate-100 text-slate-700`;
+}
+
+function displayPurchaseOrderStatus(status: string): string {
+    const map: Record<string, string> = {
+        DRAFT: 'Draft PO',
+        PLACED: 'Issued PO',
+    };
+
+    return map[status] ?? status.replaceAll('_', ' ');
 }
 
 function formatDate(value?: string) {

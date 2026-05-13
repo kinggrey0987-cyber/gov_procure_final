@@ -34,6 +34,10 @@ type Props = {
     scopeModules: string[];
     relatedRecordOptions: RelatedRecordOption[];
     uploadEnabled: boolean;
+    uploadDefaults?: {
+        related_module?: '' | 'purchase_requests' | 'purchase_orders';
+        related_reference_id?: number | null;
+    };
 };
 
 const MODULE_LABELS: Record<string, string> = {
@@ -65,8 +69,11 @@ export default function ProcurementDocumentsIndex({
     scopeModules,
     relatedRecordOptions,
     uploadEnabled,
+    uploadDefaults,
 }: Props) {
-    const [showUpload, setShowUpload] = useState(false);
+    const defaultRelatedModule = uploadDefaults?.related_module ?? '';
+    const defaultRelatedReferenceId = uploadDefaults?.related_reference_id ? String(uploadDefaults.related_reference_id) : '';
+    const [showUpload, setShowUpload] = useState(defaultRelatedModule !== '' && defaultRelatedReferenceId !== '');
 
     const [moduleFilter, setModuleFilter] = useState(filters.module ?? '');
     const [searchFilter, setSearchFilter] = useState(filters.search ?? '');
@@ -99,8 +106,8 @@ export default function ProcurementDocumentsIndex({
         title: string;
         file: File | null;
     }>({
-        related_module: '',
-        related_reference_id: '',
+        related_module: defaultRelatedModule,
+        related_reference_id: defaultRelatedReferenceId,
         document_kind: '',
         title: '',
         file: null,

@@ -295,6 +295,25 @@ class ExecutivePpmpApprovalTest extends TestCase
             );
     }
 
+    public function test_executive_show_falls_back_to_ppmp_created_date_when_submission_history_is_missing(): void
+    {
+        $ppmp = $this->createSubmittedPpmp();
+
+        $this->assertDatabaseMissing('status_history', [
+            'reference_type' => Ppmp::class,
+            'reference_id' => $ppmp->ppmp_id,
+            'new_status' => 'SUBMITTED',
+        ]);
+
+        $this->actingAs($this->executive)
+            ->get(route('executive.ppmp-approvals.show', $ppmp->ppmp_id))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Executive/Approvals/Show')
+                ->where('ppmp.submitted_at', $ppmp->created_at->toIso8601String())
+            );
+    }
+
     private function createSubmittedPpmp(): Ppmp
     {
         return Ppmp::query()->create([

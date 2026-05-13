@@ -29,21 +29,14 @@ type Props = {
     }>;
 };
 
+const REQUEST_STATUS_FILTERS = ['ALL', 'OPEN', 'PROCESSING', 'RETURNED_FOR_REVISION', 'REJECTED'];
+const ORDER_STATUS_FILTERS = ['ALL', 'DRAFT', 'PLACED'];
+
 export default function ProcurementTracking({ summary, recentPurchaseRequests, recentPurchaseOrders }: Props) {
     const [requestSearch, setRequestSearch] = useState('');
     const [requestStatus, setRequestStatus] = useState('ALL');
     const [orderSearch, setOrderSearch] = useState('');
     const [orderStatus, setOrderStatus] = useState('ALL');
-
-    const requestStatuses = useMemo(
-        () => ['ALL', ...Array.from(new Set(recentPurchaseRequests.map((request) => request.status.toUpperCase())))],
-        [recentPurchaseRequests],
-    );
-
-    const orderStatuses = useMemo(
-        () => ['ALL', ...Array.from(new Set(recentPurchaseOrders.map((order) => order.status.toUpperCase())))],
-        [recentPurchaseOrders],
-    );
 
     const filteredPurchaseRequests = useMemo(() => {
         const keyword = requestSearch.trim().toLowerCase();
@@ -64,7 +57,7 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
                 `PR-${String(request.purchase_request_id).padStart(6, '0')}`,
                 request.office_name,
                 request.status,
-                displayProcurementStatus(request.status),
+                displayPurchaseRequestStatus(request.status),
                 formatDate(request.created_at),
             ]
                 .join(' ')
@@ -155,8 +148,8 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
                             </Link>
                         </div>
                         <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
-                            <div className="grid gap-3 md:grid-cols-5">
-                                <div className="md:col-span-3">
+                            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_10rem_7rem]">
+                                <div>
                                     <label htmlFor="procurement-request-search" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
                                         Search
                                     </label>
@@ -169,7 +162,7 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
                                         className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                                     />
                                 </div>
-                                <div>
+                                <div className="min-w-0">
                                     <label htmlFor="procurement-request-status" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
                                         Status
                                     </label>
@@ -177,11 +170,11 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
                                         id="procurement-request-status"
                                         value={requestStatus}
                                         onChange={(event) => setRequestStatus(event.target.value)}
-                                        className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                                        className="block w-full truncate rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                                     >
-                                        {requestStatuses.map((status) => (
+                                        {REQUEST_STATUS_FILTERS.map((status) => (
                                             <option key={status} value={status}>
-                                                {status === 'ALL' ? 'All statuses' : displayProcurementStatus(status)}
+                                                {status === 'ALL' ? 'All PR statuses' : displayPurchaseRequestStatus(status)}
                                             </option>
                                         ))}
                                     </select>
@@ -212,7 +205,7 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
                                             <p className="text-sm text-slate-600">{request.office_name}</p>
                                         </div>
                                         <div className="text-right">
-                                            <span className={statusClass(request.status)}>{displayProcurementStatus(request.status)}</span>
+                                            <span className={statusClass(request.status)}>{displayPurchaseRequestStatus(request.status)}</span>
                                             <p className="mt-1 text-xs text-slate-500">{formatDate(request.created_at)}</p>
                                         </div>
                                     </div>
@@ -229,8 +222,8 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
                             </Link>
                         </div>
                         <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
-                            <div className="grid gap-3 md:grid-cols-5">
-                                <div className="md:col-span-3">
+                            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_10rem_7rem]">
+                                <div>
                                     <label htmlFor="procurement-order-search" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
                                         Search
                                     </label>
@@ -243,7 +236,7 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
                                         className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                                     />
                                 </div>
-                                <div>
+                                <div className="min-w-0">
                                     <label htmlFor="procurement-order-status" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
                                         Status
                                     </label>
@@ -251,11 +244,11 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
                                         id="procurement-order-status"
                                         value={orderStatus}
                                         onChange={(event) => setOrderStatus(event.target.value)}
-                                        className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                                        className="block w-full truncate rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                                     >
-                                        {orderStatuses.map((status) => (
+                                        {ORDER_STATUS_FILTERS.map((status) => (
                                             <option key={status} value={status}>
-                                                {status === 'ALL' ? 'All statuses' : displayProcurementStatus(status)}
+                                                {status === 'ALL' ? 'All PO statuses' : displayPurchaseOrderStatus(status)}
                                             </option>
                                         ))}
                                     </select>
@@ -341,18 +334,32 @@ function statusClass(status: string) {
     const map: Record<string, string> = {
         OPEN: `${base} bg-amber-100 text-amber-700`,
         PROCESSING: `${base} bg-blue-100 text-blue-700`,
-        COMPLETED: `${base} bg-emerald-100 text-emerald-700`,
+        RETURNED_FOR_REVISION: `${base} bg-violet-100 text-violet-700`,
+        REJECTED: `${base} bg-rose-100 text-rose-700`,
+        DRAFT: `${base} bg-amber-100 text-amber-700`,
+        PLACED: `${base} bg-blue-100 text-blue-700`,
     };
 
     return map[status] ?? `${base} bg-slate-100 text-slate-700`;
 }
 
-function displayProcurementStatus(status: string): string {
+function displayPurchaseRequestStatus(status: string): string {
     const normalized = status.toUpperCase();
     const map: Record<string, string> = {
         OPEN: 'Pending Review',
-        PROCESSING: 'In Processing',
-        COMPLETED: 'Completed',
+        PROCESSING: 'Processing',
+        RETURNED_FOR_REVISION: 'Returned',
+        REJECTED: 'Rejected',
+    };
+
+    return map[normalized] ?? status.replaceAll('_', ' ');
+}
+
+function displayPurchaseOrderStatus(status: string): string {
+    const normalized = status.toUpperCase();
+    const map: Record<string, string> = {
+        DRAFT: 'Draft PO',
+        PLACED: 'Issued PO',
     };
 
     return map[normalized] ?? status.replaceAll('_', ' ');

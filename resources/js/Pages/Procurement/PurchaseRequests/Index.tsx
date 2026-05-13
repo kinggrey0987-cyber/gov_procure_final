@@ -119,17 +119,17 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                             Reset
                         </button>
                     </div>
-                    <div className="grid gap-3 md:grid-cols-5">
+                    <div className="grid gap-3 lg:grid-cols-[12rem_minmax(0,1fr)_minmax(14rem,auto)]">
                         <select
                             value={status}
                             onChange={(event) => setStatus(event.target.value)}
-                            className="rounded-lg border-slate-300 text-sm"
+                            aria-label="Filter request review queue by status"
+                            className="w-full rounded-lg border-slate-300 text-sm"
                         >
-                            <option value="">All Statuses</option>
-                            <option value="OPEN">Open</option>
+                            <option value="">All PR statuses</option>
+                            <option value="OPEN">Pending Review</option>
                             <option value="PROCESSING">Processing</option>
                             <option value="RETURNED_FOR_REVISION">Returned for Revision</option>
-                            <option value="APPROVED">Approved</option>
                             <option value="REJECTED">Rejected</option>
                         </select>
 
@@ -138,10 +138,10 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                             value={search}
                             onChange={(event) => setSearch(event.target.value)}
                             placeholder="Search request code, office, or PR ID"
-                            className="md:col-span-2 rounded-lg border-slate-300 text-sm"
+                            className="w-full rounded-lg border-slate-300 text-sm"
                         />
 
-                        <p className="flex items-center text-xs text-slate-500 md:col-span-2">Showing 5 records per page. Use pagination for the next 5.</p>
+                        <p className="flex items-center text-xs text-slate-500">Showing 5 records per page. Use pagination for the next 5.</p>
                     </div>
                 </section>
 
@@ -175,7 +175,7 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                                         </td>
                                         <td className="px-4 py-3 text-slate-700">{quantity.toFixed(2)}</td>
                                         <td className="px-4 py-3">
-                                            <span className={statusClass(row.status)}>{row.status}</span>
+                                            <span className={statusClass(row.status)}>{displayPurchaseRequestStatus(row.status)}</span>
                                         </td>
                                         <td className="px-4 py-3 text-slate-600">{formatDate(row.created_at)}</td>
                                         <td className="px-4 py-3 text-right">
@@ -234,6 +234,17 @@ function statusClass(status: string) {
     };
 
     return map[status] ?? `${base} bg-slate-100 text-slate-700`;
+}
+
+function displayPurchaseRequestStatus(status: string): string {
+    const map: Record<string, string> = {
+        OPEN: 'Pending Review',
+        PROCESSING: 'Processing',
+        RETURNED_FOR_REVISION: 'Returned for Revision',
+        REJECTED: 'Rejected',
+    };
+
+    return map[status] ?? status.replaceAll('_', ' ');
 }
 
 function formatDate(value?: string) {

@@ -354,8 +354,8 @@ export default function ExecutiveDashboardIndex({
                 </section>
 
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-                    <MetricCard label="Purchase Requests" value={procurement.purchase_request_count} helper="Office requests routed to BAC review" />
-                    <MetricCard label="Purchase Orders" value={procurement.purchase_order_count} helper="Supplier-backed procurement records" />
+                    <MetricCard label="Purchase Requests" value={procurement.purchase_request_count} helper="Office requests routed for procurement review" />
+                    <MetricCard label="Purchase Orders" value={procurement.purchase_order_count} helper="Issued and draft supplier-backed PO records" />
                     <MetricCard label="Procurement Spend" value={formatCurrency(procurement.total_purchase_order_amount)} helper="Total value of seeded PO portfolio" />
                     <MetricCard label="Active Anomalies" value={activeAnomalies} helper="Open or under-review risk signals" tone="risk" />
                     <MetricCard label="Active Alerts" value={activeAlerts} helper="Executive attention queue" tone="warning" />
@@ -771,6 +771,9 @@ function formatMonth(value: string): string {
 function formatStatusLabel(value: string): string {
     const aliases: Record<string, string> = {
         OPEN: 'Pending Review',
+        PROCESSING: 'Processing',
+        DRAFT: 'Draft PO',
+        PLACED: 'Issued PO',
         APPROVED: 'Approved',
         RETURNED_FOR_REVISION: 'Returned for Revision',
         SUBMITTED: 'Submitted',

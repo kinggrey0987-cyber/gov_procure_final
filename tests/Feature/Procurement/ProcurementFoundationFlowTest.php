@@ -182,6 +182,76 @@ class ProcurementFoundationFlowTest extends TestCase
         $this->assertContains('PLACED', $poHistory);
     }
 
+    public function test_procurement_documents_can_open_with_purchase_order_upload_context(): void
+    {
+        $office = $this->createOffice();
+        $officeUser = $this->createUser(UserRole::OFFICE_USER, $office);
+        $procurementOfficer = $this->createUser(UserRole::PROCUREMENT_OFFICER, $office);
+
+        $supplyRequest = SupplyRequest::query()->create([
+            'request_code' => 'SR-DOC-PO-1',
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(5)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Document context test',
+            'priority_level' => 'HIGH',
+            'status' => 'SUBMITTED',
+            'review_notes' => null,
+            'approved_by' => null,
+            'approved_at' => null,
+        ]);
+
+        $purchaseRequest = PurchaseRequest::query()->create([
+            'supply_request_id' => $supplyRequest->supply_request_id,
+            'office_id' => $office->id,
+            'requested_by' => $procurementOfficer->id,
+            'status' => 'PROCESSING',
+            'remarks' => 'Ready for PO documents',
+        ]);
+
+        $supplier = Supplier::query()->create([
+            'supplier_name' => 'Document Supplier',
+            'contact_person' => 'Doc Contact',
+            'email' => 'doc-supplier@test.local',
+            'phone' => '09123456789',
+            'address' => 'Document Street',
+            'status' => 'ACTIVE',
+        ]);
+
+        $purchaseOrder = PurchaseOrder::query()->create([
+            'purchase_request_id' => $purchaseRequest->purchase_request_id,
+            'supply_request_id' => $supplyRequest->supply_request_id,
+            'supplier_id' => $supplier->supplier_id,
+            'created_by' => $procurementOfficer->id,
+            'po_number' => 'PO-DOC-0001',
+            'procurement_method' => 'SMALL_VALUE_PROCUREMENT',
+            'status' => 'PLACED',
+            'expected_delivery_date' => now()->addDays(10)->toDateString(),
+            'total_amount' => 100,
+            'terms_notes' => 'Net 30',
+            'remarks' => null,
+        ]);
+
+        $this->actingAs($procurementOfficer)
+            ->get(route('procurement.documents.index', [
+                'module' => 'purchase_orders',
+                'related_module' => 'purchase_orders',
+                'related_reference_id' => $purchaseOrder->purchase_order_id,
+                'search' => $purchaseOrder->po_number,
+            ]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Procurement/Documents/Index')
+                ->where('filters.module', 'purchase_orders')
+                ->where('filters.search', 'PO-DOC-0001')
+                ->where('uploadDefaults.related_module', 'purchase_orders')
+                ->where('uploadDefaults.related_reference_id', $purchaseOrder->purchase_order_id)
+                ->where('relatedRecordOptions.1.label', 'PO-DOC-0001 - Procurement Office (PLACED)')
+            );
+    }
+
     public function test_bac_return_and_reject_decisions_require_non_empty_reason(): void
     {
         $office = $this->createOffice();

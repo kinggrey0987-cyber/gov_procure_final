@@ -23,6 +23,8 @@ class ProcurementDocumentController extends Controller
 
         $module = strtolower(trim((string) $request->input('module', '')));
         $search = trim((string) $request->input('search', ''));
+        $relatedModule = strtolower(trim((string) $request->input('related_module', '')));
+        $relatedReferenceId = (int) $request->input('related_reference_id', 0);
 
         return Inertia::render('Procurement/Documents/Index', [
             'documents' => $this->paginatedDocuments($module, $search),
@@ -33,6 +35,10 @@ class ProcurementDocumentController extends Controller
             'scopeModules' => self::PROCUREMENT_MODULES,
             'relatedRecordOptions' => $this->relatedRecordOptions(),
             'uploadEnabled' => true,
+            'uploadDefaults' => [
+                'related_module' => in_array($relatedModule, self::PROCUREMENT_MODULES, true) ? $relatedModule : '',
+                'related_reference_id' => $relatedReferenceId > 0 ? $relatedReferenceId : null,
+            ],
         ]);
     }
 
@@ -89,8 +95,8 @@ class ProcurementDocumentController extends Controller
                 'related_module' => 'purchase_requests',
                 'related_reference_id' => (int) $purchaseRequest->purchase_request_id,
                 'label' => sprintf(
-                    'PR #%d - %s (%s)',
-                    (int) $purchaseRequest->purchase_request_id,
+                    '%s - %s (%s)',
+                    $this->formatPurchaseRequestReference($purchaseRequest),
                     (string) ($purchaseRequest->office?->name ?? 'Unknown Office'),
                     (string) $purchaseRequest->status
                 ),
@@ -110,9 +116,8 @@ class ProcurementDocumentController extends Controller
                 'related_module' => 'purchase_orders',
                 'related_reference_id' => (int) $purchaseOrder->purchase_order_id,
                 'label' => sprintf(
-                    'PO %s (#%d) - %s (%s)',
-                    (string) $purchaseOrder->po_number,
-                    (int) $purchaseOrder->purchase_order_id,
+                    '%s - %s (%s)',
+                    $this->formatPurchaseOrderReference($purchaseOrder),
                     (string) ($purchaseOrder->purchaseRequest?->office?->name ?? 'Unknown Office'),
                     (string) $purchaseOrder->status
                 ),
@@ -130,8 +135,8 @@ class ProcurementDocumentController extends Controller
 
             if ($purchaseRequest instanceof PurchaseRequest) {
                 return sprintf(
-                    'PR #%d - %s (%s)',
-                    (int) $purchaseRequest->purchase_request_id,
+                    '%s - %s (%s)',
+                    $this->formatPurchaseRequestReference($purchaseRequest),
                     (string) ($purchaseRequest->office?->name ?? 'Unknown Office'),
                     (string) $purchaseRequest->status
                 );
@@ -145,9 +150,8 @@ class ProcurementDocumentController extends Controller
 
             if ($purchaseOrder instanceof PurchaseOrder) {
                 return sprintf(
-                    'PO %s (#%d) - %s (%s)',
-                    (string) $purchaseOrder->po_number,
-                    (int) $purchaseOrder->purchase_order_id,
+                    '%s - %s (%s)',
+                    $this->formatPurchaseOrderReference($purchaseOrder),
                     (string) ($purchaseOrder->purchaseRequest?->office?->name ?? 'Unknown Office'),
                     (string) $purchaseOrder->status
                 );
@@ -155,5 +159,21 @@ class ProcurementDocumentController extends Controller
         }
 
         return null;
+    }
+
+    private function formatPurchaseRequestReference(PurchaseRequest $purchaseRequest): string
+    {
+        return 'PR-'.str_pad((string) $purchaseRequest->purchase_request_id, 6, '0', STR_PAD_LEFT);
+    }
+
+    private function formatPurchaseOrderReference(PurchaseOrder $purchaseOrder): string
+    {
+        $poNumber = trim((string) $purchaseOrder->po_number);
+
+        if ($poNumber !== '') {
+            return $poNumber;
+        }
+
+        return 'PO-'.str_pad((string) $purchaseOrder->purchase_order_id, 6, '0', STR_PAD_LEFT);
     }
 }

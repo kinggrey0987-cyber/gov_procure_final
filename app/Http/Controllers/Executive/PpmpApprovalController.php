@@ -139,7 +139,7 @@ class PpmpApprovalController extends Controller
                 'total_estimated_budget' => (float) $record->total_estimated_budget,
                 'status' => (string) $record->status,
                 'date_prepared' => optional($record->date_prepared)?->toDateString(),
-                'submitted_at' => $record->submitted_at,
+                'submitted_at' => $this->ppmpSubmittedAt($record),
                 'items_count' => (int) $record->items_count,
                 'can_signoff' => $request->user()?->can('executive.ppmp-approval.signoff', $record) ?? false,
             ];
@@ -279,13 +279,24 @@ class PpmpApprovalController extends Controller
             ->values();
     }
 
-    private function ppmpSubmittedAt(Ppmp $ppmp): mixed
+    private function ppmpSubmittedAt(Ppmp $ppmp): ?string
     {
-        return DB::table('status_history')
+        $submittedAt = $ppmp->getAttribute('submitted_at')
+            ?: DB::table('status_history')
             ->where('reference_type', Ppmp::class)
             ->where('reference_id', (int) $ppmp->ppmp_id)
             ->where('new_status', 'SUBMITTED')
             ->max('changed_at');
+
+        if ($submittedAt) {
+            return (string) $submittedAt;
+        }
+
+        if (in_array((string) $ppmp->status, ['SUBMITTED', 'APPROVED', 'REJECTED', 'RETURNED_FOR_REVISION'], true)) {
+            return optional($ppmp->created_at)?->toIso8601String();
+        }
+
+        return null;
     }
 
     /**
