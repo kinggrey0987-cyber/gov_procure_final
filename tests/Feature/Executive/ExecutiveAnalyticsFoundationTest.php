@@ -107,6 +107,31 @@ class ExecutiveAnalyticsFoundationTest extends TestCase
         $this->actingAs($this->procurementUser)->get(route('executive.anomalies.index'))->assertForbidden();
     }
 
+    public function test_procurement_analytics_uses_persisted_purchase_order_number_and_consistent_purchase_request_references(): void
+    {
+        $context = $this->createSupplyAndOrderContext($this->officeA, $this->procurementUser, $this->officeUser, 9308);
+        $purchaseRequest = PurchaseRequest::query()->findOrFail($context['purchaseOrder']->purchase_request_id);
+
+        $context['purchaseOrder']->forceFill([
+            'po_number' => 'PO-2026-00050',
+            'created_at' => now()->addMinute(),
+        ])->save();
+
+        $purchaseRequest->forceFill([
+            'created_at' => now(),
+        ])->save();
+
+        $this->actingAs($this->executive)
+            ->get(route('executive.procurement-analytics'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Executive/ProcurementAnalytics/Index')
+                ->where('recent.procurement_records.data.0.reference', 'PO-2026-00050')
+                ->where('recent.procurement_records.data.0.details.linked_request', 'PR-'.str_pad((string) $purchaseRequest->purchase_request_id, 6, '0', STR_PAD_LEFT))
+                ->where('recent.procurement_records.data.1.reference', 'PR-'.str_pad((string) $purchaseRequest->purchase_request_id, 6, '0', STR_PAD_LEFT))
+            );
+    }
+
     public function test_anomaly_and_alert_linkages_and_status_history_transitions_are_recorded(): void
     {
         $context = $this->createSupplyAndOrderContext($this->officeA, $this->procurementUser, $this->officeUser, 9302);

@@ -353,7 +353,7 @@ class ExecutiveMonitoringService
                     ->map(fn (PurchaseRequest $request): array => [
                         'type' => 'pr',
                         'record_id' => $request->purchase_request_id,
-                        'reference' => 'PR-'.str_pad((string) $request->purchase_request_id, 6, '0', STR_PAD_LEFT),
+                        'reference' => $this->formatPurchaseRequestReference($request),
                         'route_name' => 'procurement.purchase-requests.show',
                         'office_name' => $request->office?->name,
                         'status' => $request->status,
@@ -378,7 +378,7 @@ class ExecutiveMonitoringService
                     ->map(fn (PurchaseOrder $order): array => [
                         'type' => 'po',
                         'record_id' => $order->purchase_order_id,
-                        'reference' => 'PO-'.$order->purchase_order_id,
+                        'reference' => $this->formatPurchaseOrderReference($order),
                         'route_name' => 'procurement.purchase-orders.show',
                         'office_name' => $order->purchaseRequest?->office?->name,
                         'status' => $order->status,
@@ -389,7 +389,7 @@ class ExecutiveMonitoringService
                         'details' => [
                             'supplier' => $order->supplier?->supplier_name,
                             'linked_request' => $order->purchaseRequest?->purchase_request_id
-                                ? 'PR-'.str_pad((string) $order->purchaseRequest->purchase_request_id, 6, '0', STR_PAD_LEFT)
+                                ? $this->formatPurchaseRequestReference($order->purchaseRequest)
                                 : null,
                             'source_reference' => $order->purchaseRequest?->supplyRequest?->request_code,
                             'procurement_method' => $order->procurement_method,
@@ -399,6 +399,22 @@ class ExecutiveMonitoringService
         }
 
         return $records;
+    }
+
+    private function formatPurchaseRequestReference(PurchaseRequest $request): string
+    {
+        return 'PR-'.str_pad((string) $request->purchase_request_id, 6, '0', STR_PAD_LEFT);
+    }
+
+    private function formatPurchaseOrderReference(PurchaseOrder $order): string
+    {
+        $poNumber = trim((string) $order->po_number);
+
+        if ($poNumber !== '') {
+            return $poNumber;
+        }
+
+        return 'PO-'.str_pad((string) $order->purchase_order_id, 6, '0', STR_PAD_LEFT);
     }
 
     /**
