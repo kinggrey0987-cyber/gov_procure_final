@@ -47,7 +47,7 @@ class AnomalyDetectionService
      */
     public function detectPriceZScoreAnomalies(User $actor): Collection
     {
-        $created = collect();
+        $created = collect();z
 
         $items = PurchaseOrderItem::query()
             ->with(['purchaseOrder.purchaseRequest:purchase_request_id,office_id', 'purchaseOrder.supplyRequest:supply_request_id,office_id'])
