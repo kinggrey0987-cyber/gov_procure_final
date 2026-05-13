@@ -11,6 +11,12 @@ class Office extends Model
 {
     use HasFactory;
 
+    public const NON_REQUESTING_OFFICE_CODES = [
+        'BAC',
+        'MAYOR_OFFICE',
+        'TECH_ADMIN',
+    ];
+
     protected $fillable = [
         'name',
         'code',
@@ -70,5 +76,12 @@ class Office extends Model
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);
+    }
+
+    public function scopeRequestingOffices(Builder $query): Builder
+    {
+        return $query
+            ->active()
+            ->whereNotIn('code', self::NON_REQUESTING_OFFICE_CODES);
     }
 }

@@ -109,6 +109,7 @@ class PpmpApprovalController extends Controller
         ];
 
         $officeBreakdown = Office::query()
+            ->requestingOffices()
             ->select(['offices.id as office_id', 'offices.name as office_name'])
             ->withCount([
                 'ppmps as total' => function ($query): void {
@@ -168,7 +169,7 @@ class PpmpApprovalController extends Controller
                 'search' => $filters['search'] ?? null,
             ],
             'filter_options' => [
-                'offices' => Office::query()->select(['id', 'name'])->orderBy('name', 'asc')->get(),
+                'offices' => Office::query()->requestingOffices()->select(['id', 'name'])->orderBy('name', 'asc')->get(),
                 'statuses' => ['SUBMITTED', 'APPROVED', 'REJECTED', 'RETURNED_FOR_REVISION'],
                 'years' => Ppmp::query()
                     ->where('date_prepared', '!=', null)

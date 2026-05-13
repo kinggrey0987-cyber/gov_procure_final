@@ -34,6 +34,7 @@ class ExecutiveMonitoringService
             'high_severity_alert_count' => Alert::query()->bySeverity('HIGH')->count(),
             'cross_office_anomaly_count' => Anomaly::query()->whereNotNull('office_id')->distinct('office_id')->count('office_id'),
             'office_breakdown' => Office::query()
+                ->requestingOffices()
                 ->select('offices.id', 'offices.name')
                 ->withCount(['anomalies as anomaly_count', 'alerts as alert_count'])
                 ->orderBy('offices.name')
@@ -291,7 +292,7 @@ class ExecutiveMonitoringService
                 'po_page' => $recordsPage,
             ],
             'filter_options' => [
-                'offices' => Office::query()->select(['id', 'name'])->orderBy('name')->get(),
+                'offices' => Office::query()->requestingOffices()->select(['id', 'name'])->orderBy('name')->get(),
                 'statuses' => $this->distinctValues([PurchaseRequest::query(), PurchaseOrder::query()], 'status'),
                 'pr_statuses' => PurchaseRequest::query()->select('status')->whereNotNull('status')->distinct()->orderBy('status')->pluck('status')->values(),
                 'po_statuses' => PurchaseOrder::query()->select('status')->whereNotNull('status')->distinct()->orderBy('status')->pluck('status')->values(),
@@ -506,7 +507,7 @@ class ExecutiveMonitoringService
                 'year' => $filters['year'] ?? null,
             ],
             'filter_options' => [
-                'offices' => Office::query()->select(['id', 'name'])->orderBy('name')->get(),
+                'offices' => Office::query()->requestingOffices()->select(['id', 'name'])->orderBy('name')->get(),
                 'severities' => $this->distinctValues([Anomaly::query(), Alert::query()], 'severity'),
                 'statuses' => $this->distinctValues([Anomaly::query(), Alert::query()], 'status'),
                 'anomaly_types' => collect(array_merge(
@@ -688,7 +689,7 @@ class ExecutiveMonitoringService
                 'year' => $filters['year'] ?? null,
             ],
             'filter_options' => [
-                'offices' => Office::query()->select(['id', 'name'])->orderBy('name')->get(),
+                'offices' => Office::query()->requestingOffices()->select(['id', 'name'])->orderBy('name')->get(),
                 'statuses' => PublicDisclosure::query()->select('status')->whereNotNull('status')->distinct()->orderBy('status')->pluck('status')->values(),
                 'types' => PublicDisclosure::query()->select('type')->whereNotNull('type')->distinct()->orderBy('type')->pluck('type')->values(),
                 'years' => $this->buildYearOptions(
