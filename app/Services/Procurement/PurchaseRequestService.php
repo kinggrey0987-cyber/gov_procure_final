@@ -223,7 +223,7 @@ class PurchaseRequestService
         }
 
         $signalMarker = sprintf('LOW_STOCK_SIGNAL:inventory:%d', (int) $inventory->inventory_id);
-        $governanceLabel = 'GSO Replenishment Basis - internal stock replenishment planning context only; not an office-approved PPMP and not a procurement approval.';
+        $governanceLabel = 'Proactive GSO Demand Forecast Signal - statistical stock-demand planning context only; not an office-approved PPMP and not a procurement approval.';
 
         $alreadyQueued = PurchaseRequest::query()
             ->whereIn('status', ['OPEN', 'PROCESSING'])
@@ -281,7 +281,7 @@ class PurchaseRequestService
                 'needed_by_date' => now()->addDays(7)->toDateString(),
                 'request_category' => 'GENERAL',
                 'purpose' => sprintf(
-                    'GSO Replenishment Basis for %s (inventory #%d). Internal stock replenishment planning context only; the Procurement Unit must still process any PR/PO.',
+                    'Proactive GSO Demand Forecast Signal for %s (inventory #%d). Statistical stock-demand planning context only; the Procurement Unit must still process any PR/PO.',
                     (string) ($inventory->item?->item_name ?? 'Unassigned Item'),
                     (int) $inventory->inventory_id
                 ),
@@ -306,7 +306,7 @@ class PurchaseRequestService
                 'requested_by' => (int) $actor->id,
                 'status' => 'OPEN',
                 'remarks' => sprintf(
-                    '%s | GSO Replenishment Basis for %s. Internal stock replenishment planning context only; this is not automated PPMP approval, procurement approval, or PO approval.',
+                    '%s | Proactive GSO Demand Forecast Signal for %s. Statistical stock-demand planning context only; this is not automated PPMP approval, procurement approval, or PO approval.',
                     $signalMarker,
                     (string) ($inventory->item?->item_name ?? 'Unassigned Item')
                 ),
@@ -316,10 +316,10 @@ class PurchaseRequestService
                 'purchase_request_id' => (int) $purchaseRequest->purchase_request_id,
                 'item_id' => (int) $inventory->item_id,
                 'quantity_requested' => round($quantityRequested, 2),
-                'remarks' => 'Quantity proposed from low-stock deficit under GSO Replenishment Basis; Procurement Unit processing remains required.',
+                'remarks' => 'Quantity proposed by proactive GSO demand forecast signal; Procurement Unit processing remains required.',
             ]);
 
-            $this->recordStatus($purchaseRequest, null, 'OPEN', $actor, 'Purchase request queued from GSO Replenishment Basis; Procurement Unit processing and PO creation remain required.');
+            $this->recordStatus($purchaseRequest, null, 'OPEN', $actor, 'Purchase request queued from proactive GSO demand forecast signal; Procurement Unit processing and PO creation remain required.');
             $this->recordAudit($actor, 'AUTO_QUEUE_LOW_STOCK', $purchaseRequest);
 
             $deficit = max((float) $inventory->low_stock_threshold - (float) $inventory->available_stock, 0);

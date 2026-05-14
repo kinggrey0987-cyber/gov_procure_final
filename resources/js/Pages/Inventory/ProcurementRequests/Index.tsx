@@ -168,18 +168,18 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                     </div>
 
                     <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">GSO Replenishment Basis Signals</h3>
+                        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Proactive GSO Demand Forecast Signals</h3>
                         <p className="mt-2 text-xs text-slate-500">
-                            Low Stock Threshold is the minimum safety stock level. Deficit is the gap between current available stock and that threshold. These signals are internal stock replenishment planning context only; they are not automated PPMP approval, procurement approval, or PO approval.
+                            The system uses a statistical demand signal to flag supplies before demand outpaces stock. Reorder threshold is the minimum safety stock level, and forecast deficit is the gap between current available stock and that threshold. These signals support proactive GSO purchase request creation only; they are not automated PPMP approval, procurement approval, or PO approval.
                         </p>
                         <div className="mt-4 space-y-3">
                             {lowStockItems.slice(0, 6).map((item) => (
                                 <div key={item.inventory_id} className={`rounded-lg border border-amber-100 bg-amber-50/70 p-3 ${focusInventoryId === item.inventory_id ? 'ring-2 ring-amber-300' : ''}`}>
                                     <p className="text-sm font-semibold text-slate-800">{item.item_name}</p>
                                     <p className="text-xs text-slate-600">
-                                        Available {item.available_stock.toFixed(2)} / Low Stock Threshold {item.low_stock_threshold.toFixed(2)}
+                                        Available {item.available_stock.toFixed(2)} / Forecast Reorder Threshold {item.low_stock_threshold.toFixed(2)}
                                     </p>
-                                    <p className="mt-1 text-xs font-semibold text-amber-700">Deficit: {item.deficit.toFixed(2)}</p>
+                                    <p className="mt-1 text-xs font-semibold text-amber-700">Forecast Deficit: {item.deficit.toFixed(2)}</p>
                                     <button
                                         type="button"
                                         disabled={initiatingInventoryId === item.inventory_id || item.is_already_queued}
@@ -189,8 +189,8 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                                         {item.is_already_queued
                                             ? 'Already Queued for Procurement'
                                             : initiatingInventoryId === item.inventory_id
-                                            ? 'Initiating...'
-                                            : 'Review Replenishment Basis'}
+                                            ? 'Creating Proactive PR...'
+                                            : 'Review Proactive PR Signal'}
                                     </button>
                                     {item.is_already_queued && item.active_purchase_request_id ? (
                                         <p className="mt-1 text-[11px] font-semibold text-slate-500">Active PR: PR-{String(item.active_purchase_request_id).padStart(6, '0')}</p>
@@ -201,17 +201,17 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                         </div>
 
                         <div className="mt-5 rounded-lg border border-blue-100 bg-blue-50/70 p-3">
-                            <h4 className="text-xs font-semibold uppercase tracking-wide text-blue-700">At Reorder Point (Advisory)</h4>
+                            <h4 className="text-xs font-semibold uppercase tracking-wide text-blue-700">At Forecast Reorder Point (Advisory)</h4>
                             <p className="mt-1 text-xs text-blue-800">
-                                These are at threshold with zero deficit, so they are not active shortage cases.
+                                These supplies are exactly at the statistical reorder threshold with zero forecast deficit, so they are watchlist cases rather than active proactive PR cases.
                             </p>
                             <div className="mt-3 space-y-2">
                                 {atReorderItems.slice(0, 5).map((item) => (
                                     <p key={item.inventory_id} className="text-xs text-slate-700">
-                                        {item.item_name}: Available {item.available_stock.toFixed(2)} / Reorder Point {item.low_stock_threshold.toFixed(2)}
+                                        {item.item_name}: Available {item.available_stock.toFixed(2)} / Forecast Reorder Point {item.low_stock_threshold.toFixed(2)}
                                     </p>
                                 ))}
-                                {atReorderItems.length === 0 ? <p className="text-xs text-slate-500">No items are exactly at reorder point.</p> : null}
+                                {atReorderItems.length === 0 ? <p className="text-xs text-slate-500">No supplies are exactly at the forecast reorder point.</p> : null}
                             </div>
                         </div>
                     </div>
@@ -220,20 +220,20 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                 <Modal show={selectedLowStockItem !== null} maxWidth="lg" onClose={closeLowStockModal}>
                     <div className="space-y-4 p-6">
                         <div>
-                            <h4 className="text-base font-semibold text-slate-900">Review GSO Replenishment Basis</h4>
-                            <p className="mt-1 text-sm text-slate-600">Review low-stock details and adjust requested quantity before queuing a procurement basis. The Procurement Unit must still process the PR and create any PO.</p>
+                            <h4 className="text-base font-semibold text-slate-900">Review Proactive GSO PR Signal</h4>
+                            <p className="mt-1 text-sm text-slate-600">Review the statistical demand signal and adjust the proposed quantity before creating a proactive GSO purchase request. The Procurement Unit must still process the PR and create any PO.</p>
                         </div>
 
                         {selectedLowStockItem ? (
                             <div className="space-y-2 rounded-lg border border-amber-100 bg-amber-50/70 p-3">
                                 <p className="text-sm font-semibold text-slate-800">{selectedLowStockItem.item_name}</p>
                                 <p className="text-xs text-slate-600">
-                                    Available {selectedLowStockItem.available_stock.toFixed(2)} / Low Stock Threshold {selectedLowStockItem.low_stock_threshold.toFixed(2)}
+                                    Available {selectedLowStockItem.available_stock.toFixed(2)} / Forecast Reorder Threshold {selectedLowStockItem.low_stock_threshold.toFixed(2)}
                                 </p>
-                                <p className="text-xs font-semibold text-amber-700">Deficit: {selectedLowStockItem.deficit.toFixed(2)}</p>
+                                <p className="text-xs font-semibold text-amber-700">Forecast Deficit: {selectedLowStockItem.deficit.toFixed(2)}</p>
 
                                 <div>
-                                    <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-600">Requested Quantity</label>
+                                    <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-600">Proposed PR Quantity</label>
                                     <input
                                         type="number"
                                         min="0.01"
@@ -243,7 +243,7 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                                         onChange={(event) => setModalQuantity(event.target.value)}
                                         className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-700 disabled:cursor-not-allowed disabled:bg-slate-100"
                                     />
-                                    <p className="mt-1 text-[11px] text-slate-500">Suggested quantity: {selectedLowStockItem.suggested_quantity.toFixed(2)}</p>
+                                    <p className="mt-1 text-[11px] text-slate-500">Algorithm-suggested quantity: {selectedLowStockItem.suggested_quantity.toFixed(2)}</p>
                                 </div>
                             </div>
                         ) : null}
@@ -264,8 +264,8 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                                 className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-500"
                             >
                                 {selectedLowStockItem && initiatingInventoryId === selectedLowStockItem.inventory_id
-                                    ? 'Initiating...'
-                                    : 'Confirm Replenishment Basis'}
+                                    ? 'Creating Proactive PR...'
+                                    : 'Create Proactive GSO PR'}
                             </button>
                         </div>
                     </div>

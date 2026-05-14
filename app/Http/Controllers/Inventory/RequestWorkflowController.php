@@ -568,7 +568,7 @@ class RequestWorkflowController
                 'focus_inventory_id' => (int) $inventory->inventory_id,
             ])
             ->with('success', sprintf(
-                'Purchase request PR-%06d queued from low-stock signal for %s (Qty %.2f).',
+                'Proactive GSO purchase request PR-%06d created from statistical demand signal for %s (Qty %.2f).',
                 (int) $queued->purchase_request_id,
                 (string) ($inventory->item?->item_name ?? 'selected item'),
                 $quantityRequested
