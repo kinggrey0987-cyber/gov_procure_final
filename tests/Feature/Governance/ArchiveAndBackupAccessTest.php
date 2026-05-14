@@ -139,12 +139,40 @@ class ArchiveAndBackupAccessTest extends TestCase
         ]);
 
         $this->assertNotNull($backup->payload);
+        $this->assertSame('Scheduled admin technical backup.', $backup->notes);
+        $this->assertSame('Scheduled admin technical backup.', data_get($backup->payload, 'content.notes'));
+        $this->assertArrayHasKey('users', data_get($backup->payload, 'content.database.tables', []));
+        $this->assertNotEmpty(data_get($backup->payload, 'content.database.tables.users.rows', []));
 
         $this->assertTrue(Storage::disk('local')->exists((string) $backup->file_path));
 
         $this->actingAs($this->admin)
             ->get(route('admin-tech.system-backups.download', $backup->backup_id))
             ->assertOk();
+    }
+
+    public function test_admin_storage_backup_contains_local_storage_files(): void
+    {
+        Storage::fake('local');
+        Storage::disk('local')->put('documents/sample-proof.txt', 'sample attachment contents');
+
+        $this->actingAs($this->admin)
+            ->post(route('admin-tech.system-backups.store'), [
+                'backup_type' => 'storage_backup',
+                'notes' => 'Storage attachment backup.',
+            ])
+            ->assertRedirect(route('admin-tech.system-backups.index'));
+
+        $backup = SystemBackup::query()->latest('backup_id')->firstOrFail();
+        $storageSnapshot = data_get($backup->payload, 'content.storage', []);
+
+        $this->assertSame('storage_backup', $backup->backup_type);
+        $this->assertSame('Storage attachment backup.', data_get($backup->payload, 'content.notes'));
+        $this->assertSame(
+            base64_encode('sample attachment contents'),
+            $storageSnapshot['documents/sample-proof.txt']['contents'] ?? null
+        );
+        $this->assertSame('base64', $storageSnapshot['documents/sample-proof.txt']['encoding'] ?? null);
     }
 
     public function test_admin_can_delete_system_backup_and_underlying_file(): void

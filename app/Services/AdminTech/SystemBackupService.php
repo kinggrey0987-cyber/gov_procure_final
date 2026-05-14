@@ -5,6 +5,7 @@ namespace App\Services\AdminTech;
 use App\Models\SystemBackup;
 use App\Models\User;
 use App\Services\AuditLogService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -48,19 +49,7 @@ class SystemBackupService
                     'note' => 'External/manual server backup registration only.',
                 ];
             } else {
-                $snapshot = [
-                    'backup_type' => $type,
-                    'created_at' => $timestamp->toIso8601String(),
-                    'created_by' => [
-                        'id' => (int) $actor->id,
-                        'name' => (string) $actor->name,
-                        'email' => (string) $actor->email,
-                    ],
-                    'database' => [
-                        'default_connection' => config('database.default'),
-                    ],
-                    'notes' => $notes,
-                ];
+                $snapshot = $this->buildSnapshot($type, $actor, $timestamp, $notes);
 
                 Storage::disk('local')->put($filePath, json_encode($snapshot, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
                 $fileSize = Storage::disk('local')->size($filePath);
@@ -109,6 +98,76 @@ class SystemBackupService
         );
 
         return $backup;
+    }
+
+    private function buildSnapshot(string $type, User $actor, \DateTimeInterface $timestamp, ?string $notes): array
+    {
+        $snapshot = [
+            'backup_type' => $type,
+            'created_at' => $timestamp->format(\DateTimeInterface::ATOM),
+            'created_by' => [
+                'id' => (int) $actor->id,
+                'name' => (string) $actor->name,
+                'email' => (string) $actor->email,
+            ],
+            'database' => [
+                'default_connection' => config('database.default'),
+            ],
+            'notes' => $notes,
+        ];
+
+        if ($type === 'database_backup') {
+            $snapshot['database']['tables'] = $this->databaseTables();
+        }
+
+        if ($type === 'storage_backup') {
+            $snapshot['storage'] = $this->storageFiles();
+        }
+
+        return $snapshot;
+    }
+
+    private function databaseTables(): array
+    {
+        $tables = collect(DB::select($this->tableListingSql()))
+            ->map(static fn (object $row): string => (string) (array_values((array) $row)[0] ?? ''))
+            ->filter()
+            ->reject(static fn (string $table): bool => str_starts_with($table, 'pg_') || str_starts_with($table, 'sqlite_'))
+            ->values();
+
+        return $tables
+            ->mapWithKeys(fn (string $table): array => [
+                $table => [
+                    'row_count' => DB::table($table)->count(),
+                    'rows' => DB::table($table)->get()->map(static fn (object $row): array => (array) $row)->all(),
+                ],
+            ])
+            ->all();
+    }
+
+    private function tableListingSql(): string
+    {
+        return match (DB::getDriverName()) {
+            'pgsql' => "select tablename from pg_catalog.pg_tables where schemaname = 'public' order by tablename",
+            'sqlite' => "select name from sqlite_master where type = 'table' and name not like 'sqlite_%' order by name",
+            'sqlsrv' => "select table_name from information_schema.tables where table_type = 'BASE TABLE' order by table_name",
+            default => "select table_name from information_schema.tables where table_schema = database() order by table_name",
+        };
+    }
+
+    private function storageFiles(): array
+    {
+        return collect(Storage::disk('local')->allFiles())
+            ->reject(static fn (string $path): bool => str_starts_with($path, 'system-backups/'))
+            ->mapWithKeys(static fn (string $path): array => [
+                $path => [
+                    'size' => Storage::disk('local')->size($path),
+                    'last_modified' => date(\DateTimeInterface::ATOM, Storage::disk('local')->lastModified($path)),
+                    'contents' => base64_encode(Storage::disk('local')->get($path)),
+                    'encoding' => 'base64',
+                ],
+            ])
+            ->all();
     }
 
     public function deleteBackup(User $actor, SystemBackup $backup): void
