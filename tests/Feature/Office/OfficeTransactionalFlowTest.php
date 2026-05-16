@@ -689,6 +689,69 @@ class OfficeTransactionalFlowTest extends TestCase
             );
     }
 
+    public function test_supply_request_create_page_lists_selected_approved_ppmp_items_case_insensitively(): void
+    {
+        $office = $this->createOffice();
+        $officeUser = $this->createUser(UserRole::OFFICE_USER, $office);
+
+        $category = ItemCategory::query()->create([
+            'category_name' => 'Case Sensitive Category',
+            'standard_delivery_days' => 5,
+            'description' => null,
+            'status' => 'active',
+        ]);
+
+        $item = Item::query()->create([
+            'item_category_id' => $category->item_category_id,
+            'item_name' => 'Trash Bag',
+            'description' => 'Case-insensitive status item',
+            'default_unit' => 'roll',
+            'status' => 'ACTIVE',
+        ]);
+
+        $ppmp = Ppmp::query()->create([
+            'office_id' => $office->id,
+            'prepared_by' => $officeUser->id,
+            'approved_by' => $officeUser->id,
+            'fiscal_year' => 2026,
+            'fund_source' => 'GAA_CURRENT',
+            'status' => 'APPROVED',
+            'total_estimated_budget' => 100,
+            'date_prepared' => now()->toDateString(),
+            'date_approved' => now()->toDateString(),
+            'remarks' => null,
+        ]);
+
+        $ppmpItem = PpmpItem::query()->create([
+            'ppmp_id' => $ppmp->ppmp_id,
+            'item_id' => $item->item_id,
+            'item_category_id' => $category->item_category_id,
+            'quantity' => 10,
+            'unit_cost' => 10,
+            'estimated_budget' => 100,
+            'procurement_schedule' => 'Q4',
+            'remarks' => null,
+        ]);
+
+        $this->actingAs($officeUser)
+            ->get(route('office.supply-requests.create', ['ppmp_id' => $ppmp->ppmp_id]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Office/SupplyRequests/Create')
+                ->where('selectedPpmpId', $ppmp->ppmp_id)
+                ->has('ppmpItemOptions', 1)
+                ->where('ppmpItemOptions.0.ppmp_item_id', $ppmpItem->ppmp_item_id)
+                ->where('ppmpItemOptions.0.item_name', 'Trash Bag')
+                ->where('ppmpItemOptions.0.remaining_quantity', 10)
+            );
+
+        $this->actingAs($officeUser)
+            ->get(route('office.supply-requests.ppmp-items', $ppmp->ppmp_id))
+            ->assertOk()
+            ->assertJsonPath('ppmp_item_options.0.ppmp_item_id', $ppmpItem->ppmp_item_id)
+            ->assertJsonPath('ppmp_item_options.0.item_name', 'Trash Bag');
+    }
+
     public function test_supply_request_create_page_shows_blocked_state_when_no_approved_ppmp_exists(): void
     {
         $office = $this->createOffice();

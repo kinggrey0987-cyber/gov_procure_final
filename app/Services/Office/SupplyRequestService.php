@@ -292,7 +292,7 @@ class SupplyRequestService
         $ppmpItems = PpmpItem::query()
             ->with('item:item_id,item_name,status')
             ->where('ppmp_id', $ppmpId)
-            ->whereHas('item', fn ($query) => $query->where('status', 'active'))
+            ->whereHas('item', fn ($query) => $query->whereRaw('LOWER(status) = ?', ['active']))
             ->orderBy('ppmp_item_id')
             ->get(['ppmp_item_id', 'ppmp_id', 'item_id', 'quantity', 'unit_cost']);
 

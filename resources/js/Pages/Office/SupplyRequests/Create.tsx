@@ -49,6 +49,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
         review_notes: '',
         items: [emptyItem()],
     });
+    const fetchedItemsForPpmpRef = useRef<string | null>(initialOptions.length > 0 && selectedPpmpId ? String(selectedPpmpId) : null);
 
     const hasPpmp = form.data.ppmp_id !== '';
 
@@ -104,6 +105,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
     const fetchPpmpItems = useCallback(async (value: string) => {
         if (!value) {
             setItemOptions([]);
+            fetchedItemsForPpmpRef.current = null;
             return;
         }
 
@@ -121,6 +123,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
 
             const payload = (await response.json()) as { ppmp_item_options?: Option[] };
             setItemOptions(payload.ppmp_item_options ?? []);
+            fetchedItemsForPpmpRef.current = value;
         } finally {
             setLoadingOptions(false);
         }
@@ -137,6 +140,14 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
     useEffect(() => {
         selectedPpmpIdRef.current = form.data.ppmp_id;
     }, [form.data.ppmp_id]);
+
+    useEffect(() => {
+        if (!form.data.ppmp_id || loadingOptions || fetchedItemsForPpmpRef.current === form.data.ppmp_id) {
+            return;
+        }
+
+        void fetchPpmpItems(form.data.ppmp_id);
+    }, [fetchPpmpItems, form.data.ppmp_id, loadingOptions]);
 
     const handleReferenceRefresh = useCallback(async () => {
         await new Promise<void>((resolve) => {
@@ -310,6 +321,13 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                     </div>
 
                     {loadingOptions ? <p className="mb-3 text-sm text-slate-500">Loading approved PPMP items...</p> : null}
+
+                    {hasPpmp && !loadingOptions && itemOptions.length === 0 ? (
+                        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                            <p className="font-semibold">No requestable PPMP items were found for the selected PPMP.</p>
+                            <p>Use Refresh Options after approval, or verify that the planned item is still active in the item catalog.</p>
+                        </div>
+                    ) : null}
 
                     {overPlanLineCount > 0 ? (
                         <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
