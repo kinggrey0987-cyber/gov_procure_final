@@ -1,7 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import InputError from '@/Components/InputError';
 import useSmartRefresh from '@/hooks/useSmartRefresh';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { FormEvent, useState } from 'react';
 import { FUND_SOURCES } from '@/constants/fundSources';
 
@@ -37,9 +37,19 @@ type Props = {
     itemOptions: ItemOption[];
 };
 
+type PageFlash = {
+    flash?: {
+        success?: string | null;
+        error?: string | null;
+    };
+    errors?: Record<string, string>;
+};
+
 const QUARTER_OPTIONS = ['Q1', 'Q2', 'Q3', 'Q4'] as const;
 
 export default function PpmpEdit({ ppmp, itemOptions }: Props) {
+    const { flash, errors: pageErrors } = usePage().props as unknown as PageFlash;
+    const [processingRowId, setProcessingRowId] = useState<number | null>(null);
     const { isRefreshing } = useSmartRefresh({
         only: ['itemOptions'],
         refreshOnFocus: true,
@@ -83,14 +93,24 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
     };
 
     const updateItem = (itemId: number) => {
+        setProcessingRowId(itemId);
         router.put(route('office.ppmp.items.update', [ppmp.ppmp_id, itemId]), editingRows[itemId], {
             preserveScroll: true,
+            preserveState: false,
+            onFinish: () => setProcessingRowId(null),
         });
     };
 
     const removeItem = (itemId: number) => {
+        if (!window.confirm('Remove this PPMP item line?')) {
+            return;
+        }
+
+        setProcessingRowId(itemId);
         router.delete(route('office.ppmp.items.destroy', [ppmp.ppmp_id, itemId]), {
             preserveScroll: true,
+            preserveState: false,
+            onFinish: () => setProcessingRowId(null),
         });
     };
 
@@ -111,6 +131,24 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
             <Head title="Edit PPMP" />
 
             <div className="space-y-6 py-4">
+                {flash?.success ? (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 shadow-sm">
+                        {flash.success}
+                    </div>
+                ) : null}
+
+                {flash?.error ? (
+                    <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 shadow-sm">
+                        {flash.error}
+                    </div>
+                ) : null}
+
+                {pageErrors && Object.keys(pageErrors).length > 0 ? (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 shadow-sm">
+                        Please review the highlighted item line fields and try again.
+                    </div>
+                ) : null}
+
                 <form onSubmit={submitHeader} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                     <div className="flex items-center justify-between">
                         <h3 className="text-2xl font-semibold text-slate-800">PPMP #{ppmp.ppmp_id}</h3>
@@ -227,8 +265,22 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
 
                                         <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 pt-3">
                                             <span className="mr-auto text-xs font-medium text-slate-500">Line Actions</span>
-                                            <button type="button" onClick={() => updateItem(item.ppmp_item_id)} className="rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-700">Update Line</button>
-                                            <button type="button" onClick={() => removeItem(item.ppmp_item_id)} className="rounded-lg border border-rose-300 px-3 py-2 text-xs font-semibold text-rose-700">Remove Line</button>
+                                            <button
+                                                type="button"
+                                                onClick={() => updateItem(item.ppmp_item_id)}
+                                                disabled={processingRowId === item.ppmp_item_id}
+                                                className="rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                            >
+                                                {processingRowId === item.ppmp_item_id ? 'Updating...' : 'Update Line'}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => removeItem(item.ppmp_item_id)}
+                                                disabled={processingRowId === item.ppmp_item_id}
+                                                className="rounded-lg border border-rose-300 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                            >
+                                                {processingRowId === item.ppmp_item_id ? 'Removing...' : 'Remove Line'}
+                                            </button>
                                         </div>
                                     </div>
                                 );
