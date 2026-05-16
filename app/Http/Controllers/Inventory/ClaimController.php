@@ -166,14 +166,17 @@ class ClaimController
 
     public function show(Claim $claim): Response
     {
-        abort_unless(request()->user()->can('claim.view', $claim), 403);
+        $user = request()->user();
 
-        $history = $this->historyTimelineService->forRecord(request()->user(), $claim);
+        abort_unless($user->can('claim.view', $claim), 403);
+
+        $history = $this->historyTimelineService->forRecord($user, $claim);
+        $routePrefix = $user->isOfficeUser() ? 'office.claims' : 'inventory.claims';
 
         $claim->load(['distributionRecord.items.item.category', 'distributionRecord.office', 'distributionRecord.supplyRequest', 'claimant', 'office']);
 
         $documents = $this->documentService
-            ->listForRelated(request()->user(), 'claims', (int) $claim->claims_id)
+            ->listForRelated($user, 'claims', (int) $claim->claims_id)
             ->map(fn ($document): array => [
                 'document_id' => (int) $document->document_id,
                 'title' => (string) $document->title,
@@ -215,8 +218,12 @@ class ClaimController
             ] : null,
             'attachments' => $documents,
             'attachmentPermissions' => [
-                'upload' => request()->user()->can('claim.view', $claim),
-                'delete' => request()->user()->can('claim.view', $claim),
+                'upload' => $user->can('claim.view', $claim),
+                'delete' => $user->can('claim.view', $claim),
+            ],
+            'routes' => [
+                'index' => $routePrefix.'.index',
+                'show' => $routePrefix.'.show',
             ],
             'statusHistory' => $history['status']->map(fn ($entry): array => [
                 'id' => (int) $entry->id,

@@ -60,17 +60,25 @@ type Props = {
         approved_at?: string | null;
         approver?: { id: number; name: string } | null;
     }>;
+    routes?: {
+        index: string;
+        show: string;
+    };
 };
 
-export default function ClaimShow({ claim, linkedDistribution, attachments, attachmentPermissions, statusHistory, approvalHistory }: Props) {
+export default function ClaimShow({ claim, linkedDistribution, attachments, attachmentPermissions, statusHistory, approvalHistory, routes }: Props) {
     const [activeTab, setActiveTab] = useState<'overview' | 'items' | 'status' | 'related' | 'notes'>('overview');
+    const routeNames = routes ?? {
+        index: 'inventory.claims.index',
+        show: 'inventory.claims.show',
+    };
 
     return (
         <AuthenticatedLayout
             header={
                 <div className="space-y-3">
                     <h2 className="text-xl font-semibold leading-tight text-gray-800">Claim Detail</h2>
-                    <Link href={route('inventory.claims.index')} className="inline-flex rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                    <Link href={route(routeNames.index)} className="inline-flex rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
                         Back to Claims and Adjustments
                     </Link>
                 </div>
