@@ -2,8 +2,11 @@
 
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use App\Models\Delivery;
+use App\Models\User;
 use App\Services\DemoDataResetService;
 use App\Services\DemoSeedAuditService;
+use App\Services\Inventory\InventoryService;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\ExecutiveDisclosureDemoSeeder;
 use Database\Seeders\LongitudinalDemoWorkflowSeeder;
@@ -91,3 +94,72 @@ Artisan::command('demo:audit-seed', function () {
 
     return self::SUCCESS;
 })->purpose('Audit seeded transactional data and apply safe relationship/file fixes.');
+
+Artisan::command('inventory:backfill-verified-deliveries {--delivery_id= : Backfill one verified delivery by ID.} {--dry-run : Show eligible deliveries without writing inventory movements.}', function () {
+    $actor = User::query()
+        ->whereHas('role', fn ($query) => $query->where('code', 'GSO_OFFICER'))
+        ->orderBy('id')
+        ->first();
+
+    if (! $actor instanceof User) {
+        $this->error('No GSO officer user was found. Cannot backfill inventory movements safely.');
+
+        return self::FAILURE;
+    }
+
+    $query = Delivery::query()
+        ->with(['items.purchaseOrderItem', 'purchaseOrder.supplyRequest.requester'])
+        ->whereIn('receipt_status', ['VERIFIED', 'PARTIALLY_RECEIVED'])
+        ->whereDoesntHave('items', function ($itemQuery): void {
+            $itemQuery->whereHas('purchaseOrderItem.item.inventory.movements', function ($movementQuery): void {
+                $movementQuery
+                    ->where('movement_type', 'DELIVERY_RECEIPT')
+                    ->where('reference_type', Delivery::class)
+                    ->whereColumn('reference_id', 'deliveries.delivery_id');
+            });
+        })
+        ->orderBy('delivery_id');
+
+    $deliveryId = $this->option('delivery_id');
+    if ($deliveryId !== null && $deliveryId !== '') {
+        $query->where('delivery_id', (int) $deliveryId);
+    }
+
+    $deliveries = $query->get();
+
+    if ($deliveries->isEmpty()) {
+        $this->info('No verified or partially received deliveries need inventory backfill.');
+
+        return self::SUCCESS;
+    }
+
+    $dryRun = (bool) $this->option('dry-run');
+    $inventoryService = app(InventoryService::class);
+
+    foreach ($deliveries as $delivery) {
+        $acceptedQuantity = $delivery->items->sum(fn ($item): float => max((float) $item->received_quantity - (float) $item->damaged_quantity, 0));
+
+        $this->line(sprintf(
+            '%s delivery_id=%d code=%s status=%s accepted_quantity=%.2f',
+            $dryRun ? '[DRY-RUN]' : '[BACKFILL]',
+            (int) $delivery->delivery_id,
+            (string) $delivery->delivery_code,
+            (string) $delivery->receipt_status,
+            $acceptedQuantity,
+        ));
+
+        if ($dryRun) {
+            continue;
+        }
+
+        $inventoryService->updateFromVerifiedDelivery($delivery, $actor);
+    }
+
+    $this->info(sprintf(
+        '%s %d delivery record(s).',
+        $dryRun ? 'Checked' : 'Backfilled',
+        $deliveries->count(),
+    ));
+
+    return self::SUCCESS;
+})->purpose('Backfill inventory movements for verified deliveries that were approved before automatic inventory sync was added.');
