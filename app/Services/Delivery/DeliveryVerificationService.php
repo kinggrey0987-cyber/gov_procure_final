@@ -7,12 +7,16 @@ use App\Models\DeliveryVerification;
 use App\Models\StatusHistory;
 use App\Models\User;
 use App\Services\AuditLogService;
+use App\Services\Inventory\InventoryService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class DeliveryVerificationService
 {
-    public function __construct(private readonly AuditLogService $auditLogService)
+    public function __construct(
+        private readonly AuditLogService $auditLogService,
+        private readonly InventoryService $inventoryService,
+    )
     {
     }
 
@@ -83,6 +87,10 @@ class DeliveryVerificationService
 
             $this->recordStatus($delivery, $oldStatus, $newStatus, $actor, 'Delivery verified.');
             $this->recordAudit($actor, 'CREATE_VERIFICATION', $delivery);
+
+            if ($newStatus === 'VERIFIED') {
+                $this->inventoryService->updateFromVerifiedDelivery($delivery->fresh() ?? $delivery, $actor);
+            }
 
             if ($newStatus === 'PARTIALLY_RECEIVED') {
                 $this->recordAudit($actor, 'DISCREPANCY_FOR_BAC_FOLLOW_UP', $delivery);

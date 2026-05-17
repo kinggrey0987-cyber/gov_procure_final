@@ -5,6 +5,8 @@ namespace Tests\Feature\Delivery;
 use App\Enums\UserRole;
 use App\Models\Delivery;
 use App\Models\DeliveryItem;
+use App\Models\Inventory;
+use App\Models\InventoryMovement;
 use App\Models\Office;
 use App\Models\Ppmp;
 use App\Models\PpmpItem;
@@ -287,6 +289,18 @@ class DeliveryFeatureTest extends TestCase
             'delivery_id' => $delivery->delivery_id,
             'verification_status' => 'APPROVED',
         ]);
+
+        $inventory = Inventory::query()->where('item_id', $this->purchaseOrderItem->item_id)->firstOrFail();
+
+        $this->assertSame('5.00', (string) $inventory->available_stock);
+        $this->assertSame('5.00', (string) $inventory->stock_on_hand);
+
+        $this->assertSame(1, InventoryMovement::query()
+            ->where('inventory_id', $inventory->inventory_id)
+            ->where('movement_type', 'DELIVERY_RECEIPT')
+            ->where('reference_type', Delivery::class)
+            ->where('reference_id', $delivery->delivery_id)
+            ->count());
     }
 
     public function test_verification_rejects_approval_when_received_items_have_discrepancy(): void
