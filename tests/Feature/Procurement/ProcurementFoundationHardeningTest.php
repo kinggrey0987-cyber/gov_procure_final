@@ -270,7 +270,7 @@ class ProcurementFoundationHardeningTest extends TestCase
             ->assertRedirect();
 
         $purchaseOrder->refresh();
-        $this->assertSame('240.00', (string) $purchaseOrder->total_amount);
+        $this->assertSame('600.00', (string) $purchaseOrder->total_amount);
 
         /** @var PurchaseOrderItem $orderItem */
         $orderItem = $purchaseOrder->items()->firstOrFail();
@@ -292,8 +292,8 @@ class ProcurementFoundationHardeningTest extends TestCase
         $purchaseOrder->refresh();
         $orderItem->refresh();
 
-        $this->assertSame('600.00', (string) $orderItem->total_price);
-        $this->assertSame('600.00', (string) $purchaseOrder->total_amount);
+        $this->assertSame('750.00', (string) $orderItem->total_price);
+        $this->assertSame('750.00', (string) $purchaseOrder->total_amount);
     }
 
     public function test_office_user_procurement_visibility_is_read_only_and_admin_stays_denied(): void

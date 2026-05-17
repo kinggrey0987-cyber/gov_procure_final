@@ -58,20 +58,16 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
             form.setData('supply_request_item_id', 0);
             form.setData('item_id', 0);
             form.setData('item_name_snapshot', '');
+            form.setData('quantity_ordered', '');
+            form.setData('unit', '');
             return;
         }
 
         form.setData('supply_request_item_id', row.supply_request_item_id);
         form.setData('item_id', row.item_id);
         form.setData('item_name_snapshot', row.item_name_snapshot);
-
-        if (!form.data.unit.trim()) {
-            form.setData('unit', row.default_unit || '');
-        }
-
-        if (!form.data.quantity_ordered) {
-            form.setData('quantity_ordered', String(toWholeQuantity(row.quantity_requested ?? 0)));
-        }
+        form.setData('unit', row.default_unit || '');
+        form.setData('quantity_ordered', String(toWholeQuantity(row.quantity_requested ?? 0)));
     };
 
     const submit = (event: FormEvent) => {
@@ -98,80 +94,61 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                         </div>
                     </section>
 
-                    <form onSubmit={submit} className="grid gap-3 rounded-lg border bg-white p-4 md:grid-cols-4">
-                        <select
-                            value={form.data.supply_request_item_id || ''}
-                            onChange={(event) => applySourceItem(Number(event.target.value))}
-                            className="rounded border-gray-300 text-sm md:col-span-2"
-                            required
-                        >
-                            <option value="">Select Source Request Item</option>
-                            {sourceItems.map((row) => (
-                                <option key={row.supply_request_item_id} value={row.supply_request_item_id}>
-                                    {row.item_name_snapshot} · Req Qty {toWholeQuantity(row.quantity_requested ?? 0)}
-                                </option>
-                            ))}
-                        </select>
-                        <input
-                            type="number"
-                            placeholder="Supply Request Item ID"
-                            value={form.data.supply_request_item_id || ''}
-                            onChange={(event) => applySourceItem(Number(event.target.value))}
-                            className="rounded border-gray-300 text-sm"
-                            required
-                        />
-                        <input
-                            type="number"
-                            placeholder="Item ID"
-                            value={form.data.item_id || ''}
-                            onChange={(event) => form.setData('item_id', Number(event.target.value))}
-                            className="rounded border-gray-300 text-sm"
-                            required
-                        />
-                        <input
-                            type="text"
-                            placeholder="Item Name Snapshot"
-                            value={form.data.item_name_snapshot}
-                            onChange={(event) => form.setData('item_name_snapshot', event.target.value)}
-                            className="rounded border-gray-300 text-sm"
-                            required
-                        />
-                        <input
-                            type="text"
-                            placeholder="Specification"
-                            value={form.data.specification}
-                            onChange={(event) => form.setData('specification', event.target.value)}
-                            className="rounded border-gray-300 text-sm"
-                        />
-                        <input
-                            type="number"
-                            step="1"
-                            min="1"
-                            inputMode="numeric"
-                            placeholder="Quantity Ordered"
-                            value={form.data.quantity_ordered}
-                            onChange={(event) => form.setData('quantity_ordered', String(toWholeQuantity(event.target.value)))}
-                            className="rounded border-gray-300 text-sm"
-                            required
-                        />
-                        <input
-                            type="text"
-                            placeholder="Unit"
-                            value={form.data.unit}
-                            onChange={(event) => form.setData('unit', event.target.value)}
-                            className="rounded border-gray-300 text-sm"
-                            required
-                        />
-                        <input
-                            type="number"
-                            step="0.01"
-                            placeholder="Unit Price"
-                            value={form.data.unit_price}
-                            onChange={(event) => form.setData('unit_price', event.target.value)}
-                            className="rounded border-gray-300 text-sm"
-                            required
-                        />
-                        <button type="submit" disabled={isDuplicateSelection || form.processing} className="rounded bg-indigo-600 px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60">
+                    <form onSubmit={submit} className="grid gap-4 rounded-lg border bg-white p-5 md:grid-cols-4">
+                        <div className="md:col-span-4">
+                            <p className="text-sm font-semibold text-slate-800">Source Request Line</p>
+                            <p className="mt-1 text-xs text-slate-500">Choose the approved request line. Source identifiers, item name, requested quantity, and unit are locked for traceability.</p>
+                        </div>
+                        <label className="grid gap-1 text-sm font-semibold text-slate-700 md:col-span-2">
+                            Select Source Request Item
+                            <select
+                                value={form.data.supply_request_item_id || ''}
+                                onChange={(event) => applySourceItem(Number(event.target.value))}
+                                className="rounded border-gray-300 text-sm font-normal"
+                                required
+                            >
+                                <option value="">Select Source Request Item</option>
+                                {sourceItems.map((row) => (
+                                    <option key={row.supply_request_item_id} value={row.supply_request_item_id}>
+                                        SR Line #{row.supply_request_item_id} · {row.item_name_snapshot} · Req Qty {toWholeQuantity(row.quantity_requested ?? 0)} {row.default_unit || ''}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                        <ReadOnlyField label="Supply Request Line Reference" value={form.data.supply_request_item_id ? `SR Line #${form.data.supply_request_item_id}` : 'Select a source line'} />
+                        <ReadOnlyField label="Catalog Item Reference" value={form.data.item_id ? `Item #${form.data.item_id}` : 'Select a source line'} />
+                        <ReadOnlyField label="Item Name from Request" value={form.data.item_name_snapshot || 'Select a source line'} />
+                        <ReadOnlyField label="Quantity to Procure" value={form.data.quantity_ordered ? `${form.data.quantity_ordered}` : 'Select a source line'} />
+                        <ReadOnlyField label="Unit" value={form.data.unit || 'Select a source line'} />
+                        <input type="hidden" name="supply_request_item_id" value={form.data.supply_request_item_id || ''} />
+                        <input type="hidden" name="item_id" value={form.data.item_id || ''} />
+                        <input type="hidden" name="item_name_snapshot" value={form.data.item_name_snapshot} />
+                        <input type="hidden" name="quantity_ordered" value={form.data.quantity_ordered} />
+                        <input type="hidden" name="unit" value={form.data.unit} />
+                        <label className="grid gap-1 text-sm font-semibold text-slate-700 md:col-span-2">
+                            Specification / Supplier Quote Details
+                            <input
+                                type="text"
+                                placeholder="Encode quoted brand, model, variant, or other supplier specification"
+                                value={form.data.specification}
+                                onChange={(event) => form.setData('specification', event.target.value)}
+                                className="rounded border-gray-300 text-sm font-normal"
+                            />
+                        </label>
+                        <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                            Unit Price from Supplier Quote
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0.01"
+                                placeholder="0.00"
+                                value={form.data.unit_price}
+                                onChange={(event) => form.setData('unit_price', event.target.value)}
+                                className="rounded border-gray-300 text-sm font-normal"
+                                required
+                            />
+                        </label>
+                        <button type="submit" disabled={isDuplicateSelection || form.processing || !selectedSource} className="rounded bg-indigo-600 px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60">
                             Add Item
                         </button>
                         {isDuplicateSelection ? (
@@ -248,6 +225,15 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                  </div>
              </div>
         </AuthenticatedLayout>
+    );
+}
+
+function ReadOnlyField({ label, value }: { label: string; value: string }) {
+    return (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+            <p className="mt-1 text-sm font-medium text-slate-800">{value}</p>
+        </div>
     );
 }
 

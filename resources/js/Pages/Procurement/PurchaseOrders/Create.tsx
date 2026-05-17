@@ -62,6 +62,7 @@ export default function PurchaseOrdersCreate({ eligiblePurchaseRequests, supplie
     const canSubmit = hasEligiblePurchaseRequests && hasSuppliers && !form.processing;
     const selectedItems = selectedPurchaseRequest?.items ?? [];
     const selectedTotalQty = selectedItems.reduce((sum, row) => sum + Number(row.quantity_requested ?? 0), 0);
+    const today = new Date().toISOString().slice(0, 10);
 
     // Warn before leaving if form has unsaved changes
     useEffect(() => {
@@ -234,12 +235,19 @@ export default function PurchaseOrdersCreate({ eligiblePurchaseRequests, supplie
                                 ))}
                             </select>
                         </div>
-                        <input
-                            type="date"
-                            value={form.data.expected_delivery_date}
-                            onChange={(event) => form.setData('expected_delivery_date', event.target.value)}
-                            className="rounded-lg border-gray-300 text-sm"
-                        />
+                        <div>
+                            <label className="text-sm font-semibold text-slate-700">Expected Delivery Date</label>
+                            <p className="mt-1 text-xs text-slate-500">This is the target supplier delivery date used later as the delivery intake expected arrival date. Past dates are not allowed.</p>
+                            <input
+                                type="date"
+                                min={today}
+                                value={form.data.expected_delivery_date}
+                                onChange={(event) => form.setData('expected_delivery_date', event.target.value)}
+                                className="mt-2 w-full rounded-lg border-gray-300 text-sm"
+                                required
+                            />
+                            {form.errors.expected_delivery_date ? <p className="mt-1 text-xs font-semibold text-rose-600">{form.errors.expected_delivery_date}</p> : null}
+                        </div>
                         <textarea
                             placeholder="Terms Notes"
                             value={form.data.terms_notes}

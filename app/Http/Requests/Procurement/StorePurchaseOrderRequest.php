@@ -20,7 +20,7 @@ class StorePurchaseOrderRequest extends FormRequest
             'supplier_id' => ['required', 'integer', 'exists:suppliers,supplier_id'],
             'po_number' => ['nullable', 'string', 'max:80', Rule::unique('purchase_orders', 'po_number')],
             'procurement_method' => ['required', 'string', Rule::in(ProcurementMethod::values())],
-            'expected_delivery_date' => ['nullable', 'date'],
+            'expected_delivery_date' => ['required', 'date', 'after_or_equal:today'],
             'terms_notes' => ['nullable', 'string'],
             'remarks' => ['nullable', 'string'],
         ];

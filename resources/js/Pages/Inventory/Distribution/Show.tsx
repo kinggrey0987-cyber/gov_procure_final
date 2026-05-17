@@ -69,6 +69,10 @@ export default function DistributionShow({ record }: Props) {
     const canConfirmReceipt = isOfficeUser && record.status === 'RELEASED';
     const canFileClaim = isOfficeUser && (record.status === 'RELEASED' || record.status === 'RECEIVED');
     const [activeTab, setActiveTab] = useState<'overview' | 'items' | 'status' | 'related' | 'notes'>('overview');
+    const isDeliveryBackedRelease = record.delivery !== null && record.delivery !== undefined;
+    const releaseSource = isDeliveryBackedRelease ? 'Verified Delivery' : 'Available Inventory';
+    const sourceReference = isDeliveryBackedRelease ? record.delivery?.delivery_code ?? 'Verified delivery' : 'Current inventory balance';
+    const releaseDate = record.release_date ?? (record.status === 'DRAFT' ? 'Pending item release' : 'Not recorded');
 
     return (
         <AuthenticatedLayout
@@ -111,8 +115,9 @@ export default function DistributionShow({ record }: Props) {
                         <Info label="Status" value={displayDistributionStatus(record.status)} />
                         <Info label="Linked Office" value={record.office?.name ?? '-'} />
                         <Info label="Linked Request" value={record.supply_request?.request_code ?? '-'} mono />
-                        <Info label="Delivery Reference" value={record.delivery?.delivery_code ?? '-'} mono />
-                        <Info label="Release Date" value={record.release_date ?? '-'} />
+                        <Info label="Release Source" value={releaseSource} />
+                        <Info label="Source Reference" value={sourceReference} mono={isDeliveryBackedRelease} />
+                        <Info label="Release Date" value={releaseDate} />
                         <Info label="Prepared / Released By" value={record.preparer?.name ?? '-'} />
                         <Info label="Received By" value={record.receiver?.name ?? 'Awaiting Office Confirmation'} />
                     </div>

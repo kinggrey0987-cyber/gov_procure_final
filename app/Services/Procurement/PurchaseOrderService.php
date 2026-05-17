@@ -235,19 +235,20 @@ class PurchaseOrderService
             ->where('supply_request_item_id', $incomingSupplyRequestItemId)
             ->firstOrFail();
 
-        $this->assertItemMatchesOrderContext($purchaseOrder, $supplyRequestItem, (int) $payload['item_id']);
+        $this->assertItemMatchesOrderContext($purchaseOrder, $supplyRequestItem);
 
-        return DB::transaction(function () use ($purchaseOrder, $actor, $payload): PurchaseOrderItem {
-            $quantity = (int) $payload['quantity_ordered'];
+        return DB::transaction(function () use ($purchaseOrder, $actor, $payload, $supplyRequestItem): PurchaseOrderItem {
+            $quantity = max((int) $supplyRequestItem->quantity_requested, 1);
             $unitPrice = (float) $payload['unit_price'];
+            $unit = trim((string) ($supplyRequestItem->item?->default_unit ?? ''));
 
             $item = $purchaseOrder->items()->create([
-                'supply_request_item_id' => (int) $payload['supply_request_item_id'],
-                'item_id' => (int) $payload['item_id'],
-                'item_name_snapshot' => $payload['item_name_snapshot'],
+                'supply_request_item_id' => (int) $supplyRequestItem->supply_request_item_id,
+                'item_id' => (int) $supplyRequestItem->item_id,
+                'item_name_snapshot' => $supplyRequestItem->item_name_snapshot ?: ($supplyRequestItem->item?->item_name ?? 'Unknown item'),
                 'specification' => $payload['specification'] ?? null,
                 'quantity_ordered' => $quantity,
-                'unit' => $payload['unit'],
+                'unit' => $unit !== '' ? $unit : (string) $payload['unit'],
                 'unit_price' => $unitPrice,
                 'total_price' => round($quantity * $unitPrice, 2),
             ]);
@@ -278,19 +279,20 @@ class PurchaseOrderService
             ->where('supply_request_item_id', (int) $payload['supply_request_item_id'])
             ->firstOrFail();
 
-        $this->assertItemMatchesOrderContext($purchaseOrder, $supplyRequestItem, (int) $payload['item_id']);
+        $this->assertItemMatchesOrderContext($purchaseOrder, $supplyRequestItem);
 
-        return DB::transaction(function () use ($purchaseOrder, $item, $actor, $payload): PurchaseOrderItem {
-            $quantity = (int) $payload['quantity_ordered'];
+        return DB::transaction(function () use ($purchaseOrder, $item, $actor, $payload, $supplyRequestItem): PurchaseOrderItem {
+            $quantity = max((int) $supplyRequestItem->quantity_requested, 1);
             $unitPrice = (float) $payload['unit_price'];
+            $unit = trim((string) ($supplyRequestItem->item?->default_unit ?? ''));
 
             $item->fill([
-                'supply_request_item_id' => (int) $payload['supply_request_item_id'],
-                'item_id' => (int) $payload['item_id'],
-                'item_name_snapshot' => $payload['item_name_snapshot'],
+                'supply_request_item_id' => (int) $supplyRequestItem->supply_request_item_id,
+                'item_id' => (int) $supplyRequestItem->item_id,
+                'item_name_snapshot' => $supplyRequestItem->item_name_snapshot ?: ($supplyRequestItem->item?->item_name ?? 'Unknown item'),
                 'specification' => $payload['specification'] ?? null,
                 'quantity_ordered' => $quantity,
-                'unit' => $payload['unit'],
+                'unit' => $unit !== '' ? $unit : (string) $payload['unit'],
                 'unit_price' => $unitPrice,
                 'total_price' => round($quantity * $unitPrice, 2),
             ])->save();
@@ -359,17 +361,11 @@ class PurchaseOrderService
         }
     }
 
-    private function assertItemMatchesOrderContext(PurchaseOrder $purchaseOrder, SupplyRequestItem $supplyRequestItem, int $itemId): void
+    private function assertItemMatchesOrderContext(PurchaseOrder $purchaseOrder, SupplyRequestItem $supplyRequestItem): void
     {
         if ((int) $supplyRequestItem->supply_request_id !== (int) $purchaseOrder->supply_request_id) {
             throw ValidationException::withMessages([
                 'supply_request_item_id' => 'Supply request item does not belong to the selected supply request.',
-            ]);
-        }
-
-        if ((int) $supplyRequestItem->item_id !== $itemId) {
-            throw ValidationException::withMessages([
-                'item_id' => 'Item must match the selected supply request item.',
             ]);
         }
     }

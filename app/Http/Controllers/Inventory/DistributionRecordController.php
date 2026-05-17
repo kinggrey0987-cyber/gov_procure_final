@@ -11,6 +11,7 @@ use Illuminate\Support\Collection;
 use App\Services\Inventory\DistributionRecordService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Redirect;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -84,6 +85,7 @@ class DistributionRecordController
         $eligibleRows = $inventoryBackedRows
             ->concat($procurementBackedRows)
             ->unique('supply_request_id')
+            ->sortByDesc(fn (array $row): int => (int) $row['sort_timestamp'])
             ->values();
 
         $focusedReason = null;
@@ -102,8 +104,10 @@ class DistributionRecordController
                 ->values();
         }
 
+        $paginatedRows = $this->paginateEligibleRows($eligibleRows, $request);
+
         return Inertia::render('Inventory/Distribution/Create', [
-            'eligibleRows' => $eligibleRows,
+            'eligibleRows' => $paginatedRows,
             'focusSupplyRequestId' => $focusSupplyRequestId > 0 ? $focusSupplyRequestId : null,
             'focusReleasableReason' => $focusedReason,
         ]);
@@ -148,6 +152,7 @@ class DistributionRecordController
             'delivery_code' => (string) $delivery->delivery_code,
             'receipt_status' => (string) $delivery->receipt_status,
             'releasable_reason' => null,
+            'sort_timestamp' => (int) ($delivery->created_at?->getTimestamp() ?? $delivery->delivery_id),
         ];
     }
 
@@ -189,7 +194,29 @@ class DistributionRecordController
             'delivery_code' => null,
             'receipt_status' => null,
             'releasable_reason' => null,
+            'sort_timestamp' => (int) ($request->created_at?->getTimestamp() ?? $request->supply_request_id),
         ];
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $rows
+     * @return LengthAwarePaginator<int, array<string, mixed>>
+     */
+    private function paginateEligibleRows(Collection $rows, Request $request): LengthAwarePaginator
+    {
+        $perPage = 5;
+        $page = max((int) $request->query('page', 1), 1);
+
+        return new LengthAwarePaginator(
+            items: $rows->forPage($page, $perPage)->values(),
+            total: $rows->count(),
+            perPage: $perPage,
+            currentPage: $page,
+            options: [
+                'path' => $request->url(),
+                'query' => $request->query(),
+            ],
+        );
     }
 
     private function supplyRequestShortageTotal(SupplyRequest $request): float

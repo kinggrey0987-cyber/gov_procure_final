@@ -115,6 +115,28 @@ class DomainDashboardController extends Controller
             ])
             ->values();
 
+        $releasedSuppliesPreview = DistributionRecord::query()
+            ->forOffice($officeId)
+            ->with(['supplyRequest', 'items.item'])
+            ->whereIn('status', DashboardStatusGroups::officeReadyForClaimDistributionStatuses())
+            ->latest('release_date')
+            ->latest('distribution_record_id')
+            ->limit(5)
+            ->get()
+            ->map(fn (DistributionRecord $record): array => [
+                'distribution_record_id' => (int) $record->distribution_record_id,
+                'distribution_code' => (string) $record->distribution_code,
+                'request_code' => (string) ($record->supplyRequest?->request_code ?? 'Unlinked request'),
+                'release_date' => optional($record->release_date)?->toDateString(),
+                'status' => (string) $record->status,
+                'items_count' => (int) $record->items->count(),
+                'items_summary' => $record->items
+                    ->take(2)
+                    ->map(fn ($item): string => (string) ($item->item?->item_name ?? $item->item_name_snapshot))
+                    ->implode(', '),
+            ])
+            ->values();
+
         $notificationPreview = $user
             ? Notification::query()
                 ->forUser((int) $user->id)
@@ -163,6 +185,7 @@ class DomainDashboardController extends Controller
                 'completed_requests' => $completedRequestCount,
             ],
             'recentRequests' => $recentRequests,
+            'releasedSuppliesPreview' => $releasedSuppliesPreview,
             'notificationPreview' => $notificationPreview,
         ]);
 

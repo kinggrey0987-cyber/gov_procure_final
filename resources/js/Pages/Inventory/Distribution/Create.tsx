@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import PaginationNav from '@/Components/PaginationNav';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
@@ -16,7 +17,11 @@ type EligibleRow = {
 };
 
 type Props = {
-    eligibleRows: EligibleRow[];
+    eligibleRows: {
+        data: EligibleRow[];
+        links: Array<{ url: string | null; label: string; active: boolean }>;
+        total: number;
+    };
     focusSupplyRequestId?: number | null;
     focusReleasableReason?: string | null;
 };
@@ -32,7 +37,7 @@ export default function DistributionCreate({ eligibleRows, focusSupplyRequestId 
         notes: '',
     });
 
-    const rows = useMemo(() => eligibleRows, [eligibleRows]);
+    const rows = useMemo(() => eligibleRows.data, [eligibleRows.data]);
     const focusedRowExists = focusSupplyRequestId ? rows.some((row) => row.supply_request_id === focusSupplyRequestId) : false;
 
     const processRelease = (row: EligibleRow) => {
@@ -83,7 +88,7 @@ export default function DistributionCreate({ eligibleRows, focusSupplyRequestId 
                     <div className="border-b border-slate-200 px-6 py-5">
                         <h3 className="text-2xl font-semibold text-slate-900">Supply Distribution</h3>
                         <p className="mt-1 text-lg text-slate-500">
-                            Process stock-ready office requests and release supplies to offices - {rows.length} request(s) ready
+                            Process stock-ready office requests and release supplies to offices - {eligibleRows.total} request(s) ready
                         </p>
                         <p className="mt-2 text-sm text-slate-500">Use Claims and Adjustments only for post-release discrepancies, losses, or damages.</p>
                     </div>
@@ -142,6 +147,11 @@ export default function DistributionCreate({ eligibleRows, focusSupplyRequestId 
                             </tbody>
                         </table>
                     </div>
+                    {eligibleRows.total > rows.length ? (
+                        <div className="border-t border-slate-200 px-6 py-4">
+                            <PaginationNav links={eligibleRows.links} preserveState={false} />
+                        </div>
+                    ) : null}
                 </section>
             </div>
         </AuthenticatedLayout>
