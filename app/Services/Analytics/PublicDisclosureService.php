@@ -7,6 +7,7 @@ use App\Models\PublicDisclosure;
 use App\Models\StatusHistory;
 use App\Models\User;
 use App\Services\AuditLogService;
+use App\Services\Executive\PublicDisclosurePackageService;
 use App\Services\NotificationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -16,6 +17,7 @@ class PublicDisclosureService
     public function __construct(
         private readonly AuditLogService $auditLogService,
         private readonly NotificationService $notificationService,
+        private readonly PublicDisclosurePackageService $packageService,
     ) {
     }
 
@@ -41,6 +43,7 @@ class PublicDisclosureService
 
             $this->recordStatus($disclosure, null, 'DRAFT', $actor, 'Disclosure draft created.');
             $this->recordAudit($actor, 'CREATE_DRAFT', $disclosure, []);
+            $this->packageService->syncSources($disclosure);
 
             return $disclosure;
         });
@@ -86,6 +89,7 @@ class PublicDisclosureService
             ])->save();
 
             $this->recordAudit($actor, 'UPDATE_DRAFT', $disclosure, []);
+            $this->packageService->syncSources($disclosure);
 
             return $disclosure->fresh(['publisher']) ?? $disclosure;
         });
@@ -120,6 +124,7 @@ class PublicDisclosureService
             $this->recordStatus($disclosure, $oldStatus, 'PUBLISHED', $actor, 'Disclosure published.');
             $this->recordApproval($disclosure, $actor, 'PUBLISHED', 'Disclosure publication approved.');
             $this->recordAudit($actor, 'PUBLISH', $disclosure, []);
+            $this->packageService->ensureOfficialPackageAttachment($disclosure, $actor);
 
             $publicUsers = User::query()->whereHas('role', fn ($q) => $q->where('code', 'PUBLIC'))->get();
             $this->notificationService->notifyUsers(

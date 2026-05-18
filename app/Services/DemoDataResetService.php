@@ -20,6 +20,7 @@ class DemoDataResetService
     {
         return [
             'documents',
+            'public_disclosure_sources',
             'public_disclosures',
             'record_archives',
             'notifications',

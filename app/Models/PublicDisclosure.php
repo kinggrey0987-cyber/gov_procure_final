@@ -51,6 +51,13 @@ class PublicDisclosure extends Model
             ->where('related_module', 'public_disclosures');
     }
 
+    public function sources(): HasMany
+    {
+        return $this->hasMany(PublicDisclosureSource::class, 'disclosure_id', 'disclosure_id')
+            ->orderBy('sort_order')
+            ->orderBy('id');
+    }
+
     public function statusHistory(): MorphMany
     {
         return $this->morphMany(StatusHistory::class, 'reference', 'reference_type', 'reference_id');

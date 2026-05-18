@@ -7,8 +7,10 @@ use App\Models\DistributionRecord;
 use App\Models\Ppmp;
 use App\Models\PublicDisclosure;
 use App\Models\PurchaseOrder;
+use App\Models\PurchaseRequest;
 use App\Models\User;
 use App\Services\Analytics\PublicDisclosureService;
+use App\Services\Executive\PublicDisclosurePackageService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
@@ -39,10 +41,12 @@ class ExecutiveDisclosureDemoSeeder extends Seeder
             ->get();
 
         $purchaseOrders = PurchaseOrder::query()
+            ->with(['purchaseRequest.office', 'supplyRequest.ppmp.office', 'supplier', 'items', 'deliveries.distributionRecords.office'])
             ->where(function ($query): void {
                 $query->where('status', 'COMPLETED')
                     ->orWhere('status', 'PLACED');
             })
+            ->whereHas('purchaseRequest')
             ->latest('updated_at')
             ->take(4)
             ->get();
@@ -67,6 +71,7 @@ class ExecutiveDisclosureDemoSeeder extends Seeder
         }
 
         $service = app(PublicDisclosureService::class);
+        $packageService = app(PublicDisclosurePackageService::class);
 
         $primaryPpmp = $approvedPpmps->first();
         $secondaryPpmp = $approvedPpmps->skip(1)->first();
@@ -76,6 +81,21 @@ class ExecutiveDisclosureDemoSeeder extends Seeder
         $secondaryDistribution = $receivedDistributions->skip(1)->first();
 
         $publishedDefinitions = [
+            [
+                'title' => sprintf('Procurement Disclosure Package - %s', (string) ($purchaseOrder->po_number ?: 'PO-'.$purchaseOrder->purchase_order_id)),
+                'type' => 'PROCUREMENT_PACKAGE',
+                'reference_type' => PurchaseOrder::class,
+                'reference_id' => (int) $purchaseOrder->purchase_order_id,
+                'description' => sprintf(
+                    'Official public-safe procurement package linking %s to PR-%d and related procurement records.',
+                    (string) ($purchaseOrder->po_number ?: 'PO-'.$purchaseOrder->purchase_order_id),
+                    (int) $purchaseOrder->purchase_request_id,
+                ),
+                'remarks' => 'Published as the canonical PR-PO disclosure package for public transparency.',
+                'attachments' => [
+                    ['title' => 'PR-PO Certification', 'suffix' => 'pr-po-certification.txt', 'body' => "PR-PO Certification\nPO: ".($purchaseOrder->po_number ?: 'PO-'.$purchaseOrder->purchase_order_id)."\nPR: PR-{$purchaseOrder->purchase_request_id}\nStatus: {$purchaseOrder->status}\n"],
+                ],
+            ],
             [
                 'title' => 'Procurement Summary Notice',
                 'type' => 'PROCUREMENT_SUMMARY',
@@ -158,6 +178,8 @@ class ExecutiveDisclosureDemoSeeder extends Seeder
                 actor: $executive,
                 attachments: $definition['attachments'] ?? [],
             );
+
+            $packageService->ensureOfficialPackageAttachment($disclosure, $executive);
         }
 
         $this->ensureDraftDisclosure(
@@ -207,6 +229,18 @@ class ExecutiveDisclosureDemoSeeder extends Seeder
                 ],
                 service: $service,
             );
+        }
+
+        $linkedPurchaseRequest = PurchaseRequest::query()
+            ->whereKey((int) $purchaseOrder->purchase_request_id)
+            ->first();
+
+        if ($linkedPurchaseRequest instanceof PurchaseRequest) {
+            $this->command?->info(sprintf(
+                'ExecutiveDisclosureDemoSeeder linked public disclosure package to real PR-%d and %s.',
+                (int) $linkedPurchaseRequest->purchase_request_id,
+                (string) ($purchaseOrder->po_number ?: 'PO-'.$purchaseOrder->purchase_order_id),
+            ));
         }
     }
 

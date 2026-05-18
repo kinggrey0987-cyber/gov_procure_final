@@ -30,12 +30,22 @@ class PublicDisclosurePortalController
     public function index(): Response
     {
         $disclosures = PublicDisclosure::query()
+            ->with('sources')
             ->published()
             ->orderByDesc('published_at')
             ->paginate(20);
 
         return Inertia::render('Public/Disclosures/Index', [
-            'disclosures' => $disclosures,
+            'disclosures' => $disclosures->through(fn (PublicDisclosure $disclosure): array => [
+                'disclosure_id' => (int) $disclosure->disclosure_id,
+                'title' => (string) $disclosure->title,
+                'type' => (string) $disclosure->type,
+                'published_at' => optional($disclosure->published_at)?->toIso8601String(),
+                'primary_source' => $disclosure->sources->firstWhere('source_role', 'PRIMARY')?->source_label
+                    ?? $disclosure->sources->first()?->source_label
+                    ?? 'Disclosure package',
+                'linked_records_count' => $disclosure->sources->count(),
+            ]),
         ]);
     }
 
@@ -50,6 +60,7 @@ class PublicDisclosurePortalController
                     'document_id' => (int) $document->document_id,
                     'title' => (string) $document->title,
                     'file_name' => (string) $document->file_name,
+                    'document_kind' => $document->document_kind,
                     'uploaded_at' => optional($document->uploaded_at)?->toIso8601String(),
                 ])->values();
         } catch (ValidationException) {
@@ -64,13 +75,24 @@ class PublicDisclosurePortalController
                     'document_id' => (int) $document->document_id,
                     'title' => (string) $document->title,
                     'file_name' => (string) $document->file_name,
+                    'document_kind' => $document->document_kind,
                     'uploaded_at' => optional($document->uploaded_at)?->toIso8601String(),
                 ])->values();
         }
 
+        $public_disclosure->loadMissing('sources');
+
         return Inertia::render('Public/Disclosures/Show', [
             'disclosure' => $public_disclosure,
             'attachments' => $documents,
+            'sources' => $public_disclosure->sources->map(fn ($source): array => [
+                'id' => (int) $source->id,
+                'source_role' => (string) $source->source_role,
+                'source_label' => (string) $source->source_label,
+                'source_type' => (string) $source->source_type,
+                'source_id' => (int) $source->source_id,
+                'snapshot' => $source->snapshot_json ?? [],
+            ])->values(),
             'backPage' => (int) request()->query('page', 0) > 0 ? (int) request()->query('page') : null,
         ]);
     }

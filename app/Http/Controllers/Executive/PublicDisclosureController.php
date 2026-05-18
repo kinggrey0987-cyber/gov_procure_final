@@ -13,6 +13,7 @@ use App\Models\PurchaseRequest;
 use App\Services\Analytics\PublicDisclosureService;
 use App\Services\Documents\DocumentService;
 use App\Services\Executive\DisclosureEligibilityService;
+use App\Services\Executive\PublicDisclosurePackageService;
 use App\Services\History\HistoryTimelineService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Http\RedirectResponse;
@@ -30,6 +31,7 @@ class PublicDisclosureController
         private readonly HistoryTimelineService $historyTimelineService,
         private readonly DisclosureEligibilityService $eligibilityService,
         private readonly DocumentService $documentService,
+        private readonly PublicDisclosurePackageService $packageService,
     ) {
     }
 
@@ -99,17 +101,7 @@ class PublicDisclosureController
         }
 
         if (! $request->hasFile('main_file') && count($supportingFiles) === 0) {
-            $generatedAttachment = $this->buildGeneratedDisclosureAttachment($disclosure);
-
-            $this->documentService->createGeneratedAttachment(
-                actor: $user,
-                relatedModule: 'public_disclosures',
-                relatedReferenceId: (int) $disclosure->disclosure_id,
-                title: $generatedAttachment['title'],
-                fileName: $generatedAttachment['file_name'],
-                content: $generatedAttachment['content'],
-                mimeExtension: 'txt',
-            );
+            $this->packageService->ensureOfficialPackageAttachment($disclosure, $user);
         }
 
         return Redirect::route('executive.disclosures.show', $disclosure->disclosure_id)
@@ -152,13 +144,23 @@ class PublicDisclosureController
                 'file_name' => (string) $document->file_name,
                 'uploaded_at' => optional($document->uploaded_at)?->toIso8601String(),
                 'uploader_name' => $document->uploader?->name,
+                'document_kind' => $document->document_kind,
             ])->values();
 
-        $public_disclosure->load(['publisher', 'statusHistory.changedBy']);
+        $this->packageService->syncSources($public_disclosure);
+        $public_disclosure->load(['publisher', 'statusHistory.changedBy', 'sources']);
 
         return Inertia::render('Executive/Disclosures/Show', [
             'disclosure' => $public_disclosure,
             'attachments' => $attachments,
+            'sources' => $public_disclosure->sources->map(fn ($source): array => [
+                'id' => (int) $source->id,
+                'source_role' => (string) $source->source_role,
+                'source_label' => (string) $source->source_label,
+                'source_type' => (string) $source->source_type,
+                'source_id' => (int) $source->source_id,
+                'snapshot' => $source->snapshot_json ?? [],
+            ])->values(),
             'attachmentPermissions' => [
                 'upload' => (string) $public_disclosure->status === 'DRAFT',
                 'delete' => (string) $public_disclosure->status === 'DRAFT',

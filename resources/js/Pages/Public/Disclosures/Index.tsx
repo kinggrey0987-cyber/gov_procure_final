@@ -6,6 +6,8 @@ type DisclosureRow = {
     title: string;
     type: string;
     published_at: string;
+    primary_source?: string | null;
+    linked_records_count?: number;
 };
 
 type Props = {
@@ -38,8 +40,14 @@ export default function PublicDisclosureIndex({ disclosures }: Props) {
                             </span>
                         </div>
 
-                        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Public Disclosures</h1>
-                        <p className="mt-2 text-sm text-slate-600">Published procurement records available for public transparency.</p>
+                        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Public Disclosure Packages</h1>
+                        <p className="mt-2 text-sm text-slate-600">Published procurement packages with official downloads and source traceability.</p>
+
+                        <div className="mt-5 grid gap-3 md:grid-cols-3">
+                            <SummaryCard label="Packages on Page" value={String(rows.length)} />
+                            <SummaryCard label="Linked Source Records" value={String(rows.reduce((sum, row) => sum + (row.linked_records_count ?? 0), 0))} />
+                            <SummaryCard label="Official Downloads" value="Available per package" />
+                        </div>
 
                         <div className="mt-6 overflow-hidden rounded-xl border border-red-200">
                             {rows.length === 0 ? (
@@ -51,31 +59,43 @@ export default function PublicDisclosureIndex({ disclosures }: Props) {
                                     <table className="min-w-full divide-y divide-red-100 text-sm">
                                         <thead className="bg-red-50/80">
                                             <tr>
-                                                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">Title</th>
-                                                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">Type</th>
-                                                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">Published</th>
-                                                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">Action</th>
+                                                 <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">Title</th>
+                                                 <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">Type</th>
+                                                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">Primary Source</th>
+                                                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">Linked Records</th>
+                                                 <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">Published</th>
+                                                 <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-red-100 bg-white">
                                             {rows.map((row) => (
                                                 <tr key={row.disclosure_id} className="transition-colors hover:bg-red-50/50">
                                                     <td className="px-5 py-3.5 text-sm font-medium text-slate-900">{row.title}</td>
-                                                    <td className="px-5 py-3.5 text-slate-700">
-                                                        <span className="inline-flex rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">
-                                                            {formatTypeLabel(row.type)}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-5 py-3.5 text-slate-700">{formatPublishedDate(row.published_at)}</td>
-                                                    <td className="px-5 py-3.5">
-                                                        <Link
-                                                            href={buildDisclosureHref(row.disclosure_id, currentPage)}
-                                                            className="inline-flex rounded-lg bg-red-700 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-800"
-                                                        >
-                                                            View Disclosure
-                                                        </Link>
-                                                    </td>
-                                                </tr>
+                                                     <td className="px-5 py-3.5 text-slate-700">
+                                                         <span className="inline-flex rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">
+                                                             {formatTypeLabel(row.type)}
+                                                         </span>
+                                                     </td>
+                                                    <td className="px-5 py-3.5 text-sm font-semibold text-slate-800">{row.primary_source || 'Disclosure package'}</td>
+                                                    <td className="px-5 py-3.5 text-slate-700">{row.linked_records_count ?? 0} linked</td>
+                                                     <td className="px-5 py-3.5 text-slate-700">{formatPublishedDate(row.published_at)}</td>
+                                                     <td className="px-5 py-3.5">
+                                                        <div className="flex flex-wrap gap-2">
+                                                            <Link
+                                                                href={buildDisclosureHref(row.disclosure_id, currentPage)}
+                                                                className="inline-flex rounded-lg bg-red-700 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-800"
+                                                            >
+                                                                View Details
+                                                            </Link>
+                                                            <a
+                                                                href={route('public.disclosures.download', row.disclosure_id)}
+                                                                className="inline-flex rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
+                                                            >
+                                                                Download Package
+                                                            </a>
+                                                        </div>
+                                                     </td>
+                                                 </tr>
                                             ))}
                                         </tbody>
                                     </table>
@@ -90,6 +110,15 @@ export default function PublicDisclosureIndex({ disclosures }: Props) {
                 </div>
             </div>
         </>
+    );
+}
+
+function SummaryCard({ label, value }: { label: string; value: string }) {
+    return (
+        <div className="rounded-xl border border-red-100 bg-red-50/60 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-red-700">{label}</p>
+            <p className="mt-1 text-lg font-bold text-slate-900">{value}</p>
+        </div>
     );
 }
 

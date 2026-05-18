@@ -8,6 +8,7 @@ use App\Http\Middleware\EnsureTwoFactorVerified;
 use App\Models\Document;
 use App\Models\Office;
 use App\Models\PublicDisclosure;
+use App\Models\PublicDisclosureSource;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -119,12 +120,17 @@ class PublicDisclosureWorkflowTest extends TestCase
         $attachment = Document::query()
             ->where('related_module', 'public_disclosures')
             ->where('related_reference_id', (int) $disclosure->disclosure_id)
+            ->where('document_kind', 'OFFICIAL_DISCLOSURE_PACKAGE')
             ->first();
 
         $this->assertNotNull($attachment);
-        $this->assertStringContainsString('disclosure-'.$disclosure->disclosure_id.'-source-record', (string) $attachment->file_name);
+        $this->assertStringContainsString('disclosure-'.$disclosure->disclosure_id.'-official-package', (string) $attachment->file_name);
         $this->assertStringContainsString('documents/public_disclosures/'.$disclosure->disclosure_id.'/', (string) $attachment->file_path);
         $this->assertTrue(Storage::disk('public')->exists((string) $attachment->file_path));
+        $this->assertDatabaseHas('public_disclosure_sources', [
+            'disclosure_id' => (int) $disclosure->disclosure_id,
+            'source_role' => 'PRIMARY',
+        ]);
     }
 
     private function createUser(UserRole $role, Office $office): User

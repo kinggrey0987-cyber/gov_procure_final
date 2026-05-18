@@ -17,6 +17,15 @@ type Props = {
         file_name: string;
         uploaded_at?: string | null;
         uploader_name?: string | null;
+        document_kind?: string | null;
+    }>;
+    sources: Array<{
+        id: number;
+        source_role: string;
+        source_label: string;
+        source_type: string;
+        source_id: number;
+        snapshot?: Record<string, string | number | null>;
     }>;
     attachmentPermissions: {
         upload: boolean;
@@ -39,7 +48,7 @@ type Props = {
     }>;
 };
 
-export default function DisclosureShow({ disclosure, attachments, attachmentPermissions, statusHistory, approvalHistory }: Props) {
+export default function DisclosureShow({ disclosure, attachments, sources, attachmentPermissions, statusHistory, approvalHistory }: Props) {
     const publishForm = useForm({ remarks: '' });
 
     const onPublish = () => {
@@ -91,6 +100,23 @@ export default function DisclosureShow({ disclosure, attachments, attachmentPerm
                     <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
                         Executive governance access: prepare, review, and publish public disclosures.
                     </div>
+
+                    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <h3 className="text-lg font-semibold text-slate-900">Disclosure Package Sources</h3>
+                        <p className="mt-1 text-sm text-slate-600">Records that will be frozen into the official public disclosure package.</p>
+                        {sources.length === 0 ? (
+                            <p className="mt-4 rounded-xl border border-dashed border-slate-200 px-4 py-4 text-sm text-slate-600">No source traceability records found.</p>
+                        ) : (
+                            <div className="mt-4 grid gap-3 md:grid-cols-2">
+                                {sources.map((source) => (
+                                    <div key={source.id} className="rounded-xl border border-red-100 bg-red-50/50 px-4 py-3">
+                                        <p className="text-xs font-semibold uppercase tracking-wide text-red-700">{source.source_role.replaceAll('_', ' ')}</p>
+                                        <p className="mt-1 text-sm font-semibold text-slate-900">{source.source_label}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </section>
 
                     {disclosure.status === 'DRAFT' && (
                         <section className="rounded-2xl border border-red-200 bg-white p-6 shadow-sm">
