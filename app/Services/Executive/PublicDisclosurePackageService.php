@@ -34,7 +34,18 @@ class PublicDisclosurePackageService
 
         if ($referenceType === PurchaseOrder::class) {
             $order = PurchaseOrder::query()
-                ->with(['purchaseRequest.office', 'supplyRequest.ppmp.office', 'supplier', 'items', 'deliveries.distributionRecords.office'])
+                ->with([
+                    'purchaseRequest.office',
+                    'purchaseRequest.items.item',
+                    'supplyRequest.ppmp.office',
+                    'supplyRequest.ppmp.items.item',
+                    'supplyRequest.items.item',
+                    'supplier',
+                    'items.item',
+                    'deliveries.items.purchaseOrderItem.item',
+                    'deliveries.distributionRecords.office',
+                    'deliveries.distributionRecords.items.item',
+                ])
                 ->find($referenceId);
 
             return $order instanceof PurchaseOrder ? $this->fromPurchaseOrder($order) : [];
@@ -42,21 +53,42 @@ class PublicDisclosurePackageService
 
         if ($referenceType === PurchaseRequest::class) {
             $request = PurchaseRequest::query()
-                ->with(['office', 'supplyRequest.ppmp.office', 'purchaseOrders.supplier', 'purchaseOrders.items', 'purchaseOrders.deliveries.distributionRecords.office'])
+                ->with([
+                    'office',
+                    'items.item',
+                    'supplyRequest.ppmp.office',
+                    'supplyRequest.ppmp.items.item',
+                    'supplyRequest.items.item',
+                    'purchaseOrders.supplier',
+                    'purchaseOrders.items.item',
+                    'purchaseOrders.deliveries.items.purchaseOrderItem.item',
+                    'purchaseOrders.deliveries.distributionRecords.office',
+                    'purchaseOrders.deliveries.distributionRecords.items.item',
+                ])
                 ->find($referenceId);
 
             return $request instanceof PurchaseRequest ? $this->fromPurchaseRequest($request) : [];
         }
 
         if ($referenceType === Ppmp::class) {
-            $ppmp = Ppmp::query()->with(['office', 'items'])->find($referenceId);
+            $ppmp = Ppmp::query()->with(['office', 'items.item'])->find($referenceId);
 
             return $ppmp instanceof Ppmp ? [$this->sourceRow($ppmp, 'PRIMARY', 10)] : [];
         }
 
         if ($referenceType === DistributionRecord::class) {
             $distribution = DistributionRecord::query()
-                ->with(['office', 'supplyRequest.ppmp.office', 'delivery.purchaseOrder.purchaseRequest.office'])
+                ->with([
+                    'office',
+                    'items.item',
+                    'supplyRequest.items.item',
+                    'supplyRequest.ppmp.office',
+                    'supplyRequest.ppmp.items.item',
+                    'delivery.items.purchaseOrderItem.item',
+                    'delivery.purchaseOrder.items.item',
+                    'delivery.purchaseOrder.purchaseRequest.office',
+                    'delivery.purchaseOrder.purchaseRequest.items.item',
+                ])
                 ->find($referenceId);
 
             return $distribution instanceof DistributionRecord ? $this->fromDistribution($distribution) : [];
@@ -208,6 +240,12 @@ class PublicDisclosurePackageService
             $lines[] = sprintf('%02d. [%s] %s', (int) $source->sort_order, (string) $source->source_role, (string) $source->source_label);
             $snapshot = is_array($source->snapshot_json) ? $source->snapshot_json : [];
             foreach ($snapshot as $key => $value) {
+                if ($key === 'items' && is_array($value)) {
+                    $this->appendItemRows($lines, $value);
+
+                    continue;
+                }
+
                 if (is_array($value)) {
                     continue;
                 }
@@ -359,6 +397,14 @@ class PublicDisclosurePackageService
                 'procurement_method' => (string) $record->procurement_method,
                 'total_amount' => number_format((float) $record->total_amount, 2),
                 'item_count' => $record->items->count(),
+                'items' => $record->items->map(fn ($item): array => [
+                    'item' => $this->itemName($item),
+                    'specification' => (string) ($item->specification ?? 'N/A'),
+                    'unit' => (string) ($item->unit ?: $item->item?->default_unit ?: 'unit'),
+                    'quantity_ordered' => $this->decimal($item->quantity_ordered),
+                    'unit_price' => $this->money($item->unit_price),
+                    'line_total' => $this->money($item->total_price),
+                ])->values()->all(),
             ];
         }
 
@@ -367,6 +413,13 @@ class PublicDisclosurePackageService
                 'pr_number' => 'PR-'.(int) $record->purchase_request_id,
                 'office' => (string) ($record->office?->name ?? 'Unknown Office'),
                 'status' => (string) $record->status,
+                'item_count' => $record->items->count(),
+                'items' => $record->items->map(fn ($item): array => [
+                    'item' => $this->itemName($item),
+                    'unit' => (string) ($item->item?->default_unit ?: 'unit'),
+                    'quantity_requested' => $this->decimal($item->quantity_requested),
+                    'remarks' => (string) ($item->remarks ?: 'N/A'),
+                ])->values()->all(),
             ];
         }
 
@@ -377,6 +430,15 @@ class PublicDisclosurePackageService
                 'fiscal_year' => (int) $record->fiscal_year,
                 'status' => (string) $record->status,
                 'budget' => number_format((float) $record->total_estimated_budget, 2),
+                'item_count' => $record->items->count(),
+                'items' => $record->items->map(fn ($item): array => [
+                    'item' => $this->itemName($item),
+                    'unit' => (string) ($item->item?->default_unit ?: 'unit'),
+                    'quantity' => $this->decimal($item->quantity),
+                    'unit_cost' => $this->money($item->unit_cost),
+                    'estimated_budget' => $this->money($item->estimated_budget),
+                    'procurement_schedule' => (string) ($item->procurement_schedule ?: 'N/A'),
+                ])->values()->all(),
             ];
         }
 
@@ -386,6 +448,13 @@ class PublicDisclosurePackageService
                 'office' => (string) ($record->office?->name ?? 'Unknown Office'),
                 'status' => (string) $record->status,
                 'purpose' => (string) ($record->purpose ?? 'N/A'),
+                'item_count' => $record->items->count(),
+                'items' => $record->items->map(fn ($item): array => [
+                    'item' => $this->itemName($item),
+                    'unit' => (string) ($item->item?->default_unit ?: $item->ppmpItem?->item?->default_unit ?: 'unit'),
+                    'quantity_requested' => $this->decimal($item->quantity_requested),
+                    'ppmp_item' => $item->ppmp_item_id ? 'PPMP Item #'.(int) $item->ppmp_item_id : 'N/A',
+                ])->values()->all(),
             ];
         }
 
@@ -394,6 +463,15 @@ class PublicDisclosurePackageService
                 'delivery_code' => (string) ($record->delivery_code ?: 'DEL-'.$record->delivery_id),
                 'receipt_status' => (string) $record->receipt_status,
                 'actual_delivery_date' => optional($record->actual_delivery_date)?->format('Y-m-d') ?? 'N/A',
+                'item_count' => $record->items->count(),
+                'items' => $record->items->map(fn ($item): array => [
+                    'item' => $this->itemName($item->purchaseOrderItem ?? $item),
+                    'expected_quantity' => $this->decimal($item->expected_quantity),
+                    'received_quantity' => $this->decimal($item->received_quantity),
+                    'damaged_quantity' => $this->decimal($item->damaged_quantity),
+                    'missing_quantity' => $this->decimal($item->missing_quantity),
+                    'condition' => (string) ($item->item_condition ?: 'N/A'),
+                ])->values()->all(),
             ];
         }
 
@@ -403,10 +481,79 @@ class PublicDisclosurePackageService
                 'office' => (string) ($record->office?->name ?? 'Unknown Office'),
                 'status' => (string) $record->status,
                 'release_date' => optional($record->release_date)?->format('Y-m-d') ?? 'N/A',
+                'item_count' => $record->items->count(),
+                'items' => $record->items->map(fn ($item): array => [
+                    'item' => $this->itemName($item),
+                    'unit' => (string) ($item->unit ?: $item->item?->default_unit ?: 'unit'),
+                    'quantity_released' => $this->decimal($item->quantity_released),
+                    'quantity_received' => $this->decimal($item->quantity_received),
+                    'quantity_damaged' => $this->decimal($item->quantity_damaged),
+                    'quantity_missing' => $this->decimal($item->quantity_missing),
+                    'receipt_condition' => (string) ($item->receipt_condition ?: 'N/A'),
+                ])->values()->all(),
             ];
         }
 
         return [];
+    }
+
+    /**
+     * @param  array<int, mixed>  $items
+     * @param  array<int, string>  $lines
+     */
+    private function appendItemRows(array &$lines, array $items): void
+    {
+        $lines[] = '    - Items:';
+
+        if ($items === []) {
+            $lines[] = '        No item-level records were available for this source.';
+
+            return;
+        }
+
+        foreach ($items as $index => $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $lines[] = sprintf('        %02d. %s', $index + 1, (string) ($item['item'] ?? 'Unnamed item'));
+
+            foreach ($item as $key => $value) {
+                if ($key === 'item' || is_array($value)) {
+                    continue;
+                }
+
+                $lines[] = sprintf('            - %s: %s', ucwords(str_replace('_', ' ', (string) $key)), (string) $value);
+            }
+        }
+    }
+
+    private function itemName(Model $item): string
+    {
+        $snapshot = $item->getAttribute('item_name_snapshot');
+        if (is_string($snapshot) && trim($snapshot) !== '') {
+            return trim($snapshot);
+        }
+
+        $relatedItem = $item->getRelationValue('item');
+        if ($relatedItem instanceof Model) {
+            $name = $relatedItem->getAttribute('item_name');
+            if (is_string($name) && trim($name) !== '') {
+                return trim($name);
+            }
+        }
+
+        return 'Item #'.(string) ($item->getAttribute('item_id') ?? 'N/A');
+    }
+
+    private function decimal(mixed $value): string
+    {
+        return number_format((float) ($value ?? 0), 2);
+    }
+
+    private function money(mixed $value): string
+    {
+        return number_format((float) ($value ?? 0), 2);
     }
 
     /**

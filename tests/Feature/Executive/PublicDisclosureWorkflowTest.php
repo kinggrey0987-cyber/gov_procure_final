@@ -6,7 +6,11 @@ use App\Enums\UserRole;
 use App\Http\Middleware\EnsureMustChangePassword;
 use App\Http\Middleware\EnsureTwoFactorVerified;
 use App\Models\Document;
+use App\Models\Item;
+use App\Models\ItemCategory;
 use App\Models\Office;
+use App\Models\Ppmp;
+use App\Models\PpmpItem;
 use App\Models\PublicDisclosure;
 use App\Models\PublicDisclosureSource;
 use App\Models\Role;
@@ -131,6 +135,75 @@ class PublicDisclosureWorkflowTest extends TestCase
             'disclosure_id' => (int) $disclosure->disclosure_id,
             'source_role' => 'PRIMARY',
         ]);
+    }
+
+    public function test_official_disclosure_package_includes_public_safe_ppmp_item_details(): void
+    {
+        $category = ItemCategory::query()->create([
+            'category_name' => 'Office Supplies',
+            'standard_delivery_days' => 7,
+            'status' => 'active',
+        ]);
+
+        $item = Item::query()->create([
+            'item_category_id' => (int) $category->item_category_id,
+            'item_name' => 'Bond Paper A4',
+            'description' => 'Public-safe item description.',
+            'default_unit' => 'ream',
+            'status' => 'active',
+        ]);
+
+        $ppmp = Ppmp::query()->create([
+            'office_id' => (int) $this->office->id,
+            'prepared_by' => (int) $this->officeUser->id,
+            'approved_by' => (int) $this->executiveUser->id,
+            'fiscal_year' => 2026,
+            'status' => 'APPROVED',
+            'total_estimated_budget' => 7500,
+            'date_prepared' => now()->toDateString(),
+            'date_approved' => now()->toDateString(),
+        ]);
+
+        PpmpItem::query()->create([
+            'ppmp_id' => (int) $ppmp->ppmp_id,
+            'item_id' => (int) $item->item_id,
+            'item_category_id' => (int) $category->item_category_id,
+            'quantity' => 50,
+            'unit_cost' => 150,
+            'estimated_budget' => 7500,
+            'procurement_schedule' => 'Q1',
+            'remarks' => 'Internal remarks should not be rendered in public item rows.',
+        ]);
+
+        $response = $this->actingAs($this->executiveUser)->post(route('executive.disclosures.store'), [
+            'title' => 'Approved PPMP Summary',
+            'type' => 'PPMP_SUMMARY',
+            'reference_type' => Ppmp::class,
+            'reference_id' => (int) $ppmp->ppmp_id,
+            'description' => 'Approved annual PPMP summary for public publication.',
+            'status' => 'PUBLISHED',
+        ]);
+
+        $response->assertRedirect();
+
+        $disclosure = PublicDisclosure::query()->firstOrFail();
+        $this->assertSame('PUBLISHED', $disclosure->status);
+
+        $attachment = Document::query()
+            ->where('related_module', 'public_disclosures')
+            ->where('related_reference_id', (int) $disclosure->disclosure_id)
+            ->where('document_kind', 'OFFICIAL_DISCLOSURE_PACKAGE')
+            ->firstOrFail();
+
+        $content = Storage::disk('public')->get((string) $attachment->file_path);
+
+        $this->assertStringContainsString('Items:', $content);
+        $this->assertStringContainsString('Bond Paper A4', $content);
+        $this->assertStringContainsString('Quantity: 50.00', $content);
+        $this->assertStringContainsString('Unit Cost: 150.00', $content);
+        $this->assertStringContainsString('Estimated Budget: 7,500.00', $content);
+        $this->assertStringContainsString('Procurement Schedule: Q1', $content);
+        $this->assertStringNotContainsString('Internal remarks should not be rendered', $content);
     }
 
     private function createUser(UserRole $role, Office $office): User

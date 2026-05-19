@@ -137,12 +137,16 @@ export default function DisclosureCreate({ eligibleSources }: Props) {
             ? [form.data.remarks?.trim(), 'Submitted for review.'].filter(Boolean).join(' ')
             : form.data.remarks;
 
-        form.setData('status', status);
-        form.setData('remarks', remarks);
+        form.transform((data) => ({
+            ...data,
+            status,
+            remarks,
+        }));
 
         form.post(route('executive.disclosures.store'), {
             forceFormData: true,
             onFinish: () => {
+                form.transform((data) => data);
                 form.setData('status', priorStatus);
                 form.setData('remarks', priorRemarks);
             },
