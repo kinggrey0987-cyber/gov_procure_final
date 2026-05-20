@@ -58,6 +58,8 @@ class InventoryController
             ->paginate(5)
             ->withQueryString();
 
+        $inventories->getCollection()->transform(fn (Inventory $inventory): Inventory => $this->withComputedReservedQuantity($inventory));
+
         $categories = ItemCategory::query()
             ->orderBy('category_name')
             ->get(['item_category_id', 'category_name'])
@@ -83,6 +85,7 @@ class InventoryController
         abort_unless(auth()->user()->can('inventory.view', $inventory), 403);
 
         $inventory->load(['item.category']);
+        $inventory = $this->withComputedReservedQuantity($inventory);
 
         $recentMovements = $inventory->movements()
             ->with('performer')
@@ -122,5 +125,14 @@ class InventoryController
 
         return Redirect::route('inventory.inventory.index')
             ->with('success', 'Inventory updated from accepted delivery quantity.');
+    }
+
+    private function withComputedReservedQuantity(Inventory $inventory): Inventory
+    {
+        $computedReserved = max((float) $inventory->stock_on_hand - (float) $inventory->available_stock, 0);
+
+        $inventory->setAttribute('reserved_quantity', number_format($computedReserved, 2, '.', ''));
+
+        return $inventory;
     }
 }

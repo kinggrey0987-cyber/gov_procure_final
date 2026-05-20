@@ -886,7 +886,7 @@ class DemoWorkflowSeeder extends Seeder
                 [
                     'stock_on_hand' => (float) $values['stock_on_hand'],
                     'available_stock' => (float) $values['available_stock'],
-                    'reserved_quantity' => 0,
+                    'reserved_quantity' => max((float) $values['stock_on_hand'] - (float) $values['available_stock'], 0),
                     'released_quantity' => 0,
                     'low_stock_threshold' => (float) $values['threshold'],
                     'last_updated' => now(),
@@ -924,7 +924,7 @@ class DemoWorkflowSeeder extends Seeder
                 [
                     'stock_on_hand' => $stockOnHand,
                     'available_stock' => $availableStock,
-                    'reserved_quantity' => 0,
+                    'reserved_quantity' => max((float) $stockOnHand - (float) $availableStock, 0),
                     'released_quantity' => 0,
                     'low_stock_threshold' => $lowStockThreshold,
                     'last_updated' => now(),

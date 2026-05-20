@@ -119,8 +119,9 @@ export default function InventoryIndex({ inventories, categories, filters }: Pro
                     </Link>
                 </div>
 
-                <div className="rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-600 shadow-sm">
-                    Low Stock Threshold is the reorder point. Items strictly below this level are active low-stock cases for procurement initiation; items equal to threshold are advisory only.
+                <div className="rounded-xl border border-slate-200 bg-white p-4 text-xs leading-5 text-slate-600 shadow-sm">
+                    <p>Available is the quantity ready for new office releases. On Hand is total stock still controlled by GSO. Reserved is computed as On Hand minus Available, representing stock already set aside or not currently releasable.</p>
+                    <p className="mt-1">Low Stock Threshold is the reorder point. Items strictly below this level are active low-stock cases for procurement initiation; items equal to threshold are advisory only.</p>
                 </div>
 
                 <div className="responsive-table-wrap rounded-xl border border-slate-200 bg-white shadow-sm">

@@ -8,17 +8,19 @@ import UpdateProfileInformationForm from './Partials/UpdateProfileInformationFor
 export default function Edit({
     mustVerifyEmail,
     status,
-}: PageProps<{ mustVerifyEmail: boolean; status?: string; twoFactor?: { required: boolean; policy: string } }>) {
+    pendingEmailChange,
+}: PageProps<{ mustVerifyEmail: boolean; status?: string; twoFactor?: { required: boolean; policy: string }; pendingEmailChange?: { email: string; expires_at?: string | null } | null }>) {
     const page = usePage().props as {
         auth: {
             user: {
                 role_code?: string;
             };
         };
-        twoFactor?: {
+                        twoFactor?: {
             required: boolean;
             policy: string;
         };
+        pendingEmailChange?: { email: string; expires_at?: string | null } | null;
     };
     const roleCode = page.auth.user.role_code ?? '';
     const canDeleteAccount = !['ADMIN', 'EXEC_OFFICER'].includes(roleCode);
@@ -39,6 +41,7 @@ export default function Edit({
                         <UpdateProfileInformationForm
                             mustVerifyEmail={mustVerifyEmail}
                             status={status}
+                            pendingEmailChange={pendingEmailChange ?? page.pendingEmailChange ?? null}
                             className="max-w-2xl"
                         />
                         </div>

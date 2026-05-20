@@ -33,7 +33,7 @@ class TwoFactorChallengeService
     /**
      * @return array{challenge: TwoFactorChallenge, delivery_ok: bool, delivery_error: string|null, delivery_duration_ms: int}
      */
-    public function issueChallenge(User $user, ?string $ipAddress, ?string $userAgent, bool $isResend = false): array
+    public function issueChallenge(User $user, ?string $ipAddress, ?string $userAgent, bool $isResend = false, string $purpose = 'login'): array
     {
         TwoFactorChallenge::query()
             ->where('user_id', $user->id)
@@ -58,7 +58,7 @@ class TwoFactorChallengeService
         $mailStartedAt = microtime(true);
 
         try {
-            Mail::to($user->email)->send(new TwoFactorCodeMail($user, $code, $expiresInMinutes));
+            Mail::to($user->email)->send(new TwoFactorCodeMail($user, $code, $expiresInMinutes, $purpose));
         } catch (Throwable $throwable) {
             $deliveryFailed = true;
             $deliveryError = mb_substr($throwable->getMessage(), 0, 500);
@@ -99,6 +99,7 @@ class TwoFactorChallengeService
                 'expires_at' => $challenge->expires_at?->toIso8601String(),
                 'delivery_failed' => $deliveryFailed,
                 'delivery_duration_ms' => $deliveryDurationMs,
+                'purpose' => $purpose,
             ],
             logDomain: 'TECHNICAL',
             officeId: $user->office_id,

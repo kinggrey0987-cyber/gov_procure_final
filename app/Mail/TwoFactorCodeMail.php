@@ -17,6 +17,7 @@ class TwoFactorCodeMail extends Mailable
         public readonly User $user,
         public readonly string $code,
         public readonly int $expiresInMinutes,
+        public readonly string $purpose = 'login',
     ) {
     }
 

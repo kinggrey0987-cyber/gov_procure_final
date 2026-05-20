@@ -240,7 +240,7 @@ export default function DistributionIndex({ records, filters, filter_options }: 
                                     <td className="px-4 py-3">
                                         <span className={statusClass(row.status)}>{displayDistributionStatus(row.status)}</span>
                                     </td>
-                                    <td className="px-4 py-3 text-slate-600">{row.release_date || '-'}</td>
+                                    <td className="px-4 py-3 text-slate-600">{formatDate(row.release_date)}</td>
                                     <td className="px-4 py-3 text-slate-600">{row.items_count} released / {row.claims_count} claim(s)</td>
                                     <td className="px-4 py-3 text-right">
                                         <Link
@@ -279,6 +279,17 @@ function statusClass(status: string) {
     };
 
     return map[status] ?? `${base} bg-slate-100 text-slate-700`;
+}
+
+function formatDate(value?: string | null): string {
+    if (!value) {
+        return '-';
+    }
+
+    const datePart = value.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
+    const parsed = new Date(datePart ? `${datePart}T00:00:00` : value);
+
+    return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 function displayDistributionStatus(status: string): string {

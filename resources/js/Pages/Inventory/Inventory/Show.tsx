@@ -56,7 +56,10 @@ export default function InventoryShow({ inventory, recentMovements }: Props) {
                         <Metric label="Low Stock Threshold" value={inventory.low_stock_threshold} />
                     </div>
 
-                    <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                    <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700">
+                        <p>
+                            <span className="font-semibold text-slate-800">Quantity meaning:</span> Available is ready for new office releases. On Hand is total stock still controlled by GSO. Reserved is computed as On Hand minus Available.
+                        </p>
                         <p>
                             <span className="font-semibold text-slate-800">Threshold meaning:</span> Low Stock Threshold is the safety level used to signal reorder risk.
                             Values below this level appear as active low-stock shortage signals. Values equal to threshold are advisory reorder-point warnings.

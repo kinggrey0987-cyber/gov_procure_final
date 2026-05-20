@@ -259,7 +259,9 @@ class DomainDashboardController extends Controller
                 'low_stock_count' => Inventory::query()->lowStock()->count(),
                 'out_of_stock_count' => Inventory::query()->outOfStock()->count(),
                 'total_available_stock' => (float) Inventory::query()->sum('available_stock'),
-                'reserved_quantity' => (float) Inventory::query()->sum('reserved_quantity'),
+                'reserved_quantity' => (float) Inventory::query()
+                    ->selectRaw('SUM(CASE WHEN stock_on_hand > available_stock THEN stock_on_hand - available_stock ELSE 0 END) as computed_reserved_quantity')
+                    ->value('computed_reserved_quantity'),
                 'movement_count' => InventoryMovement::query()->count(),
                 'released_distribution_count' => DistributionRecord::query()->released()->count(),
                 'received_distribution_count' => DistributionRecord::query()->received()->count(),

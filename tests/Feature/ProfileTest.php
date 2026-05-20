@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Mail\TwoFactorCodeMail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class ProfileTest extends TestCase
@@ -23,6 +25,7 @@ class ProfileTest extends TestCase
 
     public function test_profile_information_can_be_updated(): void
     {
+        Mail::fake();
         $user = User::factory()->create();
 
         $response = $this
@@ -39,6 +42,46 @@ class ProfileTest extends TestCase
         $user->refresh();
 
         $this->assertSame('Test User', $user->name);
+        $this->assertNotSame('test@example.com', $user->email);
+
+        $response->assertSessionHas('profile.email_change.pending.email', 'test@example.com');
+        Mail::assertSent(TwoFactorCodeMail::class, fn (TwoFactorCodeMail $mail): bool => $mail->hasTo($user->email) && $mail->purpose === 'email_change');
+    }
+
+    public function test_pending_email_change_can_be_confirmed_with_two_factor_code(): void
+    {
+        Mail::fake();
+        $user = User::factory()->create();
+
+        $this
+            ->actingAs($user)
+            ->patch('/profile', [
+                'name' => 'Test User',
+                'email' => 'test@example.com',
+            ]);
+
+        $code = null;
+        Mail::assertSent(TwoFactorCodeMail::class, function (TwoFactorCodeMail $mail) use (&$code): bool {
+            $code = $mail->code;
+
+            return $mail->purpose === 'email_change';
+        });
+
+        $this
+            ->actingAs($user)
+            ->withSession([
+                'profile.email_change.pending' => [
+                    'email' => 'test@example.com',
+                ],
+            ])
+            ->post(route('profile.email-change.confirm'), [
+                'code' => $code,
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect('/profile');
+
+        $user->refresh();
+
         $this->assertSame('test@example.com', $user->email);
         $this->assertNull($user->email_verified_at);
     }

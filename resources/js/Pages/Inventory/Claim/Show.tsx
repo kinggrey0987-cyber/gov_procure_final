@@ -114,7 +114,7 @@ export default function ClaimShow({ claim, linkedDistribution, attachments, atta
                         <Info label="Claim Code" value={claim.claim_code} mono />
                         <Info label="Status" value={displayClaimStatus(claim.status)} />
                         <Info label="Issue Type" value={displayClaimType(claim.claim_type)} />
-                        <Info label="Date Observed" value={claim.claim_date} />
+                        <Info label="Date Observed" value={formatDate(claim.claim_date)} />
                         <Info label="Issue Location" value={claim.claim_location} />
                         <Info label="Disputed Quantity" value={String(claim.quantity_disputed ?? 0)} />
                         <Info label="Resolution Type" value={claim.resolution_type ?? 'Pending review'} />
@@ -131,7 +131,7 @@ export default function ClaimShow({ claim, linkedDistribution, attachments, atta
                             <Info label="Distribution Status" value={linkedDistribution.status} />
                             <Info label="Office" value={linkedDistribution.office_name} />
                             <Info label="Office Request" value={linkedDistribution.request_code} mono />
-                            <Info label="Release Date" value={linkedDistribution.release_date ?? '-'} />
+                            <Info label="Release Date" value={formatDate(linkedDistribution.release_date)} />
                             <Info label="Record ID" value={String(linkedDistribution.distribution_record_id)} />
                         </div>
 
@@ -215,6 +215,17 @@ function Info({ label, value, mono }: { label: string; value: string; mono?: boo
             <p className={`mt-1 text-sm text-slate-800 ${mono ? 'font-mono text-xs' : ''}`}>{value}</p>
         </div>
     );
+}
+
+function formatDate(value?: string | null): string {
+    if (!value) {
+        return '-';
+    }
+
+    const datePart = value.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
+    const parsed = new Date(datePart ? `${datePart}T00:00:00` : value);
+
+    return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 function displayClaimType(type: string): string {

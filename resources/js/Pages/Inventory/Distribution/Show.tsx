@@ -72,7 +72,7 @@ export default function DistributionShow({ record }: Props) {
     const isDeliveryBackedRelease = record.delivery !== null && record.delivery !== undefined;
     const releaseSource = isDeliveryBackedRelease ? 'Verified Delivery' : 'Available Inventory';
     const sourceReference = isDeliveryBackedRelease ? record.delivery?.delivery_code ?? 'Verified delivery' : 'Current inventory balance';
-    const releaseDate = record.release_date ?? (record.status === 'DRAFT' ? 'Pending item release' : 'Not recorded');
+    const releaseDate = record.release_date ? formatDate(record.release_date) : (record.status === 'DRAFT' ? 'Pending item release' : 'Not recorded');
 
     return (
         <AuthenticatedLayout
@@ -284,7 +284,7 @@ export default function DistributionShow({ record }: Props) {
                                     <td className="px-4 py-3 font-mono text-xs text-slate-700">{claim.claim_code}</td>
                                     <td className="px-4 py-3 text-slate-700">{humanizeEnum(claim.claim_type)}</td>
                                     <td className="px-4 py-3 text-slate-700">{displayClaimStatus(claim.status)}</td>
-                                    <td className="px-4 py-3 text-slate-600">{claim.claim_date ?? '-'}</td>
+                                    <td className="px-4 py-3 text-slate-600">{formatDate(claim.claim_date)}</td>
                                     <td className="px-4 py-3 text-right">
                                         <Link href={route(isOfficeUser ? 'office.claims.show' : 'inventory.claims.show', claim.claims_id)} className="text-sm font-semibold text-red-700 hover:text-red-900">
                                             View Claim
@@ -330,6 +330,17 @@ function Info({ label, value, mono }: { label: string; value: string; mono?: boo
             <p className={`mt-1 text-sm text-slate-800 ${mono ? 'font-mono text-xs' : ''}`}>{value}</p>
         </div>
     );
+}
+
+function formatDate(value?: string | null): string {
+    if (!value) {
+        return '-';
+    }
+
+    const datePart = value.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
+    const parsed = new Date(datePart ? `${datePart}T00:00:00` : value);
+
+    return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 function displayDistributionStatus(status: string): string {

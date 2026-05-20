@@ -1,7 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link } from '@inertiajs/react';
 import type { ReactNode } from 'react';
-import { useMemo, useState } from 'react';
 
 type Props = {
     summary: {
@@ -19,124 +18,62 @@ type Props = {
 };
 
 export default function InventoryTracking({ summary }: Props) {
-    const [actionSearch, setActionSearch] = useState('');
-    const [actionCategory, setActionCategory] = useState<'ALL' | 'DELIVERY' | 'DISTRIBUTION' | 'CLAIMS' | 'INVENTORY'>('ALL');
-
-    const quickActions = useMemo(
-        () => [
-            { href: route('inventory.deliveries.index'), label: 'Delivery Monitoring', category: 'DELIVERY' as const },
-            { href: route('inventory.deliveries.create'), label: 'Receive Deliveries', category: 'DELIVERY' as const },
-            { href: route('inventory.distribution-records.index'), label: 'Distribution Records', category: 'DISTRIBUTION' as const },
-            { href: route('inventory.distribution-records.create'), label: 'Supply Distribution', category: 'DISTRIBUTION' as const },
-            { href: route('inventory.claims.index'), label: 'Office Supply Claims', category: 'CLAIMS' as const },
-            { href: route('inventory.inventory.index'), label: 'Inventory Monitoring', category: 'INVENTORY' as const },
-        ],
-        [],
-    );
-
-    const filteredQuickActions = useMemo(() => {
-        const keyword = actionSearch.trim().toLowerCase();
-
-        return quickActions.filter((action) => {
-            const matchesCategory = actionCategory === 'ALL' || action.category === actionCategory;
-            if (!matchesCategory) {
-                return false;
-            }
-
-            if (keyword.length === 0) {
-                return true;
-            }
-
-            return `${action.label} ${action.category}`.toLowerCase().includes(keyword);
-        });
-    }, [quickActions, actionCategory, actionSearch]);
+    const quickActions = [
+        { href: route('inventory.deliveries.index'), label: 'Monitor Deliveries', description: 'Review incoming supplies and delivery status.' },
+        { href: route('inventory.distribution-records.create'), label: 'Release Supplies', description: 'Create a distribution record for office requests.' },
+        { href: route('inventory.claims.index'), label: 'Review Claims', description: 'Validate pending office supply claims.' },
+        { href: route('inventory.inventory.index'), label: 'View Inventory', description: 'Check stock balances and low-stock items.' },
+    ];
 
     return (
         <AuthenticatedLayout
             header={
-                <div className="space-y-2">
-                    <h2 className="text-xl font-semibold leading-tight text-gray-800">Dashboard Overview</h2>
-                    <Link href={route('dashboard')} className="inline-flex rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
-                        Back to Main Dashboard
-                    </Link>
+                <div>
+                    <h2 className="text-xl font-semibold leading-tight text-gray-900">GSO Dashboard</h2>
+                    <p className="mt-1 text-sm font-normal text-slate-500">Inventory, deliveries, distribution, and claims overview.</p>
                 </div>
             }
         >
             <Head title="Inventory Dashboard" />
 
             <div className="space-y-6 py-8">
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    <StatCard label="Inventory Records" value={summary.inventory_count} tone="slate" helper="Catalog items with stock controls" />
-                    <StatCard label="Low Stock" value={summary.low_stock_count} tone="amber" helper="Items at or below threshold" />
-                    <StatCard label="Movement Logs" value={summary.movement_count} tone="sky" helper="Traceable stock movements" />
-                    <StatCard label="Released Distribution" value={summary.released_distribution_count} tone="blue" helper="Office releases awaiting receipt" />
-                    <StatCard label="Received Distribution" value={summary.received_distribution_count} tone="emerald" helper="Confirmed office handovers" />
-                    <StatCard label="Pending Claims" value={summary.open_claim_count} tone="rose" helper="Claims needing GSO review" />
-                </div>
-
-                <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 xl:grid-cols-4">
-                    <MiniKpi label="Available Units" value={formatQuantity(summary.total_available_stock)} />
-                    <MiniKpi label="Reserved Units" value={formatQuantity(summary.reserved_quantity)} />
-                    <MiniKpi label="Out of Stock" value={summary.out_of_stock_count} />
-                    <MiniKpi label="Pending Deliveries" value={summary.pending_delivery_count} />
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <h3 className="text-base font-semibold text-slate-900">Quick Actions</h3>
-                    <p className="mt-1 text-sm text-slate-500">Direct access to active GSO operations.</p>
-                    <div className="mt-4 grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 md:grid-cols-5">
-                        <div className="md:col-span-3">
-                            <label htmlFor="inventory-dashboard-action-search" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
-                                Search actions
-                            </label>
-                            <input
-                                id="inventory-dashboard-action-search"
-                                type="text"
-                                value={actionSearch}
-                                onChange={(event) => setActionSearch(event.target.value)}
-                                placeholder="Search delivery, distribution, claims"
-                                className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                            />
-                        </div>
+                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                         <div>
-                            <label htmlFor="inventory-dashboard-action-category" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
-                                Category
-                            </label>
-                            <select
-                                id="inventory-dashboard-action-category"
-                                value={actionCategory}
-                                onChange={(event) => setActionCategory(event.target.value as 'ALL' | 'DELIVERY' | 'DISTRIBUTION' | 'CLAIMS' | 'INVENTORY')}
-                                className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                            >
-                                <option value="ALL">All categories</option>
-                                <option value="DELIVERY">Delivery</option>
-                                <option value="DISTRIBUTION">Distribution</option>
-                                <option value="CLAIMS">Claims</option>
-                                <option value="INVENTORY">Inventory</option>
-                            </select>
+                            <p className="text-sm font-semibold uppercase tracking-wide text-red-700">GSO Overview</p>
+                            <h3 className="mt-1 text-2xl font-bold text-slate-950">Today&apos;s inventory snapshot</h3>
                         </div>
-                        <div className="flex items-end">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setActionSearch('');
-                                    setActionCategory('ALL');
-                                }}
-                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-                            >
-                                Clear
-                            </button>
+                        <p className="max-w-xl text-sm leading-6 text-slate-500">A cleaner summary of stock availability, deliveries, distributions, and items needing attention.</p>
+                    </div>
+
+                    <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                        <StatCard label="Available Units" value={formatQuantity(summary.total_available_stock)} tone="emerald" helper="Ready for office release" />
+                        <StatCard label="Low Stock" value={summary.low_stock_count} tone="amber" helper="Items at or below threshold" />
+                        <StatCard label="Pending Deliveries" value={summary.pending_delivery_count} tone="blue" helper="Awaiting receipt or verification" />
+                        <StatCard label="Pending Claims" value={summary.open_claim_count} tone="rose" helper="Claims needing GSO review" />
+                    </div>
+
+                    <div className="mt-5 grid gap-3 border-t border-slate-100 pt-5 sm:grid-cols-2 xl:grid-cols-4">
+                        <MiniKpi label="Inventory Records" value={summary.inventory_count} />
+                        <MiniKpi label="Movement Logs" value={summary.movement_count} />
+                        <MiniKpi label="Released" value={summary.released_distribution_count} />
+                        <MiniKpi label="Received" value={summary.received_distribution_count} />
+                    </div>
+                </section>
+
+                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                        <div>
+                            <h3 className="text-lg font-semibold text-slate-950">Quick Actions</h3>
+                            <p className="mt-1 text-sm text-slate-500">Most-used GSO tasks in one clean area.</p>
                         </div>
                     </div>
-                    <p className="mt-3 text-xs text-slate-500">
-                        Showing {filteredQuickActions.length} of {quickActions.length} quick action(s).
-                    </p>
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                        {filteredQuickActions.map((action) => (
-                            <ActionLink key={`${action.category}-${action.href}`} href={action.href} label={action.label} />
+                    <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        {quickActions.map((action) => (
+                            <ActionLink key={action.href} href={action.href} label={action.label} description={action.description} />
                         ))}
                     </div>
-                </div>
+                </section>
 
                 <div className="grid gap-4 lg:grid-cols-2">
                     <Panel title="Delivery and Distribution">
@@ -171,7 +108,7 @@ export default function InventoryTracking({ summary }: Props) {
     );
 }
 
-function StatCard({ label, value, tone, helper }: { label: string; value: number; tone: 'slate' | 'amber' | 'sky' | 'blue' | 'emerald' | 'rose'; helper?: string }) {
+function StatCard({ label, value, tone, helper }: { label: string; value: number | string; tone: 'slate' | 'amber' | 'sky' | 'blue' | 'emerald' | 'rose'; helper?: string }) {
     const classes = {
         slate: 'text-slate-700 bg-slate-50',
         amber: 'text-amber-700 bg-amber-50',
@@ -182,9 +119,9 @@ function StatCard({ label, value, tone, helper }: { label: string; value: number
     };
 
     return (
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-sm text-slate-500">{label}</p>
-            <p className={`mt-2 inline-flex rounded-md px-3 py-1 text-2xl font-semibold ${classes[tone]}`}>{value}</p>
+        <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+            <p className="text-sm font-medium text-slate-500">{label}</p>
+            <p className={`mt-3 inline-flex rounded-lg px-3 py-1 text-2xl font-bold ${classes[tone]}`}>{value}</p>
             {helper ? <p className="mt-2 text-xs leading-5 text-slate-500">{helper}</p> : null}
         </div>
     );
@@ -192,7 +129,7 @@ function StatCard({ label, value, tone, helper }: { label: string; value: number
 
 function MiniKpi({ label, value }: { label: string; value: number | string }) {
     return (
-        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
             <p className="mt-1 text-xl font-bold text-slate-900">{value}</p>
         </div>
@@ -205,10 +142,11 @@ function formatQuantity(value: number) {
     }).format(value);
 }
 
-function ActionLink({ href, label }: { href: string; label: string }) {
+function ActionLink({ href, label, description }: { href: string; label: string; description: string }) {
     return (
-        <Link href={href} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700">
-            {label}
+        <Link href={href} className="group rounded-xl border border-slate-200 bg-slate-50/70 p-4 transition hover:border-red-200 hover:bg-red-50">
+            <span className="text-sm font-semibold text-slate-900 group-hover:text-red-700">{label}</span>
+            <span className="mt-2 block text-xs leading-5 text-slate-500">{description}</span>
         </Link>
     );
 }

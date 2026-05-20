@@ -35,6 +35,21 @@ const todayDate = (): string => {
     return offsetDate.toISOString().split('T')[0];
 };
 
+function dateInputValue(value?: string | null): string | undefined {
+    return value?.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
+}
+
+function formatDate(value?: string | null): string {
+    if (!value) {
+        return '-';
+    }
+
+    const datePart = dateInputValue(value);
+    const parsed = new Date(datePart ? `${datePart}T00:00:00` : value);
+
+    return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
 export default function ClaimCreate({ distributionRecords, preselectedDistributionRecordId = null }: Props) {
     const { auth } = usePage<PageProps>().props;
     const isOfficeUser = auth?.user?.role_code === 'OFFICE_USER';
@@ -124,7 +139,7 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                 <p><span className="font-semibold text-slate-800">Office:</span> {selectedRecord.office_name}</p>
                                 <p><span className="font-semibold text-slate-800">Distribution Code:</span> {selectedRecord.distribution_code}</p>
                                 <p><span className="font-semibold text-slate-800">Linked Request:</span> {selectedRecord.request_code}</p>
-                                <p><span className="font-semibold text-slate-800">Release Date:</span> {selectedRecord.release_date ?? '-'}</p>
+                                <p><span className="font-semibold text-slate-800">Release Date:</span> {formatDate(selectedRecord.release_date)}</p>
                                 <p><span className="font-semibold text-slate-800">Distribution Status:</span> {selectedRecord.status}</p>
                             </div>
                         ) : null}
@@ -179,7 +194,7 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                 <input
                                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                                     type="date"
-                                    min={selectedRecord?.release_date ?? undefined}
+                                    min={dateInputValue(selectedRecord?.release_date)}
                                     max={todayDate()}
                                     value={form.data.claim_date}
                                     onChange={(e) => form.setData('claim_date', e.target.value)}
