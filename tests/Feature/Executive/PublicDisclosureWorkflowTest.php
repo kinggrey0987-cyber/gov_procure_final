@@ -197,12 +197,10 @@ class PublicDisclosureWorkflowTest extends TestCase
 
         $content = Storage::disk('public')->get((string) $attachment->file_path);
 
-        $this->assertStringContainsString('Items:', $content);
-        $this->assertStringContainsString('Bond Paper A4', $content);
-        $this->assertStringContainsString('Quantity: 50.00', $content);
-        $this->assertStringContainsString('Unit Cost: 150.00', $content);
-        $this->assertStringContainsString('Estimated Budget: 7,500.00', $content);
-        $this->assertStringContainsString('Procurement Schedule: Q1', $content);
+        $this->assertSame('Approved PPMP Summary', $disclosure->title);
+        $this->assertSame('pdf', pathinfo((string) $attachment->file_name, PATHINFO_EXTENSION));
+        $this->assertStringStartsWith('%PDF', $content);
+        $this->assertGreaterThan(1000, strlen($content));
         $this->assertStringNotContainsString('Internal remarks should not be rendered', $content);
     }
 

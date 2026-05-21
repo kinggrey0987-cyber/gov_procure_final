@@ -22,10 +22,14 @@ type Props = {
         source_label: string;
         source_type: string;
         source_id: number;
-        snapshot?: Record<string, string | number | null>;
+        snapshot?: Record<string, SnapshotValue>;
     }>;
     backPage?: number | null;
 };
+
+type SnapshotPrimitive = string | number | boolean | null;
+type SnapshotItem = Record<string, SnapshotPrimitive>;
+type SnapshotValue = SnapshotPrimitive | SnapshotItem[];
 
 export default function PublicDisclosureShow({ disclosure, attachments, sources, backPage }: Props) {
     const hasFile = Boolean(disclosure.file_path);
@@ -129,7 +133,7 @@ export default function PublicDisclosureShow({ disclosure, attachments, sources,
                                         {source.snapshot && Object.keys(source.snapshot).length > 0 ? (
                                             <div className="mt-3 grid gap-2 sm:grid-cols-2">
                                                 {Object.entries(source.snapshot).map(([key, value]) => (
-                                                    <DetailCell key={`${source.id}-${key}`} label={formatTypeLabel(key)} value={String(value ?? 'N/A')} />
+                                                    <DetailCell key={`${source.id}-${key}`} label={formatTypeLabel(key)} value={formatSnapshotValue(key, value)} />
                                                 ))}
                                             </div>
                                         ) : null}
@@ -227,7 +231,7 @@ function DetailCell({ label, value }: { label: string; value: string }) {
     return (
         <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">{label}</p>
-            <p className="mt-1 text-sm font-semibold text-slate-900">{value}</p>
+            <p className="mt-1 whitespace-pre-line text-sm font-semibold text-slate-900">{value}</p>
         </div>
     );
 }
@@ -253,7 +257,49 @@ function formatPublicDate(value?: string | null): string {
 function formatTypeLabel(value: string): string {
     return value
         .replaceAll('_', ' ')
+        .toLowerCase()
         .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatSnapshotValue(key: string, value: SnapshotValue): string {
+    if (Array.isArray(value)) {
+        return formatSnapshotItems(value);
+    }
+
+    if (value === null || value === undefined || value === '') {
+        return 'N/A';
+    }
+
+    if (key === 'supplier' && String(value).trim().toLowerCase() === 'unknown supplier') {
+        return 'N/A';
+    }
+
+    if (key === 'procurement_method' || key.endsWith('_status') || key === 'status') {
+        return formatTypeLabel(String(value));
+    }
+
+    return String(value);
+}
+
+function formatSnapshotItems(items: SnapshotItem[]): string {
+    if (items.length === 0) {
+        return 'No items listed';
+    }
+
+    return items
+        .map((item, index) => {
+            const name = String(item.item ?? `Item ${index + 1}`);
+            const details = [
+                ['Quantity', item.quantity],
+                ['Cost', item.cost],
+            ]
+                .filter(([, value]) => value !== null && value !== undefined && value !== '')
+                .map(([label, value]) => `${label}: ${value}`)
+                .join(', ');
+
+            return details ? `${index + 1}. ${name} (${details})` : `${index + 1}. ${name}`;
+        })
+        .join('\n');
 }
 
 function formatRoleLabel(value: string): string {

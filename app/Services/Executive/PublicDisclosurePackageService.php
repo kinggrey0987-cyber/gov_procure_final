@@ -13,6 +13,7 @@ use App\Models\PurchaseRequest;
 use App\Models\SupplyRequest;
 use App\Models\User;
 use App\Services\Documents\DocumentService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 
@@ -171,7 +172,7 @@ class PublicDisclosurePackageService
         $this->syncSources($disclosure);
         $disclosure->loadMissing('sources');
 
-        $content = $this->buildSnapshotContent($disclosure);
+        $content = $this->buildSnapshotPdf($disclosure);
         $fileBaseName = sprintf('disclosure-%d-official-package', (int) $disclosure->disclosure_id);
 
         $existing = Document::query()
@@ -181,16 +182,18 @@ class PublicDisclosurePackageService
             ->first();
 
         if ($existing instanceof Document) {
-            $path = (string) $existing->file_path;
-            if ($path === '') {
-                $path = sprintf('documents/public_disclosures/%d/%s.txt', (int) $disclosure->disclosure_id, $fileBaseName);
-            }
+            $previousPath = (string) $existing->file_path;
+            $path = sprintf('documents/public_disclosures/%d/%s.pdf', (int) $disclosure->disclosure_id, $fileBaseName);
 
             Storage::disk($this->publicDisk())->put($path, $content);
+            if ($previousPath !== '' && $previousPath !== $path) {
+                Storage::disk($this->publicDisk())->delete($previousPath);
+            }
+
             $existing->forceFill([
                 'uploaded_by' => (int) $actor->id,
                 'title' => 'Official Disclosure Package',
-                'file_name' => basename($path),
+                'file_name' => $fileBaseName.'.pdf',
                 'document_kind' => 'OFFICIAL_DISCLOSURE_PACKAGE',
                 'file_path' => $path,
                 'uploaded_at' => now(),
@@ -206,12 +209,35 @@ class PublicDisclosurePackageService
             title: 'Official Disclosure Package',
             fileName: $fileBaseName,
             content: $content,
-            mimeExtension: 'txt',
+            mimeExtension: 'pdf',
         );
 
         $document->forceFill(['document_kind' => 'OFFICIAL_DISCLOSURE_PACKAGE'])->save();
 
         return $document->fresh() ?? $document;
+    }
+
+    public function buildSnapshotPdf(PublicDisclosure $disclosure): string
+    {
+        $disclosure->loadMissing('sources');
+
+        return Pdf::loadView('reports.public-disclosure-package', [
+            'disclosure' => $disclosure,
+            'typeLabel' => $this->label((string) $disclosure->type),
+            'statusLabel' => $this->label((string) $disclosure->status),
+            'generatedAt' => now(),
+            'sources' => $disclosure->sources
+                ->sortBy('sort_order')
+                ->map(fn (PublicDisclosureSource $source): array => [
+                    'sort_order' => (int) $source->sort_order,
+                    'role' => $this->roleLabel((string) $source->source_role),
+                    'label' => (string) $source->source_label,
+                    'details' => $this->snapshotDetails(is_array($source->snapshot_json) ? $source->snapshot_json : []),
+                    'items' => $this->snapshotItems(is_array($source->snapshot_json) ? ($source->snapshot_json['items'] ?? []) : []),
+                ])
+                ->values()
+                ->all(),
+        ])->setPaper('a4')->output();
     }
 
     public function buildSnapshotContent(PublicDisclosure $disclosure): string
@@ -393,17 +419,14 @@ class PublicDisclosurePackageService
             return [
                 'po_number' => (string) ($record->po_number ?: 'PO-'.$record->purchase_order_id),
                 'status' => (string) $record->status,
-                'supplier' => (string) ($record->supplier?->name ?? 'Unknown Supplier'),
-                'procurement_method' => (string) $record->procurement_method,
+                'supplier' => $this->supplierName($record),
+                'procurement_method' => $this->label((string) $record->procurement_method),
                 'total_amount' => number_format((float) $record->total_amount, 2),
                 'item_count' => $record->items->count(),
                 'items' => $record->items->map(fn ($item): array => [
                     'item' => $this->itemName($item),
-                    'specification' => (string) ($item->specification ?? 'N/A'),
-                    'unit' => (string) ($item->unit ?: $item->item?->default_unit ?: 'unit'),
-                    'quantity_ordered' => $this->decimal($item->quantity_ordered),
-                    'unit_price' => $this->money($item->unit_price),
-                    'line_total' => $this->money($item->total_price),
+                    'quantity' => $this->decimal($item->quantity_ordered),
+                    'cost' => $this->money($item->total_price),
                 ])->values()->all(),
             ];
         }
@@ -416,9 +439,7 @@ class PublicDisclosurePackageService
                 'item_count' => $record->items->count(),
                 'items' => $record->items->map(fn ($item): array => [
                     'item' => $this->itemName($item),
-                    'unit' => (string) ($item->item?->default_unit ?: 'unit'),
-                    'quantity_requested' => $this->decimal($item->quantity_requested),
-                    'remarks' => (string) ($item->remarks ?: 'N/A'),
+                    'quantity' => $this->decimal($item->quantity_requested),
                 ])->values()->all(),
             ];
         }
@@ -433,11 +454,8 @@ class PublicDisclosurePackageService
                 'item_count' => $record->items->count(),
                 'items' => $record->items->map(fn ($item): array => [
                     'item' => $this->itemName($item),
-                    'unit' => (string) ($item->item?->default_unit ?: 'unit'),
                     'quantity' => $this->decimal($item->quantity),
-                    'unit_cost' => $this->money($item->unit_cost),
-                    'estimated_budget' => $this->money($item->estimated_budget),
-                    'procurement_schedule' => (string) ($item->procurement_schedule ?: 'N/A'),
+                    'cost' => $this->money($item->estimated_budget),
                 ])->values()->all(),
             ];
         }
@@ -451,9 +469,7 @@ class PublicDisclosurePackageService
                 'item_count' => $record->items->count(),
                 'items' => $record->items->map(fn ($item): array => [
                     'item' => $this->itemName($item),
-                    'unit' => (string) ($item->item?->default_unit ?: $item->ppmpItem?->item?->default_unit ?: 'unit'),
-                    'quantity_requested' => $this->decimal($item->quantity_requested),
-                    'ppmp_item' => $item->ppmp_item_id ? 'PPMP Item #'.(int) $item->ppmp_item_id : 'N/A',
+                    'quantity' => $this->decimal($item->quantity_requested),
                 ])->values()->all(),
             ];
         }
@@ -466,11 +482,7 @@ class PublicDisclosurePackageService
                 'item_count' => $record->items->count(),
                 'items' => $record->items->map(fn ($item): array => [
                     'item' => $this->itemName($item->purchaseOrderItem ?? $item),
-                    'expected_quantity' => $this->decimal($item->expected_quantity),
-                    'received_quantity' => $this->decimal($item->received_quantity),
-                    'damaged_quantity' => $this->decimal($item->damaged_quantity),
-                    'missing_quantity' => $this->decimal($item->missing_quantity),
-                    'condition' => (string) ($item->item_condition ?: 'N/A'),
+                    'quantity' => $this->decimal($item->expected_quantity),
                 ])->values()->all(),
             ];
         }
@@ -484,12 +496,7 @@ class PublicDisclosurePackageService
                 'item_count' => $record->items->count(),
                 'items' => $record->items->map(fn ($item): array => [
                     'item' => $this->itemName($item),
-                    'unit' => (string) ($item->unit ?: $item->item?->default_unit ?: 'unit'),
-                    'quantity_released' => $this->decimal($item->quantity_released),
-                    'quantity_received' => $this->decimal($item->quantity_received),
-                    'quantity_damaged' => $this->decimal($item->quantity_damaged),
-                    'quantity_missing' => $this->decimal($item->quantity_missing),
-                    'receipt_condition' => (string) ($item->receipt_condition ?: 'N/A'),
+                    'quantity' => $this->decimal($item->quantity_released),
                 ])->values()->all(),
             ];
         }
@@ -544,6 +551,94 @@ class PublicDisclosurePackageService
         }
 
         return 'Item #'.(string) ($item->getAttribute('item_id') ?? 'N/A');
+    }
+
+    private function supplierName(PurchaseOrder $purchaseOrder): string
+    {
+        $supplier = $purchaseOrder->supplier;
+
+        if ($supplier instanceof Model) {
+            foreach (['supplier_name', 'name'] as $attribute) {
+                $value = $supplier->getAttribute($attribute);
+                if (is_string($value) && trim($value) !== '') {
+                    return trim($value);
+                }
+            }
+        }
+
+        return 'N/A';
+    }
+
+    private function label(string $value): string
+    {
+        $normalized = trim(str_replace('_', ' ', $value));
+
+        if ($normalized === '') {
+            return 'N/A';
+        }
+
+        return mb_convert_case(mb_strtolower($normalized), MB_CASE_TITLE, 'UTF-8');
+    }
+
+    private function roleLabel(string $value): string
+    {
+        return $this->label(preg_replace('/^RELATED_/', '', $value) ?? $value);
+    }
+
+    /**
+     * @param  array<string, mixed>  $snapshot
+     * @return array<int, array{label: string, value: string}>
+     */
+    private function snapshotDetails(array $snapshot): array
+    {
+        $hidden = ['items'];
+
+        return collect($snapshot)
+            ->reject(fn (mixed $value, string $key): bool => in_array($key, $hidden, true) || is_array($value))
+            ->map(fn (mixed $value, string $key): array => [
+                'label' => $this->label($key),
+                'value' => $this->publicSnapshotValue($key, $value),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  mixed  $items
+     * @return array<int, array{item: string, quantity: string, cost: string}>
+     */
+    private function snapshotItems(mixed $items): array
+    {
+        if (! is_array($items)) {
+            return [];
+        }
+
+        return collect($items)
+            ->filter(fn (mixed $item): bool => is_array($item))
+            ->map(fn (array $item): array => [
+                'item' => (string) ($item['item'] ?? 'Unnamed item'),
+                'quantity' => (string) ($item['quantity'] ?? 'N/A'),
+                'cost' => (string) ($item['cost'] ?? 'N/A'),
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function publicSnapshotValue(string $key, mixed $value): string
+    {
+        if ($value === null || $value === '') {
+            return 'N/A';
+        }
+
+        if ($key === 'supplier' && is_string($value) && mb_strtolower(trim($value)) === 'unknown supplier') {
+            return 'N/A';
+        }
+
+        if ($key === 'status' || $key === 'procurement_method' || str_ends_with($key, '_status')) {
+            return $this->label((string) $value);
+        }
+
+        return (string) $value;
     }
 
     private function decimal(mixed $value): string
