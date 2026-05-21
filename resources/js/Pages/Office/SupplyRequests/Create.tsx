@@ -15,6 +15,7 @@ type Option = {
     ppmp_id: number;
     item_id: number;
     item_name: string;
+    default_unit?: string | null;
     planned_quantity: number;
     requested_quantity: number;
     remaining_quantity: number;
@@ -380,16 +381,26 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                                 onChange={(event) => updateItem(index, { quantity_requested: event.target.value })}
                                                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                                             />
+                                            <span className="mt-1 block text-xs text-slate-500">Quantity: {item.quantity_requested || 0} {option?.default_unit || '-'}</span>
                                             {form.errors[`items.${index}.quantity_requested`] ? <p className="mt-1 text-xs text-rose-600">{form.errors[`items.${index}.quantity_requested`]}</p> : null}
+                                        </Field>
+
+                                        <Field label="Unit" hint="Auto-filled from the item catalog.">
+                                            <input
+                                                value={option?.default_unit || '-'}
+                                                readOnly
+                                                aria-readonly="true"
+                                                className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700"
+                                            />
                                         </Field>
 
                                     </div>
 
                                     {option ? (
                                         <div className="mt-3 grid gap-2 text-xs text-slate-600 md:grid-cols-4">
-                                            <div>Planned: <strong>{option.planned_quantity}</strong></div>
-                                            <div>Already requested: <strong>{option.requested_quantity}</strong></div>
-                                            <div>Remaining: <strong>{option.remaining_quantity}</strong></div>
+                                            <div>Planned: <strong>{option.planned_quantity} {option.default_unit || ''}</strong></div>
+                                            <div>Already requested: <strong>{option.requested_quantity} {option.default_unit || ''}</strong></div>
+                                            <div>Remaining: <strong>{option.remaining_quantity} {option.default_unit || ''}</strong></div>
                                             <div>PPMP reference unit cost: <strong>{option.suggested_unit_cost}</strong></div>
                                         </div>
                                     ) : null}

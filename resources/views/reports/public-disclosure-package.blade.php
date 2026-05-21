@@ -18,7 +18,7 @@
         .value { display: block; font-size: 12px; font-weight: 700; margin-top: 3px; }
         .summary { background: #fff7f7; border: 1px solid #fecaca; border-radius: 8px; padding: 10px 12px; }
         .source { border: 1px solid #fecaca; border-radius: 8px; margin-bottom: 12px; padding: 10px; page-break-inside: avoid; }
-        .badge { background: #fef2f2; border: 1px solid #fecaca; border-radius: 999px; color: #b91c1c; display: inline-block; font-size: 9px; font-weight: 700; margin-right: 6px; padding: 2px 7px; }
+        .badge { background: #fef2f2; border-radius: 999px; color: #b91c1c; display: inline-block; font-size: 9px; font-weight: 700; margin-right: 6px; padding: 2px 7px; }
         .details { width: 100%; border-collapse: collapse; margin-top: 9px; }
         .details th, .details td { border: 1px solid #e2e8f0; padding: 6px 7px; text-align: left; vertical-align: top; }
         .details th { background: #f8fafc; color: #334155; font-size: 9px; letter-spacing: .04em; text-transform: uppercase; }

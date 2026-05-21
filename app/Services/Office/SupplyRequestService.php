@@ -290,7 +290,7 @@ class SupplyRequestService
         }
 
         $ppmpItems = PpmpItem::query()
-            ->with('item:item_id,item_name,status')
+            ->with('item:item_id,item_name,status,default_unit')
             ->where('ppmp_id', $ppmpId)
             ->whereHas('item', fn ($query) => $query->whereRaw('LOWER(status) = ?', ['active']))
             ->orderBy('ppmp_item_id')
@@ -317,6 +317,7 @@ class SupplyRequestService
                 'ppmp_id' => (int) $ppmpItem->ppmp_id,
                 'item_id' => (int) $ppmpItem->item_id,
                 'item_name' => (string) ($ppmpItem->item?->item_name ?? 'Unknown Item'),
+                'default_unit' => (string) ($ppmpItem->item?->default_unit ?? ''),
                 'planned_quantity' => $plannedQuantity,
                 'requested_quantity' => $requestedQuantity,
                 'remaining_quantity' => $remainingQuantity,

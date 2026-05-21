@@ -28,6 +28,7 @@ use App\Http\Controllers\Inventory\InventoryController;
 use App\Http\Controllers\Inventory\InventoryMovementController;
 use App\Http\Controllers\Inventory\ItemCatalogController;
 use App\Http\Controllers\Inventory\ItemCategoryController;
+use App\Http\Controllers\Inventory\ItemUnitController;
 use App\Http\Controllers\Inventory\RequestWorkflowController;
 use App\Http\Controllers\Executive\AlertController as ExecutiveAlertController;
 use App\Http\Controllers\Executive\AnomalyController;
@@ -479,6 +480,18 @@ Route::middleware(['auth', 'twofactor', 'must-change-password'])->group(function
                     ->middleware('can:inventory.catalog.manage')
                     ->name('update');
                 Route::patch('/{item_category}/toggle-status', [ItemCategoryController::class, 'toggleStatus'])
+                    ->middleware('can:inventory.catalog.manage')
+                    ->name('toggle-status');
+            });
+
+            Route::prefix('item-units')->name('item-units.')->group(function () {
+                Route::get('/', [ItemUnitController::class, 'index'])
+                    ->middleware('can:inventory.catalog.view-any')
+                    ->name('index');
+                Route::post('/', [ItemUnitController::class, 'store'])
+                    ->middleware('can:inventory.catalog.manage')
+                    ->name('store');
+                Route::patch('/{item_unit}/toggle-status', [ItemUnitController::class, 'toggleStatus'])
                     ->middleware('can:inventory.catalog.manage')
                     ->name('toggle-status');
             });

@@ -6,6 +6,7 @@ use App\Http\Requests\Inventory\StoreItemRequest;
 use App\Http\Requests\Inventory\UpdateItemRequest;
 use App\Models\Item;
 use App\Models\ItemCategory;
+use App\Models\ItemUnit;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redirect;
@@ -66,6 +67,7 @@ class ItemCatalogController
 
         return Inertia::render('Inventory/Items/Create', [
             'categories' => $this->categoryOptions(),
+            'units' => $this->unitOptions(),
         ]);
     }
 
@@ -121,6 +123,7 @@ class ItemCatalogController
                 'status' => (string) $item->status,
             ],
             'categories' => $this->categoryOptions(),
+            'units' => $this->unitOptions((string) $item->default_unit),
         ]);
     }
 
@@ -166,6 +169,30 @@ class ItemCatalogController
             ->map(fn (ItemCategory $category): array => [
                 'item_category_id' => (int) $category->item_category_id,
                 'category_name' => (string) $category->category_name,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, array<string, int|string>>
+     */
+    private function unitOptions(?string $includeUnit = null): array
+    {
+        return ItemUnit::query()
+            ->where(function ($query) use ($includeUnit): void {
+                $query->where('status', 'active');
+
+                if ($includeUnit !== null && $includeUnit !== '') {
+                    $query->orWhere('name', $includeUnit);
+                }
+            })
+            ->orderBy('name', 'asc')
+            ->get(['item_unit_id', 'name', 'status'])
+            ->map(fn (ItemUnit $unit): array => [
+                'item_unit_id' => (int) $unit->item_unit_id,
+                'name' => (string) $unit->name,
+                'status' => (string) $unit->status,
             ])
             ->values()
             ->all();

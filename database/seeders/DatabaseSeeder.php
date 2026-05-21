@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             OfficeSeeder::class,
             AdminUserSeeder::class,
+            ItemUnitSeeder::class,
             ItemCatalogSeeder::class,
         ]);
 

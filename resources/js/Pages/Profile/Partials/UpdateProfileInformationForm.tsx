@@ -1,10 +1,12 @@
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
+import Modal from '@/Components/Modal';
 import PrimaryButton from '@/Components/PrimaryButton';
+import SecondaryButton from '@/Components/SecondaryButton';
 import TextInput from '@/Components/TextInput';
 import { Transition } from '@headlessui/react';
-import { Link, useForm, usePage } from '@inertiajs/react';
-import { FormEventHandler } from 'react';
+import { Link, router, useForm, usePage } from '@inertiajs/react';
+import { FormEventHandler, useEffect, useState } from 'react';
 
 export default function UpdateProfileInformation({
     mustVerifyEmail,
@@ -18,6 +20,7 @@ export default function UpdateProfileInformation({
     className?: string;
 }) {
     const user = usePage().props.auth.user;
+    const [confirmingEmailChange, setConfirmingEmailChange] = useState(Boolean(pendingEmailChange));
 
     const { data, setData, patch, errors, processing, recentlySuccessful } =
         useForm({
@@ -28,6 +31,12 @@ export default function UpdateProfileInformation({
     const emailCodeForm = useForm({
         code: '',
     });
+
+    useEffect(() => {
+        if (pendingEmailChange) {
+            setConfirmingEmailChange(true);
+        }
+    }, [pendingEmailChange]);
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
@@ -40,7 +49,29 @@ export default function UpdateProfileInformation({
 
         emailCodeForm.post(route('profile.email-change.confirm'), {
             preserveScroll: true,
-            onSuccess: () => emailCodeForm.reset('code'),
+            onSuccess: () => {
+                emailCodeForm.reset('code');
+                setConfirmingEmailChange(false);
+            },
+        });
+    };
+
+    const closeEmailChangeModal = () => {
+        setConfirmingEmailChange(false);
+        emailCodeForm.clearErrors();
+        emailCodeForm.reset('code');
+    };
+
+    const resendEmailChangeCode = () => {
+        if (!pendingEmailChange) {
+            return;
+        }
+
+        router.patch(route('profile.update'), {
+            name: data.name,
+            email: pendingEmailChange.email,
+        }, {
+            preserveScroll: true,
         });
     };
 
@@ -147,43 +178,60 @@ export default function UpdateProfileInformation({
             </form>
 
             {pendingEmailChange ? (
-                <form onSubmit={confirmEmailChange} className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <h3 className="text-sm font-semibold text-slate-900">Confirm Email Change</h3>
-                    <p className="mt-1 text-sm text-slate-600">
-                        Pending new email: <span className="font-semibold text-slate-900">{pendingEmailChange.email}</span>
-                    </p>
-                    <div className="mt-4 space-y-3">
-                        <div>
-                            <InputLabel htmlFor="email-change-code" value="Verification Code" />
-                            <TextInput
-                                id="email-change-code"
-                                className="mt-1 block w-full"
-                                value={emailCodeForm.data.code}
-                                onChange={(e) => emailCodeForm.setData('code', e.target.value.replace(/\D/g, '').slice(0, 6))}
-                                inputMode="numeric"
-                                maxLength={6}
-                                placeholder="Enter 6-digit code"
-                                required
-                            />
-                            <InputError className="mt-2" message={emailCodeForm.errors.code} />
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <PrimaryButton disabled={emailCodeForm.processing}>Confirm Email Change</PrimaryButton>
-                            <button
-                                type="button"
-                                onClick={() => patch(route('profile.update'), { preserveScroll: true })}
-                                disabled={processing}
-                                className="text-sm font-semibold text-slate-600 hover:text-slate-900 disabled:opacity-50"
-                            >
-                                Resend code
-                            </button>
-                        </div>
+                <>
+                    <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <h3 className="text-sm font-semibold text-slate-900">Email change pending</h3>
+                        <p className="mt-1 text-sm text-slate-600">
+                            Pending new email: <span className="font-semibold text-slate-900">{pendingEmailChange.email}</span>
+                        </p>
+                        <PrimaryButton className="mt-4" onClick={() => setConfirmingEmailChange(true)}>
+                            Confirm Email Change
+                        </PrimaryButton>
                     </div>
-                </form>
+
+                    <Modal show={confirmingEmailChange} onClose={closeEmailChangeModal} maxWidth="md">
+                        <form onSubmit={confirmEmailChange} className="p-6">
+                            <h3 className="text-lg font-semibold text-slate-900">Confirm Email Change</h3>
+                            <p className="mt-1 text-sm text-slate-600">
+                                Enter the verification code sent to your current email address to confirm the new email: <span className="font-semibold text-slate-900">{pendingEmailChange.email}</span>
+                            </p>
+
+                            <div className="mt-6">
+                                <InputLabel htmlFor="email-change-code" value="Verification Code" />
+                                <TextInput
+                                    id="email-change-code"
+                                    className="mt-1 block w-full"
+                                    value={emailCodeForm.data.code}
+                                    onChange={(e) => emailCodeForm.setData('code', e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                    inputMode="numeric"
+                                    maxLength={6}
+                                    placeholder="Enter 6-digit code"
+                                    required
+                                    isFocused
+                                />
+                                <InputError className="mt-2" message={emailCodeForm.errors.code} />
+                            </div>
+
+                            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+                                <button
+                                    type="button"
+                                    onClick={resendEmailChangeCode}
+                                    disabled={processing}
+                                    className="text-sm font-semibold text-slate-600 hover:text-slate-900 disabled:opacity-50 sm:me-auto"
+                                >
+                                    Resend code
+                                </button>
+                                <SecondaryButton type="button" onClick={closeEmailChangeModal}>
+                                    Cancel
+                                </SecondaryButton>
+                                <PrimaryButton disabled={emailCodeForm.processing}>Confirm Email Change</PrimaryButton>
+                            </div>
+                        </form>
+                    </Modal>
+                </>
             ) : null}
         </section>
     );
 }
-
 
 

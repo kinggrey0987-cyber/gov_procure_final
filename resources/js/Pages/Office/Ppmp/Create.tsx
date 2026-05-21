@@ -9,6 +9,7 @@ type ItemOption = {
     item_name: string;
     item_category_id: number;
     item_category_name: string;
+    default_unit?: string | null;
 };
 
 type ItemDraft = {
@@ -65,6 +66,8 @@ export default function PpmpCreate({ itemOptions }: Props) {
         patchItem(index, { item_id: String(option.item_id), item_category_id: String(option.item_category_id) });
     };
 
+    const itemOptionById = new Map(itemOptions.map((option) => [String(option.item_id), option]));
+
     return (
         <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Create PPMP</h2>}>
             <Head title="Create PPMP" />
@@ -109,7 +112,11 @@ export default function PpmpCreate({ itemOptions }: Props) {
                     </div>
 
                     <div className="space-y-4">
-                        {form.data.items.map((item, index) => (
+                        {form.data.items.map((item, index) => {
+                            const selectedItem = itemOptionById.get(item.item_id);
+                            const unit = selectedItem?.default_unit || '-';
+
+                            return (
                             <div key={index} className="rounded-xl border border-slate-200 p-4">
                                 <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                                     <label className="block">
@@ -124,6 +131,11 @@ export default function PpmpCreate({ itemOptions }: Props) {
                                     <label className="block">
                                         <span className="mb-1 block text-sm font-medium text-slate-700">Quantity</span>
                                         <input type="number" min="1" value={item.quantity} onChange={(event) => patchItem(index, { quantity: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+                                        <span className="mt-1 block text-xs text-slate-500">Quantity: {item.quantity || 0} {unit}</span>
+                                    </label>
+                                    <label className="block">
+                                        <span className="mb-1 block text-sm font-medium text-slate-700">Unit</span>
+                                        <input value={unit} readOnly aria-readonly="true" className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700" />
                                     </label>
                                     <label className="block">
                                         <span className="mb-1 block text-sm font-medium text-slate-700">Unit Cost</span>
@@ -147,7 +159,8 @@ export default function PpmpCreate({ itemOptions }: Props) {
                                     <button type="button" onClick={() => removeItem(index)} className="rounded-lg border border-rose-300 px-3 py-1.5 text-xs font-semibold text-rose-700">Remove Row</button>
                                 </div>
                             </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </section>
 

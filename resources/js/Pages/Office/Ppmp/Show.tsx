@@ -8,7 +8,7 @@ type PpmpItem = {
     unit_cost: number;
     procurement_schedule: string;
     remarks?: string | null;
-    item?: { item_name?: string | null } | null;
+    item?: { item_name?: string | null; default_unit?: string | null } | null;
 };
 
 type Props = {
@@ -100,6 +100,7 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
                                     <tr>
                                         <th className="px-4 py-3 text-left font-semibold text-slate-700">Item</th>
                                         <th className="px-4 py-3 text-left font-semibold text-slate-700">Qty</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Unit</th>
                                         <th className="px-4 py-3 text-left font-semibold text-slate-700">Unit Cost</th>
                                         <th className="px-4 py-3 text-left font-semibold text-slate-700">Subtotal</th>
                                         <th className="px-4 py-3 text-left font-semibold text-slate-700">Schedule</th>
@@ -110,7 +111,8 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
                                     {ppmp.items.map((item) => (
                                         <tr key={item.ppmp_item_id}>
                                             <td className="px-4 py-3 text-slate-700">{item.item?.item_name ?? `Item #${item.ppmp_item_id}`}</td>
-                                            <td className="px-4 py-3 text-slate-700">{item.quantity}</td>
+                                            <td className="px-4 py-3 text-slate-700">{item.quantity} {item.item?.default_unit ?? ''}</td>
+                                            <td className="px-4 py-3 text-slate-700">{item.item?.default_unit ?? '-'}</td>
                                             <td className="px-4 py-3 text-slate-700">{formatMoney(item.unit_cost)}</td>
                                             <td className="px-4 py-3 text-slate-700">{formatMoney(item.quantity * item.unit_cost)}</td>
                                             <td className="px-4 py-3 text-slate-700">{item.procurement_schedule}</td>

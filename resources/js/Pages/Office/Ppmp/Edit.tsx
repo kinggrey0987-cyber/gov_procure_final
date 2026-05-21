@@ -10,6 +10,7 @@ type ItemOption = {
     item_name: string;
     item_category_id: number;
     item_category_name: string;
+    default_unit?: string | null;
 };
 
 type ExistingItem = {
@@ -21,7 +22,7 @@ type ExistingItem = {
     estimated_budget?: number;
     procurement_schedule: string;
     remarks?: string | null;
-    item?: { item_name?: string | null } | null;
+    item?: { item_name?: string | null; default_unit?: string | null } | null;
 };
 
 type Props = {
@@ -126,6 +127,9 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
         newItem.setData('item_category_id', String(option.item_category_id));
     };
 
+    const itemOptionById = new Map(itemOptions.map((option) => [String(option.item_id), option]));
+    const selectedNewItemUnit = itemOptionById.get(newItem.data.item_id)?.default_unit || '-';
+
     return (
         <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Edit PPMP</h2>}>
             <Head title="Edit PPMP" />
@@ -200,6 +204,7 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                             {ppmp.items.map((item) => {
                                 const row = editingRows[item.ppmp_item_id];
                                 const estimatedBudget = Number(row.quantity || 0) * Number(row.unit_cost || 0);
+                                const unit = row.item?.default_unit || itemOptionById.get(String(row.item_id))?.default_unit || '-';
 
                                 return (
                                     <div key={item.ppmp_item_id} className="rounded-xl border border-slate-200 p-4">
@@ -225,6 +230,17 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                                                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                                                     value={row.quantity}
                                                     onChange={(event) => setEditingRows({ ...editingRows, [item.ppmp_item_id]: { ...row, quantity: Number(event.target.value) } })}
+                                                />
+                                                <span className="mt-1 block text-xs text-slate-500">Quantity: {row.quantity || 0} {unit}</span>
+                                            </label>
+
+                                            <label className="block">
+                                                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Unit</span>
+                                                <input
+                                                    type="text"
+                                                    className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm"
+                                                    value={unit}
+                                                    readOnly
                                                 />
                                             </label>
 
@@ -309,7 +325,13 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                         <label className="block">
                             <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Quantity</span>
                             <input type="number" min="1" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={newItem.data.quantity} onChange={(event) => newItem.setData('quantity', event.target.value)} />
+                            <span className="mt-1 block text-xs text-slate-500">Quantity: {newItem.data.quantity || 0} {selectedNewItemUnit}</span>
                             <InputError message={newItem.errors.quantity} className="mt-1" />
+                        </label>
+
+                        <label className="block">
+                            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Unit</span>
+                            <input type="text" className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm" value={selectedNewItemUnit} readOnly />
                         </label>
 
                         <label className="block">

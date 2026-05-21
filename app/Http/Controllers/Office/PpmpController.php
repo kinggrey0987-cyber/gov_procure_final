@@ -162,12 +162,13 @@ class PpmpController extends Controller
         return Item::query()
             ->with('category:item_category_id,category_name')
             ->orderBy('item_name', 'asc')
-            ->get(['item_id', 'item_category_id', 'item_name'])
+            ->get(['item_id', 'item_category_id', 'item_name', 'default_unit'])
             ->map(fn (Item $item): array => [
                 'item_id' => (int) $item->item_id,
                 'item_name' => (string) $item->item_name,
                 'item_category_id' => (int) $item->item_category_id,
                 'item_category_name' => (string) ($item->category?->category_name ?? 'Uncategorized'),
+                'default_unit' => (string) ($item->default_unit ?? ''),
             ])
             ->values()
             ->all();

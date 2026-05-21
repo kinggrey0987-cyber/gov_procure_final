@@ -8,6 +8,12 @@ type CategoryOption = {
     category_name: string;
 };
 
+type UnitOption = {
+    item_unit_id: number;
+    name: string;
+    status: string;
+};
+
 type Item = {
     item_id: number;
     item_name: string;
@@ -20,9 +26,10 @@ type Item = {
 type Props = {
     item: Item;
     categories: CategoryOption[];
+    units: UnitOption[];
 };
 
-export default function EditItem({ item, categories }: Props) {
+export default function EditItem({ item, categories, units }: Props) {
     const { data, setData, put, processing, errors } = useForm({
         item_name: item.item_name,
         item_category_id: String(item.item_category_id),
@@ -74,11 +81,19 @@ export default function EditItem({ item, categories }: Props) {
 
                         <div>
                             <label className="mb-1 block text-sm font-medium text-slate-700">Default Unit</label>
-                            <input
+                            <select
                                 value={data.default_unit}
                                 onChange={(event) => setData('default_unit', event.target.value)}
                                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                            />
+                            >
+                                <option value="">Select unit</option>
+                                {units.map((unit) => (
+                                    <option key={unit.item_unit_id} value={unit.name} disabled={unit.status !== 'active'}>
+                                        {unit.name}{unit.status !== 'active' ? ' (inactive)' : ''}
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="mt-1 text-xs text-slate-500">Missing a unit? Add it first in Item Units.</p>
                             <InputError message={errors.default_unit} className="mt-1" />
                         </div>
 

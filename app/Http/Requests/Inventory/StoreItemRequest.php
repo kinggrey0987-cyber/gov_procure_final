@@ -7,6 +7,15 @@ use Illuminate\Validation\Rule;
 
 class StoreItemRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('default_unit')) {
+            $this->merge([
+                'default_unit' => strtolower(trim((string) $this->input('default_unit'))),
+            ]);
+        }
+    }
+
     public function authorize(): bool
     {
         return auth()->user()?->can('inventory.catalog.manage') ?? false;
@@ -21,7 +30,7 @@ class StoreItemRequest extends FormRequest
             'item_name' => ['required', 'string', 'max:200', 'unique:items,item_name'],
             'item_category_id' => ['required', 'integer', 'exists:item_categories,item_category_id'],
             'description' => ['nullable', 'string'],
-            'default_unit' => ['nullable', 'string', 'max:50'],
+            'default_unit' => ['required', 'string', 'max:50', Rule::exists('item_units', 'name')->where('status', 'active')],
             'status' => ['required', Rule::in(['active', 'inactive'])],
         ];
     }

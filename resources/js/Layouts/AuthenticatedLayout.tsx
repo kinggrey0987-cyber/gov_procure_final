@@ -814,6 +814,11 @@ export default function Authenticated({
                 active: route().current('inventory.items.*'),
             },
             {
+                label: 'Item Units',
+                href: route('inventory.item-units.index'),
+                active: route().current('inventory.item-units.*'),
+            },
+            {
                 label: 'Delivery Monitoring',
                 href: route('inventory.deliveries.index'),
                 active: route().current('inventory.deliveries.*'),
