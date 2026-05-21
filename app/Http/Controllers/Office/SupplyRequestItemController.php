@@ -33,7 +33,7 @@ class SupplyRequestItemController extends Controller
     {
         $this->service->addItem($supplyRequest, $request->user(), $request->validated());
 
-        return redirect()->route('office.supply-requests.items.index', $supplyRequest->supply_request_id)
+        return redirect()->route('office.supply-requests.edit', $supplyRequest->supply_request_id)
             ->with('success', 'Supply request item added.');
     }
 
@@ -44,7 +44,7 @@ class SupplyRequestItemController extends Controller
     ): RedirectResponse {
         $this->service->updateItem($supplyRequest, $supplyRequestItem, $request->user(), $request->validated());
 
-        return redirect()->route('office.supply-requests.items.index', $supplyRequest->supply_request_id)
+        return redirect()->route('office.supply-requests.edit', $supplyRequest->supply_request_id)
             ->with('success', 'Supply request item updated.');
     }
 
@@ -54,7 +54,7 @@ class SupplyRequestItemController extends Controller
 
         $this->service->removeItem($supplyRequest, $supplyRequestItem, $request->user());
 
-        return redirect()->route('office.supply-requests.show', $supplyRequest->supply_request_id)
+        return redirect()->route('office.supply-requests.edit', $supplyRequest->supply_request_id)
             ->with('success', 'Supply request item removed.');
     }
 }
