@@ -85,6 +85,7 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
     const addItem = () => {
         newItem.post(route('office.ppmp.items.store', ppmp.ppmp_id), {
             preserveScroll: true,
+            preserveState: false,
             onSuccess: () => {
                 newItem.reset('item_id', 'item_category_id', 'quantity', 'unit_cost', 'procurement_schedule', 'remarks');
                 newItem.setData('quantity', '1');
