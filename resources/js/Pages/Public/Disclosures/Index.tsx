@@ -28,20 +28,29 @@ export default function PublicDisclosureIndex({ disclosures }: Props) {
             <div className="min-h-screen bg-gradient-to-b from-red-50 via-white to-red-50 py-12">
                 <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
                     <div className="rounded-2xl border border-red-200 bg-white p-6 shadow-[0_10px_24px_rgba(15,23,42,0.08)] sm:p-8">
-                        <div className="mb-4 flex items-center justify-between gap-3">
-                            <Link
-                                href={route('landing')}
-                                className="inline-flex rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
-                            >
-                                Back to Homepage
-                            </Link>
-                            <span className="inline-flex rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700">
-                                {rows.length} Published on this page
-                            </span>
-                        </div>
+                        <div className="mb-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-stretch">
+                            <div>
+                                <Link
+                                    href={route('landing')}
+                                    className="inline-flex rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
+                                >
+                                    Back to Homepage
+                                </Link>
 
-                        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Public Disclosure Packages</h1>
-                        <p className="mt-2 text-sm text-slate-600">Published procurement packages with official downloads and source traceability.</p>
+                                <h1 className="mt-6 text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">Public Disclosure Packages</h1>
+                                <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600">
+                                    Published procurement packages with official PDF downloads and source traceability.
+                                </p>
+                            </div>
+
+                            <div className="flex rounded-2xl border border-red-200 bg-gradient-to-br from-red-50 to-white px-6 py-5 shadow-sm lg:min-h-40 lg:flex-col lg:items-center lg:justify-center">
+                                <div>
+                                    <p className="text-sm font-semibold uppercase tracking-wide text-red-700">Published on this page</p>
+                                    <p className="mt-2 text-5xl font-black tracking-tight text-red-700">{rows.length}</p>
+                                    <p className="mt-1 text-sm font-medium text-slate-600">public disclosure packages</p>
+                                </div>
+                            </div>
+                        </div>
 
                         <div className="mt-5 grid gap-3 md:grid-cols-3">
                             <SummaryCard label="Packages on Page" value={String(rows.length)} />
