@@ -32,8 +32,9 @@ export default function PublicDisclosureIndex({ disclosures }: Props) {
                             <div>
                                 <Link
                                     href={route('landing')}
-                                    className="inline-flex rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
+                                    className="inline-flex items-center gap-2 rounded-full border border-red-700 bg-red-700 px-5 py-2.5 text-sm font-bold text-white shadow-sm shadow-red-900/20 transition-all hover:-translate-y-0.5 hover:bg-red-800 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2"
                                 >
+                                    <span aria-hidden="true">←</span>
                                     Back to Homepage
                                 </Link>
 
@@ -43,10 +44,10 @@ export default function PublicDisclosureIndex({ disclosures }: Props) {
                                 </p>
                             </div>
 
-                            <div className="flex rounded-2xl border border-red-200 bg-gradient-to-br from-red-50 to-white px-6 py-5 shadow-sm lg:min-h-40 lg:flex-col lg:items-center lg:justify-center">
+                            <div className="flex rounded-2xl border border-slate-200 bg-slate-50 px-6 py-5 shadow-sm lg:min-h-40 lg:flex-col lg:items-center lg:justify-center">
                                 <div>
-                                    <p className="text-sm font-semibold uppercase tracking-wide text-red-700">Published on this page</p>
-                                    <p className="mt-2 text-5xl font-black tracking-tight text-red-700">{rows.length}</p>
+                                    <p className="text-sm font-semibold uppercase tracking-wide text-slate-600">Published on this page</p>
+                                    <p className="mt-2 text-5xl font-black tracking-tight text-slate-900">{rows.length}</p>
                                     <p className="mt-1 text-sm font-medium text-slate-600">public disclosure packages</p>
                                 </div>
                             </div>
@@ -124,8 +125,8 @@ export default function PublicDisclosureIndex({ disclosures }: Props) {
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
     return (
-        <div className="rounded-xl border border-red-100 bg-red-50/60 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-red-700">{label}</p>
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">{label}</p>
             <p className="mt-1 text-lg font-bold text-slate-900">{value}</p>
         </div>
     );

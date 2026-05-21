@@ -48,8 +48,9 @@ export default function PublicDisclosureShow({ disclosure, attachments, sources,
                                 href={route('public.disclosures.index', {
                                     page: backPage || undefined,
                                 })}
-                                className="inline-flex items-center rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
+                                className="inline-flex items-center gap-2 rounded-full border border-red-700 bg-red-700 px-4 py-2 text-xs font-bold text-white shadow-sm shadow-red-900/20 transition-all hover:-translate-y-0.5 hover:bg-red-800 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2"
                             >
+                                <span aria-hidden="true">←</span>
                                 Back to Public Disclosures
                             </Link>
                             <div className="flex flex-wrap items-center gap-2">
