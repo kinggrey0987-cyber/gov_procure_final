@@ -21,6 +21,9 @@ type Option = {
     remaining_quantity: number;
     over_requested_quantity: number;
     suggested_unit_cost: number;
+    procurement_schedule?: string | null;
+    is_schedule_mismatch?: boolean;
+    current_quarter?: string | null;
 };
 
 type RequestItemDraft = {
@@ -188,6 +191,27 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
         }, 0);
     }, [form.data.items, optionById]);
 
+    const selectedPpmpItemIds = useMemo(() => {
+        return form.data.items
+            .map((item) => item.ppmp_item_id)
+            .filter((value) => value !== '');
+    }, [form.data.items]);
+
+    const duplicatePpmpItemIds = useMemo(() => {
+        return selectedPpmpItemIds.filter((value, index, values) => values.indexOf(value) !== index);
+    }, [selectedPpmpItemIds]);
+
+    const duplicateLineCount = useMemo(() => {
+        return form.data.items.filter((item) => item.ppmp_item_id !== '' && duplicatePpmpItemIds.includes(item.ppmp_item_id)).length;
+    }, [duplicatePpmpItemIds, form.data.items]);
+
+    const scheduleMismatchLineCount = useMemo(() => {
+        return form.data.items.reduce((count, item) => {
+            const option = optionById.get(item.ppmp_item_id);
+            return option?.is_schedule_mismatch ? count + 1 : count;
+        }, 0);
+    }, [form.data.items, optionById]);
+
     return (
         <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Create Supply Request</h2>}>
             <Head title="Create Supply Request" />
@@ -337,12 +361,27 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                         </div>
                     ) : null}
 
+                    {scheduleMismatchLineCount > 0 ? (
+                        <div className="mb-3 rounded-lg border border-orange-300 bg-orange-50 px-3 py-2 text-xs text-orange-900">
+                            <p className="font-semibold">{scheduleMismatchLineCount} out-of-schedule PPMP line(s) detected.</p>
+                            <p>GSO may still process this SR, but early consumption will be flagged in Executive anomaly monitoring.</p>
+                        </div>
+                    ) : null}
+
+                    {duplicateLineCount > 0 ? (
+                        <div className="mb-3 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs text-rose-900">
+                            <p className="font-semibold">{duplicateLineCount} duplicate PPMP line selection(s) detected.</p>
+                            <p>Use one row per PPMP item line and update the quantity instead of adding the same line again.</p>
+                        </div>
+                    ) : null}
+
                     <div className="space-y-4">
                         {form.data.items.map((item, index) => {
                             const option = optionById.get(item.ppmp_item_id);
                             const rowQuantity = Number(item.quantity_requested || '0');
                             const remaining = option?.remaining_quantity ?? null;
                             const exceedsRemaining = remaining !== null && rowQuantity > remaining;
+                            const isDuplicate = item.ppmp_item_id !== '' && duplicatePpmpItemIds.includes(item.ppmp_item_id);
 
                             return (
                                 <div key={index} className="rounded-xl border border-slate-200 p-4">
@@ -357,7 +396,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                                 <option value="">{hasPpmp ? 'Select PPMP item' : 'Select PPMP first'}</option>
                                                 {itemOptions.map((entry) => (
                                                     <option key={entry.ppmp_item_id} value={entry.ppmp_item_id}>
-                                                        {entry.item_name} (remaining: {entry.remaining_quantity})
+                                                        {entry.item_name} {entry.procurement_schedule ? `- ${entry.procurement_schedule}` : ''} (remaining: {entry.remaining_quantity})
                                                     </option>
                                                 ))}
                                             </select>
@@ -402,6 +441,21 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                             <div>Already requested: <strong>{option.requested_quantity} {option.default_unit || ''}</strong></div>
                                             <div>Remaining: <strong>{option.remaining_quantity} {option.default_unit || ''}</strong></div>
                                             <div>PPMP reference unit cost: <strong>{option.suggested_unit_cost}</strong></div>
+                                            <div>Schedule: <strong>{option.procurement_schedule || '-'}</strong></div>
+                                        </div>
+                                    ) : null}
+
+                                    {isDuplicate ? (
+                                        <div className="mt-2 rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-xs text-rose-900">
+                                            <p className="font-semibold">This PPMP item line is already selected in another row.</p>
+                                            <p>Remove the duplicate row and update the quantity on the existing row.</p>
+                                        </div>
+                                    ) : null}
+
+                                    {option?.is_schedule_mismatch ? (
+                                        <div className="mt-2 rounded-md border border-orange-300 bg-orange-50 px-3 py-2 text-xs text-orange-900">
+                                            <p className="font-semibold">Out-of-schedule PPMP consumption detected.</p>
+                                            <p>This item is planned for {option.procurement_schedule || 'a later schedule'} but the request is being made in {option.current_quarter || 'the current quarter'}. It can proceed to GSO but will be flagged for Executive anomaly review.</p>
                                         </div>
                                     ) : null}
 
@@ -446,7 +500,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                         </Link>
                         <button
                             type="submit"
-                            disabled={form.processing || !hasPpmp}
+                            disabled={form.processing || !hasPpmp || duplicateLineCount > 0}
                             className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
                         >
                             Save Request
@@ -455,6 +509,11 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                     {!hasPpmp ? (
                         <p className="mt-3 text-right text-xs font-medium text-amber-700">
                             Save is disabled until you select an approved PPMP.
+                        </p>
+                    ) : null}
+                    {duplicateLineCount > 0 ? (
+                        <p className="mt-3 text-right text-xs font-medium text-rose-700">
+                            Save is disabled while duplicate PPMP item lines exist.
                         </p>
                     ) : null}
                 </section>

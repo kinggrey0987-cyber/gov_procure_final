@@ -62,6 +62,18 @@ export default function UpdateProfileInformation({
         emailCodeForm.reset('code');
     };
 
+    const cancelEmailChange = () => {
+        router.delete(route('profile.email-change.cancel'), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setConfirmingEmailChange(false);
+                emailCodeForm.clearErrors();
+                emailCodeForm.reset('code');
+                setData('email', user.email);
+            },
+        });
+    };
+
     const resendEmailChangeCode = () => {
         if (!pendingEmailChange) {
             return;
@@ -134,6 +146,12 @@ export default function UpdateProfileInformation({
                 {status === 'email-change-confirmed' ? (
                     <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
                         Your email address was updated. Please verify the new email address if prompted.
+                    </div>
+                ) : null}
+
+                {status === 'email-change-cancelled' ? (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                        The pending email change was cancelled.
                     </div>
                 ) : null}
 
@@ -221,7 +239,7 @@ export default function UpdateProfileInformation({
                                 >
                                     Resend code
                                 </button>
-                                <SecondaryButton type="button" onClick={closeEmailChangeModal}>
+                                <SecondaryButton type="button" onClick={cancelEmailChange} disabled={emailCodeForm.processing}>
                                     Cancel
                                 </SecondaryButton>
                                 <PrimaryButton disabled={emailCodeForm.processing}>Confirm Email Change</PrimaryButton>
@@ -233,5 +251,4 @@ export default function UpdateProfileInformation({
         </section>
     );
 }
-
 

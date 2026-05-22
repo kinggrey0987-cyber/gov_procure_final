@@ -86,6 +86,24 @@ class ProfileTest extends TestCase
         $this->assertNull($user->email_verified_at);
     }
 
+    public function test_pending_email_change_can_be_cancelled(): void
+    {
+        $user = User::factory()->create();
+
+        $this
+            ->actingAs($user)
+            ->withSession([
+                'profile.email_change.pending' => [
+                    'email' => 'test@example.com',
+                ],
+            ])
+            ->delete(route('profile.email-change.cancel'))
+            ->assertSessionMissing('profile.email_change.pending')
+            ->assertRedirect('/profile');
+
+        $this->assertNotSame('test@example.com', $user->refresh()->email);
+    }
+
     public function test_email_verification_status_is_unchanged_when_the_email_address_is_unchanged(): void
     {
         $user = User::factory()->create();

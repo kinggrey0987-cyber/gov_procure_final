@@ -81,6 +81,7 @@ Route::middleware(['auth', 'twofactor', 'must-change-password'])->group(function
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::post('/profile/email-change/confirm', [ProfileController::class, 'confirmEmailChange'])->name('profile.email-change.confirm');
+    Route::delete('/profile/email-change', [ProfileController::class, 'cancelEmailChange'])->name('profile.email-change.cancel');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     Route::prefix('documents')->name('documents.')->group(function () {

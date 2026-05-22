@@ -20,6 +20,9 @@ type Option = {
     remaining_quantity: number;
     over_requested_quantity: number;
     suggested_unit_cost: number;
+    procurement_schedule?: string | null;
+    is_schedule_mismatch?: boolean;
+    current_quarter?: string | null;
 };
 
 type ExistingItem = {
@@ -94,6 +97,21 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
     }, [editingRows, optionById, supplyRequest.items]);
 
     const newItemOption = useMemo(() => optionById.get(newItem.ppmp_item_id), [newItem.ppmp_item_id, optionById]);
+    const existingPpmpItemIds = useMemo(() => {
+        return Object.values(editingRows).map((item) => String(item.ppmp_item_id));
+    }, [editingRows]);
+
+    const newItemIsDuplicate = newItem.ppmp_item_id !== '' && existingPpmpItemIds.includes(newItem.ppmp_item_id);
+
+    const scheduleMismatchExistingLineCount = useMemo(() => {
+        return supplyRequest.items.reduce((count, item) => {
+            const row = editingRows[item.supply_request_item_id];
+            const context = optionById.get(String(row.ppmp_item_id));
+
+            return context?.is_schedule_mismatch ? count + 1 : count;
+        }, 0);
+    }, [editingRows, optionById, supplyRequest.items]);
+
     const newItemExceedsRemaining = useMemo(() => {
         if (!newItemOption) {
             return false;
@@ -242,6 +260,12 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                             <p>You may still submit for urgent or unplanned needs, but this request will be flagged for executive review.</p>
                         </div>
                     ) : null}
+                    {scheduleMismatchExistingLineCount > 0 ? (
+                        <div className="rounded-lg border border-orange-300 bg-orange-50 px-3 py-2 text-xs text-orange-900">
+                            <p className="font-semibold">{scheduleMismatchExistingLineCount} out-of-schedule PPMP line(s) detected.</p>
+                            <p>GSO may still process this SR, but early consumption will be flagged in Executive anomaly monitoring.</p>
+                        </div>
+                    ) : null}
                     {supplyRequest.items.length === 0 ? (
                         <p className="text-sm text-slate-600">No items attached yet.</p>
                     ) : (
@@ -300,6 +324,14 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                                                 <div>Already requested: <strong>{context.requested_quantity} {context.default_unit || ''}</strong></div>
                                                 <div>Remaining before this line: <strong>{context.remaining_quantity} {context.default_unit || ''}</strong></div>
                                                 <div>PPMP reference unit cost: <strong>{context.suggested_unit_cost}</strong></div>
+                                                <div>Schedule: <strong>{context.procurement_schedule || '-'}</strong></div>
+                                            </div>
+                                        ) : null}
+
+                                        {context?.is_schedule_mismatch ? (
+                                            <div className="mt-2 rounded-md border border-orange-300 bg-orange-50 px-3 py-2 text-xs text-orange-900">
+                                                <p className="font-semibold">Out-of-schedule PPMP consumption detected.</p>
+                                                <p>This item is planned for {context.procurement_schedule || 'a later schedule'} but the request is being made in {context.current_quarter || 'the current quarter'}. It can proceed to GSO but will be flagged for Executive anomaly review.</p>
                                             </div>
                                         ) : null}
 
@@ -328,7 +360,7 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                         >
                             <option value="">{hasPpmp ? 'Select PPMP Item' : 'Select PPMP first'}</option>
                             {itemOptions.map((option) => (
-                                <option key={option.ppmp_item_id} value={option.ppmp_item_id}>{option.item_name} (remaining: {option.remaining_quantity})</option>
+                                <option key={option.ppmp_item_id} value={option.ppmp_item_id}>{option.item_name} {option.procurement_schedule ? `- ${option.procurement_schedule}` : ''} (remaining: {option.remaining_quantity})</option>
                             ))}
                         </select>
                         <input
@@ -344,7 +376,7 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                             readOnly
                             aria-readonly="true"
                         />
-                        <button type="button" onClick={addItem} disabled={!hasPpmp} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60">
+                        <button type="button" onClick={addItem} disabled={!hasPpmp || newItemIsDuplicate} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60">
                             Add Item
                         </button>
                     </div>
@@ -352,6 +384,20 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                     {newItem.ppmp_item_id ? (
                         <div className="text-xs text-slate-600">
                             Remaining quantity: <strong>{optionById.get(newItem.ppmp_item_id)?.remaining_quantity ?? 0}</strong>
+                        </div>
+                    ) : null}
+
+                    {newItemIsDuplicate ? (
+                        <div className="rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-xs text-rose-900">
+                            <p className="font-semibold">This PPMP item line is already included.</p>
+                            <p>Update the existing row quantity instead of adding the same PPMP line again.</p>
+                        </div>
+                    ) : null}
+
+                    {newItemOption?.is_schedule_mismatch ? (
+                        <div className="rounded-md border border-orange-300 bg-orange-50 px-3 py-2 text-xs text-orange-900">
+                            <p className="font-semibold">Out-of-schedule PPMP consumption detected.</p>
+                            <p>This item is planned for {newItemOption.procurement_schedule || 'a later schedule'} but the request is being made in {newItemOption.current_quarter || 'the current quarter'}. It can proceed to GSO but will be flagged for Executive anomaly review.</p>
                         </div>
                     ) : null}
 

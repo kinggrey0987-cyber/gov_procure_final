@@ -64,7 +64,7 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
                         <div>
                             <p className="text-sm font-medium text-slate-500">PPMP ID</p>
                             <h3 className="text-2xl font-bold text-red-700">PPMP-{ppmp.fiscal_year}-{String(ppmp.ppmp_id).padStart(4, '0')}</h3>
-                            <p className="mt-2 text-sm text-slate-600">Date prepared: {ppmp.date_prepared}</p>
+                            <p className="mt-2 text-sm text-slate-600">Date prepared: {formatDate(ppmp.date_prepared)}</p>
                         </div>
                         <StatusBadge status={ppmp.status} />
                     </div>
@@ -155,6 +155,18 @@ function Card({ label, value }: { label: string; value: string }) {
 
 function formatMoney(value: number): string {
     return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(value);
+}
+
+function formatDate(value?: string | null): string {
+    if (!value) {
+        return '-';
+    }
+
+    const parsed = new Date(value);
+
+    return Number.isNaN(parsed.getTime())
+        ? value
+        : parsed.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
 function StatusBadge({ status }: { status: string }) {

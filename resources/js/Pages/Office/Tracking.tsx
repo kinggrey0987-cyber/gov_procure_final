@@ -74,16 +74,7 @@ export default function OfficeTracking({ summary, recentRequests, releasedSuppli
     }, [recentRequests, requestSearch, requestStatus]);
 
     return (
-        <AuthenticatedLayout
-            header={
-                <div className="space-y-2">
-                    <h2 className="text-xl font-semibold leading-tight text-gray-800">Office Dashboard</h2>
-                    <Link href={route('dashboard')} className="inline-flex rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
-                        Back to Main Dashboard
-                    </Link>
-                </div>
-            }
-        >
+        <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Office Dashboard</h2>}>
             <Head title="Office Dashboard" />
 
             <div className="space-y-6 py-4">
@@ -110,12 +101,6 @@ export default function OfficeTracking({ summary, recentRequests, releasedSuppli
                             className="rounded-xl border border-blue-300 bg-white px-4 py-5 text-center text-lg font-semibold text-blue-700 transition hover:bg-blue-50"
                         >
                             Track Request Status
-                        </Link>
-                        <Link
-                            href={route('office.supplies-ready.index')}
-                            className="rounded-xl border border-emerald-300 bg-white px-4 py-5 text-center text-lg font-semibold text-emerald-700 transition hover:bg-emerald-50"
-                        >
-                            View Ready Supplies
                         </Link>
                     </div>
                 </section>

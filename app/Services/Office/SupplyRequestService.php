@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\Analytics\AnomalyService;
 use App\Services\AuditLogService;
 use App\Services\NotificationService;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -117,6 +118,7 @@ class SupplyRequestService
             ])->save();
 
             $overRequestCount = $this->createOrUpdatePpmpOverRequestAnomalies($supplyRequest);
+            $scheduleMismatchCount = $this->createOrUpdatePpmpScheduleMismatchAnomalies($supplyRequest);
 
             $this->recordStatus($supplyRequest, $oldStatus, 'SUBMITTED', $actor, 'Supply request submitted');
             $this->recordAudit($actor, 'SUBMIT', $supplyRequest);
@@ -132,6 +134,7 @@ class SupplyRequestService
 
             $freshSupplyRequest = $supplyRequest->fresh(['items', 'office', 'requester', 'approver']) ?? $supplyRequest;
             $freshSupplyRequest->setAttribute('ppmp_over_request_count', $overRequestCount);
+            $freshSupplyRequest->setAttribute('ppmp_schedule_mismatch_count', $scheduleMismatchCount);
 
             return $freshSupplyRequest;
         });
@@ -151,6 +154,7 @@ class SupplyRequestService
         }
 
         $ppmpItem = $this->resolvePpmpItemForRequest($supplyRequest, (int) $payload['ppmp_item_id']);
+        $this->assertNoDuplicatePpmpItemLine($supplyRequest, (int) $ppmpItem->ppmp_item_id);
         $payloadItemId = isset($payload['item_id']) ? (int) $payload['item_id'] : null;
         if ($payloadItemId && $payloadItemId !== (int) $ppmpItem->item_id) {
             throw ValidationException::withMessages([
@@ -199,6 +203,7 @@ class SupplyRequestService
         }
 
         $ppmpItem = $this->resolvePpmpItemForRequest($supplyRequest, (int) $payload['ppmp_item_id']);
+        $this->assertNoDuplicatePpmpItemLine($supplyRequest, (int) $ppmpItem->ppmp_item_id, (int) $item->supply_request_item_id);
         $payloadItemId = isset($payload['item_id']) ? (int) $payload['item_id'] : null;
         if ($payloadItemId && $payloadItemId !== (int) $ppmpItem->item_id) {
             throw ValidationException::withMessages([
@@ -294,7 +299,7 @@ class SupplyRequestService
             ->where('ppmp_id', $ppmpId)
             ->whereHas('item', fn ($query) => $query->whereRaw('LOWER(status) = ?', ['active']))
             ->orderBy('ppmp_item_id')
-            ->get(['ppmp_item_id', 'ppmp_id', 'item_id', 'quantity', 'unit_cost']);
+            ->get(['ppmp_item_id', 'ppmp_id', 'item_id', 'quantity', 'unit_cost', 'procurement_schedule']);
 
         $consumptionRows = SupplyRequestItem::query()
             ->selectRaw('ppmp_item_id, COALESCE(SUM(quantity_requested), 0) as requested_quantity')
@@ -323,6 +328,9 @@ class SupplyRequestService
                 'remaining_quantity' => $remainingQuantity,
                 'over_requested_quantity' => $overRequestedQuantity,
                 'suggested_unit_cost' => (float) $ppmpItem->unit_cost,
+                'procurement_schedule' => (string) ($ppmpItem->procurement_schedule ?? ''),
+                'is_schedule_mismatch' => $this->isScheduleEarlierThanPlanned(now(), (string) ($ppmpItem->procurement_schedule ?? '')),
+                'current_quarter' => 'Q'.now()->quarter,
             ];
         })->values()->all();
     }
@@ -407,6 +415,24 @@ class SupplyRequestService
     private function itemNameSnapshotForPpmpItem(PpmpItem $ppmpItem): string
     {
         return (string) ($ppmpItem->item?->item_name ?? 'Unknown Item');
+    }
+
+    private function assertNoDuplicatePpmpItemLine(
+        SupplyRequest $supplyRequest,
+        int $ppmpItemId,
+        ?int $excludeSupplyRequestItemId = null,
+    ): void {
+        $query = $supplyRequest->items()->where('ppmp_item_id', $ppmpItemId);
+
+        if ($excludeSupplyRequestItemId !== null) {
+            $query->where('supply_request_item_id', '!=', $excludeSupplyRequestItemId);
+        }
+
+        if ($query->exists()) {
+            throw ValidationException::withMessages([
+                'ppmp_item_id' => 'This PPMP item line is already included in the supply request. Update the existing row quantity instead.',
+            ]);
+        }
     }
 
     private function recordStatus(
@@ -553,6 +579,80 @@ class SupplyRequestService
         }
 
         return $anomalyCount;
+    }
+
+    private function createOrUpdatePpmpScheduleMismatchAnomalies(SupplyRequest $supplyRequest): int
+    {
+        $requestDate = $supplyRequest->request_date instanceof Carbon
+            ? $supplyRequest->request_date
+            : Carbon::parse((string) $supplyRequest->request_date);
+
+        $requestItems = $supplyRequest->items()
+            ->with('ppmpItem:ppmp_item_id,item_id,procurement_schedule')
+            ->get(['supply_request_item_id', 'supply_request_id', 'ppmp_item_id', 'item_id', 'item_name_snapshot', 'quantity_requested']);
+
+        $anomalyCount = 0;
+
+        foreach ($requestItems as $requestItem) {
+            $schedule = (string) ($requestItem->ppmpItem?->procurement_schedule ?? '');
+            if (! $this->isScheduleEarlierThanPlanned($requestDate, $schedule)) {
+                continue;
+            }
+
+            $plannedQuarter = $this->quarterNumberFromSchedule($schedule);
+            if ($plannedQuarter === null) {
+                continue;
+            }
+
+            $this->anomalyService->createOrUpdateSystemDetected([
+                'anomaly_type' => 'PPMP_SCHEDULE_MISMATCH',
+                'reference_type' => SupplyRequestItem::class,
+                'reference_id' => (int) $requestItem->supply_request_item_id,
+                'item_id' => (int) ($requestItem->ppmpItem?->item_id ?: $requestItem->item_id),
+                'office_id' => (int) $supplyRequest->office_id,
+                'detected_value' => (float) $requestDate->quarter,
+                'expected_value' => (float) $plannedQuarter,
+                'threshold_value' => (float) $plannedQuarter,
+                'detection_method' => 'PPMP_SCHEDULE_ALIGNMENT',
+                'severity' => $plannedQuarter - (int) $requestDate->quarter >= 2 ? 'HIGH' : 'MEDIUM',
+                'detected_at' => now(),
+                'remarks' => sprintf(
+                    'Supply request %s requested %s in Q%d while PPMP item #%d is planned for %s. GSO may still issue from stock or create a PR if stock is unavailable, but the early consumption is flagged for executive review.',
+                    (string) $supplyRequest->request_code,
+                    (string) ($requestItem->item_name_snapshot ?: 'an item'),
+                    (int) $requestDate->quarter,
+                    (int) $requestItem->ppmp_item_id,
+                    strtoupper($schedule),
+                ),
+            ]);
+
+            $anomalyCount++;
+        }
+
+        return $anomalyCount;
+    }
+
+    private function isScheduleEarlierThanPlanned(Carbon $requestDate, string $procurementSchedule): bool
+    {
+        $plannedQuarter = $this->quarterNumberFromSchedule($procurementSchedule);
+
+        return $plannedQuarter !== null && (int) $requestDate->quarter < $plannedQuarter;
+    }
+
+    private function quarterNumberFromSchedule(string $procurementSchedule): ?int
+    {
+        $schedule = strtoupper(trim($procurementSchedule));
+        if (preg_match('/Q([1-4])/', $schedule, $matches) === 1) {
+            return (int) $matches[1];
+        }
+
+        return match ($schedule) {
+            'JANUARY', 'FEBRUARY', 'MARCH' => 1,
+            'APRIL', 'MAY', 'JUNE' => 2,
+            'JULY', 'AUGUST', 'SEPTEMBER' => 3,
+            'OCTOBER', 'NOVEMBER', 'DECEMBER' => 4,
+            default => null,
+        };
     }
 
     private function severityForPpmpOverRequest(float $plannedQuantity, float $overRequestedQuantity): string

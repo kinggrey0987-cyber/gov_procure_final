@@ -19,6 +19,7 @@ class Anomaly extends Model
     public const TYPE_PPMP_OVER_REQUEST = 'PPMP_OVER_REQUEST';
     public const TYPE_PPMP_EARLY_DEPLETION = 'PPMP_EARLY_DEPLETION';
     public const TYPE_PPMP_FREQUENCY_IRREGULARITY = 'PPMP_FREQUENCY_IRREGULARITY';
+    public const TYPE_PPMP_SCHEDULE_MISMATCH = 'PPMP_SCHEDULE_MISMATCH';
 
     protected $primaryKey = 'anomaly_id';
 
@@ -112,6 +113,7 @@ class Anomaly extends Model
             self::TYPE_PPMP_OVER_REQUEST,
             self::TYPE_PPMP_EARLY_DEPLETION,
             self::TYPE_PPMP_FREQUENCY_IRREGULARITY,
+            self::TYPE_PPMP_SCHEDULE_MISMATCH,
         ];
     }
 }

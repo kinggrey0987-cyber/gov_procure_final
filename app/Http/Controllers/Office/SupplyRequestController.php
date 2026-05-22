@@ -524,13 +524,15 @@ class SupplyRequestController extends Controller
     {
         $submittedRequest = $this->service->submit($supplyRequest, $request->user(), $request->input('review_notes'));
         $overRequestCount = (int) ($submittedRequest->getAttribute('ppmp_over_request_count') ?? 0);
+        $scheduleMismatchCount = (int) ($submittedRequest->getAttribute('ppmp_schedule_mismatch_count') ?? 0);
 
         $successMessage = 'Supply request submitted successfully.';
 
-        if ($overRequestCount > 0) {
+        if ($overRequestCount > 0 || $scheduleMismatchCount > 0) {
             $successMessage = sprintf(
-                'Supply request submitted successfully. %d PPMP over-allocation line(s) were flagged for executive review.',
+                'Supply request submitted successfully. %d PPMP over-allocation line(s) and %d out-of-schedule line(s) were flagged for executive review.',
                 $overRequestCount,
+                $scheduleMismatchCount,
             );
         }
 

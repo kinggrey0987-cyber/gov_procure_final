@@ -62,6 +62,15 @@ class StoreSupplyRequestItemRequest extends FormRequest
                 return;
             }
 
+            $alreadyIncluded = $supplyRequest->items()
+                ->where('ppmp_item_id', $ppmpItemId)
+                ->exists();
+
+            if ($alreadyIncluded) {
+                $validator->errors()->add('ppmp_item_id', 'This PPMP item line is already included in the supply request. Update the existing row quantity instead.');
+                return;
+            }
+
             $isRequestableCatalogItem = PpmpItem::query()
                 ->where('ppmp_item_id', $ppmpItemId)
                 ->where('ppmp_id', (int) $supplyRequest->ppmp_id)

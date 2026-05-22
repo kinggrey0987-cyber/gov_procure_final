@@ -80,6 +80,19 @@ class StoreSupplyRequestRequest extends FormRequest
                 ->map(fn ($value): int => (int) $value)
                 ->values();
 
+            $duplicatePpmpItemIds = $ppmpItemIds
+                ->duplicates()
+                ->unique()
+                ->values();
+
+            if ($duplicatePpmpItemIds->isNotEmpty()) {
+                foreach ($items as $index => $row) {
+                    if ($duplicatePpmpItemIds->contains((int) ($row['ppmp_item_id'] ?? 0))) {
+                        $validator->errors()->add("items.$index.ppmp_item_id", 'This PPMP item line is already included. Update the existing row quantity instead.');
+                    }
+                }
+            }
+
             if ($ppmpItemIds->isEmpty()) {
                 return;
             }

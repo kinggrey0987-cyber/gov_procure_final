@@ -115,6 +115,13 @@ class ProfileController extends Controller
         return Redirect::route('profile.edit')->with('status', 'email-change-confirmed');
     }
 
+    public function cancelEmailChange(Request $request): RedirectResponse
+    {
+        $request->session()->forget('profile.email_change.pending');
+
+        return Redirect::route('profile.edit')->with('status', 'email-change-cancelled');
+    }
+
     /**
      * Delete the user's account.
      */

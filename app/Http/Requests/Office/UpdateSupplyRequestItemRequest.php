@@ -62,6 +62,19 @@ class UpdateSupplyRequestItemRequest extends FormRequest
                 return;
             }
 
+            $supplyRequestItem = $this->route('supply_request_item');
+            $currentSupplyRequestItemId = $supplyRequestItem ? (int) $supplyRequestItem->supply_request_item_id : 0;
+
+            $alreadyIncluded = $supplyRequest->items()
+                ->where('ppmp_item_id', $ppmpItemId)
+                ->when($currentSupplyRequestItemId > 0, fn ($query) => $query->where('supply_request_item_id', '!=', $currentSupplyRequestItemId))
+                ->exists();
+
+            if ($alreadyIncluded) {
+                $validator->errors()->add('ppmp_item_id', 'This PPMP item line is already included in the supply request. Update the existing row quantity instead.');
+                return;
+            }
+
             $isActiveCatalogItem = PpmpItem::query()
                 ->where('ppmp_item_id', $ppmpItemId)
                 ->where('ppmp_id', (int) $supplyRequest->ppmp_id)
