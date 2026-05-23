@@ -312,6 +312,7 @@ class SupplyRequestController extends Controller
                     'planned_quantity' => isset($context['planned_quantity']) ? (float) $context['planned_quantity'] : null,
                     'already_requested_quantity' => isset($context['requested_quantity']) ? (float) $context['requested_quantity'] : null,
                     'remaining_quantity' => isset($context['remaining_quantity']) ? (float) $context['remaining_quantity'] : null,
+                    'item_specification' => isset($context['item_specification']) ? (string) $context['item_specification'] : null,
                     'over_requested_quantity' => isset($context['over_requested_quantity']) ? (float) $context['over_requested_quantity'] : null,
                     'exceeds_ppmp_allocation' => isset($context['over_requested_quantity'])
                         ? (float) $context['over_requested_quantity'] > 0

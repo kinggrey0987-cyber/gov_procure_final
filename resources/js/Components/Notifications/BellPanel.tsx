@@ -1,4 +1,4 @@
-import { Link, usePage } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 
 type BellNotification = {
@@ -34,6 +34,10 @@ export default function BellPanel({ unreadCount, recent }: Props) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const page = usePage();
     const onNotificationsPage = route().current('notifications.*');
+
+    const markAllAsRead = () => {
+        router.put(route('notifications.mark-all-read'), {}, { preserveScroll: true });
+    };
 
     useEffect(() => {
         setOpen(false);
@@ -93,8 +97,21 @@ export default function BellPanel({ unreadCount, recent }: Props) {
             {open && (
                 <div className="absolute right-0 z-50 mt-3 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
                     <div className="border-b border-slate-200 px-4 py-3">
-                        <h3 className="text-sm font-semibold text-slate-800">Recent Notifications</h3>
-                        <p className="mt-1 text-xs text-slate-500">Latest updates from your account activity.</p>
+                        <div className="flex items-start justify-between gap-3">
+                            <div>
+                                <h3 className="text-sm font-semibold text-slate-800">Recent Notifications</h3>
+                                <p className="mt-1 text-xs text-slate-500">Latest updates from your account activity.</p>
+                            </div>
+                            {unreadCount > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={markAllAsRead}
+                                    className="shrink-0 rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-red-700 transition hover:bg-red-50"
+                                >
+                                    Mark all as read
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     <div className="max-h-96 overflow-y-auto">

@@ -35,7 +35,7 @@ type Props = {
     }>;
 };
 
-export default function OfficeTracking({ summary, recentRequests, releasedSuppliesPreview, notificationPreview }: Props) {
+export default function OfficeTracking({ summary, recentRequests, notificationPreview }: Props) {
     const [requestSearch, setRequestSearch] = useState('');
     const [requestStatus, setRequestStatus] = useState('ALL');
 
@@ -101,6 +101,12 @@ export default function OfficeTracking({ summary, recentRequests, releasedSuppli
                             className="rounded-xl border border-blue-300 bg-white px-4 py-5 text-center text-lg font-semibold text-blue-700 transition hover:bg-blue-50"
                         >
                             Track Request Status
+                        </Link>
+                        <Link
+                            href={route('office.supplies-ready.index')}
+                            className="rounded-xl border border-emerald-300 bg-white px-4 py-5 text-center text-lg font-semibold text-emerald-700 transition hover:bg-emerald-50"
+                        >
+                            Supplies Ready to Claim
                         </Link>
                     </div>
                 </section>
@@ -202,64 +208,6 @@ export default function OfficeTracking({ summary, recentRequests, releasedSuppli
                     )}
                 </section>
 
-                <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-100 bg-emerald-50/50 px-6 py-5">
-                        <div>
-                            <h3 className="text-2xl font-semibold text-slate-800">Released Supplies</h3>
-                            <p className="mt-1 text-lg text-slate-500">Supplies released by GSO and ready for office confirmation or claims.</p>
-                        </div>
-                        <Link href={route('office.supplies-ready.index')} className="rounded-lg border border-emerald-300 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50">
-                            Open Released Supplies
-                        </Link>
-                    </div>
-
-                    {releasedSuppliesPreview.length === 0 ? (
-                        <div className="px-6 py-10 text-sm text-slate-600">No released supplies are awaiting office action.</div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-slate-200 text-sm">
-                                <thead className="bg-slate-50">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Request ID</th>
-                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Released</th>
-                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Items</th>
-                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Status</th>
-                                        <th className="px-4 py-3 text-right font-semibold text-slate-700">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {releasedSuppliesPreview.map((record) => (
-                                        <tr key={record.distribution_record_id}>
-                                            <td className="px-4 py-3">
-                                                <p className="font-semibold text-red-700">{record.request_code}</p>
-                                                <p className="font-mono text-xs text-slate-500">{record.distribution_code}</p>
-                                            </td>
-                                            <td className="px-4 py-3 text-slate-700">{formatDate(record.release_date)}</td>
-                                            <td className="px-4 py-3 text-slate-700">
-                                                <p>{record.items_count} item(s)</p>
-                                                <p className="text-xs text-slate-500">{record.items_summary || 'No item summary'}</p>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <DistributionStatusBadge status={record.status} />
-                                            </td>
-                                            <td className="px-4 py-3 text-right">
-                                                <div className="flex flex-wrap items-center justify-end gap-2">
-                                                    <Link href={route('office.distribution-records.show', record.distribution_record_id)} className="rounded-lg border border-emerald-300 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50">
-                                                        Open
-                                                    </Link>
-                                                    <Link href={route('office.claims.create', { distribution_record_id: record.distribution_record_id })} className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50">
-                                                        File Claim
-                                                    </Link>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </section>
-
                 <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="border-b border-slate-200 px-6 py-5">
                         <h3 className="text-2xl font-semibold text-slate-800">Recent Updates</h3>
@@ -314,17 +262,6 @@ function StatusBadge({ status }: { status: string }) {
                     : 'bg-amber-100 text-amber-700';
 
     return <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${style}`}>{displayOfficeRequestStatus(status)}</span>;
-}
-
-function DistributionStatusBadge({ status }: { status: string }) {
-    const normalized = status.toUpperCase();
-    const style = normalized === 'RELEASED'
-        ? 'bg-emerald-100 text-emerald-700'
-        : normalized === 'RECEIVED'
-            ? 'bg-blue-100 text-blue-700'
-            : 'bg-slate-100 text-slate-700';
-
-    return <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${style}`}>{status.replaceAll('_', ' ')}</span>;
 }
 
 function displayOfficeRequestStatus(status: string): string {

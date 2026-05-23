@@ -47,6 +47,7 @@ type PageFlash = {
 };
 
 const QUARTER_OPTIONS = ['Q1', 'Q2', 'Q3', 'Q4'] as const;
+const CURRENT_YEAR = new Date().getFullYear();
 
 export default function PpmpEdit({ ppmp, itemOptions }: Props) {
     const { flash, errors: pageErrors } = usePage().props as unknown as PageFlash;
@@ -165,11 +166,13 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                     <div className="grid gap-4 md:grid-cols-2">
                         <label className="block">
                             <span className="mb-1 block text-sm font-medium text-slate-700">Fiscal Year</span>
-                            <input type="number" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={form.data.fiscal_year} onChange={(event) => form.setData('fiscal_year', Number(event.target.value))} />
+                            <input type="number" min={CURRENT_YEAR} className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700" value={form.data.fiscal_year} readOnly aria-readonly="true" />
+                            <span className="mt-1 block text-xs text-slate-500">Fiscal year is locked after PPMP creation.</span>
                         </label>
                         <label className="block">
                             <span className="mb-1 block text-sm font-medium text-slate-700">Date Prepared</span>
-                            <input type="date" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={form.data.date_prepared} onChange={(event) => form.setData('date_prepared', event.target.value)} />
+                            <input type="date" className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700" value={form.data.date_prepared} readOnly aria-readonly="true" />
+                            <span className="mt-1 block text-xs text-slate-500">Date prepared is system-recorded and cannot be edited.</span>
                         </label>
                         <label className="block md:col-span-2">
                             <span className="mb-1 block text-sm font-medium text-slate-700">Fund Source</span>
@@ -278,6 +281,19 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                                                     ))}
                                                 </select>
                                             </label>
+
+                                            <label className="block xl:col-span-2">
+                                                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Item Specification</span>
+                                                <input
+                                                    type="text"
+                                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                                    value={row.remarks ?? ''}
+                                                    onChange={(event) => setEditingRows({ ...editingRows, [item.ppmp_item_id]: { ...row, remarks: event.target.value } })}
+                                                    placeholder="Required item specification for SR and PO"
+                                                    required
+                                                />
+                                                <span className="mt-1 block text-xs text-slate-500">This specification flows to Supply Requests and Purchase Orders.</span>
+                                            </label>
                                         </div>
 
                                         <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 pt-3">
@@ -309,7 +325,7 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                 <section className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-6 shadow-sm">
                     <div>
                         <h4 className="text-xl font-semibold text-slate-800">Add New Item</h4>
-                        <p className="mt-1 text-sm text-slate-600">Add a planning line to this PPMP using the same required fields.</p>
+                        <p className="mt-1 text-sm text-slate-600">Add a planning line to this PPMP using the required fields. The same catalog item cannot be repeated for the same procurement quarter.</p>
                     </div>
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
                         <label className="block xl:col-span-2">
@@ -351,10 +367,16 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                             </select>
                             <InputError message={newItem.errors.procurement_schedule} className="mt-1" />
                         </label>
+
+                        <label className="block xl:col-span-2">
+                            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Item Specification</span>
+                            <input type="text" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={newItem.data.remarks} onChange={(event) => newItem.setData('remarks', event.target.value)} placeholder="Required item specification for SR and PO" required />
+                            <span className="mt-1 block text-xs text-slate-500">This becomes the item specification shown on Supply Requests and auto-filled on Purchase Orders.</span>
+                            <InputError message={newItem.errors.remarks} className="mt-1" />
+                        </label>
                     </div>
 
                     <InputError message={newItem.errors.item_category_id} className="mt-1" />
-                    <InputError message={newItem.errors.remarks} className="mt-1" />
 
                     <div className="flex justify-end">
                         <button type="button" onClick={addItem} disabled={newItem.processing} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">Add Item</button>

@@ -24,7 +24,7 @@ class UpdatePpmpItemRequest extends FormRequest
             'quantity' => ['required', 'numeric', 'gt:0'],
             'unit_cost' => ['required', 'numeric', 'gte:0'],
             'procurement_schedule' => ['required', 'string', Rule::in(['Q1', 'Q2', 'Q3', 'Q4'])],
-            'remarks' => ['nullable', 'string', 'max:1000'],
+            'remarks' => ['required', 'string', 'max:1000'],
         ];
     }
 
@@ -39,6 +39,7 @@ class UpdatePpmpItemRequest extends FormRequest
     {
         return [
             'procurement_schedule.in' => 'Procurement Schedule must be one of: Q1, Q2, Q3, or Q4.',
+            'remarks.required' => 'Item Remarks are required because they become the item specification for Supply Requests and Purchase Orders.',
         ];
     }
 }

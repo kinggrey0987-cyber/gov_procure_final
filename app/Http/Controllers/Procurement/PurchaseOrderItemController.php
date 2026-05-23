@@ -26,6 +26,7 @@ class PurchaseOrderItemController extends Controller
         $purchaseOrder->load([
             'items.item.category',
             'supplyRequest.items.item',
+            'supplyRequest.items.ppmpItem',
         ]);
 
         $sourceItems = collect($purchaseOrder->supplyRequest?->items ?? [])
@@ -33,6 +34,7 @@ class PurchaseOrderItemController extends Controller
                 'supply_request_item_id' => (int) $row->supply_request_item_id,
                 'item_id' => (int) $row->item_id,
                 'item_name_snapshot' => (string) ($row->item_name_snapshot ?: ($row->item?->item_name ?? 'Unknown item')),
+                'item_specification' => (string) ($row->ppmpItem?->remarks ?? ''),
                 'default_unit' => (string) ($row->item?->default_unit ?? ''),
                 'quantity_requested' => (float) ($row->quantity_requested ?? 0),
             ])

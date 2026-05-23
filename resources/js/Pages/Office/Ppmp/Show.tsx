@@ -105,6 +105,7 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
                                         <th className="px-4 py-3 text-left font-semibold text-slate-700">Subtotal</th>
                                         <th className="px-4 py-3 text-left font-semibold text-slate-700">Schedule</th>
                                         <th className="px-4 py-3 text-left font-semibold text-slate-700">Fund Source</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Specification</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
@@ -117,6 +118,7 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
                                             <td className="px-4 py-3 text-slate-700">{formatMoney(item.quantity * item.unit_cost)}</td>
                                             <td className="px-4 py-3 text-slate-700">{item.procurement_schedule}</td>
                                             <td className="px-4 py-3"><span className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-800">{getFundSourceLabel(ppmp.fund_source)}</span></td>
+                                            <td className="px-4 py-3 text-slate-700">{item.remarks || '-'}</td>
                                         </tr>
                                     ))}
                                 </tbody>

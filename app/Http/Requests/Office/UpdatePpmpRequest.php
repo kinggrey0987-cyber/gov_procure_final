@@ -20,8 +20,8 @@ class UpdatePpmpRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'fiscal_year' => ['required', 'integer', 'min:2000', 'max:3000'],
-            'date_prepared' => ['required', 'date'],
+            'fiscal_year' => ['nullable', 'integer'],
+            'date_prepared' => ['nullable', 'date'],
             'fund_source' => ['required', 'string', Rule::in(FundSource::values())],
             'remarks' => ['nullable', 'string', 'max:2000'],
         ];

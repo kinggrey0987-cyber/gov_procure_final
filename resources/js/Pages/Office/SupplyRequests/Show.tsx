@@ -30,6 +30,7 @@ type Props = {
             quantity_requested: number;
             quantity_released?: number | null;
             quantity_received?: number | null;
+            item_specification?: string | null;
             planned_quantity?: number | null;
             already_requested_quantity?: number | null;
             remaining_quantity?: number | null;
@@ -281,6 +282,7 @@ export default function SupplyRequestShow({
                                 <thead className="bg-slate-50">
                                     <tr>
                                         <th className="px-4 py-3 text-left font-semibold text-slate-700">Item</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Specification</th>
                                         <th className="px-4 py-3 text-left font-semibold text-slate-700">PPMP Item</th>
                                         <th className="px-4 py-3 text-right font-semibold text-slate-700">Requested</th>
                                         <th className="px-4 py-3 text-right font-semibold text-slate-700">Released</th>
@@ -294,6 +296,7 @@ export default function SupplyRequestShow({
                                     {supplyRequest.items.map((item) => (
                                         <tr key={item.supply_request_item_id}>
                                             <td className="px-4 py-3 text-slate-700">{item.item_name_snapshot ?? '-'}</td>
+                                            <td className="px-4 py-3 text-slate-700">{item.item_specification || '-'}</td>
                                             <td className="px-4 py-3 text-slate-700">#{item.ppmp_item_id}</td>
                                             <td className="px-4 py-3 text-right font-semibold text-slate-700">{formatNumber(item.quantity_requested)}</td>
                                             <td className="px-4 py-3 text-right text-slate-700">{formatNumber(item.quantity_released)}</td>

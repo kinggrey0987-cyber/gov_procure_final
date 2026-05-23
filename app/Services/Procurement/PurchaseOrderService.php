@@ -232,6 +232,7 @@ class PurchaseOrderService
         }
 
         $supplyRequestItem = SupplyRequestItem::query()
+            ->with('ppmpItem:ppmp_item_id,remarks')
             ->where('supply_request_item_id', $incomingSupplyRequestItemId)
             ->firstOrFail();
 
@@ -246,7 +247,7 @@ class PurchaseOrderService
                 'supply_request_item_id' => (int) $supplyRequestItem->supply_request_item_id,
                 'item_id' => (int) $supplyRequestItem->item_id,
                 'item_name_snapshot' => $supplyRequestItem->item_name_snapshot ?: ($supplyRequestItem->item?->item_name ?? 'Unknown item'),
-                'specification' => $payload['specification'] ?? null,
+                'specification' => $this->resolveItemSpecification($payload, $supplyRequestItem),
                 'quantity_ordered' => $quantity,
                 'unit' => $unit !== '' ? $unit : (string) $payload['unit'],
                 'unit_price' => $unitPrice,
@@ -276,6 +277,7 @@ class PurchaseOrderService
         }
 
         $supplyRequestItem = SupplyRequestItem::query()
+            ->with('ppmpItem:ppmp_item_id,remarks')
             ->where('supply_request_item_id', (int) $payload['supply_request_item_id'])
             ->firstOrFail();
 
@@ -290,7 +292,7 @@ class PurchaseOrderService
                 'supply_request_item_id' => (int) $supplyRequestItem->supply_request_item_id,
                 'item_id' => (int) $supplyRequestItem->item_id,
                 'item_name_snapshot' => $supplyRequestItem->item_name_snapshot ?: ($supplyRequestItem->item?->item_name ?? 'Unknown item'),
-                'specification' => $payload['specification'] ?? null,
+                'specification' => $this->resolveItemSpecification($payload, $supplyRequestItem),
                 'quantity_ordered' => $quantity,
                 'unit' => $unit !== '' ? $unit : (string) $payload['unit'],
                 'unit_price' => $unitPrice,
@@ -323,6 +325,19 @@ class PurchaseOrderService
             $this->recordStatus($purchaseOrder, (string) $purchaseOrder->status, (string) $purchaseOrder->status, $actor, 'Purchase order item removed.');
             $this->recordAudit($actor, 'REMOVE_ITEM', $purchaseOrder);
         });
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function resolveItemSpecification(array $payload, SupplyRequestItem $supplyRequestItem): string
+    {
+        $incomingSpecification = trim((string) ($payload['specification'] ?? ''));
+        if ($incomingSpecification !== '') {
+            return $incomingSpecification;
+        }
+
+        return trim((string) ($supplyRequestItem->ppmpItem?->remarks ?? ''));
     }
 
     private function recomputeTotalAmount(PurchaseOrder $purchaseOrder): void

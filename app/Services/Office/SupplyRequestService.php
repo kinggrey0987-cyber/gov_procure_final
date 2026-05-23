@@ -299,7 +299,7 @@ class SupplyRequestService
             ->where('ppmp_id', $ppmpId)
             ->whereHas('item', fn ($query) => $query->whereRaw('LOWER(status) = ?', ['active']))
             ->orderBy('ppmp_item_id')
-            ->get(['ppmp_item_id', 'ppmp_id', 'item_id', 'quantity', 'unit_cost', 'procurement_schedule']);
+            ->get(['ppmp_item_id', 'ppmp_id', 'item_id', 'quantity', 'unit_cost', 'procurement_schedule', 'remarks']);
 
         $consumptionRows = SupplyRequestItem::query()
             ->selectRaw('ppmp_item_id, COALESCE(SUM(quantity_requested), 0) as requested_quantity')
@@ -329,6 +329,7 @@ class SupplyRequestService
                 'over_requested_quantity' => $overRequestedQuantity,
                 'suggested_unit_cost' => (float) $ppmpItem->unit_cost,
                 'procurement_schedule' => (string) ($ppmpItem->procurement_schedule ?? ''),
+                'item_specification' => (string) ($ppmpItem->remarks ?? ''),
                 'is_schedule_mismatch' => $this->isScheduleEarlierThanPlanned(now(), (string) ($ppmpItem->procurement_schedule ?? '')),
                 'current_quarter' => 'Q'.now()->quarter,
             ];

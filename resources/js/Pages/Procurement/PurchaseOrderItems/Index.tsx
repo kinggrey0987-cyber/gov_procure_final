@@ -13,6 +13,7 @@ type PurchaseOrderItem = {
     supply_request_item_id: number;
     item_id: number;
     item_name_snapshot: string;
+    specification?: string | null;
     quantity_ordered: string;
     unit: string;
     unit_price: string;
@@ -23,6 +24,7 @@ type SourceItem = {
     supply_request_item_id: number;
     item_id: number;
     item_name_snapshot: string;
+    item_specification: string;
     default_unit: string;
     quantity_requested: number;
 };
@@ -58,6 +60,7 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
             form.setData('supply_request_item_id', 0);
             form.setData('item_id', 0);
             form.setData('item_name_snapshot', '');
+            form.setData('specification', '');
             form.setData('quantity_ordered', '');
             form.setData('unit', '');
             return;
@@ -66,6 +69,7 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
         form.setData('supply_request_item_id', row.supply_request_item_id);
         form.setData('item_id', row.item_id);
         form.setData('item_name_snapshot', row.item_name_snapshot);
+        form.setData('specification', row.item_specification || '');
         form.setData('unit', row.default_unit || '');
         form.setData('quantity_ordered', String(toWholeQuantity(row.quantity_requested ?? 0)));
     };
@@ -126,14 +130,16 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                         <input type="hidden" name="quantity_ordered" value={form.data.quantity_ordered} />
                         <input type="hidden" name="unit" value={form.data.unit} />
                         <label className="grid gap-1 text-sm font-semibold text-slate-700 md:col-span-2">
-                            Specification / Supplier Quote Details
+                            Specification from PPMP Item Remarks
                             <input
                                 type="text"
-                                placeholder="Encode quoted brand, model, variant, or other supplier specification"
+                                placeholder="Auto-filled from PPMP item remarks; adjust only if supplier quote requires clarification"
                                 value={form.data.specification}
                                 onChange={(event) => form.setData('specification', event.target.value)}
                                 className="rounded border-gray-300 text-sm font-normal"
+                                required
                             />
+                            <span className="text-xs font-normal text-slate-500">This is automatically copied from the PPMP item specification.</span>
                         </label>
                         <label className="grid gap-1 text-sm font-semibold text-slate-700">
                             Unit Price from Supplier Quote
@@ -175,6 +181,7 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                                 <tr>
                                     <th className="px-3 py-2 text-left">Item ID</th>
                                     <th className="px-3 py-2 text-left">Name</th>
+                                    <th className="px-3 py-2 text-left">Specification</th>
                                     <th className="px-3 py-2 text-left">Qty</th>
                                     <th className="px-3 py-2 text-left">Unit</th>
                                     <th className="px-3 py-2 text-left">Unit Price</th>
@@ -187,6 +194,7 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                                     <tr key={row.purchase_order_item_id} className="border-t">
                                         <td className="px-3 py-2">{row.item_id}</td>
                                         <td className="px-3 py-2">{row.item_name_snapshot}</td>
+                                        <td className="px-3 py-2">{row.specification || '-'}</td>
                                         <td className="px-3 py-2">{row.quantity_ordered}</td>
                                         <td className="px-3 py-2">{row.unit}</td>
                                         <td className="px-3 py-2">{row.unit_price}</td>
@@ -210,7 +218,7 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                                 ))}
                                 {items.data.length === 0 ? (
                                     <tr className="border-t">
-                                        <td colSpan={7} className="px-3 py-8 text-center text-slate-500">No purchase order items recorded yet.</td>
+                                        <td colSpan={8} className="px-3 py-8 text-center text-slate-500">No purchase order items recorded yet.</td>
                                     </tr>
                                 ) : null}
                             </tbody>

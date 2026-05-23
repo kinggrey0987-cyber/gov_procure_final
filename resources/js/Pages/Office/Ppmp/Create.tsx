@@ -26,6 +26,8 @@ type Props = {
 };
 
 const QUARTER_OPTIONS = ['Q1', 'Q2', 'Q3', 'Q4'] as const;
+const CURRENT_YEAR = new Date().getFullYear();
+const TODAY = new Date().toISOString().slice(0, 10);
 
 export default function PpmpCreate({ itemOptions }: Props) {
     const { isRefreshing } = useSmartRefresh({
@@ -35,8 +37,8 @@ export default function PpmpCreate({ itemOptions }: Props) {
     });
 
     const form = useForm({
-        fiscal_year: new Date().getFullYear(),
-        date_prepared: new Date().toISOString().slice(0, 10),
+        fiscal_year: CURRENT_YEAR,
+        date_prepared: TODAY,
         fund_source: DEFAULT_FUND_SOURCE,
         remarks: '',
         items: [emptyItem()],
@@ -84,11 +86,13 @@ export default function PpmpCreate({ itemOptions }: Props) {
                     <div className="grid gap-4 md:grid-cols-2">
                         <label className="block">
                             <span className="mb-1 block text-sm font-medium text-slate-700">Fiscal Year</span>
-                            <input type="number" min="2000" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={form.data.fiscal_year} onChange={(event) => form.setData('fiscal_year', Number(event.target.value))} />
+                            <input type="number" min={CURRENT_YEAR} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={form.data.fiscal_year} onChange={(event) => form.setData('fiscal_year', Number(event.target.value))} />
+                            <span className="mt-1 block text-xs text-slate-500">Fiscal year cannot be earlier than {CURRENT_YEAR}.</span>
                         </label>
                         <label className="block">
                             <span className="mb-1 block text-sm font-medium text-slate-700">Date Prepared</span>
-                            <input type="date" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={form.data.date_prepared} onChange={(event) => form.setData('date_prepared', event.target.value)} />
+                            <input type="date" className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700" value={form.data.date_prepared} readOnly aria-readonly="true" />
+                            <span className="mt-1 block text-xs text-slate-500">Automatically set to today and locked for audit consistency.</span>
                         </label>
                         <label className="block md:col-span-2">
                             <span className="mb-1 block text-sm font-medium text-slate-700">Fund Source</span>
@@ -152,7 +156,8 @@ export default function PpmpCreate({ itemOptions }: Props) {
                                     </label>
                                     <label className="block">
                                         <span className="mb-1 block text-sm font-medium text-slate-700">Item Remarks</span>
-                                        <input value={item.remarks} onChange={(event) => patchItem(index, { remarks: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+                                        <input value={item.remarks} onChange={(event) => patchItem(index, { remarks: event.target.value })} placeholder="Required item specification for SR and PO" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required />
+                                        <span className="mt-1 block text-xs text-slate-500">This becomes the item specification shown on Supply Requests and auto-filled on Purchase Orders.</span>
                                     </label>
                                 </div>
                                 <div className="mt-3 flex justify-end">
