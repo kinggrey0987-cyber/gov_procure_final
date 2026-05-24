@@ -97,14 +97,8 @@ export default function DisclosureCreate({ eligibleSources }: Props) {
 
         form.setData('reference_type', source.reference_type);
         form.setData('reference_id', String(source.reference_id));
-
-        if (!form.data.title.trim()) {
-            form.setData('title', source.suggested_title);
-        }
-
-        if (!form.data.type.trim()) {
-            form.setData('type', source.suggested_type);
-        }
+        form.setData('title', source.suggested_title);
+        form.setData('type', source.suggested_type);
     };
 
     const onMainFileChange = (event: ChangeEvent<HTMLInputElement>) => {

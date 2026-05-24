@@ -9,6 +9,7 @@ type RequestRow = {
     supply_request_id: number;
     request_code: string;
     status: string;
+    raw_status?: string;
     request_date?: string | null;
     items_count?: number;
 };
@@ -67,6 +68,20 @@ export default function SupplyRequestsIndex({ supplyRequests, filters, filter_op
             only: ['supplyRequests', 'filters'],
         });
     }, [activeFilters]);
+
+    const deleteDraft = (row: RequestRow) => {
+        if ((row.raw_status ?? row.status) !== 'DRAFT') {
+            return;
+        }
+
+        if (!window.confirm(`Delete draft supply request ${row.request_code}? This will remove it from your request list.`)) {
+            return;
+        }
+
+        router.delete(route('office.supply-requests.destroy', row.supply_request_id), {
+            preserveScroll: true,
+        });
+    };
 
     return (
         <AuthenticatedLayout
@@ -189,12 +204,23 @@ export default function SupplyRequestsIndex({ supplyRequests, filters, filter_op
                                             </td>
                                             <td className="px-4 py-3 text-slate-700">{row.items_count ?? 0} item(s)</td>
                                             <td className="px-4 py-3 text-right">
+                                                <div className="inline-flex flex-wrap justify-end gap-2">
                                                 <Link
                                                     href={route('office.supply-requests.show', row.supply_request_id)}
                                                     className="inline-flex items-center rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
                                                 >
                                                     View Details
                                                 </Link>
+                                                    {(row.raw_status ?? row.status) === 'DRAFT' && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => deleteDraft(row)}
+                                                            className="inline-flex items-center rounded-lg border border-rose-300 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50"
+                                                        >
+                                                            Delete
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}

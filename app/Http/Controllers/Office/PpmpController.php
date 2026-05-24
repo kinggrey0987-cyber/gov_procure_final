@@ -157,6 +157,16 @@ class PpmpController extends Controller
             ->with('success', 'PPMP submitted successfully.');
     }
 
+    public function destroy(Request $request, Ppmp $ppmp): RedirectResponse
+    {
+        abort_unless($request->user()?->can('office.ppmp.delete', $ppmp), 403);
+
+        $this->service->deleteDraft($ppmp, $request->user());
+
+        return redirect()->route('office.ppmp.index')
+            ->with('success', 'Draft PPMP deleted successfully.');
+    }
+
     private function itemOptions(): array
     {
         return Item::query()

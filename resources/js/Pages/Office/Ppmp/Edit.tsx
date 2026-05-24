@@ -2,7 +2,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import InputError from '@/Components/InputError';
 import useSmartRefresh from '@/hooks/useSmartRefresh';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { FormEvent, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { FUND_SOURCES } from '@/constants/fundSources';
 
 type ItemOption = {
@@ -131,6 +131,10 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
 
     const itemOptionById = new Map(itemOptions.map((option) => [String(option.item_id), option]));
     const selectedNewItemUnit = itemOptionById.get(newItem.data.item_id)?.default_unit || '-';
+    const newItemDuplicateMessage = useMemo(
+        () => duplicateMessageForNewItem(newItem.data.item_id, newItem.data.procurement_schedule, ppmp.items, itemOptionById),
+        [itemOptionById, newItem.data.item_id, newItem.data.procurement_schedule, ppmp.items],
+    );
 
     return (
         <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Edit PPMP</h2>}>
@@ -330,7 +334,7 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
                         <label className="block xl:col-span-2">
                             <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Item</span>
-                            <select className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={newItem.data.item_id} onChange={(event) => onOptionChange(event.target.value)}>
+                            <select className={`w-full rounded-lg border px-3 py-2 text-sm ${newItemDuplicateMessage ? 'border-amber-300 bg-amber-50' : 'border-slate-300'}`} value={newItem.data.item_id} onChange={(event) => onOptionChange(event.target.value)}>
                                 <option value="">Select Item</option>
                                 {itemOptions.map((option) => (
                                     <option key={option.item_id} value={option.item_id}>{option.item_name}</option>
@@ -359,7 +363,7 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
 
                         <label className="block">
                             <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Procurement Schedule</span>
-                            <select className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={newItem.data.procurement_schedule} onChange={(event) => newItem.setData('procurement_schedule', event.target.value)}>
+                            <select className={`w-full rounded-lg border px-3 py-2 text-sm ${newItemDuplicateMessage ? 'border-amber-300 bg-amber-50' : 'border-slate-300'}`} value={newItem.data.procurement_schedule} onChange={(event) => newItem.setData('procurement_schedule', event.target.value)}>
                                 <option value="">Select Quarter</option>
                                 {QUARTER_OPTIONS.map((quarter) => (
                                     <option key={quarter} value={quarter}>{quarter}</option>
@@ -378,13 +382,43 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
 
                     <InputError message={newItem.errors.item_category_id} className="mt-1" />
 
+                    {newItemDuplicateMessage ? (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+                            {newItemDuplicateMessage}
+                        </div>
+                    ) : null}
+
                     <div className="flex justify-end">
-                        <button type="button" onClick={addItem} disabled={newItem.processing} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">Add Item</button>
+                        <button type="button" onClick={addItem} disabled={newItem.processing || Boolean(newItemDuplicateMessage)} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">Add Item</button>
                     </div>
                 </section>
             </div>
         </AuthenticatedLayout>
     );
+}
+
+function duplicateMessageForNewItem(
+    itemId: string,
+    procurementSchedule: string,
+    existingItems: ExistingItem[],
+    itemOptionById: Map<string, ItemOption>,
+): string | null {
+    const normalizedItemId = itemId.trim();
+    const normalizedSchedule = procurementSchedule.trim().toUpperCase();
+
+    if (normalizedItemId === '' || normalizedSchedule === '') {
+        return null;
+    }
+
+    const exists = existingItems.some((item) => String(item.item_id) === normalizedItemId && item.procurement_schedule.trim().toUpperCase() === normalizedSchedule);
+
+    if (!exists) {
+        return null;
+    }
+
+    const itemName = itemOptionById.get(normalizedItemId)?.item_name ?? `Item #${normalizedItemId}`;
+
+    return `${itemName} is already planned for ${normalizedSchedule}. Update the existing line instead of adding a duplicate.`;
 }
 
 function scheduleOptionsForValue(value: string): Array<{ value: string; label: string }> {

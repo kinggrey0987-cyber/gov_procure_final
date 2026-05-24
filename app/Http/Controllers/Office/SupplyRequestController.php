@@ -541,6 +541,16 @@ class SupplyRequestController extends Controller
             ->with('success', $successMessage);
     }
 
+    public function destroy(Request $request, SupplyRequest $supplyRequest): RedirectResponse
+    {
+        abort_unless($request->user()?->can('office.supply-request.delete', $supplyRequest), 403);
+
+        $this->service->deleteDraft($supplyRequest, $request->user());
+
+        return redirect()->route('office.supply-requests.index')
+            ->with('success', 'Draft supply request deleted successfully.');
+    }
+
     public function suppliesReadyForClaim(Request $request): Response
     {
         abort_unless($request->user()?->can('office.supply-request.view-any'), 403);

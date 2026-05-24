@@ -86,6 +86,9 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('office.ppmp.update', function (User $user, Ppmp $ppmp): bool {
             return $user->can('office.ppmp.view', $ppmp) && in_array((string) $ppmp->status, ['DRAFT', 'RETURNED_FOR_REVISION'], true);
         });
+        Gate::define('office.ppmp.delete', function (User $user, Ppmp $ppmp): bool {
+            return $user->can('office.ppmp.view', $ppmp) && (string) $ppmp->status === 'DRAFT';
+        });
         Gate::define('office.ppmp.submit', function (User $user, Ppmp $ppmp): bool {
             return $user->can('office.ppmp.update', $ppmp);
         });
@@ -96,6 +99,9 @@ class AppServiceProvider extends ServiceProvider
             return $user->isOfficeUser() && $supplyRequest->office_id === $user->office_id;
         });
         Gate::define('office.supply-request.update', function (User $user, SupplyRequest $supplyRequest): bool {
+            return $user->can('office.supply-request.view', $supplyRequest) && $supplyRequest->status === 'DRAFT';
+        });
+        Gate::define('office.supply-request.delete', function (User $user, SupplyRequest $supplyRequest): bool {
             return $user->can('office.supply-request.view', $supplyRequest) && $supplyRequest->status === 'DRAFT';
         });
         Gate::define('office.supply-request.submit', function (User $user, SupplyRequest $supplyRequest): bool {

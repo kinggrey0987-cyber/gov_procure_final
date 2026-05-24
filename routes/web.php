@@ -225,6 +225,9 @@ Route::middleware(['auth', 'twofactor', 'must-change-password'])->group(function
                 Route::put('/{ppmp}', [OfficePpmpController::class, 'update'])
                     ->middleware('can:office.ppmp.update,ppmp')
                     ->name('update');
+                Route::delete('/{ppmp}', [OfficePpmpController::class, 'destroy'])
+                    ->middleware('can:office.ppmp.delete,ppmp')
+                    ->name('destroy');
                 Route::post('/{ppmp}/submit', [OfficePpmpController::class, 'submit'])
                     ->middleware('can:office.ppmp.submit,ppmp')
                     ->name('submit');
@@ -265,6 +268,9 @@ Route::middleware(['auth', 'twofactor', 'must-change-password'])->group(function
                 Route::put('/{supply_request}', [OfficeSupplyRequestController::class, 'update'])
                     ->middleware('can:office.supply-request.update,supply_request')
                     ->name('update');
+                Route::delete('/{supply_request}', [OfficeSupplyRequestController::class, 'destroy'])
+                    ->middleware('can:office.supply-request.delete,supply_request')
+                    ->name('destroy');
                 Route::post('/{supply_request}/submit', [OfficeSupplyRequestController::class, 'submit'])
                     ->middleware('can:office.supply-request.submit,supply_request')
                     ->name('submit');

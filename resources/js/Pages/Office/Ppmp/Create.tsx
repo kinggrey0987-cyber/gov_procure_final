@@ -1,7 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import useSmartRefresh from '@/hooks/useSmartRefresh';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { FormEvent } from 'react';
+import { FormEvent, useMemo } from 'react';
 import { FUND_SOURCES, DEFAULT_FUND_SOURCE } from '@/constants/fundSources';
 
 type ItemOption = {
@@ -44,8 +44,16 @@ export default function PpmpCreate({ itemOptions }: Props) {
         items: [emptyItem()],
     });
 
+    const duplicateRowIndexes = useMemo(() => duplicateIndexesForDraftItems(form.data.items), [form.data.items]);
+    const hasDuplicateItems = duplicateRowIndexes.size > 0;
+
     const submit = (event: FormEvent) => {
         event.preventDefault();
+
+        if (hasDuplicateItems) {
+            return;
+        }
+
         form.post(route('office.ppmp.store'));
     };
 
@@ -115,13 +123,25 @@ export default function PpmpCreate({ itemOptions }: Props) {
                         <button type="button" onClick={addItem} className="rounded-lg border border-emerald-300 px-4 py-2 text-sm font-semibold text-emerald-700">Add Item Row</button>
                     </div>
 
+                    {hasDuplicateItems ? (
+                        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+                            Duplicate PPMP item lines are not allowed. Use one row per item and procurement quarter, then adjust the quantity or remove the duplicate row.
+                        </div>
+                    ) : null}
+
                     <div className="space-y-4">
                         {form.data.items.map((item, index) => {
                             const selectedItem = itemOptionById.get(item.item_id);
                             const unit = selectedItem?.default_unit || '-';
+                            const isDuplicate = duplicateRowIndexes.has(index);
 
                             return (
-                            <div key={index} className="rounded-xl border border-slate-200 p-4">
+                            <div key={index} className={`rounded-xl border p-4 ${isDuplicate ? 'border-amber-300 bg-amber-50/40' : 'border-slate-200'}`}>
+                                {isDuplicate ? (
+                                    <div className="mb-3 rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm font-semibold text-amber-800">
+                                        This item is already planned for {item.procurement_schedule}. Update the existing row instead of saving a duplicate.
+                                    </div>
+                                ) : null}
                                 <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                                     <label className="block">
                                         <span className="mb-1 block text-sm font-medium text-slate-700">Item</span>
@@ -170,11 +190,38 @@ export default function PpmpCreate({ itemOptions }: Props) {
                 </section>
 
                 <div className="flex justify-end">
-                    <button type="submit" disabled={form.processing} className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white disabled:opacity-60">Save PPMP</button>
+                    <button type="submit" disabled={form.processing || hasDuplicateItems} className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">Save PPMP</button>
                 </div>
             </form>
         </AuthenticatedLayout>
     );
+}
+
+function duplicateIndexesForDraftItems(items: ItemDraft[]): Set<number> {
+    const firstIndexByKey = new Map<string, number>();
+    const duplicates = new Set<number>();
+
+    items.forEach((item, index) => {
+        const itemId = item.item_id.trim();
+        const schedule = item.procurement_schedule.trim().toUpperCase();
+
+        if (itemId === '' || schedule === '') {
+            return;
+        }
+
+        const key = `${itemId}|${schedule}`;
+        const firstIndex = firstIndexByKey.get(key);
+
+        if (firstIndex !== undefined) {
+            duplicates.add(firstIndex);
+            duplicates.add(index);
+            return;
+        }
+
+        firstIndexByKey.set(key, index);
+    });
+
+    return duplicates;
 }
 
 function emptyItem(): ItemDraft {

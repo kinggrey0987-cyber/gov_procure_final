@@ -112,6 +112,24 @@ class PpmpService
         });
     }
 
+    public function deleteDraft(Ppmp $ppmp, User $actor): void
+    {
+        $this->assertDeletableDraftAndOwned($ppmp, $actor);
+
+        DB::transaction(function () use ($ppmp, $actor): void {
+            $ppmp->loadMissing('items');
+            $itemCount = $ppmp->items->count();
+
+            $this->recordAudit($actor, 'DELETE_DRAFT', $ppmp, [
+                'items_count' => $itemCount,
+                'deleted_at' => now()->toIso8601String(),
+            ]);
+
+            $ppmp->items()->delete();
+            $ppmp->delete();
+        });
+    }
+
     /**
      * @param  array<string, mixed>  $payload
      */
@@ -209,6 +227,21 @@ class PpmpService
         if (! in_array((string) $ppmp->status, ['DRAFT', 'RETURNED_FOR_REVISION'], true)) {
             throw ValidationException::withMessages([
                 'status' => 'Only DRAFT or RETURNED_FOR_REVISION PPMP records can be modified.',
+            ]);
+        }
+    }
+
+    private function assertDeletableDraftAndOwned(Ppmp $ppmp, User $actor): void
+    {
+        if ((int) $ppmp->office_id !== (int) $actor->office_id) {
+            throw ValidationException::withMessages([
+                'office_id' => 'You can only delete PPMP records from your office.',
+            ]);
+        }
+
+        if ((string) $ppmp->status !== 'DRAFT') {
+            throw ValidationException::withMessages([
+                'status' => 'Only DRAFT PPMP records can be deleted.',
             ]);
         }
     }

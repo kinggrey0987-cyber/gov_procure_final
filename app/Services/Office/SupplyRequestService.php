@@ -140,6 +140,24 @@ class SupplyRequestService
         });
     }
 
+    public function deleteDraft(SupplyRequest $supplyRequest, User $actor): void
+    {
+        $this->assertDraftAndOwned($supplyRequest, $actor);
+
+        DB::transaction(function () use ($supplyRequest, $actor): void {
+            $supplyRequest->loadMissing('items');
+            $itemCount = $supplyRequest->items->count();
+
+            $this->recordAudit($actor, 'DELETE_DRAFT', $supplyRequest, [
+                'items_count' => $itemCount,
+                'deleted_at' => now()->toIso8601String(),
+            ]);
+
+            $supplyRequest->items()->delete();
+            $supplyRequest->delete();
+        });
+    }
+
     /**
      * @param  array<string, mixed>  $payload
      */

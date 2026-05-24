@@ -52,6 +52,20 @@ export default function PpmpIndex({ ppmps, filters, filter_options }: Props) {
         });
     }, [activeFilters]);
 
+    const deleteDraft = (ppmp: PpmpRow) => {
+        if (ppmp.status !== 'DRAFT') {
+            return;
+        }
+
+        if (!window.confirm(`Delete draft ${ppmp.ppmp_code}? This will remove it from your PPMP list.`)) {
+            return;
+        }
+
+        router.delete(route('office.ppmp.destroy', ppmp.ppmp_id), {
+            preserveScroll: true,
+        });
+    };
+
     return (
         <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">PPMP</h2>}>
             <Head title="PPMP" />
@@ -158,12 +172,23 @@ export default function PpmpIndex({ ppmps, filters, filter_options }: Props) {
                                             </td>
                                             <td className="px-4 py-3 text-slate-700">{formatDateTime(ppmp.last_updated)}</td>
                                             <td className="px-4 py-3 text-right">
+                                                <div className="inline-flex flex-wrap justify-end gap-2">
                                                 <Link
                                                     href={route('office.ppmp.show', ppmp.ppmp_id)}
                                                     className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
                                                 >
                                                     View Details
                                                 </Link>
+                                                    {ppmp.status === 'DRAFT' && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => deleteDraft(ppmp)}
+                                                            className="rounded-lg border border-rose-300 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50"
+                                                        >
+                                                            Delete
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
