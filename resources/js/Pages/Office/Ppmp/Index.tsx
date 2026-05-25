@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PaginationNav from '@/Components/PaginationNav';
+import Modal from '@/Components/Modal';
 import { Head, Link, router } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -28,6 +29,7 @@ export default function PpmpIndex({ ppmps, filters, filter_options }: Props) {
     const [status, setStatus] = useState(filters?.status ?? '');
     const [year, setYear] = useState(filters?.year ?? '');
     const [month, setMonth] = useState(filters?.month ?? '');
+    const [draftToDelete, setDraftToDelete] = useState<PpmpRow | null>(null);
     const hasMountedRef = useRef(false);
 
     useEffect(() => {
@@ -52,17 +54,14 @@ export default function PpmpIndex({ ppmps, filters, filter_options }: Props) {
         });
     }, [activeFilters]);
 
-    const deleteDraft = (ppmp: PpmpRow) => {
-        if (ppmp.status !== 'DRAFT') {
+    const confirmDeleteDraft = () => {
+        if (!draftToDelete || draftToDelete.status !== 'DRAFT') {
             return;
         }
 
-        if (!window.confirm(`Delete draft ${ppmp.ppmp_code}? This will remove it from your PPMP list.`)) {
-            return;
-        }
-
-        router.delete(route('office.ppmp.destroy', ppmp.ppmp_id), {
+        router.delete(route('office.ppmp.destroy', draftToDelete.ppmp_id), {
             preserveScroll: true,
+            onFinish: () => setDraftToDelete(null),
         });
     };
 
@@ -182,7 +181,7 @@ export default function PpmpIndex({ ppmps, filters, filter_options }: Props) {
                                                     {ppmp.status === 'DRAFT' && (
                                                         <button
                                                             type="button"
-                                                            onClick={() => deleteDraft(ppmp)}
+                                                            onClick={() => setDraftToDelete(ppmp)}
                                                             className="rounded-lg border border-rose-300 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50"
                                                         >
                                                             Delete
@@ -200,6 +199,31 @@ export default function PpmpIndex({ ppmps, filters, filter_options }: Props) {
 
                 <PaginationNav links={ppmps.links} preserveState={false} />
             </div>
+
+            <Modal show={draftToDelete !== null} maxWidth="md" onClose={() => setDraftToDelete(null)}>
+                <div className="p-6">
+                    <h2 className="text-lg font-semibold text-slate-900">Delete draft PPMP?</h2>
+                    <p className="mt-2 text-sm text-slate-600">
+                        Delete draft {draftToDelete?.ppmp_code}? This will remove it from your PPMP list.
+                    </p>
+                    <div className="mt-6 flex justify-end gap-3">
+                        <button
+                            type="button"
+                            onClick={() => setDraftToDelete(null)}
+                            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={confirmDeleteDraft}
+                            className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700"
+                        >
+                            Delete PPMP
+                        </button>
+                    </div>
+                </div>
+            </Modal>
         </AuthenticatedLayout>
     );
 }

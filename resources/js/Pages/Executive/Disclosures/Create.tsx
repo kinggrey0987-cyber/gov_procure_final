@@ -25,14 +25,6 @@ type Props = {
 
 type PublicationAction = 'DRAFT' | 'REVIEW' | 'PUBLISHED';
 
-const DEFAULT_TYPES = [
-    'PPMP_SUMMARY',
-    'PROCUREMENT_SUMMARY',
-    'DISTRIBUTION_SUMMARY',
-    'NOTICE',
-    'PROJECT_UPDATE',
-];
-
 export default function DisclosureCreate({ eligibleSources }: Props) {
     const form = useForm({
         title: '',
@@ -57,11 +49,6 @@ export default function DisclosureCreate({ eligibleSources }: Props) {
         ...eligibleSources.recent_purchase_requests,
         ...eligibleSources.distribution_summaries,
     ];
-
-    const disclosureTypeOptions = useMemo(() => {
-        const fromSources = sourceOptions.map((source) => source.suggested_type);
-        return [...new Set([...DEFAULT_TYPES, ...fromSources])].sort();
-    }, [sourceOptions]);
 
     const selectedSource = useMemo(
         () => sourceOptions.find((item) => `${item.reference_type}:${item.reference_id}` === selectedSourceKey) ?? null,
@@ -208,7 +195,6 @@ export default function DisclosureCreate({ eligibleSources }: Props) {
                                         <div className="mt-3 grid gap-2 sm:grid-cols-2">
                                             <PreviewField label="Office" value={selectedSource.office ?? 'N/A'} />
                                             <PreviewField label="Release Date" value={formatDate(selectedSource.release_date)} />
-                                            <PreviewField label="Suggested Type" value={formatTypeLabel(selectedSource.suggested_type)} />
                                             <PreviewField label="Suggested Title" value={selectedSource.suggested_title} />
                                         </div>
                                     </div>
@@ -234,19 +220,15 @@ export default function DisclosureCreate({ eligibleSources }: Props) {
                                     onChange={(event) => form.setData('title', event.target.value)}
                                 />
                             </Field>
-                            <Field label="Type" required>
-                                <select
-                                    className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm"
-                                    value={form.data.type}
-                                    onChange={(event) => form.setData('type', event.target.value)}
-                                >
-                                    <option value="">Select disclosure type</option>
-                                    {disclosureTypeOptions.map((type) => (
-                                        <option key={type} value={type}>
-                                            {formatTypeLabel(type)}
-                                        </option>
-                                    ))}
-                                </select>
+                            <Field label="Disclosure Type" required>
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                    <p className="text-sm font-semibold text-slate-800">
+                                        {form.data.type ? formatTypeLabel(form.data.type) : 'Select a source to assign a disclosure type'}
+                                    </p>
+                                    <p className="mt-1 text-xs text-slate-500">
+                                        Disclosure type is automatically assigned based on the selected source.
+                                    </p>
+                                </div>
                             </Field>
                         </div>
 

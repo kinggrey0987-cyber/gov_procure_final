@@ -1,6 +1,8 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import Modal from '@/Components/Modal';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { getFundSourceLabel } from '@/constants/fundSources';
+import { useState } from 'react';
 
 type PpmpItem = {
     ppmp_item_id: number;
@@ -42,8 +44,22 @@ type Props = {
 
 export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, approvalHistory }: Props) {
     const submitForm = useForm({ remarks: ppmp.remarks ?? '' });
+    const [confirmingDelete, setConfirmingDelete] = useState(false);
 
     const totalBudget = ppmp.items.reduce((total, item) => total + item.quantity * item.unit_cost, 0);
+    const isDraft = ppmp.status.toUpperCase() === 'DRAFT';
+    const ppmpCode = `PPMP-${ppmp.fiscal_year}-${String(ppmp.ppmp_id).padStart(4, '0')}`;
+
+    const deleteDraft = () => {
+        if (!isDraft) {
+            return;
+        }
+
+        router.delete(route('office.ppmp.destroy', ppmp.ppmp_id), {
+            preserveScroll: true,
+            onFinish: () => setConfirmingDelete(false),
+        });
+    };
 
     return (
         <AuthenticatedLayout
@@ -63,7 +79,7 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
                     <div className="flex flex-wrap items-start justify-between gap-4">
                         <div>
                             <p className="text-sm font-medium text-slate-500">PPMP ID</p>
-                            <h3 className="text-2xl font-bold text-red-700">PPMP-{ppmp.fiscal_year}-{String(ppmp.ppmp_id).padStart(4, '0')}</h3>
+                            <h3 className="text-2xl font-bold text-red-700">{ppmpCode}</h3>
                             <p className="mt-2 text-sm text-slate-600">Date prepared: {formatDate(ppmp.date_prepared)}</p>
                         </div>
                         <StatusBadge status={ppmp.status} />
@@ -133,6 +149,15 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
                         {canEdit ? (
                             <Link href={route('office.ppmp.edit', ppmp.ppmp_id)} className="rounded-lg border border-blue-300 px-4 py-2 text-sm font-semibold text-blue-700">Edit PPMP</Link>
                         ) : null}
+                        {isDraft ? (
+                            <button
+                                type="button"
+                                onClick={() => setConfirmingDelete(true)}
+                                className="rounded-lg border border-rose-300 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50"
+                            >
+                                Delete PPMP
+                            </button>
+                        ) : null}
                         {canSubmit ? (
                             <button onClick={() => submitForm.post(route('office.ppmp.submit', ppmp.ppmp_id))} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white">
                                 Submit PPMP
@@ -142,6 +167,31 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
                 </section>
 
             </div>
+
+            <Modal show={confirmingDelete} maxWidth="md" onClose={() => setConfirmingDelete(false)}>
+                <div className="p-6">
+                    <h2 className="text-lg font-semibold text-slate-900">Delete draft PPMP?</h2>
+                    <p className="mt-2 text-sm text-slate-600">
+                        Delete draft {ppmpCode}? This will remove it from your PPMP list.
+                    </p>
+                    <div className="mt-6 flex justify-end gap-3">
+                        <button
+                            type="button"
+                            onClick={() => setConfirmingDelete(false)}
+                            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={deleteDraft}
+                            className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700"
+                        >
+                            Delete PPMP
+                        </button>
+                    </div>
+                </div>
+            </Modal>
         </AuthenticatedLayout>
     );
 }

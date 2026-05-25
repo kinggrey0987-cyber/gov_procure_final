@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import Modal from '@/Components/Modal';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { FormEvent, useMemo, useState } from 'react';
 
 type Props = {
@@ -84,6 +85,7 @@ export default function SupplyRequestShow({
     approvalHistory,
 }: Props) {
     const [reportIssueOpen, setReportIssueOpen] = useState(false);
+    const [confirmingDelete, setConfirmingDelete] = useState(false);
     const [activeTab, setActiveTab] = useState<'overview' | 'items' | 'status' | 'related' | 'notes'>('overview');
 
     const overAllocationCount = useMemo(() => {
@@ -109,9 +111,21 @@ export default function SupplyRequestShow({
         const status = supplyRequest.status.toUpperCase();
         return status === 'RELEASED' || status === 'COMPLETED';
     }, [supplyRequest.status]);
+    const isDraft = (supplyRequest.raw_status ?? supplyRequest.status).toUpperCase() === 'DRAFT';
 
     const handleSubmit = () => {
         submitForm.post(route('office.supply-requests.submit', supplyRequest.supply_request_id));
+    };
+
+    const deleteDraft = () => {
+        if (!isDraft) {
+            return;
+        }
+
+        router.delete(route('office.supply-requests.destroy', supplyRequest.supply_request_id), {
+            preserveScroll: true,
+            onFinish: () => setConfirmingDelete(false),
+        });
     };
 
     const handleIssueSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -217,6 +231,16 @@ export default function SupplyRequestShow({
                                     >
                                         Edit Request
                                     </Link>
+                                ) : null}
+
+                                {isDraft ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => setConfirmingDelete(true)}
+                                        className="rounded-lg border border-rose-300 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50"
+                                    >
+                                        Delete Request
+                                    </button>
                                 ) : null}
 
                                 {canSubmit ? (
@@ -490,6 +514,31 @@ export default function SupplyRequestShow({
                     </div>
                 </div>
             ) : null}
+
+            <Modal show={confirmingDelete} maxWidth="md" onClose={() => setConfirmingDelete(false)}>
+                <div className="p-6">
+                    <h2 className="text-lg font-semibold text-slate-900">Delete draft supply request?</h2>
+                    <p className="mt-2 text-sm text-slate-600">
+                        Delete draft supply request {supplyRequest.request_code}? This will remove it from your request list.
+                    </p>
+                    <div className="mt-6 flex justify-end gap-3">
+                        <button
+                            type="button"
+                            onClick={() => setConfirmingDelete(false)}
+                            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={deleteDraft}
+                            className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700"
+                        >
+                            Delete Request
+                        </button>
+                    </div>
+                </div>
+            </Modal>
         </AuthenticatedLayout>
     );
 }

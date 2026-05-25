@@ -1,6 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PaginationNav from '@/Components/PaginationNav';
 import MonthFilterSelect from '@/Components/MonthFilterSelect';
+import Modal from '@/Components/Modal';
 import useDebouncedValue from '@/hooks/useDebouncedValue';
 import { Head, Link, router } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -35,6 +36,7 @@ export default function SupplyRequestsIndex({ supplyRequests, filters, filter_op
     const [year, setYear] = useState(filters?.year ?? '');
     const [month, setMonth] = useState(filters?.month ?? '');
     const [search, setSearch] = useState(filters?.search ?? '');
+    const [draftToDelete, setDraftToDelete] = useState<RequestRow | null>(null);
     const debouncedSearch = useDebouncedValue(search, 450);
     const hasMountedRef = useRef(false);
 
@@ -69,17 +71,14 @@ export default function SupplyRequestsIndex({ supplyRequests, filters, filter_op
         });
     }, [activeFilters]);
 
-    const deleteDraft = (row: RequestRow) => {
-        if ((row.raw_status ?? row.status) !== 'DRAFT') {
+    const confirmDeleteDraft = () => {
+        if (!draftToDelete || (draftToDelete.raw_status ?? draftToDelete.status) !== 'DRAFT') {
             return;
         }
 
-        if (!window.confirm(`Delete draft supply request ${row.request_code}? This will remove it from your request list.`)) {
-            return;
-        }
-
-        router.delete(route('office.supply-requests.destroy', row.supply_request_id), {
+        router.delete(route('office.supply-requests.destroy', draftToDelete.supply_request_id), {
             preserveScroll: true,
+            onFinish: () => setDraftToDelete(null),
         });
     };
 
@@ -214,7 +213,7 @@ export default function SupplyRequestsIndex({ supplyRequests, filters, filter_op
                                                     {(row.raw_status ?? row.status) === 'DRAFT' && (
                                                         <button
                                                             type="button"
-                                                            onClick={() => deleteDraft(row)}
+                                                            onClick={() => setDraftToDelete(row)}
                                                             className="inline-flex items-center rounded-lg border border-rose-300 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50"
                                                         >
                                                             Delete
@@ -232,6 +231,31 @@ export default function SupplyRequestsIndex({ supplyRequests, filters, filter_op
 
                 <PaginationNav links={supplyRequests.links} preserveState={false} />
             </div>
+
+            <Modal show={draftToDelete !== null} maxWidth="md" onClose={() => setDraftToDelete(null)}>
+                <div className="p-6">
+                    <h2 className="text-lg font-semibold text-slate-900">Delete draft supply request?</h2>
+                    <p className="mt-2 text-sm text-slate-600">
+                        Delete draft supply request {draftToDelete?.request_code}? This will remove it from your request list.
+                    </p>
+                    <div className="mt-6 flex justify-end gap-3">
+                        <button
+                            type="button"
+                            onClick={() => setDraftToDelete(null)}
+                            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={confirmDeleteDraft}
+                            className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700"
+                        >
+                            Delete Request
+                        </button>
+                    </div>
+                </div>
+            </Modal>
         </AuthenticatedLayout>
     );
 }
