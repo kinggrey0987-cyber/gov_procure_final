@@ -23,7 +23,7 @@ type Props = {
     };
 };
 
-type PublicationAction = 'DRAFT' | 'REVIEW' | 'PUBLISHED';
+type PublicationAction = 'DRAFT' | 'PUBLISHED';
 
 export default function DisclosureCreate({ eligibleSources }: Props) {
     const form = useForm({
@@ -114,9 +114,7 @@ export default function DisclosureCreate({ eligibleSources }: Props) {
         const priorRemarks = form.data.remarks;
 
         const status = publicationAction === 'PUBLISHED' ? 'PUBLISHED' : 'DRAFT';
-        const remarks = publicationAction === 'REVIEW'
-            ? [form.data.remarks?.trim(), 'Submitted for review.'].filter(Boolean).join(' ')
-            : form.data.remarks;
+        const remarks = form.data.remarks;
 
         form.transform((data) => ({
             ...data,
@@ -280,19 +278,13 @@ export default function DisclosureCreate({ eligibleSources }: Props) {
                         </div>
                     </StepCard>
 
-                    <StepCard step="4" title="Publication" subtitle="Choose publication intent">
-                        <div className="grid gap-3 md:grid-cols-3">
+                    <StepCard step="4" title="Publication" subtitle="Choose whether to keep the disclosure as a draft or publish it now">
+                        <div className="grid gap-3 md:grid-cols-2">
                             <ActionChoice
                                 title="Save as Draft"
                                 description="Keep this disclosure in draft state."
                                 active={publicationAction === 'DRAFT'}
                                 onClick={() => setPublicationAction('DRAFT')}
-                            />
-                            <ActionChoice
-                                title="Submit for Review"
-                                description="Record as draft and mark remarks for review handoff."
-                                active={publicationAction === 'REVIEW'}
-                                onClick={() => setPublicationAction('REVIEW')}
                             />
                             <ActionChoice
                                 title="Publish Immediately"
@@ -345,7 +337,7 @@ export default function DisclosureCreate({ eligibleSources }: Props) {
 
                     <div className="flex flex-wrap items-center gap-2">
                         <button type="submit" className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800" disabled={form.processing}>
-                            {publicationAction === 'PUBLISHED' ? 'Publish Disclosure' : publicationAction === 'REVIEW' ? 'Save and Mark for Review' : 'Save Draft'}
+                            {publicationAction === 'PUBLISHED' ? 'Publish Disclosure' : 'Save Draft'}
                         </button>
                         <Link href={route('executive.transparency-monitoring')} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                             Back to Transparency & Disclosures
@@ -424,10 +416,6 @@ function publicationLabel(action: PublicationAction): string {
         return 'Publish Immediately';
     }
 
-    if (action === 'REVIEW') {
-        return 'Submit for Review';
-    }
-
     return 'Save as Draft';
 }
 
@@ -453,7 +441,6 @@ function formatTypeLabel(value: string): string {
         .replaceAll('_', ' ')
         .replace(/\b\w/g, (char) => char.toUpperCase());
 }
-
 
 
 

@@ -98,7 +98,7 @@ export default function DisclosureShow({ disclosure, attachments, sources, attac
                     </div>
 
                     <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-                        Executive governance access: prepare, review, and publish public disclosures.
+                        Executive governance access: prepare and publish public disclosures.
                     </div>
 
                     <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -145,7 +145,14 @@ export default function DisclosureShow({ disclosure, attachments, sources, attac
                         uploadRoute={route('documents.store', { related_module: 'public_disclosures', related_reference_id: disclosure.disclosure_id })}
                         canUpload={attachmentPermissions.upload}
                         canDelete={attachmentPermissions.delete}
-                        downloadRouteFor={(documentId: number) => route('documents.show', documentId)}
+                        downloadRouteFor={(documentId: number) =>
+                            disclosure.status === 'PUBLISHED'
+                                ? route('public.disclosures.documents.download', {
+                                    public_disclosure: disclosure.disclosure_id,
+                                    document: documentId,
+                                })
+                                : route('documents.show', documentId)
+                        }
                         deleteRouteFor={(documentId: number) => route('documents.destroy', documentId)}
                     />
 
@@ -163,8 +170,6 @@ function DetailCell({ label, value }: { label: string; value: string }) {
         </div>
     );
 }
-
-
 
 
 
