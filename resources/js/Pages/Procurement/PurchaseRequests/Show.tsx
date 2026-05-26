@@ -70,9 +70,10 @@ export default function PurchaseRequestsShow({ purchaseRequest, reviewMode = fal
     };
 
     const submitReviewAction = (action: 'process' | 'return' | 'reject') => {
-        processForm.setData('action', action);
+        processForm.transform((data) => ({ ...data, action }));
         processForm.post(route('procurement.purchase-requests.process', purchaseRequest.purchase_request_id), {
             preserveScroll: true,
+            onFinish: () => processForm.transform((data) => data),
         });
     };
 
@@ -232,6 +233,4 @@ function formatRequestRemarks(remarks?: string | null) {
 
     return cleaned;
 }
-
-
 

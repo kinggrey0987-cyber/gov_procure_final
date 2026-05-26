@@ -136,7 +136,8 @@ class RequestWorkflowController
             ];
         }
 
-        $hasPurchaseRequest = $request->purchaseRequests->isNotEmpty();
+        $hasPurchaseRequest = $request->purchaseRequests
+            ->contains(fn (PurchaseRequest $purchaseRequest): bool => in_array((string) $purchaseRequest->status, ['OPEN', 'PROCESSING'], true));
         $stockAssessment = $shortageTotal > 0 ? 'SHORTAGE_REQUIRES_PROCUREMENT' : 'STOCK_READY';
         $distributionRecordsCount = (int) $request->distribution_records_count;
         $hasDraftDistribution = $request->distributionRecords->contains(fn ($record): bool => (string) $record->status === 'DRAFT');

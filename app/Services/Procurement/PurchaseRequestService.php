@@ -136,7 +136,12 @@ class PurchaseRequestService
             ]);
         }
 
-        if (PurchaseRequest::query()->where('supply_request_id', $supplyRequest->supply_request_id)->exists()) {
+        $existingPurchaseRequest = PurchaseRequest::query()
+            ->where('supply_request_id', $supplyRequest->supply_request_id)
+            ->latest('purchase_request_id')
+            ->first();
+
+        if ($existingPurchaseRequest instanceof PurchaseRequest && (string) $existingPurchaseRequest->status !== 'RETURNED_FOR_REVISION') {
             throw ValidationException::withMessages([
                 'supply_request_id' => 'A purchase request already exists for this supply request.',
             ]);
@@ -155,33 +160,44 @@ class PurchaseRequestService
             ]);
         }
 
-        return DB::transaction(function () use ($actor, $payload, $supplyRequest): PurchaseRequest {
-            $purchaseRequest = PurchaseRequest::query()->create([
-                'supply_request_id' => (int) $supplyRequest->supply_request_id,
-                'office_id' => (int) $supplyRequest->office_id,
-                'requested_by' => (int) $supplyRequest->requested_by,
-                'status' => 'OPEN',
-                'remarks' => $payload['remarks'] ?? 'Queued by GSO due to stock shortage.',
-            ]);
+        return DB::transaction(function () use ($actor, $payload, $supplyRequest, $existingPurchaseRequest): PurchaseRequest {
+            $remarks = $payload['remarks'] ?? 'Queued by GSO due to stock shortage.';
 
-            $itemRows = [];
-            foreach ($supplyRequest->items as $supplyRequestItem) {
-                $itemRows[] = [
-                    'purchase_request_id' => (int) $purchaseRequest->purchase_request_id,
-                    'item_id' => (int) $supplyRequestItem->item_id,
-                    'quantity_requested' => (float) $supplyRequestItem->quantity_requested,
-                    'remarks' => null,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
+            if ($existingPurchaseRequest instanceof PurchaseRequest) {
+                $purchaseRequest = $existingPurchaseRequest;
+                $oldStatus = (string) $purchaseRequest->status;
+
+                $purchaseRequest->forceFill([
+                    'status' => 'OPEN',
+                    'remarks' => $remarks,
+                ])->save();
+
+                $purchaseRequest->items()->delete();
+                $this->recreateItemsFromSupplyRequest($purchaseRequest, $supplyRequest);
+
+                $this->recordStatus($purchaseRequest, $oldStatus, 'OPEN', $actor, 'Purchase request re-queued by GSO after office revision.');
+                $this->recordAudit($actor, 'REQUEUE', $purchaseRequest);
+            } else {
+                $purchaseRequest = PurchaseRequest::query()->create([
+                    'supply_request_id' => (int) $supplyRequest->supply_request_id,
+                    'office_id' => (int) $supplyRequest->office_id,
+                    'requested_by' => (int) $supplyRequest->requested_by,
+                    'status' => 'OPEN',
+                    'remarks' => $remarks,
+                ]);
+
+                $this->recreateItemsFromSupplyRequest($purchaseRequest, $supplyRequest);
+
+                $this->recordStatus($purchaseRequest, null, 'OPEN', $actor, 'Purchase request queued by GSO due to stock shortage.');
+                $this->recordAudit($actor, 'QUEUE', $purchaseRequest);
             }
 
-            if ($itemRows !== []) {
-                PurchaseRequestItem::query()->insert($itemRows);
-            }
-
-            $this->recordStatus($purchaseRequest, null, 'OPEN', $actor, 'Purchase request queued by GSO due to stock shortage.');
-            $this->recordAudit($actor, 'QUEUE', $purchaseRequest);
+            $this->syncSupplyRequestStatus(
+                $purchaseRequest,
+                $actor,
+                'FOR_PROCUREMENT',
+                'Supply request queued by GSO for procurement due to stock shortage.'
+            );
 
             $requester = User::query()->find($purchaseRequest->requested_by);
             if ($requester instanceof User) {
@@ -197,6 +213,25 @@ class PurchaseRequestService
 
             return $purchaseRequest->fresh(['items', 'office', 'requester', 'supplyRequest']) ?? $purchaseRequest;
         });
+    }
+
+    private function recreateItemsFromSupplyRequest(PurchaseRequest $purchaseRequest, SupplyRequest $supplyRequest): void
+    {
+        $itemRows = [];
+        foreach ($supplyRequest->items as $supplyRequestItem) {
+            $itemRows[] = [
+                'purchase_request_id' => (int) $purchaseRequest->purchase_request_id,
+                'item_id' => (int) $supplyRequestItem->item_id,
+                'quantity_requested' => (float) $supplyRequestItem->quantity_requested,
+                'remarks' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
+        if ($itemRows !== []) {
+            PurchaseRequestItem::query()->insert($itemRows);
+        }
     }
 
     public function createFromLowStockSignal(User $actor, Inventory $inventory, float $quantityRequested): PurchaseRequest
@@ -550,6 +585,13 @@ class PurchaseRequestService
                 'remarks' => $remarks ?? $purchaseRequest->remarks,
             ])->save();
 
+            $this->syncSupplyRequestStatus(
+                $purchaseRequest,
+                $actor,
+                'FOR_PROCUREMENT',
+                'Linked purchase request moved to procurement processing.'
+            );
+
             $this->recordStatus($purchaseRequest, $oldStatus, 'PROCESSING', $actor, 'Purchase request is now in procurement processing.');
 
             ApprovalHistory::query()->create([
@@ -592,6 +634,13 @@ class PurchaseRequestService
                 'remarks' => $finalRemarks,
             ])->save();
 
+            $this->syncSupplyRequestStatus(
+                $purchaseRequest,
+                $actor,
+                'DRAFT',
+                'Linked purchase request returned for revision by procurement. '.$finalRemarks
+            );
+
             $this->recordStatus($purchaseRequest, $oldStatus, 'RETURNED_FOR_REVISION', $actor, 'Purchase request returned for revision by procurement.');
 
             ApprovalHistory::query()->create([
@@ -633,6 +682,13 @@ class PurchaseRequestService
                 'status' => 'REJECTED',
                 'remarks' => $finalRemarks,
             ])->save();
+
+            $this->syncSupplyRequestStatus(
+                $purchaseRequest,
+                $actor,
+                'REJECTED',
+                'Linked purchase request rejected by procurement. '.$finalRemarks
+            );
 
             $this->recordStatus($purchaseRequest, $oldStatus, 'REJECTED', $actor, 'Purchase request rejected by procurement.');
 
@@ -759,6 +815,68 @@ class PurchaseRequestService
             'remarks' => $remarks,
             'changed_at' => now(),
         ]);
+    }
+
+    private function syncSupplyRequestStatus(
+        PurchaseRequest $purchaseRequest,
+        User $actor,
+        string $newStatus,
+        string $remarks
+    ): void {
+        $supplyRequest = $purchaseRequest->supplyRequest()->first();
+        if (! $supplyRequest instanceof SupplyRequest) {
+            return;
+        }
+
+        $oldStatus = (string) $supplyRequest->status;
+        if ($oldStatus === $newStatus) {
+            return;
+        }
+
+        $supplyRequest->forceFill([
+            'status' => $newStatus,
+            'review_notes' => $remarks,
+            'approved_by' => null,
+            'approved_at' => null,
+        ])->save();
+
+        StatusHistory::query()->create([
+            'reference_type' => SupplyRequest::class,
+            'reference_id' => (int) $supplyRequest->supply_request_id,
+            'old_status' => $oldStatus,
+            'new_status' => $newStatus,
+            'changed_by' => (int) $actor->id,
+            'remarks' => $remarks,
+            'changed_at' => now(),
+        ]);
+
+        ApprovalHistory::query()->create([
+            'reference_type' => SupplyRequest::class,
+            'reference_id' => (int) $supplyRequest->supply_request_id,
+            'approved_by' => null,
+            'status' => $newStatus,
+            'remarks' => $remarks,
+            'approved_at' => null,
+        ]);
+
+        $requester = User::query()->find($supplyRequest->requested_by);
+        if ($requester instanceof User) {
+            $message = match ($newStatus) {
+                'DRAFT' => 'Your supply request was returned for revision by Procurement. Please review the remarks and resubmit it after updating.',
+                'REJECTED' => 'Your supply request was rejected by Procurement. Please review the remarks for the reason.',
+                'FOR_PROCUREMENT' => 'Your supply request is now being processed by Procurement.',
+                default => 'Your supply request status was updated by Procurement.',
+            };
+
+            $this->notificationService->notifyUser(
+                user: $requester,
+                title: 'Supply Request Status Updated',
+                message: $message,
+                notificationType: 'OFFICE_SUPPLY_REQUEST_STATUS_UPDATED',
+                referenceType: SupplyRequest::class,
+                referenceId: (int) $supplyRequest->supply_request_id,
+            );
+        }
     }
 
     private function recordAudit(User $actor, string $actionType, PurchaseRequest $purchaseRequest): void

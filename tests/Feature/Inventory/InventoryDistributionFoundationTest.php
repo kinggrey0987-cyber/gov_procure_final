@@ -468,6 +468,41 @@ class InventoryDistributionFoundationTest extends TestCase
         );
     }
 
+    public function test_gso_can_requeue_returned_purchase_request_after_office_resubmits_revision(): void
+    {
+        $context = $this->createSubmittedSupplyRequestForQueue($this->officeA, $this->officeUserA, 90131, 8, 1);
+
+        $this->actingAs($this->gsoOfficer)
+            ->post(route('inventory.office-supply-requests.queue', $context['supplyRequest']->supply_request_id))
+            ->assertRedirect(route('inventory.office-supply-requests.index'));
+
+        $purchaseRequest = PurchaseRequest::query()
+            ->where('supply_request_id', $context['supplyRequest']->supply_request_id)
+            ->firstOrFail();
+
+        $purchaseRequest->forceFill([
+            'status' => 'RETURNED_FOR_REVISION',
+            'remarks' => 'Clarify requested quantity.',
+        ])->save();
+
+        $context['supplyRequest']->forceFill([
+            'status' => 'SUBMITTED',
+            'review_notes' => 'Revised by office and submitted again.',
+        ])->save();
+
+        $this->actingAs($this->gsoOfficer)
+            ->post(route('inventory.office-supply-requests.queue', $context['supplyRequest']->supply_request_id))
+            ->assertRedirect(route('inventory.office-supply-requests.index'));
+
+        $purchaseRequest->refresh();
+        $this->assertSame('OPEN', (string) $purchaseRequest->status);
+        $this->assertSame('FOR_PROCUREMENT', (string) $context['supplyRequest']->fresh()?->status);
+        $this->assertSame(
+            1,
+            PurchaseRequest::query()->where('supply_request_id', $context['supplyRequest']->supply_request_id)->count()
+        );
+    }
+
     public function test_gso_queue_procurement_rejects_stock_ready_requests(): void
     {
         $context = $this->createSubmittedSupplyRequestForQueue($this->officeA, $this->officeUserA, 9014, 5, 10);

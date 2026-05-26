@@ -307,8 +307,53 @@ class ProcurementFoundationFlowTest extends TestCase
             ->assertRedirect();
 
         $purchaseRequest->refresh();
+        $supplyRequest->refresh();
         $this->assertSame('RETURNED_FOR_REVISION', (string) $purchaseRequest->status);
+        $this->assertSame('DRAFT', (string) $supplyRequest->status);
         $this->assertSame('Please clarify item specifications.', (string) $purchaseRequest->remarks);
+    }
+
+    public function test_purchase_request_reject_decision_closes_linked_supply_request(): void
+    {
+        $office = $this->createOffice();
+        $officeUser = $this->createUser(UserRole::OFFICE_USER, $office);
+        $procurementOfficer = $this->createUser(UserRole::PROCUREMENT_OFFICER, $office);
+
+        $supplyRequest = SupplyRequest::query()->create([
+            'request_code' => 'SR-BAC-REJECT-1',
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(5)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'BAC reject propagation test',
+            'priority_level' => 'HIGH',
+            'status' => 'FOR_PROCUREMENT',
+            'review_notes' => null,
+            'approved_by' => null,
+            'approved_at' => null,
+        ]);
+
+        $purchaseRequest = PurchaseRequest::query()->create([
+            'supply_request_id' => $supplyRequest->supply_request_id,
+            'office_id' => $office->id,
+            'requested_by' => $procurementOfficer->id,
+            'status' => 'PROCESSING',
+            'remarks' => null,
+        ]);
+
+        $this->actingAs($procurementOfficer)
+            ->post(route('procurement.purchase-requests.process', $purchaseRequest->purchase_request_id), [
+                'action' => 'reject',
+                'remarks' => 'Not valid for procurement.',
+            ])
+            ->assertRedirect();
+
+        $purchaseRequest->refresh();
+        $supplyRequest->refresh();
+        $this->assertSame('REJECTED', (string) $purchaseRequest->status);
+        $this->assertSame('REJECTED', (string) $supplyRequest->status);
+        $this->assertStringContainsString('Not valid for procurement.', (string) $supplyRequest->review_notes);
     }
 
     private function createOffice(): Office
