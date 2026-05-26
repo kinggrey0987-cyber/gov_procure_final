@@ -51,15 +51,12 @@ class DemoWorkflowSeeder extends Seeder
             DB::transaction(function () use ($beforeCounts): void {
                 $users = User::query()
                     ->where(function ($query): void {
-                        $query->where('email', 'rienz6977@gmail.com')
-                            ->orWhere('email', 'rienz123123@gmail.com')
-                            ->orWhere('email', 'rienyhulleza1022@gmail.com')
-                            ->orWhere('email', 'jayrossrusselherbias@gmail.com')
-                            ->orWhere('email', 'jeronopjer.chmsu@gmail.com')
-                            ->orWhere('email', 'jeronopjer@gmail.com')
-                            ->orWhere('email', 'govprocure86@gmail.com')
-                            ->orWhere('email', 'kinggrey0987@gmail.com')
-                            ->orWhere('email', 'roengwapo09@gmail.com');
+                        $query->where('email', 'office.mpdo@example.invalid')
+                            ->orWhere('email', 'gso.1@example.invalid')
+                            ->orWhere('email', 'procurement.1@example.invalid')
+                            ->orWhere('email', 'executive.1@example.invalid')
+                            ->orWhere('email', 'office.mswdo@example.invalid')
+                            ->orWhere('email', 'office.eng@example.invalid');
                     })
                     ->get()
                     ->keyBy('email');
@@ -67,12 +64,12 @@ class DemoWorkflowSeeder extends Seeder
                 $offices = Office::query()->pluck('id', 'code');
                 $items = Item::query()->pluck('item_id', 'item_name');
 
-                $execUser = $this->requireUser($users, 'jeronopjer@gmail.com');
-                $mpdoUser = $this->requireUser($users, 'rienz6977@gmail.com');
-                $gsoUser = $this->requireUser($users, 'rienyhulleza1022@gmail.com');
-                $procUser = $this->requireUser($users, 'jayrossrusselherbias@gmail.com');
-                $mswdoUser = $this->requireUser($users, 'govprocure86@gmail.com');
-                $engUser = $this->requireUser($users, 'roengwapo09@gmail.com');
+                $execUser = $this->requireUser($users, 'executive.1@example.invalid');
+                $mpdoUser = $this->requireUser($users, 'office.mpdo@example.invalid');
+                $gsoUser = $this->requireUser($users, 'gso.1@example.invalid');
+                $procUser = $this->requireUser($users, 'procurement.1@example.invalid');
+                $mswdoUser = $this->requireUser($users, 'office.mswdo@example.invalid');
+                $engUser = $this->requireUser($users, 'office.eng@example.invalid');
 
                 $mpdoOfficeId = $this->requireOfficeId($offices, 'MPDO');
                 $mswdoOfficeId = $this->requireOfficeId($offices, 'MSWDO');
