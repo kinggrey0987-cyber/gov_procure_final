@@ -34,7 +34,7 @@ class StoreSupplyRequestRequest extends FormRequest
             'purpose' => ['required', 'string'],
             'priority_level' => ['required', 'string', 'max:30'],
             'review_notes' => ['nullable', 'string', 'max:2000'],
-            'items' => ['nullable', 'array'],
+            'items' => ['required', 'array', 'min:1'],
             'items.*.item_id' => ['nullable', 'integer'],
             'items.*.ppmp_item_id' => [
                 'required_with:items',
@@ -125,5 +125,16 @@ class StoreSupplyRequestRequest extends FormRequest
                 }
             }
         });
+    }
+
+    public function messages(): array
+    {
+        return [
+            'items.required' => 'At least one complete supply request item row is required.',
+            'items.min' => 'At least one complete supply request item row is required.',
+            'purpose.required' => 'Purpose is required before saving a supply request.',
+            'items.*.ppmp_item_id.required_with' => 'Select a PPMP item for each request row.',
+            'items.*.quantity_requested.required_with' => 'Quantity is required for each request row.',
+        ];
     }
 }

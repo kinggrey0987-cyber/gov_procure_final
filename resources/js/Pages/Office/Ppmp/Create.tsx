@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import InputError from '@/Components/InputError';
 import useSmartRefresh from '@/hooks/useSmartRefresh';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEvent, useMemo } from 'react';
@@ -83,6 +84,13 @@ export default function PpmpCreate({ itemOptions }: Props) {
             <Head title="Create PPMP" />
 
             <form onSubmit={submit} className="space-y-6 py-4">
+                {Object.keys(form.errors).length > 0 ? (
+                    <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm">
+                        <p className="font-semibold">Unable to save PPMP.</p>
+                        <p className="mt-1">Please complete all required fields and review the highlighted item rows.</p>
+                    </div>
+                ) : null}
+
                 <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                     <div className="mb-4 flex items-center justify-between">
                         <h3 className="text-2xl font-semibold text-slate-800">PPMP Details</h3>
@@ -94,21 +102,24 @@ export default function PpmpCreate({ itemOptions }: Props) {
                     <div className="grid gap-4 md:grid-cols-2">
                         <label className="block">
                             <span className="mb-1 block text-sm font-medium text-slate-700">Fiscal Year</span>
-                            <input type="number" min={CURRENT_YEAR} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={form.data.fiscal_year} onChange={(event) => form.setData('fiscal_year', Number(event.target.value))} />
+                            <input type="number" min={CURRENT_YEAR} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={form.data.fiscal_year} onChange={(event) => form.setData('fiscal_year', Number(event.target.value))} required />
                             <span className="mt-1 block text-xs text-slate-500">Fiscal year cannot be earlier than {CURRENT_YEAR}.</span>
+                            <InputError message={form.errors.fiscal_year} className="mt-1" />
                         </label>
                         <label className="block">
                             <span className="mb-1 block text-sm font-medium text-slate-700">Date Prepared</span>
-                            <input type="date" className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700" value={form.data.date_prepared} readOnly aria-readonly="true" />
+                            <input type="date" className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700" value={form.data.date_prepared} readOnly aria-readonly="true" required />
                             <span className="mt-1 block text-xs text-slate-500">Automatically set to today and locked for audit consistency.</span>
+                            <InputError message={form.errors.date_prepared} className="mt-1" />
                         </label>
                         <label className="block md:col-span-2">
                             <span className="mb-1 block text-sm font-medium text-slate-700">Fund Source</span>
-                            <select value={form.data.fund_source} onChange={(event) => form.setData('fund_source', event.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                            <select value={form.data.fund_source} onChange={(event) => form.setData('fund_source', event.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required>
                                 {FUND_SOURCES.map((option) => (
                                     <option key={option.value} value={option.value}>{option.label}</option>
                                 ))}
                             </select>
+                            <InputError message={form.errors.fund_source} className="mt-1" />
                         </label>
                     </div>
                     <label className="mt-4 block">
@@ -145,17 +156,19 @@ export default function PpmpCreate({ itemOptions }: Props) {
                                 <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                                     <label className="block">
                                         <span className="mb-1 block text-sm font-medium text-slate-700">Item</span>
-                                        <select value={item.item_id} onChange={(event) => chooseItem(index, event.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                                        <select value={item.item_id} onChange={(event) => chooseItem(index, event.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required>
                                             <option value="">Select item</option>
                                             {itemOptions.map((option) => (
                                                 <option key={option.item_id} value={option.item_id}>{option.item_name}</option>
                                             ))}
                                         </select>
+                                        <InputError message={form.errors[`items.${index}.item_id`]} className="mt-1" />
                                     </label>
                                     <label className="block">
                                         <span className="mb-1 block text-sm font-medium text-slate-700">Quantity</span>
-                                        <input type="number" min="1" value={item.quantity} onChange={(event) => patchItem(index, { quantity: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+                                        <input type="number" min="1" value={item.quantity} onChange={(event) => patchItem(index, { quantity: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required />
                                         <span className="mt-1 block text-xs text-slate-500">Quantity: {item.quantity || 0} {unit}</span>
+                                        <InputError message={form.errors[`items.${index}.quantity`]} className="mt-1" />
                                     </label>
                                     <label className="block">
                                         <span className="mb-1 block text-sm font-medium text-slate-700">Unit</span>
@@ -163,21 +176,24 @@ export default function PpmpCreate({ itemOptions }: Props) {
                                     </label>
                                     <label className="block">
                                         <span className="mb-1 block text-sm font-medium text-slate-700">Unit Cost</span>
-                                        <input type="number" min="0" step="0.01" value={item.unit_cost} onChange={(event) => patchItem(index, { unit_cost: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+                                        <input type="number" min="0" step="0.01" value={item.unit_cost} onChange={(event) => patchItem(index, { unit_cost: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required />
+                                        <InputError message={form.errors[`items.${index}.unit_cost`]} className="mt-1" />
                                     </label>
                                     <label className="block">
                                         <span className="mb-1 block text-sm font-medium text-slate-700">Procurement Schedule</span>
-                                        <select value={item.procurement_schedule} onChange={(event) => patchItem(index, { procurement_schedule: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                                        <select value={item.procurement_schedule} onChange={(event) => patchItem(index, { procurement_schedule: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required>
                                             <option value="">Select Quarter</option>
                                             {QUARTER_OPTIONS.map((quarter) => (
                                                 <option key={quarter} value={quarter}>{quarter}</option>
                                             ))}
                                         </select>
+                                        <InputError message={form.errors[`items.${index}.procurement_schedule`]} className="mt-1" />
                                     </label>
                                     <label className="block">
                                         <span className="mb-1 block text-sm font-medium text-slate-700">Item Remarks</span>
                                         <input value={item.remarks} onChange={(event) => patchItem(index, { remarks: event.target.value })} placeholder="Required item specification for SR and PO" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required />
                                         <span className="mt-1 block text-xs text-slate-500">This becomes the item specification shown on Supply Requests and auto-filled on Purchase Orders.</span>
+                                        <InputError message={form.errors[`items.${index}.remarks`]} className="mt-1" />
                                     </label>
                                 </div>
                                 <div className="mt-3 flex justify-end">
@@ -234,7 +250,6 @@ function emptyItem(): ItemDraft {
         remarks: '',
     };
 }
-
 
 
 

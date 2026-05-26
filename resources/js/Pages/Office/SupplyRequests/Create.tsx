@@ -56,6 +56,17 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
     const fetchedItemsForPpmpRef = useRef<string | null>(initialOptions.length > 0 && selectedPpmpId ? String(selectedPpmpId) : null);
 
     const hasPpmp = form.data.ppmp_id !== '';
+    const isFormComplete = useMemo(() => {
+        return Boolean(
+            form.data.ppmp_id.trim() !== ''
+            && form.data.needed_by_date.trim() !== ''
+            && form.data.request_category.trim() !== ''
+            && form.data.priority_level.trim() !== ''
+            && form.data.purpose.trim() !== ''
+            && form.data.items.length > 0
+            && form.data.items.every((item) => item.ppmp_item_id.trim() !== '' && Number(item.quantity_requested) > 0),
+        );
+    }, [form.data.items, form.data.needed_by_date, form.data.ppmp_id, form.data.priority_level, form.data.purpose, form.data.request_category]);
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
@@ -279,6 +290,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                                 value={form.data.needed_by_date}
                                 onChange={(event) => form.setData('needed_by_date', event.target.value)}
+                                required
                             />
                             {form.errors.needed_by_date ? <p className="mt-1 text-xs text-rose-600">{form.errors.needed_by_date}</p> : null}
                         </Field>
@@ -288,6 +300,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                                 value={form.data.request_category}
                                 onChange={(event) => form.setData('request_category', event.target.value)}
+                                required
                             >
                                 <option value="GENERAL">General</option>
                                 <option value="OFFICE_SUPPLIES">Office Supplies</option>
@@ -302,6 +315,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                                 value={form.data.priority_level}
                                 onChange={(event) => form.setData('priority_level', event.target.value)}
+                                required
                             >
                                 <option value="LOW">Low</option>
                                 <option value="MEDIUM">Medium</option>
@@ -318,6 +332,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                 className="h-24 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                                 value={form.data.purpose}
                                 onChange={(event) => form.setData('purpose', event.target.value)}
+                                required
                             />
                             {form.errors.purpose ? <p className="mt-1 text-xs text-rose-600">{form.errors.purpose}</p> : null}
                         </Field>
@@ -392,6 +407,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                                 onChange={(event) => handleOptionChange(index, event.target.value)}
                                                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                                                 disabled={!hasPpmp || loadingOptions}
+                                                required
                                             >
                                                 <option value="">{hasPpmp ? 'Select PPMP item' : 'Select PPMP first'}</option>
                                                 {itemOptions.map((entry) => (
@@ -419,6 +435,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                                 value={item.quantity_requested}
                                                 onChange={(event) => updateItem(index, { quantity_requested: event.target.value })}
                                                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                                required
                                             />
                                             <span className="mt-1 block text-xs text-slate-500">Quantity: {item.quantity_requested || 0} {option?.default_unit || '-'}</span>
                                             {form.errors[`items.${index}.quantity_requested`] ? <p className="mt-1 text-xs text-rose-600">{form.errors[`items.${index}.quantity_requested`]}</p> : null}
@@ -500,7 +517,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                         </Link>
                         <button
                             type="submit"
-                            disabled={form.processing || !hasPpmp || duplicateLineCount > 0}
+                            disabled={form.processing || !hasPpmp || duplicateLineCount > 0 || !isFormComplete}
                             className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
                         >
                             Save Request
@@ -514,6 +531,11 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                     {duplicateLineCount > 0 ? (
                         <p className="mt-3 text-right text-xs font-medium text-rose-700">
                             Save is disabled while duplicate PPMP item lines exist.
+                        </p>
+                    ) : null}
+                    {hasPpmp && !isFormComplete ? (
+                        <p className="mt-3 text-right text-xs font-medium text-rose-700">
+                            Save is disabled until purpose and every request item field are complete.
                         </p>
                     ) : null}
                 </section>
@@ -540,7 +562,6 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
         </label>
     );
 }
-
 
 
 

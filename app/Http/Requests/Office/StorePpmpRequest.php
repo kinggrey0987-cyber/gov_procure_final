@@ -23,7 +23,7 @@ class StorePpmpRequest extends FormRequest
             'date_prepared' => ['required', 'date'],
             'fund_source' => ['required', 'string', Rule::in(FundSource::values())],
             'remarks' => ['nullable', 'string', 'max:2000'],
-            'items' => ['nullable', 'array'],
+            'items' => ['required', 'array', 'min:1'],
             'items.*.item_id' => ['required_with:items', 'integer', 'exists:items,item_id'],
             'items.*.item_category_id' => ['required_with:items', 'integer', 'exists:item_categories,item_category_id'],
             'items.*.quantity' => ['required_with:items', 'numeric', 'gt:0'],
@@ -82,6 +82,8 @@ class StorePpmpRequest extends FormRequest
     {
         return [
             'fiscal_year.min' => 'Fiscal Year cannot be earlier than the current year.',
+            'items.required' => 'At least one complete PPMP item row is required.',
+            'items.min' => 'At least one complete PPMP item row is required.',
             'items.*.procurement_schedule.in' => 'Procurement Schedule must be one of: Q1, Q2, Q3, or Q4.',
             'items.*.remarks.required_with' => 'Item Remarks are required because they become the item specification for Supply Requests and Purchase Orders.',
         ];

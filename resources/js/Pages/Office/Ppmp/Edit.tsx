@@ -25,6 +25,15 @@ type ExistingItem = {
     item?: { item_name?: string | null; default_unit?: string | null } | null;
 };
 
+type PpmpItemDraft = {
+    item_id: string | number;
+    item_category_id: string | number;
+    quantity: string | number;
+    unit_cost: string | number;
+    procurement_schedule: string;
+    remarks?: string | null;
+};
+
 type Props = {
     ppmp: {
         ppmp_id: number;
@@ -84,6 +93,10 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
     };
 
     const addItem = () => {
+        if (!isPpmpItemComplete(newItem.data)) {
+            return;
+        }
+
         newItem.post(route('office.ppmp.items.store', ppmp.ppmp_id), {
             preserveScroll: true,
             preserveState: false,
@@ -96,6 +109,10 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
     };
 
     const updateItem = (itemId: number) => {
+        if (!isPpmpItemComplete(editingRows[itemId])) {
+            return;
+        }
+
         setProcessingRowId(itemId);
         router.put(route('office.ppmp.items.update', [ppmp.ppmp_id, itemId]), editingRows[itemId], {
             preserveScroll: true,
@@ -213,6 +230,7 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                                 const row = editingRows[item.ppmp_item_id];
                                 const estimatedBudget = Number(row.quantity || 0) * Number(row.unit_cost || 0);
                                 const unit = row.item?.default_unit || itemOptionById.get(String(row.item_id))?.default_unit || '-';
+                                const isRowComplete = isPpmpItemComplete(row);
 
                                 return (
                                     <div key={item.ppmp_item_id} className="rounded-xl border border-slate-200 p-4">
@@ -235,9 +253,11 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                                                 <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Quantity</span>
                                                 <input
                                                     type="number"
+                                                    min="1"
                                                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                                                     value={row.quantity}
                                                     onChange={(event) => setEditingRows({ ...editingRows, [item.ppmp_item_id]: { ...row, quantity: Number(event.target.value) } })}
+                                                    required
                                                 />
                                                 <span className="mt-1 block text-xs text-slate-500">Quantity: {row.quantity || 0} {unit}</span>
                                             </label>
@@ -256,10 +276,12 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                                                 <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Unit Cost</span>
                                                 <input
                                                     type="number"
+                                                    min="0"
                                                     step="0.01"
                                                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                                                     value={row.unit_cost}
                                                     onChange={(event) => setEditingRows({ ...editingRows, [item.ppmp_item_id]: { ...row, unit_cost: Number(event.target.value) } })}
+                                                    required
                                                 />
                                             </label>
 
@@ -279,6 +301,7 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                                                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                                                     value={row.procurement_schedule}
                                                     onChange={(event) => setEditingRows({ ...editingRows, [item.ppmp_item_id]: { ...row, procurement_schedule: event.target.value } })}
+                                                    required
                                                 >
                                                     {scheduleOptionsForValue(row.procurement_schedule).map((option) => (
                                                         <option key={option.value} value={option.value}>{option.label}</option>
@@ -305,7 +328,8 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                                             <button
                                                 type="button"
                                                 onClick={() => updateItem(item.ppmp_item_id)}
-                                                disabled={processingRowId === item.ppmp_item_id}
+                                                disabled={processingRowId === item.ppmp_item_id || !isRowComplete}
+                                                title={!isRowComplete ? 'Complete quantity, unit cost, procurement schedule, and item specification first.' : undefined}
                                                 className="rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
                                             >
                                                 {processingRowId === item.ppmp_item_id ? 'Updating...' : 'Update Line'}
@@ -319,6 +343,11 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                                                 {processingRowId === item.ppmp_item_id ? 'Removing...' : 'Remove Line'}
                                             </button>
                                         </div>
+                                        {!isRowComplete ? (
+                                            <p className="mt-2 text-right text-xs font-medium text-rose-700">
+                                                Complete all required line fields before updating this PPMP item.
+                                            </p>
+                                        ) : null}
                                     </div>
                                 );
                             })}
@@ -334,7 +363,7 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
                         <label className="block xl:col-span-2">
                             <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Item</span>
-                            <select className={`w-full rounded-lg border px-3 py-2 text-sm ${newItemDuplicateMessage ? 'border-amber-300 bg-amber-50' : 'border-slate-300'}`} value={newItem.data.item_id} onChange={(event) => onOptionChange(event.target.value)}>
+                            <select className={`w-full rounded-lg border px-3 py-2 text-sm ${newItemDuplicateMessage ? 'border-amber-300 bg-amber-50' : 'border-slate-300'}`} value={newItem.data.item_id} onChange={(event) => onOptionChange(event.target.value)} required>
                                 <option value="">Select Item</option>
                                 {itemOptions.map((option) => (
                                     <option key={option.item_id} value={option.item_id}>{option.item_name}</option>
@@ -345,7 +374,7 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
 
                         <label className="block">
                             <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Quantity</span>
-                            <input type="number" min="1" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={newItem.data.quantity} onChange={(event) => newItem.setData('quantity', event.target.value)} />
+                            <input type="number" min="1" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={newItem.data.quantity} onChange={(event) => newItem.setData('quantity', event.target.value)} required />
                             <span className="mt-1 block text-xs text-slate-500">Quantity: {newItem.data.quantity || 0} {selectedNewItemUnit}</span>
                             <InputError message={newItem.errors.quantity} className="mt-1" />
                         </label>
@@ -357,13 +386,13 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
 
                         <label className="block">
                             <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Unit Cost</span>
-                            <input type="number" min="0" step="0.01" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={newItem.data.unit_cost} onChange={(event) => newItem.setData('unit_cost', event.target.value)} />
+                            <input type="number" min="0" step="0.01" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={newItem.data.unit_cost} onChange={(event) => newItem.setData('unit_cost', event.target.value)} required />
                             <InputError message={newItem.errors.unit_cost} className="mt-1" />
                         </label>
 
                         <label className="block">
                             <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Procurement Schedule</span>
-                            <select className={`w-full rounded-lg border px-3 py-2 text-sm ${newItemDuplicateMessage ? 'border-amber-300 bg-amber-50' : 'border-slate-300'}`} value={newItem.data.procurement_schedule} onChange={(event) => newItem.setData('procurement_schedule', event.target.value)}>
+                            <select className={`w-full rounded-lg border px-3 py-2 text-sm ${newItemDuplicateMessage ? 'border-amber-300 bg-amber-50' : 'border-slate-300'}`} value={newItem.data.procurement_schedule} onChange={(event) => newItem.setData('procurement_schedule', event.target.value)} required>
                                 <option value="">Select Quarter</option>
                                 {QUARTER_OPTIONS.map((quarter) => (
                                     <option key={quarter} value={quarter}>{quarter}</option>
@@ -389,11 +418,28 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                     ) : null}
 
                     <div className="flex justify-end">
-                        <button type="button" onClick={addItem} disabled={newItem.processing || Boolean(newItemDuplicateMessage)} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">Add Item</button>
+                        <button type="button" onClick={addItem} disabled={newItem.processing || Boolean(newItemDuplicateMessage) || !isPpmpItemComplete(newItem.data)} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">Add Item</button>
                     </div>
+                    {!isPpmpItemComplete(newItem.data) ? (
+                        <p className="text-right text-xs font-medium text-rose-700">
+                            Complete all required item fields before adding this PPMP line.
+                        </p>
+                    ) : null}
                 </section>
             </div>
         </AuthenticatedLayout>
+    );
+}
+
+function isPpmpItemComplete(item: Partial<PpmpItemDraft> | Partial<ExistingItem>): boolean {
+    return Boolean(
+        String(item.item_id ?? '').trim() !== ''
+        && String(item.item_category_id ?? '').trim() !== ''
+        && Number(item.quantity) > 0
+        && String(item.unit_cost ?? '').trim() !== ''
+        && Number(item.unit_cost) >= 0
+        && QUARTER_OPTIONS.includes(String(item.procurement_schedule ?? '').trim().toUpperCase() as (typeof QUARTER_OPTIONS)[number])
+        && String(item.remarks ?? '').trim() !== '',
     );
 }
 
@@ -431,8 +477,6 @@ function scheduleOptionsForValue(value: string): Array<{ value: string; label: s
 
     return [{ value: normalized, label: `${normalized} (legacy value)` }, ...options];
 }
-
-
 
 
 
