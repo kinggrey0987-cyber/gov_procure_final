@@ -112,8 +112,8 @@ class DemoWorkflowSeeder extends Seeder
                         approver: $execUser,
                         fiscalYear: 2026,
                         plannedItems: [
-                            ['item_name' => 'Bond Paper', 'quantity' => 20, 'unit_cost' => 18],
-                            ['item_name' => 'Ballpen', 'quantity' => 30, 'unit_cost' => 6],
+                            ['item_name' => 'Bond Paper', 'quantity' => 20, 'unit_cost' => 18, 'remarks' => 'A4 80gsm multipurpose bond paper for official reports and correspondence.'],
+                            ['item_name' => 'Ballpen', 'quantity' => 30, 'unit_cost' => 6, 'remarks' => 'Black ink ballpen, smooth-writing, office-grade supply.'],
                         ],
                         desiredStatus: 'APPROVED',
                         remarks: '2026 municipal planning stationery plan.',
@@ -124,9 +124,9 @@ class DemoWorkflowSeeder extends Seeder
                         approver: $execUser,
                         fiscalYear: 2026,
                         plannedItems: [
-                            ['item_name' => 'Rubbing Alcohol', 'quantity' => 20, 'unit_cost' => 25],
-                            ['item_name' => 'Detergent Powder', 'quantity' => 25, 'unit_cost' => 38],
-                            ['item_name' => 'Safety Gloves', 'quantity' => 12, 'unit_cost' => 45],
+                            ['item_name' => 'Rubbing Alcohol', 'quantity' => 20, 'unit_cost' => 25, 'remarks' => '70% isopropyl alcohol for sanitation desk and field welfare kits.'],
+                            ['item_name' => 'Detergent Powder', 'quantity' => 25, 'unit_cost' => 38, 'remarks' => 'Powder detergent for municipal facility cleaning and sanitation use.'],
+                            ['item_name' => 'Safety Gloves', 'quantity' => 12, 'unit_cost' => 45, 'remarks' => 'Reusable safety gloves suitable for welfare operations and cleaning tasks.'],
                         ],
                         desiredStatus: 'RETURNED_FOR_REVISION',
                         remarks: 'Returned for budget alignment and quantity review.',
@@ -137,9 +137,9 @@ class DemoWorkflowSeeder extends Seeder
                         approver: $execUser,
                         fiscalYear: 2026,
                         plannedItems: [
-                            ['item_name' => 'Printer Ink', 'quantity' => 8, 'unit_cost' => 850],
-                            ['item_name' => 'Mouse', 'quantity' => 12, 'unit_cost' => 325],
-                            ['item_name' => 'Logbook', 'quantity' => 10, 'unit_cost' => 120],
+                            ['item_name' => 'Printer Ink', 'quantity' => 8, 'unit_cost' => 850, 'remarks' => 'Compatible printer ink cartridge for engineering office document production.'],
+                            ['item_name' => 'Mouse', 'quantity' => 12, 'unit_cost' => 325, 'remarks' => 'USB optical mouse for workstation replacement and staff productivity.'],
+                            ['item_name' => 'Logbook', 'quantity' => 10, 'unit_cost' => 120, 'remarks' => 'Hardbound logbook for maintenance records and engineering activity tracking.'],
                         ],
                         desiredStatus: 'APPROVED',
                         remarks: 'Engineering office operating stock plan.',
@@ -978,7 +978,7 @@ class DemoWorkflowSeeder extends Seeder
                     'unit_cost' => $unitCost,
                     'estimated_budget' => $estimatedBudget,
                     'procurement_schedule' => now()->addWeeks(2)->toDateString(),
-                    'remarks' => 'Seeded demo PPMP line item.',
+                    'remarks' => (string) ($plannedItem['remarks'] ?? sprintf('Required specification for %s from seeded PPMP item remarks.', $plannedItem['item_name'])),
                 ],
             );
         }

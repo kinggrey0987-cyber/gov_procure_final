@@ -85,30 +85,30 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
         >
             <Head title="Purchase Order Items" />
 
-            <div className="py-10">
-                <div className="mx-auto max-w-6xl space-y-4 px-4 sm:px-6 lg:px-8">
-                    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="space-y-6 py-4">
+                    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <div>
-                                <p className="text-xs uppercase tracking-[0.15em] text-slate-500">Line Encoding</p>
-                                <h3 className="mt-1 text-lg font-semibold text-slate-900">{purchaseOrder.po_number ?? `PO #${purchaseOrder.purchase_order_id}`}</h3>
+                                <p className="text-xs font-semibold uppercase tracking-[0.15em] text-red-700">Line Encoding</p>
+                                <h3 className="mt-1 text-2xl font-semibold text-slate-800">{purchaseOrder.po_number ?? `PO #${purchaseOrder.purchase_order_id}`}</h3>
                                 <p className="mt-1 text-sm text-slate-600">Select a source request item, then encode quantity and unit price from supplier quotation.</p>
                             </div>
                             <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">{purchaseOrder.status ?? 'DRAFT'}</span>
                         </div>
                     </section>
 
-                    <form onSubmit={submit} className="grid gap-4 rounded-lg border bg-white p-5 md:grid-cols-4">
+                    <form onSubmit={submit} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                         <div className="md:col-span-4">
-                            <p className="text-sm font-semibold text-slate-800">Source Request Line</p>
+                            <p className="text-xl font-semibold text-slate-800">Source Request Line</p>
                             <p className="mt-1 text-xs text-slate-500">Choose the approved request line. Source identifiers, item name, requested quantity, and unit are locked for traceability.</p>
                         </div>
+                        <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
                         <label className="grid gap-1 text-sm font-semibold text-slate-700 md:col-span-2">
                             Select Source Request Item
                             <select
                                 value={form.data.supply_request_item_id || ''}
                                 onChange={(event) => applySourceItem(Number(event.target.value))}
-                                className="rounded border-gray-300 text-sm font-normal"
+                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal"
                                 required
                             >
                                 <option value="">Select Source Request Item</option>
@@ -133,13 +133,14 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                             Specification from PPMP Item Remarks
                             <input
                                 type="text"
-                                placeholder="Auto-filled from PPMP item remarks; adjust only if supplier quote requires clarification"
+                                placeholder="Auto-filled from PPMP item remarks"
                                 value={form.data.specification}
-                                onChange={(event) => form.setData('specification', event.target.value)}
-                                className="rounded border-gray-300 text-sm font-normal"
+                                className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-normal text-slate-700"
+                                readOnly
+                                aria-readonly="true"
                                 required
                             />
-                            <span className="text-xs font-normal text-slate-500">This is automatically copied from the PPMP item specification.</span>
+                            <span className="text-xs font-normal text-slate-500">This is locked because it is derived from the PPMP item remarks.</span>
                         </label>
                         <label className="grid gap-1 text-sm font-semibold text-slate-700">
                             Unit Price from Supplier Quote
@@ -150,13 +151,14 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                                 placeholder="0.00"
                                 value={form.data.unit_price}
                                 onChange={(event) => form.setData('unit_price', event.target.value)}
-                                className="rounded border-gray-300 text-sm font-normal"
+                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal"
                                 required
                             />
                         </label>
-                        <button type="submit" disabled={isDuplicateSelection || form.processing || !selectedSource} className="rounded bg-indigo-600 px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60">
+                        <button type="submit" disabled={isDuplicateSelection || form.processing || !selectedSource} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60">
                             Add Item
                         </button>
+                        </div>
                         {isDuplicateSelection ? (
                             <button type="button" className="rounded border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700">
                                 Duplicate Not Allowed
@@ -175,8 +177,8 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                         ) : null}
                     </form>
 
-                    <div className="responsive-table-wrap rounded-lg border bg-white">
-                    <table className="min-w-full text-sm">
+                    <div className="responsive-table-wrap rounded-2xl border border-slate-200 bg-white shadow-sm">
+                        <table className="min-w-full text-sm">
                             <thead className="bg-gray-50">
                                 <tr>
                                     <th className="px-3 py-2 text-left">Item ID</th>
@@ -225,13 +227,12 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                         </table>
                     </div>
 
-                     <div className="flex flex-wrap gap-3">
-                         <Link href={route('procurement.purchase-orders.show', purchaseOrder.purchase_order_id)} className="rounded border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                             Back to Purchase Order
-                         </Link>
-                     </div>
-                 </div>
-             </div>
+                    <div className="flex flex-wrap gap-3">
+                        <Link href={route('procurement.purchase-orders.show', purchaseOrder.purchase_order_id)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                            Back to Purchase Order
+                        </Link>
+                    </div>
+            </div>
         </AuthenticatedLayout>
     );
 }
@@ -244,8 +245,6 @@ function ReadOnlyField({ label, value }: { label: string; value: string }) {
         </div>
     );
 }
-
-
 
 
 

@@ -942,7 +942,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                     'unit_cost' => $unitCost,
                     'estimated_budget' => $estimatedBudget,
                     'procurement_schedule' => now()->addWeeks(2)->toDateString(),
-                    'remarks' => 'Seeded demo PPMP line item.',
+                    'remarks' => (string) ($plannedItem['remarks'] ?? sprintf('Required specification for %s from seeded PPMP item remarks.', $plannedItem['item_name'])),
                 ],
             );
         }

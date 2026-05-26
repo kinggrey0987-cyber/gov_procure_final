@@ -332,11 +332,6 @@ class PurchaseOrderService
      */
     private function resolveItemSpecification(array $payload, SupplyRequestItem $supplyRequestItem): string
     {
-        $incomingSpecification = trim((string) ($payload['specification'] ?? ''));
-        if ($incomingSpecification !== '') {
-            return $incomingSpecification;
-        }
-
         return trim((string) ($supplyRequestItem->ppmpItem?->remarks ?? ''));
     }
 
