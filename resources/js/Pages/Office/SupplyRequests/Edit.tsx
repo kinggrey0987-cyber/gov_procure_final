@@ -1,6 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { FormEvent, ReactNode, useMemo, useState } from 'react';
+import { dateInputValue } from '@/lib/dateInput';
 
 type PpmpOption = {
     ppmp_id: number;
@@ -56,8 +57,8 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
 
     const form = useForm({
         ppmp_id: selectedPpmpId ? String(selectedPpmpId) : '',
-        request_date: supplyRequest.request_date,
-        needed_by_date: supplyRequest.needed_by_date,
+        request_date: dateInputValue(supplyRequest.request_date),
+        needed_by_date: dateInputValue(supplyRequest.needed_by_date),
         request_category: supplyRequest.request_category,
         purpose: supplyRequest.purpose,
         priority_level: supplyRequest.priority_level,
@@ -222,7 +223,7 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
 
                     <div className="grid gap-4 md:grid-cols-2">
                         <Field label="Request Date" hint="Request date is automatically recorded by the system.">
-                            <input type="text" className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700" value={supplyRequest.request_date} readOnly aria-readonly="true" />
+                            <input type="text" className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700" value={form.data.request_date} readOnly aria-readonly="true" />
                         </Field>
                         <Field label="Needed By Date">
                             <input type="date" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={form.data.needed_by_date} onChange={(event) => form.setData('needed_by_date', event.target.value)} />
@@ -422,7 +423,6 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
         </label>
     );
 }
-
 
 
 

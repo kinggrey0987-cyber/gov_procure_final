@@ -2,6 +2,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEvent, useMemo, useEffect } from 'react';
 import { PROCUREMENT_METHODS, DEFAULT_PROCUREMENT_METHOD } from '@/constants/procurementMethods';
+import { todayInputValue } from '@/lib/dateInput';
 
 type PurchaseRequestOption = {
     purchase_request_id: number;
@@ -62,7 +63,7 @@ export default function PurchaseOrdersCreate({ eligiblePurchaseRequests, supplie
     const canSubmit = hasEligiblePurchaseRequests && hasSuppliers && !form.processing;
     const selectedItems = selectedPurchaseRequest?.items ?? [];
     const selectedTotalQty = selectedItems.reduce((sum, row) => sum + Number(row.quantity_requested ?? 0), 0);
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayInputValue();
 
     // Warn before leaving if form has unsaved changes
     useEffect(() => {
@@ -294,7 +295,6 @@ function ContextField({ label, value }: { label: string; value: string }) {
         </div>
     );
 }
-
 
 
 

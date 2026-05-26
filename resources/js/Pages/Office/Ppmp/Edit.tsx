@@ -4,6 +4,7 @@ import useSmartRefresh from '@/hooks/useSmartRefresh';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { FormEvent, useMemo, useState } from 'react';
 import { FUND_SOURCES } from '@/constants/fundSources';
+import { dateInputValue } from '@/lib/dateInput';
 
 type ItemOption = {
     item_id: number;
@@ -69,7 +70,7 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
 
     const form = useForm({
         fiscal_year: ppmp.fiscal_year,
-        date_prepared: ppmp.date_prepared,
+        date_prepared: dateInputValue(ppmp.date_prepared),
         fund_source: ppmp.fund_source,
         remarks: ppmp.remarks ?? '',
     });
@@ -477,6 +478,5 @@ function scheduleOptionsForValue(value: string): Array<{ value: string; label: s
 
     return [{ value: normalized, label: `${normalized} (legacy value)` }, ...options];
 }
-
 
 

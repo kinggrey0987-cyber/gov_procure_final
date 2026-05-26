@@ -4,6 +4,7 @@ import useSmartRefresh from '@/hooks/useSmartRefresh';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEvent, useMemo } from 'react';
 import { FUND_SOURCES, DEFAULT_FUND_SOURCE } from '@/constants/fundSources';
+import { todayInputValue } from '@/lib/dateInput';
 
 type ItemOption = {
     item_id: number;
@@ -28,7 +29,7 @@ type Props = {
 
 const QUARTER_OPTIONS = ['Q1', 'Q2', 'Q3', 'Q4'] as const;
 const CURRENT_YEAR = new Date().getFullYear();
-const TODAY = new Date().toISOString().slice(0, 10);
+const TODAY = todayInputValue();
 
 export default function PpmpCreate({ itemOptions }: Props) {
     const { isRefreshing } = useSmartRefresh({
@@ -250,7 +251,6 @@ function emptyItem(): ItemDraft {
         remarks: '',
     };
 }
-
 
 
 

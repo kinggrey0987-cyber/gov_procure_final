@@ -2,6 +2,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import useSmartRefresh from '@/hooks/useSmartRefresh';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { dateInputValue, todayInputValue } from '@/lib/dateInput';
 
 type PpmpOption = {
     ppmp_id: number;
@@ -46,7 +47,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
 
     const form = useForm({
         ppmp_id: selectedPpmpId ? String(selectedPpmpId) : '',
-        needed_by_date: new Date().toISOString().slice(0, 10),
+        needed_by_date: todayInputValue(),
         request_category: 'GENERAL',
         purpose: '',
         priority_level: 'MEDIUM',
@@ -281,7 +282,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
 
                     <div className="grid gap-4 md:grid-cols-2">
                         <Field label="Request Date" hint="Request date is automatically recorded by the system.">
-                            <input type="text" className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700" value={requestDate} readOnly aria-readonly="true" />
+                            <input type="text" className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700" value={dateInputValue(requestDate)} readOnly aria-readonly="true" />
                         </Field>
 
                         <Field label="Needed By Date">
@@ -562,7 +563,6 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
         </label>
     );
 }
-
 
 
 

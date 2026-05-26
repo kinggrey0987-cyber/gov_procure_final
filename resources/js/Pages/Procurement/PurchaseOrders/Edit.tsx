@@ -2,6 +2,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, useForm } from '@inertiajs/react';
 import { FormEvent } from 'react';
 import { PROCUREMENT_METHODS } from '@/constants/procurementMethods';
+import { dateInputValue, todayInputValue } from '@/lib/dateInput';
 
 type SupplierOption = {
     supplier_id: number;
@@ -24,13 +25,13 @@ type Props = {
 };
 
 export default function PurchaseOrdersEdit({ purchaseOrder, suppliers }: Props) {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayInputValue();
 
     const form = useForm({
         supplier_id: purchaseOrder.supplier_id,
         po_number: purchaseOrder.po_number,
         procurement_method: purchaseOrder.procurement_method,
-        expected_delivery_date: purchaseOrder.expected_delivery_date ?? '',
+        expected_delivery_date: dateInputValue(purchaseOrder.expected_delivery_date),
         terms_notes: purchaseOrder.terms_notes ?? '',
         remarks: purchaseOrder.remarks ?? '',
     });
@@ -114,7 +115,6 @@ export default function PurchaseOrdersEdit({ purchaseOrder, suppliers }: Props) 
         </AuthenticatedLayout>
     );
 }
-
 
 
 
