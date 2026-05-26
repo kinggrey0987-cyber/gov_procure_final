@@ -331,7 +331,7 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                                                 onClick={() => updateItem(item.ppmp_item_id)}
                                                 disabled={processingRowId === item.ppmp_item_id || !isRowComplete}
                                                 title={!isRowComplete ? 'Complete quantity, unit cost, procurement schedule, and item specification first.' : undefined}
-                                                className="rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                                className="rounded-lg border border-red-300 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
                                             >
                                                 {processingRowId === item.ppmp_item_id ? 'Updating...' : 'Update Line'}
                                             </button>
@@ -419,7 +419,7 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                     ) : null}
 
                     <div className="flex justify-end">
-                        <button type="button" onClick={addItem} disabled={newItem.processing || Boolean(newItemDuplicateMessage) || !isPpmpItemComplete(newItem.data)} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">Add Item</button>
+                        <button type="button" onClick={addItem} disabled={newItem.processing || Boolean(newItemDuplicateMessage) || !isPpmpItemComplete(newItem.data)} className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60">Add Item</button>
                     </div>
                     {!isPpmpItemComplete(newItem.data) ? (
                         <p className="text-right text-xs font-medium text-rose-700">
@@ -478,5 +478,4 @@ function scheduleOptionsForValue(value: string): Array<{ value: string; label: s
 
     return [{ value: normalized, label: `${normalized} (legacy value)` }, ...options];
 }
-
 

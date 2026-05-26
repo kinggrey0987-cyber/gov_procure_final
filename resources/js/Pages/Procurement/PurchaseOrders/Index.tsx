@@ -168,7 +168,7 @@ export default function PurchaseOrdersIndex({ purchaseOrders, filters }: Props) 
                                                 </Link>
                                             ) : null}
                                             {row.status === 'DRAFT' ? (
-                                                <Link href={route('procurement.purchase-orders.items.index', row.purchase_order_id)} className="rounded border border-emerald-300 px-3 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50">
+                                                <Link href={route('procurement.purchase-orders.items.index', row.purchase_order_id)} className="rounded border border-red-300 px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-50">
                                                     Manage Items
                                                 </Link>
                                             ) : null}
@@ -236,7 +236,6 @@ function formatMoney(value: number) {
         maximumFractionDigits: 0,
     }).format(value);
 }
-
 
 
 

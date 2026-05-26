@@ -59,7 +59,7 @@ export default function PurchaseRequestItemsIndex({ purchaseRequest, items }: Pr
                             onChange={(event) => form.setData('remarks', event.target.value)}
                             className="rounded border-gray-300 text-sm"
                         />
-                        <button type="submit" className="rounded bg-indigo-600 px-4 py-2 text-sm text-white">
+                        <button type="submit" className="rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
                             Add Item
                         </button>
                     </form>
@@ -89,7 +89,6 @@ export default function PurchaseRequestItemsIndex({ purchaseRequest, items }: Pr
         </AuthenticatedLayout>
     );
 }
-
 
 
 

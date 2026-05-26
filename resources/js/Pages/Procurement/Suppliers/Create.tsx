@@ -108,10 +108,10 @@ export default function SuppliersCreate() {
                         </div>
 
                         <div className="flex flex-wrap gap-3">
-                            <button type="submit" disabled={form.processing} className="rounded bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60">
+                            <button type="submit" disabled={form.processing} className="rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-60">
                                 {form.processing ? 'Saving...' : 'Save Supplier'}
                             </button>
-                            <Link href={route('procurement.suppliers.index')} className="rounded border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                            <Link href={route('procurement.suppliers.index')} className="rounded border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
                                 Return to Suppliers
                             </Link>
                         </div>
@@ -121,7 +121,6 @@ export default function SuppliersCreate() {
         </AuthenticatedLayout>
     );
 }
-
 
 
 

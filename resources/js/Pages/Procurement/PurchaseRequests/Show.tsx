@@ -139,15 +139,6 @@ export default function PurchaseRequestsShow({ purchaseRequest, reviewMode = fal
                         </table>
                     </section>
 
-                    <div className="flex flex-wrap gap-3">
-                        <Link
-                            href={resolvedBackLink.href}
-                            className="rounded border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                        >
-                            {resolvedBackLink.label}
-                        </Link>
-                    </div>
-
                     {(purchaseRequest.status === 'OPEN' || purchaseRequest.status === 'PROCESSING' || purchaseRequest.status === 'RETURNED_FOR_REVISION') && permissions?.process && reviewMode ? (
                         <form onSubmit={processRequest} className="space-y-3 rounded-lg border bg-white p-6">
                             <label className="mb-1 block text-sm text-gray-700">Review Decision Remarks</label>
@@ -160,20 +151,35 @@ export default function PurchaseRequestsShow({ purchaseRequest, reviewMode = fal
                             />
                             {processForm.errors.remarks ? <p className="text-xs text-rose-600">{processForm.errors.remarks}</p> : null}
                             <div className="flex flex-wrap gap-2">
+                                <Link
+                                    href={resolvedBackLink.href}
+                                    className="rounded border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
+                                >
+                                    {resolvedBackLink.label}
+                                </Link>
                                 {(purchaseRequest.status === 'OPEN' || purchaseRequest.status === 'RETURNED_FOR_REVISION') && (
-                                    <button type="button" onClick={() => submitReviewAction('process')} className="rounded bg-amber-600 px-4 py-2 text-sm text-white">
+                                    <button type="button" onClick={() => submitReviewAction('process')} className="rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
                                         Move to Processing
                                     </button>
                                 )}
-                                <button type="button" onClick={() => submitReviewAction('return')} disabled={reasonIsBlank || processForm.processing} className="rounded bg-violet-600 px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60">
+                                <button type="button" onClick={() => submitReviewAction('return')} disabled={reasonIsBlank || processForm.processing} className="rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60">
                                     Return for Revision
                                 </button>
-                                <button type="button" onClick={() => submitReviewAction('reject')} disabled={reasonIsBlank || processForm.processing} className="rounded bg-rose-600 px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60">
+                                <button type="button" onClick={() => submitReviewAction('reject')} disabled={reasonIsBlank || processForm.processing} className="rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60">
                                     Reject Request
                                 </button>
                             </div>
                         </form>
-                    ) : null}
+                    ) : (
+                        <div className="flex flex-wrap gap-3">
+                            <Link
+                                href={resolvedBackLink.href}
+                                className="rounded border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
+                            >
+                                {resolvedBackLink.label}
+                            </Link>
+                        </div>
+                    )}
                 </div>
             </div>
         </AuthenticatedLayout>
@@ -226,8 +232,6 @@ function formatRequestRemarks(remarks?: string | null) {
 
     return cleaned;
 }
-
-
 
 
 

@@ -56,7 +56,7 @@ export default function PurchaseRequestsCreate({ eligibleSupplyRequests }: Props
                             />
                         </div>
 
-                        <button type="submit" className="rounded bg-indigo-600 px-4 py-2 text-sm text-white">
+                        <button type="submit" className="rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
                             Create Purchase Request
                         </button>
                     </form>
@@ -65,7 +65,6 @@ export default function PurchaseRequestsCreate({ eligibleSupplyRequests }: Props
         </AuthenticatedLayout>
     );
 }
-
 
 
 

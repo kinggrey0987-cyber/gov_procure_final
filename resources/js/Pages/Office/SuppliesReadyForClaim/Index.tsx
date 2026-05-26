@@ -92,14 +92,14 @@ export default function SuppliesReadyForClaimIndex({ records }: Props) {
                                                                     preserveScroll: true,
                                                                 });
                                                             }}
-                                                            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                                                            className="rounded-lg bg-red-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-800"
                                                         >
                                                             Confirm Received
                                                         </button>
                                                     ) : null}
                                                     <Link
                                                         href={route('office.distribution-records.show', record.distribution_record_id)}
-                                                        className="rounded-lg border border-emerald-300 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+                                                        className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
                                                     >
                                                         Open Distribution
                                                     </Link>
@@ -138,7 +138,6 @@ function StatusBadge({ status }: { status: string }) {
 
     return <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${style}`}>{status.replaceAll('_', ' ')}</span>;
 }
-
 
 
 

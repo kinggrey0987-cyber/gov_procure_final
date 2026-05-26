@@ -132,7 +132,7 @@ export default function PpmpCreate({ itemOptions }: Props) {
                 <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                     <div className="mb-4 flex items-center justify-between">
                         <h4 className="text-xl font-semibold text-slate-800">PPMP Items</h4>
-                        <button type="button" onClick={addItem} className="rounded-lg border border-emerald-300 px-4 py-2 text-sm font-semibold text-emerald-700">Add Item Row</button>
+                        <button type="button" onClick={addItem} className="rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">Add Item Row</button>
                     </div>
 
                     {hasDuplicateItems ? (
@@ -251,6 +251,5 @@ function emptyItem(): ItemDraft {
         remarks: '',
     };
 }
-
 
 

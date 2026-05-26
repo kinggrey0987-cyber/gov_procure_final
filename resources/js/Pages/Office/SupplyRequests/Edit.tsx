@@ -306,7 +306,7 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                                             <button
                                                 type="button"
                                                 onClick={() => updateItem(item.supply_request_item_id)}
-                                                className="rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-700"
+                                                className="rounded-lg border border-red-300 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50"
                                             >
                                                 Update
                                             </button>
@@ -377,7 +377,7 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                             readOnly
                             aria-readonly="true"
                         />
-                        <button type="button" onClick={addItem} disabled={!hasPpmp || newItemIsDuplicate} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60">
+                        <button type="button" onClick={addItem} disabled={!hasPpmp || newItemIsDuplicate} className="rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-60">
                             Add Item
                         </button>
                     </div>
@@ -423,7 +423,6 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
         </label>
     );
 }
-
 
 
 

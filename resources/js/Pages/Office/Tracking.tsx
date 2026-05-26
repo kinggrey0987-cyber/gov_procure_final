@@ -98,13 +98,13 @@ export default function OfficeTracking({ summary, recentRequests, notificationPr
                         </Link>
                         <Link
                             href={route('office.supply-requests.index')}
-                            className="rounded-xl border border-blue-300 bg-white px-4 py-5 text-center text-lg font-semibold text-blue-700 transition hover:bg-blue-50"
+                            className="rounded-xl border border-red-300 bg-white px-4 py-5 text-center text-lg font-semibold text-red-700 transition hover:bg-red-50"
                         >
                             Track Request Status
                         </Link>
                         <Link
                             href={route('office.supplies-ready.index')}
-                            className="rounded-xl border border-emerald-300 bg-white px-4 py-5 text-center text-lg font-semibold text-emerald-700 transition hover:bg-emerald-50"
+                            className="rounded-xl border border-red-300 bg-white px-4 py-5 text-center text-lg font-semibold text-red-700 transition hover:bg-red-50"
                         >
                             Supplies Ready to Claim
                         </Link>
@@ -293,7 +293,6 @@ function MetricCard({ label, value, tone }: { label: string; value: number; tone
         </div>
     );
 }
-
 
 
 

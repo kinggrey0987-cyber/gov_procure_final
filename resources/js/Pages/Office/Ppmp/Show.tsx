@@ -147,7 +147,7 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
                     <div className="flex flex-wrap gap-3">
                         <Link href={route('office.ppmp.index')} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">Back to PPMP List</Link>
                         {canEdit ? (
-                            <Link href={route('office.ppmp.edit', ppmp.ppmp_id)} className="rounded-lg border border-blue-300 px-4 py-2 text-sm font-semibold text-blue-700">Edit PPMP</Link>
+                            <Link href={route('office.ppmp.edit', ppmp.ppmp_id)} className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">Edit PPMP</Link>
                         ) : null}
                         {isDraft ? (
                             <button
@@ -236,7 +236,6 @@ function StatusBadge({ status }: { status: string }) {
 
     return <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${style}`}>{status.replaceAll('_', ' ')}</span>;
 }
-
 
 
 

@@ -44,11 +44,11 @@ export default function SuppliersShow({ supplier, permissions }: Props) {
 
                     <div className="flex flex-wrap gap-3">
                         {permissions?.update ? (
-                            <Link href={route('procurement.suppliers.edit', supplier.supplier_id)} className="rounded bg-indigo-600 px-4 py-2 text-sm text-white">
+                            <Link href={route('procurement.suppliers.edit', supplier.supplier_id)} className="rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
                                 Edit Supplier
                             </Link>
                         ) : null}
-                        <Link href={route('procurement.suppliers.index')} className="rounded border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                        <Link href={route('procurement.suppliers.index')} className="rounded border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
                             Back to Suppliers
                         </Link>
                     </div>
@@ -76,7 +76,6 @@ function statusClass(status: string) {
 
     return map[status] ?? `${base} bg-slate-100 text-slate-700`;
 }
-
 
 
 

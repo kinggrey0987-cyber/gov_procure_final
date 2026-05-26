@@ -148,12 +148,6 @@ export default function PurchaseOrdersShow({ purchaseOrder, statusHistory, appro
                         </table>
                     </section>
 
-                    <div className="flex flex-wrap gap-3">
-                        <Link href={resolvedBackLink.href} className="rounded border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                            {resolvedBackLink.label}
-                        </Link>
-                    </div>
-
                     {purchaseOrder.status === 'DRAFT' && permissions?.place ? (
                         <form onSubmit={placeOrder} className="space-y-3 rounded-lg border bg-white p-6">
                             <label className="mb-1 block text-sm text-gray-700">Placement Remarks</label>
@@ -163,11 +157,22 @@ export default function PurchaseOrdersShow({ purchaseOrder, statusHistory, appro
                                 className="w-full rounded border-gray-300 text-sm"
                                 rows={3}
                             />
-                            <button type="submit" className="rounded bg-amber-600 px-4 py-2 text-sm text-white">
-                                Place Purchase Order
-                            </button>
+                            <div className="flex flex-wrap gap-3">
+                                <Link href={resolvedBackLink.href} className="rounded border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
+                                    {resolvedBackLink.label}
+                                </Link>
+                                <button type="submit" className="rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
+                                    Place Purchase Order
+                                </button>
+                            </div>
                         </form>
-                    ) : null}
+                    ) : (
+                        <div className="flex flex-wrap gap-3">
+                            <Link href={resolvedBackLink.href} className="rounded border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
+                                {resolvedBackLink.label}
+                            </Link>
+                        </div>
+                    )}
 
                     {showProcurementDocumentsLink ? <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                         <h3 className="text-lg font-semibold text-slate-900">Purchase Order Documents</h3>
@@ -228,8 +233,6 @@ function formatMoney(value: number) {
         currency: 'PHP',
     }).format(value);
 }
-
-
 
 
 

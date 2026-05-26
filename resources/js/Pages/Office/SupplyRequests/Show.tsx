@@ -144,12 +144,6 @@ export default function SupplyRequestShow({
             header={
                 <div className="space-y-2">
                     <h2 className="text-xl font-semibold leading-tight text-gray-800">Request Details</h2>
-                    <Link
-                        href={route('office.supply-requests.index')}
-                        className="inline-flex rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                    >
-                        Back to Tracking
-                    </Link>
                 </div>
             }
         >
@@ -219,7 +213,7 @@ export default function SupplyRequestShow({
                             <div className="flex flex-wrap gap-3">
                                 <Link
                                     href={route('office.supply-requests.index')}
-                                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                                    className="rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
                                 >
                                     Back to Tracking
                                 </Link>
@@ -227,7 +221,7 @@ export default function SupplyRequestShow({
                                 {canEdit ? (
                                     <Link
                                         href={route('office.supply-requests.edit', supplyRequest.supply_request_id)}
-                                        className="rounded-lg border border-blue-300 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+                                        className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800"
                                     >
                                         Edit Request
                                     </Link>
@@ -395,7 +389,7 @@ export default function SupplyRequestShow({
                         {isReleasedOrCompleted ? (
                             <button
                                 onClick={() => setReportIssueOpen(true)}
-                                className="mt-4 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600"
+                                className="mt-4 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800"
                             >
                                 Report Issue
                             </button>
@@ -582,8 +576,6 @@ function StatusBadge({ status }: { status: string }) {
 
     return <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${style}`}>{status.replaceAll('_', ' ')}</span>;
 }
-
-
 
 
 

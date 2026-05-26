@@ -38,7 +38,7 @@ export default function SupplyRequestItemsIndex({ supplyRequest, items }: Props)
                         <input type="number" className="rounded border px-2 py-1" placeholder="PPMP Item ID" onChange={(e) => form.setData('ppmp_item_id', e.target.value ? Number(e.target.value) : null)} />
                         <input className="rounded border px-2 py-1" placeholder="Item Name Snapshot" onChange={(e) => form.setData('item_name_snapshot', e.target.value)} />
                         <input type="number" className="rounded border px-2 py-1" placeholder="Quantity" onChange={(e) => form.setData('quantity_requested', Number(e.target.value))} />
-                        <button type="submit" className="rounded bg-emerald-600 px-3 py-2 text-white">Add Item</button>
+                        <button type="submit" className="rounded bg-red-700 px-3 py-2 font-semibold text-white hover:bg-red-800">Add Item</button>
                     </form>
 
                     <div className="responsive-table-wrap rounded-lg border bg-white">
@@ -66,7 +66,6 @@ export default function SupplyRequestItemsIndex({ supplyRequest, items }: Props)
         </AuthenticatedLayout>
     );
 }
-
 
 
 

@@ -121,7 +121,7 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
                         <Link href={route('procurement.purchase-requests.index')} className="rounded-xl border border-amber-300 px-4 py-5 text-center text-sm font-semibold text-amber-700 transition hover:bg-amber-50">
                             Review Requests
                         </Link>
-                        <Link href={route('procurement.purchase-orders.create')} className="rounded-xl border border-emerald-300 px-4 py-5 text-center text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50">
+                        <Link href={route('procurement.purchase-orders.create')} className="rounded-xl border border-red-300 px-4 py-5 text-center text-sm font-semibold text-red-700 transition hover:bg-red-50">
                             Create PO
                         </Link>
                         <Link href={route('procurement.suppliers.index')} className="rounded-xl border border-red-300 px-4 py-5 text-center text-sm font-semibold text-red-700 transition hover:bg-red-50">
@@ -371,7 +371,6 @@ function formatMoney(value: number) {
         maximumFractionDigits: 0,
     }).format(value);
 }
-
 
 
 

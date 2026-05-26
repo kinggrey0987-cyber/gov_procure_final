@@ -355,7 +355,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                             type="button"
                             onClick={addItem}
                             disabled={!hasPpmp}
-                            className="rounded-lg border border-emerald-300 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                            className="rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
                         >
                             Add Item Row
                         </button>
@@ -563,6 +563,5 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
         </label>
     );
 }
-
 
 

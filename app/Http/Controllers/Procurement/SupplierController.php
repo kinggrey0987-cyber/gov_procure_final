@@ -63,9 +63,9 @@ class SupplierController extends Controller
     {
         abort_unless($request->user()?->can('procurement.supplier.create'), 403);
 
-        $supplier = $this->service->create($request->user(), $request->validated());
+        $this->service->create($request->user(), $request->validated());
 
-        return redirect()->route('procurement.suppliers.show', $supplier->supplier_id)
+        return redirect()->route('procurement.suppliers.index')
             ->with('success', 'Supplier created successfully.');
     }
 
