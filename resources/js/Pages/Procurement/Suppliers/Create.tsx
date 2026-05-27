@@ -10,7 +10,6 @@ export default function SuppliersCreate() {
         email: '',
         phone: '',
         address: '',
-        status: 'ACTIVE',
     });
 
     const submit = (event: FormEvent) => {
@@ -95,15 +94,10 @@ export default function SuppliersCreate() {
 
                             <div>
                                 <label className="mb-1 block text-sm font-medium text-slate-700">Status</label>
-                                <select
-                                    value={form.data.status}
-                                    onChange={(event) => form.setData('status', event.target.value)}
-                                    className="w-full rounded border-gray-300 text-sm"
-                                >
-                                    <option value="ACTIVE">ACTIVE</option>
-                                    <option value="INACTIVE">INACTIVE</option>
-                                </select>
-                                <InputError message={form.errors.status} className="mt-1" />
+                                <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
+                                    ACTIVE
+                                </div>
+                                <p className="mt-1 text-xs text-slate-500">New suppliers are automatically activated. You can change status later from the edit screen.</p>
                             </div>
                         </div>
 
@@ -121,7 +115,6 @@ export default function SuppliersCreate() {
         </AuthenticatedLayout>
     );
 }
-
 
 
 

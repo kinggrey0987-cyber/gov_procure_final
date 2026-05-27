@@ -96,7 +96,7 @@ class SupplierController extends Controller
 
         $this->service->update($supplier, $request->user(), $request->validated());
 
-        return redirect()->route('procurement.suppliers.show', $supplier->supplier_id)
+        return redirect()->route('procurement.suppliers.index')
             ->with('success', 'Supplier updated successfully.');
     }
 }

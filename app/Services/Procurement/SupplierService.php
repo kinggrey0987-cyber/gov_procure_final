@@ -26,7 +26,7 @@ class SupplierService
             'email' => $payload['email'] ?? null,
             'phone' => $payload['phone'] ?? null,
             'address' => $payload['address'] ?? null,
-            'status' => $payload['status'],
+            'status' => 'ACTIVE',
         ]);
 
         $this->audit($actor, 'CREATE', $supplier);
