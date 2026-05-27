@@ -115,7 +115,7 @@ class AppServiceProvider extends ServiceProvider
             return $user->isProcurement() && in_array((string) $purchaseRequest->status, ['OPEN', 'PROCESSING', 'RETURNED_FOR_REVISION'], true);
         });
         Gate::define('procurement.purchase-request.process', function (User $user, PurchaseRequest $purchaseRequest): bool {
-            return $user->isProcurement() && in_array((string) $purchaseRequest->status, ['OPEN', 'RETURNED_FOR_REVISION'], true);
+            return $user->isProcurement() && in_array((string) $purchaseRequest->status, ['OPEN', 'PROCESSING'], true);
         });
 
         Gate::define('procurement.supplier.view-any', fn (User $user): bool => $user->isProcurement());

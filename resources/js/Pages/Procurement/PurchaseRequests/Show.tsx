@@ -56,6 +56,7 @@ export default function PurchaseRequestsShow({ purchaseRequest, reviewMode = fal
     const totalQuantity = (purchaseRequest.items ?? []).reduce((sum, row) => sum + Number(row.quantity_requested ?? 0), 0);
     const normalizedRequestRemarks = formatRequestRemarks(purchaseRequest.remarks);
     const reasonIsBlank = processForm.data.remarks.trim() === '';
+    const canReviewRequest = (purchaseRequest.status === 'OPEN' || purchaseRequest.status === 'PROCESSING') && permissions?.process && reviewMode;
     const resolvedBackLink = backLink ?? {
         href: route('procurement.purchase-requests.index', {
             status: backFilters?.status || undefined,
@@ -140,7 +141,7 @@ export default function PurchaseRequestsShow({ purchaseRequest, reviewMode = fal
                         </table>
                     </section>
 
-                    {(purchaseRequest.status === 'OPEN' || purchaseRequest.status === 'PROCESSING' || purchaseRequest.status === 'RETURNED_FOR_REVISION') && permissions?.process && reviewMode ? (
+                    {canReviewRequest ? (
                         <form onSubmit={processRequest} className="space-y-3 rounded-lg border bg-white p-6">
                             <label className="mb-1 block text-sm text-gray-700">Review Decision Remarks</label>
                             <textarea
@@ -158,7 +159,7 @@ export default function PurchaseRequestsShow({ purchaseRequest, reviewMode = fal
                                 >
                                     {resolvedBackLink.label}
                                 </Link>
-                                {(purchaseRequest.status === 'OPEN' || purchaseRequest.status === 'RETURNED_FOR_REVISION') && (
+                                {purchaseRequest.status === 'OPEN' && (
                                     <button type="button" onClick={() => submitReviewAction('process')} className="rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
                                         Move to Processing
                                     </button>
@@ -233,4 +234,3 @@ function formatRequestRemarks(remarks?: string | null) {
 
     return cleaned;
 }
-
