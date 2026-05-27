@@ -39,6 +39,7 @@ type Props = {
 
 export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceItems }: Props) {
     const toWholeQuantity = (value: string | number): number => Math.max(Math.trunc(Number(value) || 0), 0);
+    const hasSourceItems = sourceItems.length > 0;
 
     const form = useForm({
         supply_request_item_id: 0,
@@ -76,7 +77,9 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
-        form.post(route('procurement.purchase-orders.items.store', purchaseOrder.purchase_order_id));
+        form.post(route('procurement.purchase-orders.items.store', purchaseOrder.purchase_order_id), {
+            preserveScroll: true,
+        });
     };
 
     return (
@@ -102,6 +105,11 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                             <p className="text-xl font-semibold text-slate-800">Source Request Line</p>
                             <p className="mt-1 text-xs text-slate-500">Choose the approved request line. Source identifiers, item name, requested quantity, and unit are locked for traceability.</p>
                         </div>
+                        {!hasSourceItems ? (
+                            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                                No approved source request lines are attached to this purchase order yet. Re-seed or create workflow data with supply request items before encoding purchase order items.
+                            </div>
+                        ) : null}
                         <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
                         <label className="grid gap-1 text-sm font-semibold text-slate-700 md:col-span-2">
                             Select Source Request Item
@@ -133,14 +141,13 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                             Specification from PPMP Item Remarks
                             <input
                                 type="text"
-                                placeholder="Auto-filled from PPMP item remarks"
+                                placeholder="No PPMP item remarks supplied"
                                 value={form.data.specification}
                                 className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-normal text-slate-700"
                                 readOnly
                                 aria-readonly="true"
-                                required
                             />
-                            <span className="text-xs font-normal text-slate-500">This is locked because it is derived from the PPMP item remarks.</span>
+                            <span className="text-xs font-normal text-slate-500">This is locked because it is derived from the PPMP item remarks. Blank remarks are allowed.</span>
                         </label>
                         <label className="grid gap-1 text-sm font-semibold text-slate-700">
                             Unit Price from Supplier Quote
@@ -155,9 +162,11 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                                 required
                             />
                         </label>
-                        <button type="submit" disabled={isDuplicateSelection || form.processing || !selectedSource} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60">
-                            Add Item
-                        </button>
+                        <div className="flex items-end justify-start lg:justify-end">
+                            <button type="submit" disabled={isDuplicateSelection || form.processing || !selectedSource} className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-red-600 px-5 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto lg:min-w-32">
+                                {form.processing ? 'Adding…' : 'Add Item'}
+                            </button>
+                        </div>
                         </div>
                         {isDuplicateSelection ? (
                             <button type="button" className="rounded border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700">
@@ -245,6 +254,5 @@ function ReadOnlyField({ label, value }: { label: string; value: string }) {
         </div>
     );
 }
-
 
 
