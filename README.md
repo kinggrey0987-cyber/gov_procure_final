@@ -7,6 +7,48 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
+## GovSupply Connect deployment notes
+
+### Persistent uploaded documents
+
+Uploaded procurement documents and public disclosure attachments are written through Laravel's configured public upload disk.
+
+For local development, keep:
+
+```env
+FILESYSTEM_PUBLIC_DISK=public
+```
+
+This stores files under `storage/app/public` and serves them through `public/storage` after running:
+
+```bash
+php artisan storage:link
+```
+
+For production hosts that rebuild containers on deploy, local container storage is not persistent. Use one of these options before accepting real uploads:
+
+1. Configure S3-compatible storage:
+
+```env
+FILESYSTEM_PUBLIC_DISK=public_s3
+AWS_ACCESS_KEY_ID=your-access-key
+AWS_SECRET_ACCESS_KEY=your-secret-key
+AWS_DEFAULT_REGION=your-region
+AWS_BUCKET=your-bucket
+AWS_URL=https://your-public-bucket-url
+AWS_ENDPOINT=https://your-s3-compatible-endpoint
+AWS_USE_PATH_STYLE_ENDPOINT=false
+```
+
+2. Or mount persistent storage and point the local public disk at it:
+
+```env
+FILESYSTEM_PUBLIC_DISK=public
+FILESYSTEM_PUBLIC_ROOT=/var/data/storage/app/public
+```
+
+The database stores document metadata only. The file bytes must live on a persistent disk or object store; otherwise uploaded files can disappear after a container restart or redeploy.
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:

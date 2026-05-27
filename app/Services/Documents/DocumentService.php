@@ -44,6 +44,12 @@ class DocumentService
         $storedFileName = Str::uuid()->toString().'_'.$file->getClientOriginalName();
         $filePath = $file->storeAs('documents/'.$module.'/'.$relatedReferenceId, $storedFileName, $this->publicDisk());
 
+        if (! is_string($filePath) || trim($filePath) === '') {
+            throw ValidationException::withMessages([
+                'file' => 'The attachment could not be saved. Check the configured public file storage disk.',
+            ]);
+        }
+
         $document = DB::transaction(function () use ($actor, $module, $relatedReferenceId, $payload, $file, $filePath): Document {
             $document = Document::query()->create([
                 'uploaded_by' => (int) $actor->id,
@@ -98,7 +104,13 @@ class DocumentService
         $safeName = trim($fileName) !== '' ? $fileName : 'generated-attachment';
         $storedFileName = Str::uuid()->toString().'_'.$safeName.'.'.$mimeExtension;
         $filePath = 'documents/'.$module.'/'.$relatedReferenceId.'/'.$storedFileName;
-        Storage::disk($this->publicDisk())->put($filePath, $content);
+        $written = Storage::disk($this->publicDisk())->put($filePath, $content);
+
+        if ($written !== true) {
+            throw ValidationException::withMessages([
+                'file' => 'The generated attachment could not be saved. Check the configured public file storage disk.',
+            ]);
+        }
 
         $document = DB::transaction(function () use ($actor, $module, $relatedReferenceId, $title, $safeName, $mimeExtension, $filePath): Document {
             $document = Document::query()->create([
