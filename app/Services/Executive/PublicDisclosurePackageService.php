@@ -233,6 +233,7 @@ class PublicDisclosurePackageService
 
         return Document::query()
             ->with('uploader:id,name')
+            ->whereNotIn('document_kind', ['OFFICIAL_DISCLOSURE_PACKAGE', 'SOURCE_PROCUREMENT_DOCUMENT'])
             ->where(function ($query) use ($references): void {
                 foreach ($references as $reference) {
                     $query->orWhere(function ($nested) use ($reference): void {

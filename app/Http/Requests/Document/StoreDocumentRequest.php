@@ -38,7 +38,7 @@ class StoreDocumentRequest extends FormRequest
                 'required',
                 'file',
                 'max:10240',
-                'mimes:pdf,doc,docx,xls,xlsx,csv,png,jpg,jpeg',
+                'mimes:pdf,doc,docx,csv',
             ],
             'related_module' => ['sometimes', 'string', Rule::in($accessService->allowedModules())],
             'related_reference_id' => ['sometimes', 'integer', 'min:1'],

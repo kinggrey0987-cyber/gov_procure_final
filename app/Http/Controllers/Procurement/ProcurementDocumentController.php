@@ -47,6 +47,7 @@ class ProcurementDocumentController extends Controller
         return Document::query()
             ->with('uploader:id,name')
             ->whereIn('related_module', self::PROCUREMENT_MODULES)
+            ->whereNotIn('document_kind', ['OFFICIAL_DISCLOSURE_PACKAGE', 'SOURCE_PROCUREMENT_DOCUMENT'])
             ->when(in_array($module, self::PROCUREMENT_MODULES, true), fn ($query) => $query->where('related_module', $module))
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($nested) use ($search): void {

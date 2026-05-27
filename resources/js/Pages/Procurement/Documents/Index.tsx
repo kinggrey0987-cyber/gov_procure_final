@@ -208,7 +208,7 @@ export default function ProcurementDocumentsIndex({
                                     Use this registry for procurement-record files that belong to a PR or PO. Keep operational and public-release documents in their own workflow screens.
                                 </p>
                                 <ul className="mt-2 list-disc space-y-1 pl-5 text-amber-800">
-                                    <li>Accepted files: PDF, DOC, DOCX, XLS, XLSX, CSV, PNG, JPG, JPEG.</li>
+                                    <li>Accepted files: PDF, DOC, DOCX, and CSV only.</li>
                                     <li>Maximum file size: 10 MB per upload.</li>
                                     <li>Good fits here include supplier quotations, canvass sheets, NOA files, signed PO copies, and other procurement-record attachments.</li>
                                     <li>Do not store delivery receipts, inspection/verification forms, or distribution records here. Those belong in the delivery workflow.</li>
@@ -316,6 +316,7 @@ export default function ProcurementDocumentsIndex({
                                         <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-700">File</label>
                                         <input
                                             type="file"
+                                            accept=".pdf,.doc,.docx,.csv,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/csv"
                                             className="w-full rounded-lg border-red-200 text-sm"
                                             onChange={(event) => uploadForm.setData('file', event.target.files?.[0] ?? null)}
                                         />
