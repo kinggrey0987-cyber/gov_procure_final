@@ -55,7 +55,10 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
             $execUser = $this->requireUserByRole('EXEC_OFFICER');
             $gsoUser = $this->requireUserByRole('GSO_OFFICER');
             $procUser = $this->requireUserByRole('PROC_OFFICER');
-            [$mpdoUser, $mswdoUser, $engUser] = $this->requireOfficeUsers(3);
+            $officeUsers = $this->requireOfficeUsersByCode(['MPDO', 'MSWDO', 'ENG']);
+            $mpdoUser = $officeUsers['MPDO'];
+            $mswdoUser = $officeUsers['MSWDO'];
+            $engUser = $officeUsers['ENG'];
 
             $mpdoOfficeId = (int) $mpdoUser->office_id;
             $mswdoOfficeId = (int) $mswdoUser->office_id;
@@ -751,6 +754,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
             $this->outputLine('Stage: normalization started.');
             $this->seedInventoryShowcases();
             $this->normalizeGsoLinkedDemoData($gsoUser);
+            $this->assertDemoWorkflowConsistency();
             $this->outputLine('Stage: normalization finished.');
 
             $this->outputLine('Stage: executive detections started.');
@@ -856,6 +860,46 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
         }
 
         return $user;
+    }
+
+    /**
+     * @param  array<int, string>  $officeCodes
+     * @return array<string, User>
+     */
+    private function requireOfficeUsersByCode(array $officeCodes): array
+    {
+        $users = User::query()
+            ->whereHas('role', fn ($query) => $query->where('code', 'OFFICE_USER'))
+            ->whereNotNull('office_id')
+            ->whereHas('office', fn ($query) => $query->whereIn('code', $officeCodes))
+            ->with(['role', 'office'])
+            ->orderBy('id')
+            ->get()
+            ->unique(fn (User $user): string => (string) $user->office?->code)
+            ->keyBy(fn (User $user): string => (string) $user->office?->code);
+
+        $missingOfficeCodes = collect($officeCodes)
+            ->reject(fn (string $officeCode): bool => $users->has($officeCode))
+            ->values();
+
+        if ($missingOfficeCodes->isNotEmpty()) {
+            throw new RuntimeException(sprintf(
+                'Required OFFICE_USER users for office code(s) %s were not found. No random users were created.',
+                $missingOfficeCodes->implode(', '),
+            ));
+        }
+
+        $resolvedUsers = [];
+        foreach ($officeCodes as $officeCode) {
+            $user = $users->get($officeCode);
+            if (! $user instanceof User) {
+                throw new RuntimeException(sprintf('Required OFFICE_USER user for office code %s was not found.', $officeCode));
+            }
+
+            $resolvedUsers[$officeCode] = $user;
+        }
+
+        return $resolvedUsers;
     }
 
     /**
@@ -977,6 +1021,15 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
         string $neededByDate,
         array $lines,
     ): SupplyRequest {
+        if ((int) $actor->office_id !== (int) $ppmp->office_id) {
+            throw new RuntimeException(sprintf(
+                'Supply request %s office mismatch: actor office_id %d cannot use PPMP office_id %d.',
+                $requestCode,
+                (int) $actor->office_id,
+                (int) $ppmp->office_id,
+            ));
+        }
+
         if ((string) $ppmp->status !== 'APPROVED') {
             throw new RuntimeException(sprintf(
                 'Supply request %s cannot be seeded from non-approved PPMP %d (%s).',
@@ -1086,6 +1139,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
         }
 
         $purchaseOrder->loadMissing('items', 'purchaseRequest', 'supplyRequest');
+        $supplyRequest->loadMissing('items');
 
         if (! $purchaseOrder->items()->exists()) {
             foreach ($supplyRequest->items as $requestItem) {
@@ -1123,6 +1177,17 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
         $verificationService = app(DeliveryVerificationService::class);
         $inventoryService = app(InventoryService::class);
         $distributionService = app(DistributionRecordService::class);
+
+        $purchaseOrder->loadMissing('supplyRequest.office', 'items');
+        $supplyRequestOfficeId = (int) ($purchaseOrder->supplyRequest?->office_id ?? 0);
+        if ($supplyRequestOfficeId <= 0 || $supplyRequestOfficeId !== (int) $officeUser->office_id) {
+            throw new RuntimeException(sprintf(
+                'Distribution office mismatch for PO %d: supply request office_id %d cannot be distributed to office_id %d.',
+                (int) $purchaseOrder->purchase_order_id,
+                $supplyRequestOfficeId,
+                (int) $officeUser->office_id,
+            ));
+        }
 
         $delivery = Delivery::query()->where('purchase_order_id', (int) $purchaseOrder->purchase_order_id)->first();
         if (! $delivery instanceof Delivery) {
@@ -1204,28 +1269,69 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                 'storage_location' => 'Main GSO storage bay',
                 'notes' => 'Seeded distribution for office handoff.',
             ]);
+        } elseif (
+            (int) $distributionRecord->supply_request_id !== (int) $purchaseOrder->supply_request_id
+            || (int) $distributionRecord->office_id !== (int) $officeUser->office_id
+            || (int) $distributionRecord->received_by !== (int) $officeUser->id
+        ) {
+            $distributionRecord->forceFill([
+                'supply_request_id' => (int) $purchaseOrder->supply_request_id,
+                'office_id' => (int) $officeUser->office_id,
+                'received_by' => (int) $officeUser->id,
+                'notes' => 'Seeder normalization: corrected distribution office and request context.',
+            ])->save();
         }
 
         if (! $distributionRecord->items()->exists()) {
-            $deliveryItem = $delivery->items()->first();
-            $purchaseOrderItem = $deliveryItem?->purchaseOrderItem;
-            if ($deliveryItem instanceof DeliveryItem && $purchaseOrderItem instanceof PurchaseOrderItem) {
+            foreach ($delivery->items as $deliveryItem) {
+                $purchaseOrderItem = $deliveryItem?->purchaseOrderItem;
+                if (! $deliveryItem instanceof DeliveryItem || ! $purchaseOrderItem instanceof PurchaseOrderItem) {
+                    continue;
+                }
+
+                $releaseQuantity = min((float) $deliveryItem->received_quantity, (float) $purchaseOrderItem->quantity_ordered);
+                if ($releaseQuantity <= 0) {
+                    continue;
+                }
+
                 $distributionService->addDistributionItem($distributionRecord, $gsoUser, [
                     'item_id' => (int) $purchaseOrderItem->item_id,
                     'received_by' => (int) $officeUser->id,
                     'item_name_snapshot' => (string) $purchaseOrderItem->item_name_snapshot,
-                    'quantity_released' => min((float) $deliveryItem->received_quantity, (float) $purchaseOrderItem->quantity_ordered - 2),
+                    'quantity_released' => $releaseQuantity,
                     'unit' => (string) $purchaseOrderItem->unit,
                     'remarks' => 'Released to the office for demo distribution.',
                 ]);
             }
+        } else {
+            $distributionRecord->items()->update([
+                'received_by' => (int) $officeUser->id,
+            ]);
         }
 
         if ((string) $distributionRecord->status === 'RELEASED') {
-            $distributionService->markReceivedByOffice($distributionRecord, $officeUser, 'Office acknowledged receipt of released supplies.');
+            $distributionRecord = $distributionService->markReceivedByOffice($distributionRecord, $officeUser, 'Office acknowledged receipt of released supplies.');
         }
 
+        $this->syncReceivedDistributionItems($distributionRecord, $officeUser);
+
         return $delivery->fresh(['purchaseOrder', 'supplier', 'receiver', 'items']) ?? $delivery;
+    }
+
+    private function syncReceivedDistributionItems(DistributionRecord $distributionRecord, User $officeUser): void
+    {
+        $distributionRecord->loadMissing('items');
+
+        foreach ($distributionRecord->items as $item) {
+            $item->forceFill([
+                'received_by' => (int) $officeUser->id,
+                'quantity_received' => (float) $item->quantity_released,
+                'quantity_damaged' => 0,
+                'quantity_missing' => 0,
+                'receipt_condition' => 'GOOD',
+                'receipt_notes' => 'Seeder normalization: office receipt quantity matches released quantity.',
+            ])->save();
+        }
     }
 
     private function seedStockReadyRelease(User $gsoUser, SupplyRequest $supplyRequest, string $releaseNotes): void
@@ -1449,7 +1555,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
         $distributionService = app(DistributionRecordService::class);
 
         $records = DistributionRecord::query()
-            ->with(['supplyRequest.items', 'items', 'claims'])
+            ->with(['supplyRequest.items', 'supplyRequest.requester', 'items', 'claims'])
             ->where(function ($query): void {
                 $query->where('status', 'RELEASED')
                     ->orWhere('status', 'RECEIVED');
@@ -1460,6 +1566,30 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
         foreach ($records as $record) {
             if (! $record instanceof DistributionRecord) {
                 continue;
+            }
+
+            $requester = $record->supplyRequest?->requester;
+            if ($requester instanceof User && (int) $requester->office_id === (int) ($record->supplyRequest?->office_id ?? 0)) {
+                $expectedOfficeId = (int) $record->supplyRequest->office_id;
+                $expectedReceiverId = (int) $requester->id;
+
+                if ((int) $record->office_id !== $expectedOfficeId || (int) $record->received_by !== $expectedReceiverId) {
+                    $record->forceFill([
+                        'office_id' => $expectedOfficeId,
+                        'received_by' => $expectedReceiverId,
+                        'notes' => 'Seeder normalization: corrected distribution record to match linked supply request office.',
+                    ])->save();
+                }
+
+                if ($record->items->isNotEmpty()) {
+                    $record->items()->update([
+                        'received_by' => $expectedReceiverId,
+                    ]);
+
+                    if ((string) $record->status === 'RECEIVED') {
+                        $this->syncReceivedDistributionItems($record->fresh(['items']) ?? $record, $requester);
+                    }
+                }
             }
 
             if ($record->items->isNotEmpty()) {
@@ -1497,5 +1627,64 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
             }
         }
 
+    }
+
+    private function assertDemoWorkflowConsistency(): void
+    {
+        $distributionMismatches = DB::table('distribution_records')
+            ->join('supply_requests', 'distribution_records.supply_request_id', '=', 'supply_requests.supply_request_id')
+            ->whereColumn('distribution_records.office_id', '!=', 'supply_requests.office_id')
+            ->count();
+
+        if ($distributionMismatches > 0) {
+            throw new RuntimeException(sprintf(
+                'Longitudinal demo workflow contains %d distribution record(s) whose office does not match the linked supply request office.',
+                (int) $distributionMismatches,
+            ));
+        }
+
+        $receiverMismatches = DB::table('distribution_records')
+            ->join('users', 'distribution_records.received_by', '=', 'users.id')
+            ->whereNotNull('distribution_records.received_by')
+            ->whereColumn('distribution_records.office_id', '!=', 'users.office_id')
+            ->count();
+
+        if ($receiverMismatches > 0) {
+            throw new RuntimeException(sprintf(
+                'Longitudinal demo workflow contains %d distribution record(s) whose receiving user belongs to another office.',
+                (int) $receiverMismatches,
+            ));
+        }
+
+        $requestMismatches = DB::table('supply_requests')
+            ->join('ppmp', 'supply_requests.ppmp_id', '=', 'ppmp.ppmp_id')
+            ->whereColumn('supply_requests.office_id', '!=', 'ppmp.office_id')
+            ->count();
+
+        if ($requestMismatches > 0) {
+            throw new RuntimeException(sprintf(
+                'Longitudinal demo workflow contains %d supply request(s) whose office does not match the linked PPMP office.',
+                (int) $requestMismatches,
+            ));
+        }
+
+        $missingRequiredFields = DB::table('distribution_records')
+            ->whereIn('status', ['RELEASED', 'RECEIVED'])
+            ->where(function ($query): void {
+                $query->whereNull('supply_request_id')
+                    ->orWhereNull('office_id')
+                    ->orWhereNull('prepared_by')
+                    ->orWhereNull('received_by')
+                    ->orWhereNull('release_date')
+                    ->orWhereNull('storage_location');
+            })
+            ->count();
+
+        if ($missingRequiredFields > 0) {
+            throw new RuntimeException(sprintf(
+                'Longitudinal demo workflow contains %d released/received distribution record(s) with missing required handoff fields.',
+                (int) $missingRequiredFields,
+            ));
+        }
     }
 }
