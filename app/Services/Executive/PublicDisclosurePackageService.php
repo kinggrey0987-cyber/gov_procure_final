@@ -15,7 +15,10 @@ use App\Models\User;
 use App\Services\Documents\DocumentService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class PublicDisclosurePackageService
 {
@@ -215,6 +218,143 @@ class PublicDisclosurePackageService
         $document->forceFill(['document_kind' => 'OFFICIAL_DISCLOSURE_PACKAGE'])->save();
 
         return $document->fresh() ?? $document;
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, Document>
+     */
+    public function availableProcurementDocuments(PublicDisclosure $disclosure): \Illuminate\Support\Collection
+    {
+        $references = $this->procurementDocumentReferences($disclosure);
+
+        if ($references === []) {
+            return collect();
+        }
+
+        return Document::query()
+            ->with('uploader:id,name')
+            ->where(function ($query) use ($references): void {
+                foreach ($references as $reference) {
+                    $query->orWhere(function ($nested) use ($reference): void {
+                        $nested->where('related_module', $reference['module'])
+                            ->where('related_reference_id', $reference['id']);
+                    });
+                }
+            })
+            ->orderByDesc('uploaded_at')
+            ->orderByDesc('document_id')
+            ->get();
+    }
+
+    /**
+     * @param  array<int, int>  $documentIds
+     * @return array<int, Document>
+     */
+    public function attachProcurementDocuments(PublicDisclosure $disclosure, User $actor, array $documentIds): array
+    {
+        if ((string) $disclosure->status !== 'DRAFT') {
+            throw ValidationException::withMessages([
+                'status' => 'Only draft disclosures can receive procurement document attachments.',
+            ]);
+        }
+
+        $available = $this->availableProcurementDocuments($disclosure)
+            ->keyBy(fn (Document $document): int => (int) $document->document_id);
+
+        $selected = collect($documentIds)
+            ->map(fn ($documentId): int => (int) $documentId)
+            ->unique()
+            ->map(fn (int $documentId): ?Document => $available->get($documentId))
+            ->filter(fn (?Document $document): bool => $document instanceof Document)
+            ->values();
+
+        if ($selected->isEmpty()) {
+            throw ValidationException::withMessages([
+                'document_ids' => 'Select at least one procurement document that belongs to this disclosure source.',
+            ]);
+        }
+
+        $disk = Storage::disk($this->publicDisk());
+        $attached = [];
+
+        foreach ($selected as $sourceDocument) {
+            $sourcePath = ltrim(str_replace('\\', '/', (string) $sourceDocument->file_path), '/');
+
+            if ($sourcePath === '' || ! $disk->exists($sourcePath)) {
+                throw ValidationException::withMessages([
+                    'document_ids' => sprintf('The source file for %s is missing from storage.', (string) $sourceDocument->file_name),
+                ]);
+            }
+
+            $fileName = (string) $sourceDocument->file_name;
+            $targetName = sprintf('procurement-%d-%s', (int) $sourceDocument->document_id, $fileName);
+            $targetPath = sprintf(
+                'documents/public_disclosures/%d/%s_%s',
+                (int) $disclosure->disclosure_id,
+                Str::uuid()->toString(),
+                $targetName,
+            );
+
+            if (! $disk->copy($sourcePath, $targetPath)) {
+                throw ValidationException::withMessages([
+                    'document_ids' => sprintf('The source file %s could not be copied for public disclosure.', $fileName),
+                ]);
+            }
+
+            $attached[] = DB::transaction(function () use ($actor, $disclosure, $sourceDocument, $targetName, $targetPath): Document {
+                return Document::query()->create([
+                    'uploaded_by' => (int) $actor->id,
+                    'title' => sprintf('Public Release Copy - %s', (string) $sourceDocument->title),
+                    'file_name' => $targetName,
+                    'document_kind' => 'SOURCE_PROCUREMENT_DOCUMENT',
+                    'file_path' => $targetPath,
+                    'related_module' => 'public_disclosures',
+                    'related_reference_id' => (int) $disclosure->disclosure_id,
+                    'uploaded_at' => now(),
+                ]);
+            });
+        }
+
+        return $attached;
+    }
+
+    /**
+     * @return array<int, array{module: string, id: int}>
+     */
+    private function procurementDocumentReferences(PublicDisclosure $disclosure): array
+    {
+        $references = [];
+        $addReference = function (string $sourceType, int $sourceId) use (&$references): void {
+            if ($sourceId <= 0) {
+                return;
+            }
+
+            if ($sourceType === PurchaseRequest::class) {
+                $references[] = ['module' => 'purchase_requests', 'id' => $sourceId];
+            }
+
+            if ($sourceType === PurchaseOrder::class) {
+                $references[] = ['module' => 'purchase_orders', 'id' => $sourceId];
+
+                $purchaseOrder = PurchaseOrder::query()->find($sourceId, ['purchase_order_id', 'purchase_request_id']);
+                if ($purchaseOrder instanceof PurchaseOrder && (int) $purchaseOrder->purchase_request_id > 0) {
+                    $references[] = ['module' => 'purchase_requests', 'id' => (int) $purchaseOrder->purchase_request_id];
+                }
+            }
+        };
+
+        $addReference((string) ($disclosure->reference_type ?? ''), (int) ($disclosure->reference_id ?? 0));
+
+        $this->syncSources($disclosure);
+        $disclosure->loadMissing('sources');
+        foreach ($disclosure->sources as $source) {
+            $addReference((string) $source->source_type, (int) $source->source_id);
+        }
+
+        return collect($references)
+            ->unique(fn (array $reference): string => $reference['module'].'-'.$reference['id'])
+            ->values()
+            ->all();
     }
 
     public function buildSnapshotPdf(PublicDisclosure $disclosure): string

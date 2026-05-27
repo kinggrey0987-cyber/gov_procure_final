@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Executive;
 
+use App\Http\Requests\PublicDisclosure\AttachProcurementDocumentsRequest;
 use App\Http\Requests\PublicDisclosure\PublishPublicDisclosureRequest;
 use App\Http\Requests\PublicDisclosure\StorePublicDisclosureRequest;
 use App\Http\Requests\PublicDisclosure\UpdatePublicDisclosureRequest;
@@ -149,10 +150,24 @@ class PublicDisclosureController
 
         $this->packageService->syncSources($public_disclosure);
         $public_disclosure->load(['publisher', 'statusHistory.changedBy', 'sources']);
+        $availableProcurementDocuments = (string) $public_disclosure->status === 'DRAFT'
+            ? $this->packageService->availableProcurementDocuments($public_disclosure)
+                ->map(fn ($document): array => [
+                    'document_id' => (int) $document->document_id,
+                    'title' => (string) $document->title,
+                    'file_name' => (string) $document->file_name,
+                    'document_kind' => (string) ($document->document_kind ?? ''),
+                    'related_module' => (string) $document->related_module,
+                    'related_reference_id' => (int) $document->related_reference_id,
+                    'uploaded_at' => optional($document->uploaded_at)?->toIso8601String(),
+                    'uploader_name' => $document->uploader?->name,
+                ])->values()
+            : collect();
 
         return Inertia::render('Executive/Disclosures/Show', [
             'disclosure' => $public_disclosure,
             'attachments' => $attachments,
+            'availableProcurementDocuments' => $availableProcurementDocuments,
             'sources' => $public_disclosure->sources->map(fn ($source): array => [
                 'id' => (int) $source->id,
                 'source_role' => (string) $source->source_role,
@@ -187,6 +202,21 @@ class PublicDisclosureController
                 ] : null,
             ])->values(),
         ]);
+    }
+
+    public function attachProcurementDocuments(AttachProcurementDocumentsRequest $request, PublicDisclosure $public_disclosure): RedirectResponse
+    {
+        $user = Auth::user();
+        abort_unless($user && $user->can('public-disclosure.manage'), 403);
+
+        $this->packageService->attachProcurementDocuments(
+            disclosure: $public_disclosure,
+            actor: $user,
+            documentIds: $request->validated('document_ids'),
+        );
+
+        return Redirect::route('executive.disclosures.show', $public_disclosure->disclosure_id)
+            ->with('success', 'Selected procurement documents were attached for public disclosure review.');
     }
 
     public function publish(PublishPublicDisclosureRequest $request, PublicDisclosure $public_disclosure): RedirectResponse

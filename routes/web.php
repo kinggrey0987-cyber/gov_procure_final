@@ -770,6 +770,9 @@ Route::middleware(['auth', 'twofactor', 'must-change-password'])->group(function
                 Route::get('/{public_disclosure}', [PublicDisclosureController::class, 'show'])
                     ->middleware('can:public-disclosure.view')
                     ->name('show');
+                Route::post('/{public_disclosure}/procurement-documents', [PublicDisclosureController::class, 'attachProcurementDocuments'])
+                    ->middleware('can:public-disclosure.manage')
+                    ->name('attach-procurement-documents');
                 Route::put('/{public_disclosure}/publish', [PublicDisclosureController::class, 'publish'])
                     ->middleware('can:public-disclosure.publish,public_disclosure')
                     ->name('publish');

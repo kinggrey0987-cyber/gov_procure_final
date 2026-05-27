@@ -13,7 +13,11 @@ use App\Models\Ppmp;
 use App\Models\PpmpItem;
 use App\Models\PublicDisclosure;
 use App\Models\PublicDisclosureSource;
+use App\Models\PurchaseOrder;
+use App\Models\PurchaseRequest;
 use App\Models\Role;
+use App\Models\Supplier;
+use App\Models\SupplyRequest;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -204,6 +208,96 @@ class PublicDisclosureWorkflowTest extends TestCase
         $this->assertStringNotContainsString('Internal remarks should not be rendered', $content);
     }
 
+    public function test_exec_can_attach_procurement_upload_to_draft_public_disclosure(): void
+    {
+        $purchaseOrder = $this->createPurchaseOrder($this->office, $this->executiveUser, $this->officeUser);
+        $sourcePath = 'documents/purchase_orders/'.$purchaseOrder->purchase_order_id.'/signed-po.pdf';
+        Storage::disk('public')->put($sourcePath, 'signed purchase order copy');
+
+        $sourceDocument = Document::query()->create([
+            'uploaded_by' => (int) $this->executiveUser->id,
+            'title' => 'Signed PO Copy',
+            'file_name' => 'signed-po.pdf',
+            'document_kind' => 'signed_po',
+            'file_path' => $sourcePath,
+            'related_module' => 'purchase_orders',
+            'related_reference_id' => (int) $purchaseOrder->purchase_order_id,
+            'uploaded_at' => now(),
+        ]);
+
+        $disclosure = PublicDisclosure::query()->create([
+            'title' => 'PO Disclosure Package',
+            'type' => 'PROCUREMENT_SUMMARY',
+            'reference_type' => PurchaseOrder::class,
+            'reference_id' => (int) $purchaseOrder->purchase_order_id,
+            'description' => 'Draft public release for PO documents.',
+            'status' => 'DRAFT',
+        ]);
+
+        $response = $this->actingAs($this->executiveUser)->post(
+            route('executive.disclosures.attach-procurement-documents', $disclosure->disclosure_id),
+            ['document_ids' => [(int) $sourceDocument->document_id]],
+        );
+
+        $response->assertRedirect(route('executive.disclosures.show', $disclosure->disclosure_id));
+
+        $attachment = Document::query()
+            ->where('related_module', 'public_disclosures')
+            ->where('related_reference_id', (int) $disclosure->disclosure_id)
+            ->where('document_kind', 'SOURCE_PROCUREMENT_DOCUMENT')
+            ->firstOrFail();
+
+        $this->assertSame('Public Release Copy - Signed PO Copy', (string) $attachment->title);
+        $this->assertSame('procurement-'.$sourceDocument->document_id.'-signed-po.pdf', (string) $attachment->file_name);
+        $this->assertStringStartsWith('documents/public_disclosures/'.$disclosure->disclosure_id.'/', (string) $attachment->file_path);
+        $this->assertTrue(Storage::disk('public')->exists((string) $attachment->file_path));
+        $this->assertSame('signed purchase order copy', Storage::disk('public')->get((string) $attachment->file_path));
+        $this->assertDatabaseHas('documents', [
+            'document_id' => (int) $sourceDocument->document_id,
+            'related_module' => 'purchase_orders',
+        ]);
+    }
+
+    public function test_procurement_document_attachment_requires_matching_disclosure_source(): void
+    {
+        $purchaseOrder = $this->createPurchaseOrder($this->office, $this->executiveUser, $this->officeUser);
+        $otherPurchaseOrder = $this->createPurchaseOrder($this->office, $this->executiveUser, $this->officeUser);
+        $sourcePath = 'documents/purchase_orders/'.$otherPurchaseOrder->purchase_order_id.'/other-po.pdf';
+        Storage::disk('public')->put($sourcePath, 'other po copy');
+
+        $otherDocument = Document::query()->create([
+            'uploaded_by' => (int) $this->executiveUser->id,
+            'title' => 'Other PO Copy',
+            'file_name' => 'other-po.pdf',
+            'document_kind' => 'signed_po',
+            'file_path' => $sourcePath,
+            'related_module' => 'purchase_orders',
+            'related_reference_id' => (int) $otherPurchaseOrder->purchase_order_id,
+            'uploaded_at' => now(),
+        ]);
+
+        $disclosure = PublicDisclosure::query()->create([
+            'title' => 'PO Disclosure Package',
+            'type' => 'PROCUREMENT_SUMMARY',
+            'reference_type' => PurchaseOrder::class,
+            'reference_id' => (int) $purchaseOrder->purchase_order_id,
+            'description' => 'Draft public release for PO documents.',
+            'status' => 'DRAFT',
+        ]);
+
+        $response = $this->actingAs($this->executiveUser)->post(
+            route('executive.disclosures.attach-procurement-documents', $disclosure->disclosure_id),
+            ['document_ids' => [(int) $otherDocument->document_id]],
+        );
+
+        $response->assertSessionHasErrors('document_ids');
+        $this->assertDatabaseMissing('documents', [
+            'related_module' => 'public_disclosures',
+            'related_reference_id' => (int) $disclosure->disclosure_id,
+            'document_kind' => 'SOURCE_PROCUREMENT_DOCUMENT',
+        ]);
+    }
+
     private function createUser(UserRole $role, Office $office): User
     {
         $this->userSequence++;
@@ -221,6 +315,50 @@ class PublicDisclosureWorkflowTest extends TestCase
             'role_id' => $roleModel->id,
             'office_id' => $office->id,
             'emp_id' => sprintf('EMP-EXEC-%05d', $this->userSequence),
+        ]);
+    }
+
+    private function createPurchaseOrder(Office $office, User $createdBy, User $officeUser): PurchaseOrder
+    {
+        $supplyRequest = SupplyRequest::query()->create([
+            'request_code' => 'SR-EXEC-DISC-'.uniqid(),
+            'office_id' => (int) $office->id,
+            'requested_by' => (int) $officeUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(3)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Executive disclosure procurement document test',
+            'priority_level' => 'MEDIUM',
+            'status' => 'APPROVED',
+        ]);
+
+        $purchaseRequest = PurchaseRequest::query()->create([
+            'supply_request_id' => (int) $supplyRequest->supply_request_id,
+            'office_id' => (int) $office->id,
+            'requested_by' => (int) $createdBy->id,
+            'status' => 'PROCESSING',
+            'remarks' => 'Disclosure document source PR',
+        ]);
+
+        $supplier = Supplier::query()->create([
+            'supplier_name' => 'Executive Disclosure Supplier '.uniqid(),
+            'contact_person' => 'Disclosure Contact',
+            'email' => uniqid('exec-disclosure-supplier', true).'@test.local',
+            'phone' => '09123456789',
+            'address' => 'Supplier Address',
+            'status' => 'ACTIVE',
+        ]);
+
+        return PurchaseOrder::query()->create([
+            'purchase_request_id' => (int) $purchaseRequest->purchase_request_id,
+            'supply_request_id' => (int) $supplyRequest->supply_request_id,
+            'supplier_id' => (int) $supplier->supplier_id,
+            'created_by' => (int) $createdBy->id,
+            'po_number' => 'PO-EXEC-DISC-'.uniqid(),
+            'procurement_method' => 'SMALL_VALUE_PROCUREMENT',
+            'status' => 'DRAFT',
+            'expected_delivery_date' => now()->addDays(3)->toDateString(),
+            'total_amount' => 1000,
         ]);
     }
 }

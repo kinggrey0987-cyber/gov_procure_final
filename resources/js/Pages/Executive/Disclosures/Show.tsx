@@ -2,6 +2,17 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import AttachmentsPanel from '@/Components/AttachmentsPanel';
 import { Head, Link, useForm } from '@inertiajs/react';
 
+type ProcurementDocument = {
+    document_id: number;
+    title: string;
+    file_name: string;
+    document_kind?: string | null;
+    related_module: string;
+    related_reference_id: number;
+    uploaded_at?: string | null;
+    uploader_name?: string | null;
+};
+
 type Props = {
     disclosure: {
         disclosure_id: number;
@@ -19,6 +30,7 @@ type Props = {
         uploader_name?: string | null;
         document_kind?: string | null;
     }>;
+    availableProcurementDocuments: ProcurementDocument[];
     sources: Array<{
         id: number;
         source_role: string;
@@ -48,12 +60,29 @@ type Props = {
     }>;
 };
 
-export default function DisclosureShow({ disclosure, attachments, sources, attachmentPermissions, statusHistory, approvalHistory }: Props) {
+export default function DisclosureShow({ disclosure, attachments, availableProcurementDocuments, sources, attachmentPermissions, statusHistory, approvalHistory }: Props) {
     const publishForm = useForm({ remarks: '' });
+    const attachProcurementForm = useForm<{ document_ids: number[] }>({ document_ids: [] });
 
     const onPublish = () => {
         publishForm.put(route('executive.disclosures.publish', disclosure.disclosure_id), {
             preserveScroll: true,
+        });
+    };
+
+    const toggleProcurementDocument = (documentId: number) => {
+        attachProcurementForm.setData(
+            'document_ids',
+            attachProcurementForm.data.document_ids.includes(documentId)
+                ? attachProcurementForm.data.document_ids.filter((current) => current !== documentId)
+                : [...attachProcurementForm.data.document_ids, documentId],
+        );
+    };
+
+    const attachSelectedProcurementDocuments = () => {
+        attachProcurementForm.post(route('executive.disclosures.attach-procurement-documents', disclosure.disclosure_id), {
+            preserveScroll: true,
+            onSuccess: () => attachProcurementForm.reset('document_ids'),
         });
     };
 
@@ -156,6 +185,52 @@ export default function DisclosureShow({ disclosure, attachments, sources, attac
                         deleteRouteFor={(documentId: number) => route('documents.destroy', documentId)}
                     />
 
+                    {disclosure.status === 'DRAFT' && (
+                        <section className="rounded-lg border bg-white p-6">
+                            <h3 className="text-base font-semibold text-slate-900">Attach Procurement Unit Uploads</h3>
+                            <p className="mt-1 text-sm text-slate-600">
+                                Select internal PR/PO uploads that are cleared for inclusion in this public disclosure. The system copies selected files into this disclosure package.
+                            </p>
+
+                            {availableProcurementDocuments.length === 0 ? (
+                                <p className="mt-4 rounded border border-dashed border-slate-200 px-4 py-3 text-sm text-slate-500">
+                                    No procurement uploads are available for this disclosure source yet.
+                                </p>
+                            ) : (
+                                <div className="mt-4 space-y-3">
+                                    {availableProcurementDocuments.map((document) => (
+                                        <label key={document.document_id} className="flex gap-3 rounded border border-slate-200 p-3 text-sm hover:bg-slate-50">
+                                            <input
+                                                type="checkbox"
+                                                className="mt-1 rounded border-slate-300 text-red-700 focus:ring-red-600"
+                                                checked={attachProcurementForm.data.document_ids.includes(document.document_id)}
+                                                onChange={() => toggleProcurementDocument(document.document_id)}
+                                            />
+                                            <span className="min-w-0 flex-1">
+                                                <span className="block font-semibold text-slate-900">{document.title}</span>
+                                                <span className="mt-1 block text-xs text-slate-600">
+                                                    {document.file_name} • {document.related_module.replaceAll('_', ' ')} #{document.related_reference_id}
+                                                </span>
+                                                <span className="mt-1 block text-xs text-slate-500">
+                                                    Uploaded {document.uploaded_at ? new Date(document.uploaded_at).toLocaleString() : '-'} by {document.uploader_name ?? 'System'}
+                                                </span>
+                                            </span>
+                                        </label>
+                                    ))}
+                                    {attachProcurementForm.errors.document_ids && <p className="text-xs text-rose-700">{attachProcurementForm.errors.document_ids}</p>}
+                                    <button
+                                        type="button"
+                                        onClick={attachSelectedProcurementDocuments}
+                                        disabled={attachProcurementForm.processing || attachProcurementForm.data.document_ids.length === 0}
+                                        className="rounded bg-red-700 px-4 py-2 text-xs font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        Attach Selected to Disclosure
+                                    </button>
+                                </div>
+                            )}
+                        </section>
+                    )}
+
                 </div>
             </div>
         </AuthenticatedLayout>
@@ -170,6 +245,5 @@ function DetailCell({ label, value }: { label: string; value: string }) {
         </div>
     );
 }
-
 
 
