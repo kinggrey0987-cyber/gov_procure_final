@@ -216,14 +216,16 @@ export default function PurchaseOrdersEdit({ purchaseOrder, suppliers }: Props) 
 
                 <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                     <h4 className="mb-4 text-xl font-semibold text-slate-800">Procurement Details</h4>
-                    <div className="grid gap-4 md:grid-cols-2">
-                        <label className="block">
-                            <span className="text-sm font-semibold text-slate-700">Procurement Method</span>
-                            <p className="text-xs text-slate-500 mt-1">This field records the declared mode of procurement used externally (e.g., PhilGEPS) for compliance and audit purposes.</p>
+                    <div className="grid items-start gap-4 md:grid-cols-2">
+                        <label className="grid gap-2">
+                            <span className="min-h-14">
+                                <span className="block text-sm font-semibold text-slate-700">Procurement Method</span>
+                                <span className="mt-1 block text-xs text-slate-500">This field records the declared mode of procurement used externally (e.g., PhilGEPS) for compliance and audit purposes.</span>
+                            </span>
                             <select
                                 value={form.data.procurement_method}
                                 onChange={(event) => form.setData('procurement_method', event.target.value)}
-                                className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                                 required
                             >
                                 {PROCUREMENT_METHODS.map((option) => (
@@ -233,29 +235,31 @@ export default function PurchaseOrdersEdit({ purchaseOrder, suppliers }: Props) 
                                 ))}
                             </select>
                         </label>
-                        <label className="block">
-                            <span className="text-sm font-semibold text-slate-700">Expected Delivery Date</span>
-                            <p className="mt-1 text-xs text-slate-500">This is the target supplier delivery date used later as the delivery intake expected arrival date. Past dates are not allowed.</p>
+                        <label className="grid gap-2">
+                            <span className="min-h-14">
+                                <span className="block text-sm font-semibold text-slate-700">Expected Delivery Date</span>
+                                <span className="mt-1 block text-xs text-slate-500">This is the target supplier delivery date used later as the delivery intake expected arrival date. Past dates are not allowed.</span>
+                            </span>
                             <input
                                 type="date"
                                 min={today}
                                 value={form.data.expected_delivery_date}
                                 onChange={(event) => form.setData('expected_delivery_date', event.target.value)}
-                                className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                                 required
                             />
                             {form.errors.expected_delivery_date ? <p className="mt-1 text-xs font-semibold text-rose-600">{form.errors.expected_delivery_date}</p> : null}
                         </label>
-                        <label className="block">
-                            <span className="mb-1 block text-sm font-medium text-slate-700">Terms Notes</span>
+                        <label className="grid gap-2">
+                            <span className="block text-sm font-medium text-slate-700">Terms Notes</span>
                             <textarea
                                 value={form.data.terms_notes}
                                 onChange={(event) => form.setData('terms_notes', event.target.value)}
                                 className="h-24 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                             />
                         </label>
-                        <label className="block">
-                            <span className="mb-1 block text-sm font-medium text-slate-700">Remarks</span>
+                        <label className="grid gap-2">
+                            <span className="block text-sm font-medium text-slate-700">Remarks</span>
                             <textarea
                                 value={form.data.remarks}
                                 onChange={(event) => form.setData('remarks', event.target.value)}

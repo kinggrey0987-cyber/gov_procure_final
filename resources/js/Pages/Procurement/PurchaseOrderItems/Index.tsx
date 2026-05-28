@@ -1,6 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import Modal from '@/Components/Modal';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { FormEvent } from 'react';
+import { FormEvent, useState } from 'react';
 
 type PurchaseOrder = {
     purchase_order_id: number;
@@ -42,6 +43,7 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
     const hasSourceItems = sourceItems.length > 0;
     const isDraft = (purchaseOrder.status ?? 'DRAFT') === 'DRAFT';
     const canProcess = isDraft && items.data.length > 0;
+    const [itemPendingRemoval, setItemPendingRemoval] = useState<PurchaseOrderItem | null>(null);
 
     const form = useForm({
         supply_request_item_id: 0,
@@ -86,6 +88,7 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
 
     const processForm = useForm({ remarks: '' });
     const processErrors = processForm.errors as Record<string, string | undefined>;
+    const deleteForm = useForm({});
 
     const processPurchaseOrder = (event: FormEvent) => {
         event.preventDefault();
@@ -95,6 +98,17 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
         }
 
         processForm.post(route('procurement.purchase-orders.place', purchaseOrder.purchase_order_id));
+    };
+
+    const confirmItemRemoval = () => {
+        if (!itemPendingRemoval) {
+            return;
+        }
+
+        deleteForm.delete(route('procurement.purchase-orders.items.destroy', [purchaseOrder.purchase_order_id, itemPendingRemoval.purchase_order_item_id]), {
+            preserveScroll: true,
+            onSuccess: () => setItemPendingRemoval(null),
+        });
     };
 
     return (
@@ -226,19 +240,13 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                                         <td className="px-3 py-2">{row.unit_price}</td>
                                         <td className="px-3 py-2">{row.total_price}</td>
                                         <td className="px-3 py-2 text-right">
-                                            <Link
-                                                href={route('procurement.purchase-orders.items.destroy', [purchaseOrder.purchase_order_id, row.purchase_order_item_id])}
-                                                method="delete"
-                                                as="button"
-                                                onClick={(event) => {
-                                                    if (!window.confirm('Remove this item line from the purchase order?')) {
-                                                        event.preventDefault();
-                                                    }
-                                                }}
+                                            <button
+                                                type="button"
+                                                onClick={() => setItemPendingRemoval(row)}
                                                 className="rounded border border-rose-300 px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50"
                                             >
                                                 Remove
-                                            </Link>
+                                            </button>
                                         </td>
                                     </tr>
                                 ))}
@@ -249,12 +257,6 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                                 ) : null}
                             </tbody>
                         </table>
-                    </div>
-
-                    <div className="flex flex-wrap gap-3">
-                        <Link href={route('procurement.purchase-orders.show', purchaseOrder.purchase_order_id)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                            Back to Purchase Order
-                        </Link>
                     </div>
 
                     {isDraft ? (
@@ -280,7 +282,10 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                             </label>
                             {processErrors.items ? <p className="mt-2 text-xs font-semibold text-rose-600">{processErrors.items}</p> : null}
                             {processErrors.status ? <p className="mt-2 text-xs font-semibold text-rose-600">{processErrors.status}</p> : null}
-                            <div className="mt-4 flex justify-end">
+                            <div className="mt-4 flex flex-wrap justify-end gap-3">
+                                <Link href={route('procurement.purchase-orders.show', purchaseOrder.purchase_order_id)} className="rounded-lg border border-red-200 bg-red-50 px-5 py-2 text-sm font-semibold text-red-700 hover:border-red-300 hover:bg-red-100">
+                                    Back to Purchase Order
+                                </Link>
                                 <button
                                     type="submit"
                                     disabled={!canProcess || processForm.processing}
@@ -296,6 +301,34 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                             </div>
                         </form>
                     ) : null}
+
+                    <Modal show={Boolean(itemPendingRemoval)} maxWidth="md" onClose={() => setItemPendingRemoval(null)}>
+                        <div className="p-6">
+                            <p className="text-xs font-semibold uppercase tracking-[0.15em] text-red-700">Remove Item Line</p>
+                            <h3 className="mt-2 text-lg font-semibold text-slate-900">Confirm purchase order item removal</h3>
+                            <p className="mt-2 text-sm text-slate-600">
+                                Remove {itemPendingRemoval?.item_name_snapshot ?? 'this item line'} from this purchase order? This action will update the encoded line list.
+                            </p>
+                            <div className="mt-6 flex flex-wrap justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setItemPendingRemoval(null)}
+                                    disabled={deleteForm.processing}
+                                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={confirmItemRemoval}
+                                    disabled={deleteForm.processing}
+                                    className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    {deleteForm.processing ? 'Removing…' : 'Remove Item'}
+                                </button>
+                            </div>
+                        </div>
+                    </Modal>
             </div>
         </AuthenticatedLayout>
     );
