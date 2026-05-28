@@ -40,6 +40,8 @@ type Props = {
 export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceItems }: Props) {
     const toWholeQuantity = (value: string | number): number => Math.max(Math.trunc(Number(value) || 0), 0);
     const hasSourceItems = sourceItems.length > 0;
+    const isDraft = (purchaseOrder.status ?? 'DRAFT') === 'DRAFT';
+    const canProcess = isDraft && items.data.length > 0;
 
     const form = useForm({
         supply_request_item_id: 0,
@@ -80,6 +82,19 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
         form.post(route('procurement.purchase-orders.items.store', purchaseOrder.purchase_order_id), {
             preserveScroll: true,
         });
+    };
+
+    const processForm = useForm({ remarks: '' });
+    const processErrors = processForm.errors as Record<string, string | undefined>;
+
+    const processPurchaseOrder = (event: FormEvent) => {
+        event.preventDefault();
+
+        if (!canProcess) {
+            return;
+        }
+
+        processForm.post(route('procurement.purchase-orders.place', purchaseOrder.purchase_order_id));
     };
 
     return (
@@ -241,6 +256,46 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                             Back to Purchase Order
                         </Link>
                     </div>
+
+                    {isDraft ? (
+                        <form onSubmit={processPurchaseOrder} className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                    <p className="text-xs font-semibold uppercase tracking-[0.15em] text-red-700">Ready for Processing</p>
+                                    <h3 className="mt-1 text-xl font-semibold text-slate-800">Process Purchase Order</h3>
+                                    <p className="mt-1 text-sm text-slate-600">After encoding the supplier-quoted item lines, issue the PO and generate the delivery intake workflow.</p>
+                                </div>
+                                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${canProcess ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                    {canProcess ? `${items.data.length} encoded line(s)` : 'Add at least 1 item'}
+                                </span>
+                            </div>
+                            <label className="mt-4 block">
+                                <span className="mb-1 block text-sm font-medium text-slate-700">Processing Remarks</span>
+                                <textarea
+                                    value={processForm.data.remarks}
+                                    onChange={(event) => processForm.setData('remarks', event.target.value)}
+                                    className="h-24 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                    placeholder="Optional note for PO issuance"
+                                />
+                            </label>
+                            {processErrors.items ? <p className="mt-2 text-xs font-semibold text-rose-600">{processErrors.items}</p> : null}
+                            {processErrors.status ? <p className="mt-2 text-xs font-semibold text-rose-600">{processErrors.status}</p> : null}
+                            <div className="mt-4 flex justify-end">
+                                <button
+                                    type="submit"
+                                    disabled={!canProcess || processForm.processing}
+                                    onClick={(event) => {
+                                        if (!window.confirm('Process this purchase order now? This will issue the PO and create the delivery intake.')) {
+                                            event.preventDefault();
+                                        }
+                                    }}
+                                    className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    {processForm.processing ? 'Processing…' : 'Process Purchase Order'}
+                                </button>
+                            </div>
+                        </form>
+                    ) : null}
             </div>
         </AuthenticatedLayout>
     );
@@ -254,5 +309,3 @@ function ReadOnlyField({ label, value }: { label: string; value: string }) {
         </div>
     );
 }
-
-

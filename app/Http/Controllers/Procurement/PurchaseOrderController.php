@@ -220,7 +220,12 @@ class PurchaseOrderController extends Controller
         $suppliers = Supplier::query()->active()->orderBy('supplier_name')->get(['supplier_id', 'supplier_name']);
 
         return Inertia::render('Procurement/PurchaseOrders/Edit', [
-            'purchaseOrder' => $purchaseOrder,
+            'purchaseOrder' => $purchaseOrder->load([
+                'supplier:supplier_id,supplier_name',
+                'purchaseRequest.office:id,code,name',
+                'supplyRequest.requester:id,name',
+                'supplyRequest.items.item.category',
+            ]),
             'suppliers' => $suppliers,
         ]);
     }
