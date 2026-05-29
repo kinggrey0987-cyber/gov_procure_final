@@ -1,6 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import Modal from '@/Components/Modal';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { FormEvent } from 'react';
+import { FormEvent, useState } from 'react';
 
 type PurchaseOrder = {
     purchase_order_id: number;
@@ -40,6 +41,9 @@ type Props = {
 export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceItems }: Props) {
     const toWholeQuantity = (value: string | number): number => Math.max(Math.trunc(Number(value) || 0), 0);
     const hasSourceItems = sourceItems.length > 0;
+    const isDraft = (purchaseOrder.status ?? 'DRAFT') === 'DRAFT';
+    const canProcess = isDraft && items.data.length > 0;
+    const [itemPendingRemoval, setItemPendingRemoval] = useState<PurchaseOrderItem | null>(null);
 
     const form = useForm({
         supply_request_item_id: 0,
@@ -79,6 +83,31 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
         event.preventDefault();
         form.post(route('procurement.purchase-orders.items.store', purchaseOrder.purchase_order_id), {
             preserveScroll: true,
+        });
+    };
+
+    const processForm = useForm({ remarks: '' });
+    const processErrors = processForm.errors as Record<string, string | undefined>;
+    const deleteForm = useForm({});
+
+    const processPurchaseOrder = (event: FormEvent) => {
+        event.preventDefault();
+
+        if (!canProcess) {
+            return;
+        }
+
+        processForm.post(route('procurement.purchase-orders.place', purchaseOrder.purchase_order_id));
+    };
+
+    const confirmItemRemoval = () => {
+        if (!itemPendingRemoval) {
+            return;
+        }
+
+        deleteForm.delete(route('procurement.purchase-orders.items.destroy', [purchaseOrder.purchase_order_id, itemPendingRemoval.purchase_order_item_id]), {
+            preserveScroll: true,
+            onSuccess: () => setItemPendingRemoval(null),
         });
     };
 
@@ -211,19 +240,13 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                                         <td className="px-3 py-2">{row.unit_price}</td>
                                         <td className="px-3 py-2">{row.total_price}</td>
                                         <td className="px-3 py-2 text-right">
-                                            <Link
-                                                href={route('procurement.purchase-orders.items.destroy', [purchaseOrder.purchase_order_id, row.purchase_order_item_id])}
-                                                method="delete"
-                                                as="button"
-                                                onClick={(event) => {
-                                                    if (!window.confirm('Remove this item line from the purchase order?')) {
-                                                        event.preventDefault();
-                                                    }
-                                                }}
+                                            <button
+                                                type="button"
+                                                onClick={() => setItemPendingRemoval(row)}
                                                 className="rounded border border-rose-300 px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50"
                                             >
                                                 Remove
-                                            </Link>
+                                            </button>
                                         </td>
                                     </tr>
                                 ))}
@@ -236,11 +259,76 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                         </table>
                     </div>
 
-                    <div className="flex flex-wrap gap-3">
-                        <Link href={route('procurement.purchase-orders.show', purchaseOrder.purchase_order_id)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                            Back to Purchase Order
-                        </Link>
-                    </div>
+                    {isDraft ? (
+                        <form onSubmit={processPurchaseOrder} className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                    <p className="text-xs font-semibold uppercase tracking-[0.15em] text-red-700">Ready for Processing</p>
+                                    <h3 className="mt-1 text-xl font-semibold text-slate-800">Process Purchase Order</h3>
+                                    <p className="mt-1 text-sm text-slate-600">After encoding the supplier-quoted item lines, issue the PO and generate the delivery intake workflow.</p>
+                                </div>
+                                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${canProcess ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                    {canProcess ? `${items.data.length} encoded line(s)` : 'Add at least 1 item'}
+                                </span>
+                            </div>
+                            <label className="mt-4 block">
+                                <span className="mb-1 block text-sm font-medium text-slate-700">Processing Remarks</span>
+                                <textarea
+                                    value={processForm.data.remarks}
+                                    onChange={(event) => processForm.setData('remarks', event.target.value)}
+                                    className="h-24 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                    placeholder="Optional note for PO issuance"
+                                />
+                            </label>
+                            {processErrors.items ? <p className="mt-2 text-xs font-semibold text-rose-600">{processErrors.items}</p> : null}
+                            {processErrors.status ? <p className="mt-2 text-xs font-semibold text-rose-600">{processErrors.status}</p> : null}
+                            <div className="mt-4 flex flex-wrap justify-end gap-3">
+                                <Link href={route('procurement.purchase-orders.show', purchaseOrder.purchase_order_id)} className="rounded-lg border border-red-200 bg-red-50 px-5 py-2 text-sm font-semibold text-red-700 hover:border-red-300 hover:bg-red-100">
+                                    Back to Purchase Order
+                                </Link>
+                                <button
+                                    type="submit"
+                                    disabled={!canProcess || processForm.processing}
+                                    onClick={(event) => {
+                                        if (!window.confirm('Process this purchase order now? This will issue the PO and create the delivery intake.')) {
+                                            event.preventDefault();
+                                        }
+                                    }}
+                                    className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    {processForm.processing ? 'Processing…' : 'Process Purchase Order'}
+                                </button>
+                            </div>
+                        </form>
+                    ) : null}
+
+                    <Modal show={Boolean(itemPendingRemoval)} maxWidth="md" onClose={() => setItemPendingRemoval(null)}>
+                        <div className="p-6">
+                            <p className="text-xs font-semibold uppercase tracking-[0.15em] text-red-700">Remove Item Line</p>
+                            <h3 className="mt-2 text-lg font-semibold text-slate-900">Confirm purchase order item removal</h3>
+                            <p className="mt-2 text-sm text-slate-600">
+                                Remove {itemPendingRemoval?.item_name_snapshot ?? 'this item line'} from this purchase order? This action will update the encoded line list.
+                            </p>
+                            <div className="mt-6 flex flex-wrap justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setItemPendingRemoval(null)}
+                                    disabled={deleteForm.processing}
+                                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={confirmItemRemoval}
+                                    disabled={deleteForm.processing}
+                                    className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    {deleteForm.processing ? 'Removing…' : 'Remove Item'}
+                                </button>
+                            </div>
+                        </div>
+                    </Modal>
             </div>
         </AuthenticatedLayout>
     );
@@ -254,5 +342,3 @@ function ReadOnlyField({ label, value }: { label: string; value: string }) {
         </div>
     );
 }
-
-

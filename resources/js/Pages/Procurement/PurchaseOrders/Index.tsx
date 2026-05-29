@@ -164,7 +164,7 @@ export default function PurchaseOrdersIndex({ purchaseOrders, filters }: Props) 
                                             </Link>
                                             {row.status === 'DRAFT' ? (
                                                 <Link href={route('procurement.purchase-orders.edit', row.purchase_order_id)} className="rounded border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50">
-                                                    Update Header
+                                                    Edit PO
                                                 </Link>
                                             ) : null}
                                             {row.status === 'DRAFT' ? (
@@ -236,7 +236,6 @@ function formatMoney(value: number) {
         maximumFractionDigits: 0,
     }).format(value);
 }
-
 
 
 
