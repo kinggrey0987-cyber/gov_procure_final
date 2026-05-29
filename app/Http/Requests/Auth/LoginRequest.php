@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Auth;
 
 use Illuminate\Auth\Events\Lockout;
+use App\Models\User;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
@@ -50,6 +51,10 @@ class LoginRequest extends FormRequest
         $this->ensureIsNotRateLimited();
 
         if (! Auth::attempt($this->only('email', 'password'), $remember)) {
+            $userExists = User::query()
+                ->where('email', $this->string('email')->toString())
+                ->exists();
+
             RateLimiter::hit($this->throttleKey(), $this->currentLockoutSeconds());
 
             if (RateLimiter::tooManyAttempts($this->throttleKey(), self::MAX_FAILED_LOGIN_ATTEMPTS)) {
@@ -57,7 +62,9 @@ class LoginRequest extends FormRequest
             }
 
             throw ValidationException::withMessages([
-                'email' => trans('auth.failed'),
+                'email' => $userExists
+                    ? 'Wrong Password'
+                    : trans('auth.failed'),
             ]);
         }
 

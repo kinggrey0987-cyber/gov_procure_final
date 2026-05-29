@@ -4,7 +4,7 @@ import InputLabel from '@/Components/InputLabel';
 import PasswordInput from '@/Components/PasswordInput';
 import TextInput from '@/Components/TextInput';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
-import { FormEventHandler } from 'react';
+import { FormEventHandler, useEffect, useMemo, useState } from 'react';
 import { PageProps as AppPageProps } from '@/types';
 
 type PageProps = AppPageProps & {
@@ -12,6 +12,32 @@ type PageProps = AppPageProps & {
         success?: string | null;
         error?: string | null;
     };
+};
+
+const extractLockoutSeconds = (message?: string): number => {
+    if (! message) {
+        return 0;
+    }
+
+    const secondsMatch = message.match(/(\d+)\s+seconds?/i);
+    if (secondsMatch) {
+        return Number(secondsMatch[1]);
+    }
+
+    const minutesMatch = message.match(/(\d+)\s+minutes?/i);
+    if (minutesMatch) {
+        return Number(minutesMatch[1]) * 60;
+    }
+
+    return 0;
+};
+
+const formatCountdown = (seconds: number): string => {
+    const safeSeconds = Math.max(0, seconds);
+    const minutes = Math.floor(safeSeconds / 60);
+    const remainingSeconds = safeSeconds % 60;
+
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 };
 
 export default function Login({
@@ -31,6 +57,30 @@ export default function Login({
     const { flash } = usePage<PageProps>().props;
     const visibleStatus = status ?? flash?.success ?? null;
     const visibleError = error ?? flash?.error ?? null;
+    const [lockoutSeconds, setLockoutSeconds] = useState(0);
+    const emailError = useMemo(() => {
+        if (! errors.email || lockoutSeconds <= 0) {
+            return errors.email;
+        }
+
+        return `Too many login attempts. Please try again in ${formatCountdown(lockoutSeconds)}.`;
+    }, [errors.email, lockoutSeconds]);
+
+    useEffect(() => {
+        setLockoutSeconds(extractLockoutSeconds(errors.email));
+    }, [errors.email]);
+
+    useEffect(() => {
+        if (lockoutSeconds <= 0) {
+            return;
+        }
+
+        const interval = window.setInterval(() => {
+            setLockoutSeconds((seconds) => Math.max(0, seconds - 1));
+        }, 1000);
+
+        return () => window.clearInterval(interval);
+    }, [lockoutSeconds]);
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
@@ -100,7 +150,7 @@ export default function Login({
                                 onChange={(e) => setData('email', e.target.value)}
                             />
 
-                            <InputError message={errors.email} className="mt-2" />
+                            <InputError message={emailError} className="mt-2" />
                         </div>
 
                         <div>
@@ -149,10 +199,14 @@ export default function Login({
                         <div className="flex flex-col gap-3 pt-1">
                             <button
                                 type="submit"
-                                disabled={processing}
+                                disabled={processing || lockoutSeconds > 0}
                                 className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-red-700 px-4 text-sm font-semibold text-white transition hover:bg-red-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                                {processing ? 'Signing In...' : 'Sign In Securely'}
+                                {processing
+                                    ? 'Signing In...'
+                                    : lockoutSeconds > 0
+                                        ? `Sign In Securely (${formatCountdown(lockoutSeconds)})`
+                                        : 'Sign In Securely'}
                             </button>
 
                             <div className="relative py-2">
@@ -204,7 +258,6 @@ export default function Login({
         </div>
     );
 }
-
 
 
 
