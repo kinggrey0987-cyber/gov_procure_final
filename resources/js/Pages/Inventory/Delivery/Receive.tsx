@@ -61,19 +61,29 @@ export default function DeliveryReceive({ delivery }: Props) {
         return Math.max(Math.trunc(Number(value) || 0), 0);
     };
 
-    const { data, setData, put, processing, errors } = useForm<ReceiveFormData>({
+    const toQuantityInput = (value: string | number): string => {
+        const digits = String(value).replace(/\D/g, '');
+
+        if (digits === '') {
+            return '';
+        }
+
+        return digits.replace(/^0+(?=\d)/, '');
+    };
+
+    const { data, setData, put, processing, errors, transform } = useForm<ReceiveFormData>({
         actual_delivery_date: delivery.actual_delivery_date || todayDate(),
         remarks: delivery.remarks || '',
         items: delivery.items.map(item => ({
             delivery_item_id: item.delivery_item_id,
-            received_quantity: toWholeQuantity(item.received_quantity || 0),
-            damaged_quantity: toWholeQuantity(item.damaged_quantity || 0),
+            received_quantity: toQuantityInput(item.received_quantity || 0),
+            damaged_quantity: toQuantityInput(item.damaged_quantity || 0),
         })),
     });
 
     const handleItemChange = (index: number, field: 'received_quantity' | 'damaged_quantity', value: string | number) => {
         const updatedItems = [...data.items];
-        updatedItems[index][field] = toWholeQuantity(value);
+        updatedItems[index][field] = toQuantityInput(value);
         setData('items', updatedItems);
     };
 
@@ -100,7 +110,17 @@ export default function DeliveryReceive({ delivery }: Props) {
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
-        put(route('inventory.deliveries.update', delivery.delivery_id));
+        transform((formData) => ({
+            ...formData,
+            items: formData.items.map((item) => ({
+                ...item,
+                received_quantity: toWholeQuantity(item.received_quantity),
+                damaged_quantity: toWholeQuantity(item.damaged_quantity),
+            })),
+        }));
+        put(route('inventory.deliveries.update', delivery.delivery_id), {
+            onFinish: () => transform((formData) => formData),
+        });
     };
 
     return (
@@ -167,7 +187,7 @@ export default function DeliveryReceive({ delivery }: Props) {
                                                     step="1"
                                                     min="0"
                                                     inputMode="numeric"
-                                                    value={data.items[index].damaged_quantity ?? 0}
+                                                    value={data.items[index].damaged_quantity}
                                                     onChange={(e) => handleItemChange(index, 'damaged_quantity', e.target.value)}
                                                     className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-center text-sm focus:border-blue-500 focus:outline-none"
                                                 />
@@ -257,5 +277,4 @@ function FormField({
         </div>
     );
 }
-
 
