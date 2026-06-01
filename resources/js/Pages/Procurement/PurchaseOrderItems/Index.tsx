@@ -44,6 +44,7 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
     const isDraft = (purchaseOrder.status ?? 'DRAFT') === 'DRAFT';
     const canProcess = isDraft && items.data.length > 0;
     const [itemPendingRemoval, setItemPendingRemoval] = useState<PurchaseOrderItem | null>(null);
+    const [confirmingProcess, setConfirmingProcess] = useState(false);
 
     const form = useForm({
         supply_request_item_id: 0,
@@ -90,14 +91,24 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
     const processErrors = processForm.errors as Record<string, string | undefined>;
     const deleteForm = useForm({});
 
-    const processPurchaseOrder = (event: FormEvent) => {
+    const requestProcessPurchaseOrder = (event: FormEvent) => {
         event.preventDefault();
 
         if (!canProcess) {
             return;
         }
 
-        processForm.post(route('procurement.purchase-orders.place', purchaseOrder.purchase_order_id));
+        setConfirmingProcess(true);
+    };
+
+    const processPurchaseOrder = () => {
+        if (!canProcess) {
+            return;
+        }
+
+        processForm.post(route('procurement.purchase-orders.place', purchaseOrder.purchase_order_id), {
+            onSuccess: () => setConfirmingProcess(false),
+        });
     };
 
     const confirmItemRemoval = () => {
@@ -260,7 +271,7 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                     </div>
 
                     {isDraft ? (
-                        <form onSubmit={processPurchaseOrder} className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm">
+                        <form onSubmit={requestProcessPurchaseOrder} className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm">
                             <div className="flex flex-wrap items-start justify-between gap-3">
                                 <div>
                                     <p className="text-xs font-semibold uppercase tracking-[0.15em] text-red-700">Ready for Processing</p>
@@ -289,11 +300,6 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                                 <button
                                     type="submit"
                                     disabled={!canProcess || processForm.processing}
-                                    onClick={(event) => {
-                                        if (!window.confirm('Process this purchase order now? This will issue the PO and create the delivery intake.')) {
-                                            event.preventDefault();
-                                        }
-                                    }}
                                     className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                     {processForm.processing ? 'Processing…' : 'Process Purchase Order'}
@@ -301,6 +307,40 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                             </div>
                         </form>
                     ) : null}
+
+                    <Modal show={confirmingProcess} maxWidth="md" closeable={!processForm.processing} onClose={() => setConfirmingProcess(false)}>
+                        <div className="p-6">
+                            <p className="text-xs font-semibold uppercase tracking-[0.15em] text-red-700">Process Purchase Order</p>
+                            <h3 className="mt-2 text-lg font-semibold text-slate-900">Issue this purchase order?</h3>
+                            <p className="mt-2 text-sm text-slate-600">
+                                This will issue {purchaseOrder.po_number ?? `PO #${purchaseOrder.purchase_order_id}`} and create the delivery intake workflow for {items.data.length} encoded line(s).
+                            </p>
+                            {processForm.data.remarks ? (
+                                <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Processing Remarks</p>
+                                    <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{processForm.data.remarks}</p>
+                                </div>
+                            ) : null}
+                            <div className="mt-6 flex flex-wrap justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setConfirmingProcess(false)}
+                                    disabled={processForm.processing}
+                                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={processPurchaseOrder}
+                                    disabled={!canProcess || processForm.processing}
+                                    className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    {processForm.processing ? 'Processing…' : 'Issue Purchase Order'}
+                                </button>
+                            </div>
+                        </div>
+                    </Modal>
 
                     <Modal show={Boolean(itemPendingRemoval)} maxWidth="md" onClose={() => setItemPendingRemoval(null)}>
                         <div className="p-6">
