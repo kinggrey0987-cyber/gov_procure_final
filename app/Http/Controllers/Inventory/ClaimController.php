@@ -194,6 +194,7 @@ class ClaimController
             'claim' => [
                 'claims_id' => (int) $claim->claims_id,
                 'claim_code' => (string) $claim->claim_code,
+                'distribution_item_id' => $claim->distribution_item_id ? (int) $claim->distribution_item_id : null,
                 'status' => (string) $claim->status,
                 'claim_type' => (string) $claim->claim_type,
                 'claim_date' => optional($claim->claim_date)?->toDateString(),

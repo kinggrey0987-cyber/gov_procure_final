@@ -9,6 +9,7 @@ type Props = {
     claim: {
         claims_id: number;
         claim_code: string;
+        distribution_item_id?: number | null;
         status: string;
         claim_type: string;
         claim_date: string;
@@ -90,6 +91,14 @@ export default function ClaimShow({ claim, linkedDistribution, attachments, atta
     });
     const needsResolution = statusForm.data.status !== '' && statusForm.data.status !== 'IN_REVIEW';
     const usesReplacement = ['REPLACEMENT_RELEASED', 'PARTIAL_REPLACEMENT'].includes(statusForm.data.resolution_type);
+    const claimedItems = linkedDistribution?.items.filter((item) => {
+        if (!claim.distribution_item_id) {
+            return true;
+        }
+
+        return item.distribution_item_id === claim.distribution_item_id;
+    }) ?? [];
+    const hasSpecificClaimedItem = claim.distribution_item_id !== null && claim.distribution_item_id !== undefined;
 
     useEffect(() => {
         statusForm.setData('status', nextStatusOptions[0]?.value ?? '');
@@ -323,9 +332,54 @@ export default function ClaimShow({ claim, linkedDistribution, attachments, atta
                 ) : null}
 
                 {activeTab === 'items' ? (
-                    <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Claimed Item Scope</h3>
-                        <p className="mt-2 text-sm text-slate-600">Item-level breakdown is available through linked distribution records and claim evidence attachments.</p>
+                    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                        <div className="border-b border-slate-200 px-4 py-3">
+                            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Claimed Items</h3>
+                            <p className="mt-1 text-xs text-slate-500">
+                                {hasSpecificClaimedItem
+                                    ? 'Showing the released item selected when this claim was filed.'
+                                    : 'No specific item was selected for this claim, so the linked distribution item lines are shown.'}
+                            </p>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-slate-200 text-sm">
+                                <thead className="bg-slate-50">
+                                    <tr>
+                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Item</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Category</th>
+                                        <th className="px-4 py-3 text-right font-semibold text-slate-700">Released Qty</th>
+                                        <th className="px-4 py-3 text-right font-semibold text-slate-700">Received Qty</th>
+                                        <th className="px-4 py-3 text-right font-semibold text-slate-700">Damaged Qty</th>
+                                        <th className="px-4 py-3 text-right font-semibold text-slate-700">Missing Qty</th>
+                                        <th className="px-4 py-3 text-right font-semibold text-slate-700">Disputed Qty</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Unit</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {claimedItems.map((item) => (
+                                        <tr key={item.distribution_item_id} className="hover:bg-slate-50/60">
+                                            <td className="px-4 py-3 text-slate-700">{item.item_name}</td>
+                                            <td className="px-4 py-3 text-slate-600">{item.category_name || '-'}</td>
+                                            <td className="px-4 py-3 text-right font-semibold text-slate-700">{item.quantity_released.toFixed(2)}</td>
+                                            <td className="px-4 py-3 text-right font-semibold text-emerald-700">{(item.quantity_received ?? 0).toFixed(2)}</td>
+                                            <td className="px-4 py-3 text-right text-rose-600">{(item.quantity_damaged ?? 0).toFixed(2)}</td>
+                                            <td className="px-4 py-3 text-right text-amber-600">{(item.quantity_missing ?? 0).toFixed(2)}</td>
+                                            <td className="px-4 py-3 text-right font-semibold text-red-700">
+                                                {hasSpecificClaimedItem ? (claim.quantity_disputed ?? 0).toFixed(2) : '-'}
+                                            </td>
+                                            <td className="px-4 py-3 text-slate-700">{item.unit}</td>
+                                        </tr>
+                                    ))}
+                                    {claimedItems.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={8} className="px-4 py-8 text-center text-sm text-slate-500">
+                                                No item line is linked to this claim.
+                                            </td>
+                                        </tr>
+                                    ) : null}
+                                </tbody>
+                            </table>
+                        </div>
                     </section>
                 ) : null}
             </div>
@@ -427,5 +481,4 @@ function getResolutionTypeOptions(status: string): Array<{ value: string; label:
 
     return [];
 }
-
 
