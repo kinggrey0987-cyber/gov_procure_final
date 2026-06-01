@@ -114,7 +114,7 @@ export default function SupplyRequestShow({
 
     const isReleasedOrCompleted = useMemo(() => {
         const status = supplyRequest.status.toUpperCase();
-        return status === 'RELEASED' || status === 'COMPLETED';
+        return status === 'RELEASED' || status === 'PARTIALLY_RELEASED' || status === 'PARTIALLY_RECEIVED' || status === 'COMPLETED';
     }, [supplyRequest.status]);
     const isDraft = (supplyRequest.raw_status ?? supplyRequest.status).toUpperCase() === 'DRAFT';
 
@@ -573,13 +573,14 @@ function StatusBadge({ status }: { status: string }) {
     const style =
         normalized === 'APPROVED' || normalized === 'COMPLETED'
             ? 'bg-emerald-100 text-emerald-700'
-            : normalized === 'IN_REVIEW' || normalized === 'PROCESSING' || normalized === 'RELEASED' || normalized === 'PROCUREMENT_PO_DRAFT' || normalized === 'PROCUREMENT_PLACED'
+            : normalized === 'IN_REVIEW' || normalized === 'PROCESSING' || normalized === 'RELEASED' || normalized === 'PARTIALLY_RELEASED' || normalized === 'PROCUREMENT_PO_DRAFT' || normalized === 'PROCUREMENT_PLACED'
                 ? 'bg-blue-100 text-blue-700'
                 : normalized === 'REJECTED' || normalized === 'RETURNED_FOR_REVISION'
                     ? 'bg-rose-100 text-rose-700'
+                    : normalized === 'PARTIALLY_RECEIVED'
+                        ? 'bg-orange-100 text-orange-700'
                     : 'bg-amber-100 text-amber-700';
 
     return <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${style}`}>{status.replaceAll('_', ' ')}</span>;
 }
-
 

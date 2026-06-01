@@ -4,6 +4,8 @@ namespace Tests\Feature\Office;
 
 use App\Enums\UserRole;
 use App\Models\Anomaly;
+use App\Models\DistributionItem;
+use App\Models\DistributionRecord;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Office;
@@ -1201,6 +1203,151 @@ class OfficeTransactionalFlowTest extends TestCase
             );
     }
 
+    public function test_request_with_only_partial_received_distribution_shows_partial_received_tracking_status(): void
+    {
+        $office = $this->createOffice();
+        $officeUser = $this->createUser(UserRole::OFFICE_USER, $office);
+        [$ppmp, $ppmpItem, $item] = $this->createApprovedPpmpItemContext($office, $officeUser, 500);
+
+        $supplyRequest = SupplyRequest::query()->create([
+            'request_code' => 'SR-PARTIAL-RECEIPT-1',
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'ppmp_id' => $ppmp->ppmp_id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(3)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Partial receipt status test',
+            'priority_level' => 'MEDIUM',
+            'status' => 'SUBMITTED',
+            'review_notes' => null,
+            'approved_by' => null,
+            'approved_at' => null,
+        ]);
+
+        SupplyRequestItem::query()->create([
+            'supply_request_id' => $supplyRequest->supply_request_id,
+            'item_id' => $item->item_id,
+            'ppmp_item_id' => $ppmpItem->ppmp_item_id,
+            'item_name_snapshot' => $item->item_name,
+            'quantity_requested' => 500,
+        ]);
+
+        $distributionRecord = DistributionRecord::query()->create([
+            'distribution_code' => 'DIST-PARTIAL-1',
+            'supply_request_id' => $supplyRequest->supply_request_id,
+            'delivery_id' => null,
+            'office_id' => $office->id,
+            'prepared_by' => $officeUser->id,
+            'received_by' => $officeUser->id,
+            'release_date' => now()->toDateString(),
+            'storage_location' => 'GSO',
+            'status' => 'RECEIVED',
+            'notes' => null,
+        ]);
+
+        DistributionItem::query()->create([
+            'distribution_record_id' => $distributionRecord->distribution_record_id,
+            'item_id' => $item->item_id,
+            'received_by' => $officeUser->id,
+            'item_name_snapshot' => $item->item_name,
+            'quantity_released' => 8,
+            'quantity_received' => 8,
+            'quantity_damaged' => 0,
+            'quantity_missing' => 0,
+            'receipt_condition' => 'GOOD',
+            'unit' => 'PCS',
+            'remarks' => null,
+        ]);
+
+        $this->actingAs($officeUser)
+            ->get(route('office.supply-requests.show', $supplyRequest->supply_request_id))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Office/SupplyRequests/Show')
+                ->where('supplyRequest.status', 'PARTIALLY_RECEIVED')
+                ->where('supplyRequest.items.0.quantity_requested', 500)
+                ->where('supplyRequest.items.0.quantity_released', 8)
+                ->where('supplyRequest.items.0.quantity_received', 8)
+            );
+    }
+
+    public function test_partial_delivery_follow_up_supply_request_does_not_double_count_ppmp_consumption(): void
+    {
+        $office = $this->createOffice();
+        $officeUser = $this->createUser(UserRole::OFFICE_USER, $office);
+        $gsoOfficer = $this->createUser(UserRole::GSO_OFFICER, $office);
+        [$ppmp, $ppmpItem, $item] = $this->createApprovedPpmpItemContext($office, $officeUser, 500);
+
+        $originalRequest = SupplyRequest::query()->create([
+            'request_code' => 'SR-ORIGINAL-1',
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'ppmp_id' => $ppmp->ppmp_id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(3)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Original request',
+            'priority_level' => 'MEDIUM',
+            'status' => 'SUBMITTED',
+            'review_notes' => null,
+            'approved_by' => null,
+            'approved_at' => null,
+        ]);
+
+        SupplyRequestItem::query()->create([
+            'supply_request_id' => $originalRequest->supply_request_id,
+            'item_id' => $item->item_id,
+            'ppmp_item_id' => $ppmpItem->ppmp_item_id,
+            'item_name_snapshot' => $item->item_name,
+            'quantity_requested' => 500,
+        ]);
+
+        $followUpRequest = SupplyRequest::query()->create([
+            'request_code' => 'SR-FOLLOW-UP-1',
+            'office_id' => $office->id,
+            'requested_by' => $gsoOfficer->id,
+            'ppmp_id' => $ppmp->ppmp_id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(7)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Follow-up procurement for missing delivery',
+            'priority_level' => 'MEDIUM',
+            'status' => 'SUBMITTED',
+            'review_notes' => null,
+            'approved_by' => null,
+            'approved_at' => null,
+        ]);
+
+        SupplyRequestItem::query()->create([
+            'supply_request_id' => $followUpRequest->supply_request_id,
+            'item_id' => $item->item_id,
+            'ppmp_item_id' => $ppmpItem->ppmp_item_id,
+            'item_name_snapshot' => $item->item_name,
+            'quantity_requested' => 10,
+        ]);
+
+        PurchaseRequest::query()->create([
+            'supply_request_id' => $followUpRequest->supply_request_id,
+            'office_id' => $office->id,
+            'requested_by' => $gsoOfficer->id,
+            'source_delivery_id' => null,
+            'source_type' => 'PARTIAL_DELIVERY_FOLLOW_UP',
+            'status' => 'OPEN',
+            'remarks' => 'Generated from discrepancy follow-up.',
+        ]);
+
+        $this->actingAs($officeUser)
+            ->get(route('office.supply-requests.show', $originalRequest->supply_request_id))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Office/SupplyRequests/Show')
+                ->where('supplyRequest.items.0.already_requested_quantity', 500)
+                ->where('supplyRequest.items.0.remaining_quantity', 0)
+                ->where('supplyRequest.items.0.exceeds_ppmp_allocation', false)
+            );
+    }
+
     public function test_supply_request_create_requires_ppmp_id_matching_line_items(): void
     {
         $office = $this->createOffice();
@@ -1410,5 +1557,49 @@ class OfficeTransactionalFlowTest extends TestCase
             'office_id' => $office->id,
             'emp_id' => sprintf('OFF-%d-%s', $office->id, strtoupper(substr((string) str()->uuid(), 0, 8))),
         ]);
+    }
+
+    private function createApprovedPpmpItemContext(Office $office, User $officeUser, float $plannedQuantity): array
+    {
+        $category = ItemCategory::query()->create([
+            'category_name' => 'Office Supplies',
+            'standard_delivery_days' => 7,
+            'description' => null,
+            'status' => 'active',
+        ]);
+
+        $item = Item::query()->create([
+            'item_category_id' => $category->item_category_id,
+            'item_name' => 'Rubbing Alcohol',
+            'description' => null,
+            'default_unit' => 'PCS',
+            'status' => 'active',
+        ]);
+
+        $ppmp = Ppmp::query()->create([
+            'office_id' => $office->id,
+            'prepared_by' => $officeUser->id,
+            'approved_by' => $officeUser->id,
+            'fiscal_year' => 2026,
+            'fund_source' => 'GAA_CURRENT',
+            'status' => 'APPROVED',
+            'total_estimated_budget' => 0,
+            'date_prepared' => now()->toDateString(),
+            'date_approved' => now()->toDateString(),
+            'remarks' => null,
+        ]);
+
+        $ppmpItem = PpmpItem::query()->create([
+            'ppmp_id' => $ppmp->ppmp_id,
+            'item_id' => $item->item_id,
+            'item_category_id' => $category->item_category_id,
+            'quantity' => $plannedQuantity,
+            'unit_cost' => 100,
+            'estimated_budget' => $plannedQuantity * 100,
+            'procurement_schedule' => 'Q2',
+            'remarks' => 'Required specification for Rubbing Alcohol from seeded PPMP item remarks.',
+        ]);
+
+        return [$ppmp, $ppmpItem, $item];
     }
 }

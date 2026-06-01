@@ -322,9 +322,7 @@ class SupplyRequestService
         $consumptionRows = SupplyRequestItem::query()
             ->selectRaw('ppmp_item_id, COALESCE(SUM(quantity_requested), 0) as requested_quantity')
             ->whereIn('ppmp_item_id', $ppmpItems->pluck('ppmp_item_id')->all())
-            ->whereHas('supplyRequest', function ($query) use ($officeId, $ppmpId): void {
-                $query->where('office_id', $officeId)->where('ppmp_id', $ppmpId);
-            })
+            ->whereHas('supplyRequest', fn ($query) => $this->scopePpmpConsumptionSupplyRequests($query, $officeId, $ppmpId))
             ->groupBy('ppmp_item_id')
             ->get()
             ->mapWithKeys(fn ($row): array => [(int) $row->ppmp_item_id => (float) $row->requested_quantity]);
@@ -370,9 +368,7 @@ class SupplyRequestService
 
         $requestedQuery = SupplyRequestItem::query()
             ->where('ppmp_item_id', $ppmpItemId)
-            ->whereHas('supplyRequest', function ($query) use ($officeId, $ppmpId): void {
-                $query->where('office_id', $officeId)->where('ppmp_id', $ppmpId);
-            });
+            ->whereHas('supplyRequest', fn ($query) => $this->scopePpmpConsumptionSupplyRequests($query, $officeId, $ppmpId));
 
         if ($excludeSupplyRequestItemId) {
             $requestedQuery->where('supply_request_item_id', '!=', $excludeSupplyRequestItemId);
@@ -539,10 +535,11 @@ class SupplyRequestService
         $consumptionTotals = SupplyRequestItem::query()
             ->selectRaw('ppmp_item_id, COALESCE(SUM(quantity_requested), 0) as total_requested')
             ->whereIn('ppmp_item_id', $ppmpItemIds)
-            ->whereHas('supplyRequest', function ($query) use ($supplyRequest): void {
-                $query->where('office_id', (int) $supplyRequest->office_id)
-                    ->where('ppmp_id', (int) $supplyRequest->ppmp_id);
-            })
+            ->whereHas('supplyRequest', fn ($query) => $this->scopePpmpConsumptionSupplyRequests(
+                $query,
+                (int) $supplyRequest->office_id,
+                (int) $supplyRequest->ppmp_id,
+            ))
             ->groupBy('ppmp_item_id')
             ->get()
             ->mapWithKeys(fn ($row): array => [(int) $row->ppmp_item_id => (float) $row->total_requested]);
@@ -561,10 +558,11 @@ class SupplyRequestService
 
             $latestItem = SupplyRequestItem::query()
                 ->where('ppmp_item_id', $ppmpItemId)
-                ->whereHas('supplyRequest', function ($query) use ($supplyRequest): void {
-                    $query->where('office_id', (int) $supplyRequest->office_id)
-                        ->where('ppmp_id', (int) $supplyRequest->ppmp_id);
-                })
+                ->whereHas('supplyRequest', fn ($query) => $this->scopePpmpConsumptionSupplyRequests(
+                    $query,
+                    (int) $supplyRequest->office_id,
+                    (int) $supplyRequest->ppmp_id,
+                ))
                 ->latest('supply_request_item_id')
                 ->first(['supply_request_item_id', 'item_id']);
 
@@ -598,6 +596,15 @@ class SupplyRequestService
         }
 
         return $anomalyCount;
+    }
+
+    private function scopePpmpConsumptionSupplyRequests($query, int $officeId, int $ppmpId): void
+    {
+        $query->where('office_id', $officeId)
+            ->where('ppmp_id', $ppmpId)
+            ->whereDoesntHave('purchaseRequests', function ($purchaseRequestQuery): void {
+                $purchaseRequestQuery->where('source_type', 'PARTIAL_DELIVERY_FOLLOW_UP');
+            });
     }
 
     private function createOrUpdatePpmpScheduleMismatchAnomalies(SupplyRequest $supplyRequest): int

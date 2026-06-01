@@ -100,6 +100,8 @@ class SupplyRequestController extends Controller
     {
         match ($status) {
             'RECEIVED' => $query->whereHas('distributionRecords', fn (Builder $distributionQuery) => $distributionQuery->where('status', 'RECEIVED')),
+            'PARTIALLY_RECEIVED' => $query->whereHas('distributionRecords', fn (Builder $distributionQuery) => $distributionQuery->where('status', 'RECEIVED')),
+            'PARTIALLY_RELEASED' => $query->whereHas('distributionRecords', fn (Builder $distributionQuery) => $distributionQuery->whereIn('status', ['RELEASED', 'RECEIVED'])),
             'RELEASED' => $query
                 ->whereDoesntHave('distributionRecords', fn (Builder $distributionQuery) => $distributionQuery->where('status', 'RECEIVED'))
                 ->whereHas('distributionRecords', fn (Builder $distributionQuery) => $distributionQuery->where('status', 'RELEASED')),
@@ -363,16 +365,18 @@ class SupplyRequestController extends Controller
     {
         $baseStatus = strtoupper((string) $supplyRequest->status);
 
-        $distributionStatuses = $supplyRequest->distributionRecords
-            ->pluck('status')
-            ->map(fn ($status): string => strtoupper((string) $status));
+        $progress = $this->distributionProgress($supplyRequest);
 
-        if ($distributionStatuses->contains('RECEIVED')) {
-            return 'RECEIVED';
+        if ($progress['received'] > 0) {
+            return $progress['received'] + 0.0001 >= $progress['requested']
+                ? 'RECEIVED'
+                : 'PARTIALLY_RECEIVED';
         }
 
-        if ($distributionStatuses->contains('RELEASED')) {
-            return 'RELEASED';
+        if ($progress['released'] > 0) {
+            return $progress['released'] + 0.0001 >= $progress['requested']
+                ? 'RELEASED'
+                : 'PARTIALLY_RELEASED';
         }
 
         $purchaseOrderStatuses = $supplyRequest->purchaseOrders
@@ -415,6 +419,24 @@ class SupplyRequestController extends Controller
     }
 
     /**
+     * @return array{requested: float, released: float, received: float}
+     */
+    private function distributionProgress(SupplyRequest $supplyRequest): array
+    {
+        return [
+            'requested' => (float) $supplyRequest->items->sum('quantity_requested'),
+            'released' => (float) $supplyRequest->distributionRecords
+                ->whereIn('status', ['RELEASED', 'RECEIVED'])
+                ->flatMap(fn ($record) => $record->items)
+                ->sum('quantity_released'),
+            'received' => (float) $supplyRequest->distributionRecords
+                ->where('status', 'RECEIVED')
+                ->flatMap(fn ($record) => $record->items)
+                ->sum('quantity_received'),
+        ];
+    }
+
+    /**
      * @return array{mode: string, current_status: string, is_rejected: bool, stages: array<int, array<string, mixed>>}
      */
     private function buildProcessingTimeline(string $trackingStatus, bool $requiresProcurement): array
@@ -449,6 +471,8 @@ class SupplyRequestController extends Controller
                 'PROCESSING' => 4,
                 'PROCUREMENT_PO_DRAFT' => 4,
                 'PROCUREMENT_PLACED' => 4,
+                'PARTIALLY_RELEASED' => 5,
+                'PARTIALLY_RECEIVED' => 5,
                 'RELEASED' => 5,
                 'RECEIVED' => 6,
                 'COMPLETED' => 6,
@@ -460,6 +484,8 @@ class SupplyRequestController extends Controller
                 'IN_REVIEW' => 3,
                 'RETURNED_FOR_REVISION' => 3,
                 'REJECTED' => 3,
+                'PARTIALLY_RELEASED' => 4,
+                'PARTIALLY_RECEIVED' => 4,
                 'RELEASED' => 4,
                 'RECEIVED' => 5,
                 'COMPLETED' => 5,

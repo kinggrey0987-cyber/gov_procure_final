@@ -122,7 +122,7 @@ export default function SupplyRequestsIndex({ supplyRequests, filters, filter_op
                                 className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                             >
                                 <option value="">All statuses</option>
-                                {['DRAFT', 'SUBMITTED', 'IN_REVIEW', 'PROCUREMENT_PLACED', 'PROCESSING', 'RELEASED', 'RECEIVED', 'REJECTED', 'RETURNED_FOR_REVISION'].map((option) => (
+                                {['DRAFT', 'SUBMITTED', 'IN_REVIEW', 'PROCUREMENT_PLACED', 'PROCESSING', 'PARTIALLY_RELEASED', 'PARTIALLY_RECEIVED', 'RELEASED', 'RECEIVED', 'REJECTED', 'RETURNED_FOR_REVISION'].map((option) => (
                                     <option key={option} value={option}>{option.replaceAll('_', ' ')}</option>
                                 ))}
                             </select>
@@ -274,10 +274,12 @@ function StatusBadge({ status }: { status: string }) {
     const style =
         normalized === 'APPROVED' || normalized === 'COMPLETED'
             ? 'bg-emerald-100 text-emerald-700'
-            : normalized === 'IN_REVIEW' || normalized === 'PROCESSING' || normalized === 'RELEASED' || normalized === 'PROCUREMENT_PO_DRAFT' || normalized === 'PROCUREMENT_PLACED'
+            : normalized === 'IN_REVIEW' || normalized === 'PROCESSING' || normalized === 'RELEASED' || normalized === 'PARTIALLY_RELEASED' || normalized === 'PROCUREMENT_PO_DRAFT' || normalized === 'PROCUREMENT_PLACED'
                 ? 'bg-blue-100 text-blue-700'
                 : normalized === 'REJECTED' || normalized === 'RETURNED_FOR_REVISION'
                     ? 'bg-rose-100 text-rose-700'
+                    : normalized === 'PARTIALLY_RECEIVED'
+                        ? 'bg-orange-100 text-orange-700'
                     : 'bg-amber-100 text-amber-700';
 
     return <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${style}`}>{status.replaceAll('_', ' ')}</span>;
