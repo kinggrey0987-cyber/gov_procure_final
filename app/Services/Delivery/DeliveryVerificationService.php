@@ -108,40 +108,58 @@ class DeliveryVerificationService
 
     private function resolveSourcePartialDeliveryIfFollowUpCompleted(Delivery $delivery, User $actor): void
     {
-        $delivery->loadMissing('purchaseOrder.purchaseRequest.sourceDelivery');
+        $resolvedByDelivery = $delivery;
+        $visitedDeliveryIds = [];
 
-        $purchaseRequest = $delivery->purchaseOrder?->purchaseRequest;
-        if (
-            ! $purchaseRequest
-            || (string) $purchaseRequest->source_type !== 'PARTIAL_DELIVERY_FOLLOW_UP'
-            || (int) ($purchaseRequest->source_delivery_id ?? 0) <= 0
-        ) {
-            return;
+        while (true) {
+            $resolvedByDelivery->loadMissing('purchaseOrder.purchaseRequest.sourceDelivery');
+
+            $purchaseRequest = $resolvedByDelivery->purchaseOrder?->purchaseRequest;
+            if (
+                ! $purchaseRequest
+                || (string) $purchaseRequest->source_type !== 'PARTIAL_DELIVERY_FOLLOW_UP'
+                || (int) ($purchaseRequest->source_delivery_id ?? 0) <= 0
+            ) {
+                return;
+            }
+
+            $sourceDelivery = $purchaseRequest->sourceDelivery;
+            if (! $sourceDelivery instanceof Delivery) {
+                return;
+            }
+
+            $sourceDeliveryId = (int) $sourceDelivery->delivery_id;
+            if (isset($visitedDeliveryIds[$sourceDeliveryId])) {
+                return;
+            }
+
+            $visitedDeliveryIds[$sourceDeliveryId] = true;
+
+            if ((string) $sourceDelivery->receipt_status !== 'PARTIALLY_RECEIVED') {
+                return;
+            }
+
+            $oldStatus = (string) $sourceDelivery->receipt_status;
+
+            $sourceDelivery->forceFill([
+                'receipt_status' => 'VERIFIED',
+            ])->save();
+
+            $this->recordStatus(
+                $sourceDelivery,
+                $oldStatus,
+                'VERIFIED',
+                $actor,
+                sprintf(
+                    'Partial delivery discrepancy resolved by accepted follow-up delivery %s.',
+                    (string) $delivery->delivery_code
+                )
+            );
+
+            $this->recordAudit($actor, 'RESOLVE_PARTIAL_DELIVERY_FROM_FOLLOW_UP', $sourceDelivery);
+
+            $resolvedByDelivery = $sourceDelivery->fresh() ?? $sourceDelivery;
         }
-
-        $sourceDelivery = $purchaseRequest->sourceDelivery;
-        if (! $sourceDelivery instanceof Delivery || (string) $sourceDelivery->receipt_status !== 'PARTIALLY_RECEIVED') {
-            return;
-        }
-
-        $oldStatus = (string) $sourceDelivery->receipt_status;
-
-        $sourceDelivery->forceFill([
-            'receipt_status' => 'VERIFIED',
-        ])->save();
-
-        $this->recordStatus(
-            $sourceDelivery,
-            $oldStatus,
-            'VERIFIED',
-            $actor,
-            sprintf(
-                'Partial delivery discrepancy resolved by accepted follow-up delivery %s.',
-                (string) $delivery->delivery_code
-            )
-        );
-
-        $this->recordAudit($actor, 'RESOLVE_PARTIAL_DELIVERY_FROM_FOLLOW_UP', $sourceDelivery);
     }
 
     private function assertGsoOfficer(User $actor): void
