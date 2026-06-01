@@ -111,10 +111,12 @@ class SupplyRequestController extends Controller
                 ->whereDoesntHave('purchaseOrders', fn (Builder $purchaseOrderQuery) => $purchaseOrderQuery->where('status', 'PLACED'))
                 ->whereHas('purchaseOrders', fn (Builder $purchaseOrderQuery) => $purchaseOrderQuery->where('status', 'DRAFT')),
             'REJECTED' => $query
+                ->where('status', 'REJECTED')
                 ->whereDoesntHave('distributionRecords', fn (Builder $distributionQuery) => $distributionQuery->whereIn('status', ['RELEASED', 'RECEIVED']))
                 ->whereDoesntHave('purchaseOrders', fn (Builder $purchaseOrderQuery) => $purchaseOrderQuery->whereIn('status', ['PLACED', 'DRAFT']))
                 ->whereHas('purchaseRequests', fn (Builder $purchaseRequestQuery) => $purchaseRequestQuery->where('status', 'REJECTED')),
             'RETURNED_FOR_REVISION' => $query
+                ->where('status', 'DRAFT')
                 ->whereDoesntHave('distributionRecords', fn (Builder $distributionQuery) => $distributionQuery->whereIn('status', ['RELEASED', 'RECEIVED']))
                 ->whereDoesntHave('purchaseOrders', fn (Builder $purchaseOrderQuery) => $purchaseOrderQuery->whereIn('status', ['PLACED', 'DRAFT']))
                 ->whereDoesntHave('purchaseRequests', fn (Builder $purchaseRequestQuery) => $purchaseRequestQuery->where('status', 'REJECTED'))
@@ -359,6 +361,8 @@ class SupplyRequestController extends Controller
 
     private function resolveTrackingStatus(SupplyRequest $supplyRequest, bool $requiresProcurement): string
     {
+        $baseStatus = strtoupper((string) $supplyRequest->status);
+
         $distributionStatuses = $supplyRequest->distributionRecords
             ->pluck('status')
             ->map(fn ($status): string => strtoupper((string) $status));
@@ -387,11 +391,11 @@ class SupplyRequestController extends Controller
             ->pluck('status')
             ->map(fn ($status): string => strtoupper((string) $status));
 
-        if ($purchaseRequestStatuses->contains('REJECTED')) {
+        if ($baseStatus === 'REJECTED' && $purchaseRequestStatuses->contains('REJECTED')) {
             return 'REJECTED';
         }
 
-        if ($purchaseRequestStatuses->contains('RETURNED_FOR_REVISION')) {
+        if ($baseStatus === 'DRAFT' && $purchaseRequestStatuses->contains('RETURNED_FOR_REVISION')) {
             return 'RETURNED_FOR_REVISION';
         }
 
@@ -402,8 +406,6 @@ class SupplyRequestController extends Controller
         if ($purchaseRequestStatuses->contains('OPEN')) {
             return 'IN_REVIEW';
         }
-
-        $baseStatus = strtoupper((string) $supplyRequest->status);
 
         if ($baseStatus === 'SUBMITTED' && ! $requiresProcurement) {
             return 'IN_REVIEW';

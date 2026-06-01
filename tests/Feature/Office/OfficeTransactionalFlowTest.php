@@ -1123,7 +1123,7 @@ class OfficeTransactionalFlowTest extends TestCase
             'request_category' => 'GENERAL',
             'purpose' => 'Returned PR visibility test',
             'priority_level' => 'MEDIUM',
-            'status' => 'SUBMITTED',
+            'status' => 'DRAFT',
             'review_notes' => null,
             'approved_by' => null,
             'approved_at' => null,
@@ -1147,6 +1147,57 @@ class OfficeTransactionalFlowTest extends TestCase
                 ->where('supplyRequest.purchase_requests.0.purchase_request_id', $purchaseRequest->purchase_request_id)
                 ->where('supplyRequest.purchase_requests.0.status', 'RETURNED_FOR_REVISION')
                 ->where('supplyRequest.purchase_requests.0.remarks', 'BAC requires corrected quantities and specifications.')
+            );
+    }
+
+    public function test_resubmitted_supply_request_ignores_stale_returned_purchase_request_status(): void
+    {
+        $office = $this->createOffice();
+        $officeUser = $this->createUser(UserRole::OFFICE_USER, $office);
+        $procurementOfficer = $this->createUser(UserRole::PROCUREMENT_OFFICER, $office);
+
+        $supplyRequest = SupplyRequest::query()->create([
+            'request_code' => 'SR-RESUBMITTED-PR-1',
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'ppmp_id' => null,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(2)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Resubmitted returned PR status test',
+            'priority_level' => 'MEDIUM',
+            'status' => 'SUBMITTED',
+            'review_notes' => 'Office resubmitted after revision.',
+            'approved_by' => null,
+            'approved_at' => null,
+        ]);
+
+        PurchaseRequest::query()->create([
+            'supply_request_id' => $supplyRequest->supply_request_id,
+            'office_id' => $office->id,
+            'requested_by' => $procurementOfficer->id,
+            'status' => 'RETURNED_FOR_REVISION',
+            'remarks' => 'Previous return reason.',
+        ]);
+
+        $this->actingAs($officeUser)
+            ->get(route('office.supply-requests.show', $supplyRequest->supply_request_id))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Office/SupplyRequests/Show')
+                ->where('supplyRequest.status', 'SUBMITTED')
+                ->where('supplyRequest.raw_status', 'SUBMITTED')
+                ->has('supplyRequest.purchase_requests', 1)
+                ->where('supplyRequest.purchase_requests.0.status', 'RETURNED_FOR_REVISION')
+            );
+
+        $this->actingAs($officeUser)
+            ->get(route('office.supply-requests.index', ['status' => 'RETURNED_FOR_REVISION']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Office/SupplyRequests/Index')
+                ->where('filters.status', 'RETURNED_FOR_REVISION')
+                ->has('supplyRequests.data', 0)
             );
     }
 

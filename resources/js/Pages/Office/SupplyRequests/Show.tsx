@@ -92,8 +92,13 @@ export default function SupplyRequestShow({
         return supplyRequest.items.filter((item) => item.exceeds_ppmp_allocation).length;
     }, [supplyRequest.items]);
     const procurementDecision = useMemo(() => {
-        return (supplyRequest.purchase_requests ?? []).find((request) => ['RETURNED_FOR_REVISION', 'REJECTED'].includes(request.status.toUpperCase())) ?? null;
-    }, [supplyRequest.purchase_requests]);
+        const currentStatus = supplyRequest.status.toUpperCase();
+        if (!['RETURNED_FOR_REVISION', 'REJECTED'].includes(currentStatus)) {
+            return null;
+        }
+
+        return (supplyRequest.purchase_requests ?? []).find((request) => request.status.toUpperCase() === currentStatus) ?? null;
+    }, [supplyRequest.purchase_requests, supplyRequest.status]);
 
     const submitForm = useForm({ review_notes: supplyRequest.review_notes ?? '' });
     const issueForm = useForm({
@@ -576,6 +581,5 @@ function StatusBadge({ status }: { status: string }) {
 
     return <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${style}`}>{status.replaceAll('_', ' ')}</span>;
 }
-
 
 
