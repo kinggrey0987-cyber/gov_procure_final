@@ -13,6 +13,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -536,10 +537,21 @@ class RequestWorkflowController
                 ->with('error', 'GSO-origin supply requests are internal logistics records and cannot be queued through office procurement routing.');
         }
 
-        $this->purchaseRequestService->queueFromSupplyRequest($request->user(), [
-            'supply_request_id' => (int) $supplyRequest->supply_request_id,
-            'remarks' => 'Queued by GSO due to stock shortage.',
-        ]);
+        try {
+            $this->purchaseRequestService->queueFromSupplyRequest($request->user(), [
+                'supply_request_id' => (int) $supplyRequest->supply_request_id,
+                'remarks' => 'Queued by GSO due to stock shortage.',
+            ]);
+        } catch (ValidationException $exception) {
+            $message = collect($exception->errors())
+                ->flatten()
+                ->first() ?: 'This supply request is not eligible for procurement queueing.';
+
+            return redirect()
+                ->route('inventory.office-supply-requests.index', $request->query())
+                ->withErrors($exception->errors())
+                ->with('error', $message);
+        }
 
         return redirect()
             ->route('inventory.office-supply-requests.index', $request->query())

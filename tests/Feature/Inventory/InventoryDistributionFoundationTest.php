@@ -435,7 +435,8 @@ class InventoryDistributionFoundationTest extends TestCase
 
         $this->actingAs($this->gsoOfficer)
             ->post(route('inventory.office-supply-requests.queue', $context['supplyRequest']->supply_request_id))
-            ->assertRedirect(route('inventory.office-supply-requests.index'));
+            ->assertRedirect(route('inventory.office-supply-requests.index'))
+            ->assertSessionHasNoErrors();
 
         $purchaseRequest = PurchaseRequest::query()
             ->where('supply_request_id', $context['supplyRequest']->supply_request_id)
@@ -456,7 +457,8 @@ class InventoryDistributionFoundationTest extends TestCase
 
         $this->actingAs($this->gsoOfficer)
             ->post(route('inventory.office-supply-requests.queue', $context['supplyRequest']->supply_request_id))
-            ->assertRedirect(route('inventory.office-supply-requests.index'));
+            ->assertRedirect(route('inventory.office-supply-requests.index'))
+            ->assertSessionHasNoErrors();
 
         $this->actingAs($this->gsoOfficer)
             ->post(route('inventory.office-supply-requests.queue', $context['supplyRequest']->supply_request_id))
@@ -485,14 +487,17 @@ class InventoryDistributionFoundationTest extends TestCase
             'remarks' => 'Clarify requested quantity.',
         ])->save();
 
-        $context['supplyRequest']->forceFill([
+        SupplyRequest::query()
+            ->where('supply_request_id', $context['supplyRequest']->supply_request_id)
+            ->update([
             'status' => 'SUBMITTED',
             'review_notes' => 'Revised by office and submitted again.',
-        ])->save();
+        ]);
 
         $this->actingAs($this->gsoOfficer)
             ->post(route('inventory.office-supply-requests.queue', $context['supplyRequest']->supply_request_id))
-            ->assertRedirect(route('inventory.office-supply-requests.index'));
+            ->assertRedirect(route('inventory.office-supply-requests.index'))
+            ->assertSessionHasNoErrors();
 
         $purchaseRequest->refresh();
         $this->assertSame('OPEN', (string) $purchaseRequest->status);
@@ -501,6 +506,38 @@ class InventoryDistributionFoundationTest extends TestCase
             1,
             PurchaseRequest::query()->where('supply_request_id', $context['supplyRequest']->supply_request_id)->count()
         );
+    }
+
+    public function test_gso_cannot_requeue_returned_purchase_request_until_office_resubmits_revision(): void
+    {
+        $context = $this->createSubmittedSupplyRequestForQueue($this->officeA, $this->officeUserA, 90132, 8, 1);
+
+        $this->actingAs($this->gsoOfficer)
+            ->post(route('inventory.office-supply-requests.queue', $context['supplyRequest']->supply_request_id))
+            ->assertRedirect(route('inventory.office-supply-requests.index'));
+
+        $purchaseRequest = PurchaseRequest::query()
+            ->where('supply_request_id', $context['supplyRequest']->supply_request_id)
+            ->firstOrFail();
+
+        $purchaseRequest->forceFill([
+            'status' => 'RETURNED_FOR_REVISION',
+            'remarks' => 'Clarify requested quantity.',
+        ])->save();
+
+        $context['supplyRequest']->forceFill([
+            'status' => 'DRAFT',
+            'review_notes' => 'Linked purchase request returned for revision by procurement.',
+        ])->save();
+
+        $this->actingAs($this->gsoOfficer)
+            ->post(route('inventory.office-supply-requests.queue', $context['supplyRequest']->supply_request_id))
+            ->assertRedirect(route('inventory.office-supply-requests.index'))
+            ->assertSessionHasErrors('supply_request_id')
+            ->assertSessionHas('error', 'Only SUBMITTED supply requests can be queued for procurement.');
+
+        $this->assertSame('RETURNED_FOR_REVISION', (string) $purchaseRequest->fresh()?->status);
+        $this->assertSame('DRAFT', (string) $context['supplyRequest']->fresh()?->status);
     }
 
     public function test_gso_queue_procurement_rejects_stock_ready_requests(): void
