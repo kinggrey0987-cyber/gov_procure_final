@@ -27,7 +27,7 @@ class StorePpmpRequest extends FormRequest
             'items.*.item_id' => ['required_with:items', 'integer', 'exists:items,item_id'],
             'items.*.item_category_id' => ['required_with:items', 'integer', 'exists:item_categories,item_category_id'],
             'items.*.quantity' => ['required_with:items', 'numeric', 'gt:0'],
-            'items.*.unit_cost' => ['required_with:items', 'numeric', 'gte:0'],
+            'items.*.unit_cost' => ['required_with:items', 'numeric', 'gt:0'],
             'items.*.procurement_schedule' => ['required_with:items', 'string', Rule::in(['Q1', 'Q2', 'Q3', 'Q4'])],
             'items.*.remarks' => ['required_with:items', 'string', 'max:1000'],
         ];
@@ -84,6 +84,7 @@ class StorePpmpRequest extends FormRequest
             'fiscal_year.min' => 'Fiscal Year cannot be earlier than the current year.',
             'items.required' => 'At least one complete PPMP item row is required.',
             'items.min' => 'At least one complete PPMP item row is required.',
+            'items.*.unit_cost.gt' => 'Unit Cost must be greater than zero.',
             'items.*.procurement_schedule.in' => 'Procurement Schedule must be one of: Q1, Q2, Q3, or Q4.',
             'items.*.remarks.required_with' => 'Item Remarks are required because they become the item specification for Supply Requests and Purchase Orders.',
         ];

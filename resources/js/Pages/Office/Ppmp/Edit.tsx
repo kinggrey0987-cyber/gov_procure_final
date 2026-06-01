@@ -79,7 +79,7 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
         item_id: '',
         item_category_id: '',
         quantity: '1',
-        unit_cost: '0',
+        unit_cost: '',
         procurement_schedule: '',
         remarks: '',
     });
@@ -104,7 +104,7 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
             onSuccess: () => {
                 newItem.reset('item_id', 'item_category_id', 'quantity', 'unit_cost', 'procurement_schedule', 'remarks');
                 newItem.setData('quantity', '1');
-                newItem.setData('unit_cost', '0');
+                newItem.setData('unit_cost', '');
             },
         });
     };
@@ -277,7 +277,7 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                                                 <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Unit Cost</span>
                                                 <input
                                                     type="number"
-                                                    min="0"
+                                                    min="0.01"
                                                     step="0.01"
                                                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                                                     value={row.unit_cost}
@@ -387,7 +387,7 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
 
                         <label className="block">
                             <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Unit Cost</span>
-                            <input type="number" min="0" step="0.01" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={newItem.data.unit_cost} onChange={(event) => newItem.setData('unit_cost', event.target.value)} required />
+                            <input type="number" min="0.01" step="0.01" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={newItem.data.unit_cost} onChange={(event) => newItem.setData('unit_cost', event.target.value)} required />
                             <InputError message={newItem.errors.unit_cost} className="mt-1" />
                         </label>
 
@@ -438,7 +438,7 @@ function isPpmpItemComplete(item: Partial<PpmpItemDraft> | Partial<ExistingItem>
         && String(item.item_category_id ?? '').trim() !== ''
         && Number(item.quantity) > 0
         && String(item.unit_cost ?? '').trim() !== ''
-        && Number(item.unit_cost) >= 0
+        && Number(item.unit_cost) > 0
         && QUARTER_OPTIONS.includes(String(item.procurement_schedule ?? '').trim().toUpperCase() as (typeof QUARTER_OPTIONS)[number])
         && String(item.remarks ?? '').trim() !== '',
     );
@@ -478,4 +478,3 @@ function scheduleOptionsForValue(value: string): Array<{ value: string; label: s
 
     return [{ value: normalized, label: `${normalized} (legacy value)` }, ...options];
 }
-

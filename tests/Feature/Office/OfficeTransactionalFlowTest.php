@@ -255,6 +255,116 @@ class OfficeTransactionalFlowTest extends TestCase
         $response->assertSessionHasErrors(['quantity', 'unit_cost', 'procurement_schedule']);
     }
 
+    public function test_ppmp_creation_rejects_zero_unit_cost(): void
+    {
+        $office = $this->createOffice();
+        $officeUser = $this->createUser(UserRole::OFFICE_USER, $office);
+
+        $category = ItemCategory::query()->create([
+            'category_name' => 'PPMP Validation Category',
+            'standard_delivery_days' => 5,
+            'description' => null,
+            'status' => 'active',
+        ]);
+
+        $item = Item::query()->create([
+            'item_category_id' => $category->item_category_id,
+            'item_name' => 'PPMP Validation Item',
+            'description' => 'Unit cost validation item',
+            'default_unit' => 'piece',
+            'status' => 'active',
+        ]);
+
+        $response = $this->actingAs($officeUser)
+            ->from(route('office.ppmp.create'))
+            ->post(route('office.ppmp.store'), [
+                'fiscal_year' => 2026,
+                'fund_source' => 'GAA_CURRENT',
+                'date_prepared' => now()->toDateString(),
+                'remarks' => 'Unit cost validation',
+                'items' => [[
+                    'item_id' => $item->item_id,
+                    'item_category_id' => $category->item_category_id,
+                    'quantity' => 10,
+                    'unit_cost' => 0,
+                    'procurement_schedule' => 'Q1',
+                    'remarks' => 'Item row',
+                ]],
+            ]);
+
+        $response->assertRedirect(route('office.ppmp.create'));
+        $response->assertSessionHasErrors([
+            'items.0.unit_cost' => 'Unit Cost must be greater than zero.',
+        ]);
+        $this->assertDatabaseCount('ppmp', 0);
+    }
+
+    public function test_ppmp_item_add_and_update_reject_zero_unit_cost(): void
+    {
+        $office = $this->createOffice();
+        $officeUser = $this->createUser(UserRole::OFFICE_USER, $office);
+
+        $ppmp = Ppmp::query()->create([
+            'office_id' => $office->id,
+            'prepared_by' => $officeUser->id,
+            'approved_by' => null,
+            'fiscal_year' => 2026,
+            'fund_source' => 'GAA_CURRENT',
+            'status' => 'DRAFT',
+            'total_estimated_budget' => 50,
+            'date_prepared' => now()->toDateString(),
+            'date_approved' => null,
+            'remarks' => 'Draft validation flow',
+        ]);
+
+        $item = PpmpItem::query()->create([
+            'ppmp_id' => $ppmp->ppmp_id,
+            'item_id' => 102,
+            'item_category_id' => 12,
+            'quantity' => 1,
+            'unit_cost' => 50,
+            'estimated_budget' => 50,
+            'procurement_schedule' => 'Q2',
+            'remarks' => 'Existing row',
+        ]);
+
+        $this->actingAs($officeUser)
+            ->from(route('office.ppmp.edit', $ppmp->ppmp_id))
+            ->post(route('office.ppmp.items.store', $ppmp->ppmp_id), [
+                'item_id' => 777,
+                'item_category_id' => 77,
+                'quantity' => 5,
+                'unit_cost' => 0,
+                'procurement_schedule' => 'Q3',
+                'remarks' => 'Added from edit',
+            ])
+            ->assertRedirect(route('office.ppmp.edit', $ppmp->ppmp_id))
+            ->assertSessionHasErrors([
+                'unit_cost' => 'Unit Cost must be greater than zero.',
+            ]);
+
+        $this->actingAs($officeUser)
+            ->from(route('office.ppmp.edit', $ppmp->ppmp_id))
+            ->put(route('office.ppmp.items.update', [$ppmp->ppmp_id, $item->ppmp_item_id]), [
+                'item_id' => 102,
+                'item_category_id' => 12,
+                'quantity' => 4,
+                'unit_cost' => 0,
+                'procurement_schedule' => 'Q3',
+                'remarks' => 'Updated row',
+            ])
+            ->assertRedirect(route('office.ppmp.edit', $ppmp->ppmp_id))
+            ->assertSessionHasErrors([
+                'unit_cost' => 'Unit Cost must be greater than zero.',
+            ]);
+
+        $this->assertDatabaseHas('ppmp_items', [
+            'ppmp_item_id' => $item->ppmp_item_id,
+            'unit_cost' => 50,
+            'estimated_budget' => 50,
+        ]);
+    }
+
     public function test_office_user_can_view_return_or_reject_reasons_in_ppmp_history(): void
     {
         $office = $this->createOffice();
