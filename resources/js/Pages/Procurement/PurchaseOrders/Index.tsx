@@ -116,6 +116,7 @@ export default function PurchaseOrdersIndex({ purchaseOrders, filters }: Props) 
                             <option value="">All PO statuses</option>
                             <option value="DRAFT">Draft PO</option>
                             <option value="PLACED">Issued PO</option>
+                            <option value="COMPLETED">Completed PO</option>
                         </select>
 
                         <input
@@ -216,6 +217,7 @@ function displayPurchaseOrderStatus(status: string): string {
     const map: Record<string, string> = {
         DRAFT: 'Draft PO',
         PLACED: 'Issued PO',
+        COMPLETED: 'Completed PO',
     };
 
     return map[status] ?? status.replaceAll('_', ' ');
@@ -236,6 +238,4 @@ function formatMoney(value: number) {
         maximumFractionDigits: 0,
     }).format(value);
 }
-
-
 

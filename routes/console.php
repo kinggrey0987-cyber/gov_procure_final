@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\DemoDataResetService;
 use App\Services\DemoSeedAuditService;
 use App\Services\Inventory\InventoryService;
+use App\Services\Procurement\ProcurementStatusSyncService;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\ExecutiveDisclosureDemoSeeder;
 use Database\Seeders\LongitudinalDemoWorkflowSeeder;
@@ -163,3 +164,16 @@ Artisan::command('inventory:backfill-verified-deliveries {--delivery_id= : Backf
 
     return self::SUCCESS;
 })->purpose('Backfill inventory movements for verified deliveries that were approved before automatic inventory sync was added.');
+
+Artisan::command('procurement:sync-completed-statuses', function () {
+    $actor = User::query()
+        ->whereHas('role', fn ($query) => $query->where('code', 'GSO_OFFICER'))
+        ->orderBy('id')
+        ->first();
+
+    $synced = app(ProcurementStatusSyncService::class)->syncAllReceivedSupplyRequests($actor);
+
+    $this->info(sprintf('Checked received supply requests and synced %d completed procurement workflow(s).', $synced));
+
+    return self::SUCCESS;
+})->purpose('Sync stale PR/PO/SR statuses to final values when supply requests were already fully received.');

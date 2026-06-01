@@ -202,6 +202,7 @@ function statusClass(status: string) {
     const map: Record<string, string> = {
         OPEN: `${base} bg-amber-100 text-amber-700`,
         PROCESSING: `${base} bg-blue-100 text-blue-700`,
+        COMPLETED: `${base} bg-emerald-100 text-emerald-700`,
         RETURNED_FOR_REVISION: `${base} bg-violet-100 text-violet-700`,
         APPROVED: `${base} bg-emerald-100 text-emerald-700`,
         REJECTED: `${base} bg-rose-100 text-rose-700`,

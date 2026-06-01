@@ -9,6 +9,7 @@ use App\Models\StatusHistory;
 use App\Models\User;
 use App\Services\AuditLogService;
 use App\Services\NotificationService;
+use App\Services\Procurement\ProcurementStatusSyncService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -18,6 +19,7 @@ class DistributionRecordService
         private readonly InventoryService $inventoryService,
         private readonly AuditLogService $auditLogService,
         private readonly NotificationService $notificationService,
+        private readonly ProcurementStatusSyncService $procurementStatusSyncService,
     ) {
     }
 
@@ -135,6 +137,7 @@ class DistributionRecordService
             $this->recordStatus($record, $oldStatus, 'RECEIVED', $actor, 'Distribution record reconciled and acknowledged by office.');
             $this->recordApproval($record, $actor, 'RECEIVED', 'Office receipt reconciliation recorded.');
             $this->recordAudit($actor, 'RECONCILE_RECEIPT', $record, []);
+            $this->procurementStatusSyncService->syncCompletedStatusesForReceivedSupplyRequest($record->supplyRequest()->firstOrFail(), $actor);
 
             return $record->fresh(['office', 'receiver', 'items.item']) ?? $record;
         });
@@ -302,6 +305,7 @@ class DistributionRecordService
             $this->recordStatus($record, $oldStatus, 'RECEIVED', $actor, 'Distribution record acknowledged as received.');
             $this->recordApproval($record, $actor, 'RECEIVED', 'Distribution received confirmation recorded.');
             $this->recordAudit($actor, 'MARK_RECEIVED', $record, []);
+            $this->procurementStatusSyncService->syncCompletedStatusesForReceivedSupplyRequest($record->supplyRequest()->firstOrFail(), $actor);
 
             return $record->fresh(['office', 'receiver']) ?? $record;
         });

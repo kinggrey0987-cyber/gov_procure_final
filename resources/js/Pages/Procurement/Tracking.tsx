@@ -29,8 +29,8 @@ type Props = {
     }>;
 };
 
-const REQUEST_STATUS_FILTERS = ['ALL', 'OPEN', 'PROCESSING', 'RETURNED_FOR_REVISION', 'REJECTED'];
-const ORDER_STATUS_FILTERS = ['ALL', 'DRAFT', 'PLACED'];
+const REQUEST_STATUS_FILTERS = ['ALL', 'OPEN', 'PROCESSING', 'COMPLETED', 'RETURNED_FOR_REVISION', 'REJECTED'];
+const ORDER_STATUS_FILTERS = ['ALL', 'DRAFT', 'PLACED', 'COMPLETED'];
 
 export default function ProcurementTracking({ summary, recentPurchaseRequests, recentPurchaseOrders }: Props) {
     const [requestSearch, setRequestSearch] = useState('');
@@ -325,6 +325,7 @@ function statusClass(status: string) {
     const map: Record<string, string> = {
         OPEN: `${base} bg-amber-100 text-amber-700`,
         PROCESSING: `${base} bg-blue-100 text-blue-700`,
+        COMPLETED: `${base} bg-emerald-100 text-emerald-700`,
         RETURNED_FOR_REVISION: `${base} bg-violet-100 text-violet-700`,
         REJECTED: `${base} bg-rose-100 text-rose-700`,
         DRAFT: `${base} bg-amber-100 text-amber-700`,
@@ -339,6 +340,7 @@ function displayPurchaseRequestStatus(status: string): string {
     const map: Record<string, string> = {
         OPEN: 'Pending Review',
         PROCESSING: 'Processing',
+        COMPLETED: 'Completed',
         RETURNED_FOR_REVISION: 'Returned',
         REJECTED: 'Rejected',
     };
@@ -351,6 +353,7 @@ function displayPurchaseOrderStatus(status: string): string {
     const map: Record<string, string> = {
         DRAFT: 'Draft PO',
         PLACED: 'Issued PO',
+        COMPLETED: 'Completed PO',
     };
 
     return map[normalized] ?? status.replaceAll('_', ' ');
@@ -371,7 +374,6 @@ function formatMoney(value: number) {
         maximumFractionDigits: 0,
     }).format(value);
 }
-
 
 
 

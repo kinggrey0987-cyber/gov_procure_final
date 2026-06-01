@@ -295,6 +295,76 @@ class InventoryDistributionFoundationTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_fully_received_procurement_backed_supply_request_closes_linked_pr_and_po(): void
+    {
+        $context = $this->createVerifiedDeliveryContext($this->officeA, $this->officeUserA, $this->procurementOfficer, $this->gsoOfficer, 9026);
+
+        Inventory::query()->create([
+            'item_id' => 9026,
+            'available_stock' => 10,
+            'stock_on_hand' => 10,
+            'reserved_quantity' => 0,
+            'released_quantity' => 0,
+            'low_stock_threshold' => 2,
+            'last_updated' => now(),
+        ]);
+
+        $record = DistributionRecord::query()->create([
+            'distribution_code' => 'DIST-CLOSE-'.uniqid(),
+            'supply_request_id' => $context['supplyRequest']->supply_request_id,
+            'delivery_id' => $context['delivery']->delivery_id,
+            'office_id' => $this->officeA->id,
+            'prepared_by' => $this->gsoOfficer->id,
+            'status' => 'RELEASED',
+            'release_date' => now()->toDateString(),
+        ]);
+
+        DistributionItem::query()->create([
+            'distribution_record_id' => $record->distribution_record_id,
+            'item_id' => 9026,
+            'received_by' => null,
+            'item_name_snapshot' => 'Item 9026',
+            'quantity_released' => 5,
+            'quantity_received' => 0,
+            'quantity_damaged' => 0,
+            'quantity_missing' => 0,
+            'receipt_condition' => null,
+            'receipt_notes' => null,
+            'unit' => 'PCS',
+            'remarks' => null,
+        ]);
+
+        $this->actingAs($this->officeUserA)
+            ->post(route('office.distribution-records.receive', $record->distribution_record_id))
+            ->assertRedirect();
+
+        $supplyRequest = $context['supplyRequest']->fresh();
+        $purchaseRequest = PurchaseRequest::query()->where('supply_request_id', $supplyRequest?->supply_request_id)->firstOrFail();
+        $purchaseOrder = PurchaseOrder::query()->where('supply_request_id', $supplyRequest?->supply_request_id)->firstOrFail();
+
+        $this->assertSame('RECEIVED', (string) $supplyRequest?->status);
+        $this->assertSame('COMPLETED', (string) $purchaseRequest->status);
+        $this->assertSame('COMPLETED', (string) $purchaseOrder->status);
+
+        $this->assertDatabaseHas('status_history', [
+            'reference_type' => SupplyRequest::class,
+            'reference_id' => $supplyRequest?->supply_request_id,
+            'new_status' => 'RECEIVED',
+        ]);
+
+        $this->assertDatabaseHas('status_history', [
+            'reference_type' => PurchaseRequest::class,
+            'reference_id' => $purchaseRequest->purchase_request_id,
+            'new_status' => 'COMPLETED',
+        ]);
+
+        $this->assertDatabaseHas('status_history', [
+            'reference_type' => PurchaseOrder::class,
+            'reference_id' => $purchaseOrder->purchase_order_id,
+            'new_status' => 'COMPLETED',
+        ]);
+    }
+
     public function test_admin_is_denied_from_inventory_distribution_and_claim_routes(): void
     {
         $this->actingAs($this->adminUser)

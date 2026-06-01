@@ -129,6 +129,7 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                             <option value="">All PR statuses</option>
                             <option value="OPEN">Pending Review</option>
                             <option value="PROCESSING">Processing</option>
+                            <option value="COMPLETED">Completed</option>
                             <option value="RETURNED_FOR_REVISION">Returned for Revision</option>
                             <option value="REJECTED">Rejected</option>
                         </select>
@@ -228,6 +229,7 @@ function statusClass(status: string) {
     const map: Record<string, string> = {
         OPEN: `${base} bg-amber-100 text-amber-700`,
         PROCESSING: `${base} bg-blue-100 text-blue-700`,
+        COMPLETED: `${base} bg-emerald-100 text-emerald-700`,
         RETURNED_FOR_REVISION: `${base} bg-violet-100 text-violet-700`,
         APPROVED: `${base} bg-emerald-100 text-emerald-700`,
         REJECTED: `${base} bg-rose-100 text-rose-700`,
@@ -240,6 +242,7 @@ function displayPurchaseRequestStatus(status: string): string {
     const map: Record<string, string> = {
         OPEN: 'Pending Review',
         PROCESSING: 'Processing',
+        COMPLETED: 'Completed',
         RETURNED_FOR_REVISION: 'Returned for Revision',
         REJECTED: 'Rejected',
     };
