@@ -194,7 +194,7 @@ export default function ClaimIndex({ claims, filters, filter_options, routes, pe
                                     <td className="px-4 py-3 text-slate-600">{row.office?.name ?? row.office_id ?? '-'}</td>
                                     <td className="px-4 py-3 text-right">
                                         <Link href={route(routeNames.show, row.claims_id)} className="text-sm font-semibold text-red-700 hover:text-red-900">
-                                            View
+                                            {canProcess && ['OPEN', 'IN_REVIEW'].includes(row.status) ? 'Review' : 'View'}
                                         </Link>
                                     </td>
                                 </tr>

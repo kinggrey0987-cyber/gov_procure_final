@@ -1,8 +1,9 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import AttachmentsPanel from '@/Components/AttachmentsPanel';
 import { humanizeEnum } from '@/lib/displayLabels';
-import { Head, Link } from '@inertiajs/react';
-import { useState } from 'react';
+import { Head, Link, useForm } from '@inertiajs/react';
+import type { FormEvent } from 'react';
+import { useEffect, useState } from 'react';
 
 type Props = {
     claim: {
@@ -63,14 +64,43 @@ type Props = {
     routes?: {
         index: string;
         show: string;
+        updateStatus?: string;
+    };
+    permissions?: {
+        update: boolean;
     };
 };
 
-export default function ClaimShow({ claim, linkedDistribution, attachments, attachmentPermissions, statusHistory, approvalHistory, routes }: Props) {
+export default function ClaimShow({ claim, linkedDistribution, attachments, attachmentPermissions, statusHistory, approvalHistory, routes, permissions }: Props) {
     const [activeTab, setActiveTab] = useState<'overview' | 'items' | 'status' | 'related' | 'notes'>('overview');
     const routeNames = routes ?? {
         index: 'inventory.claims.index',
         show: 'inventory.claims.show',
+        updateStatus: 'inventory.claims.update-status',
+    };
+    const nextStatusOptions = getNextStatusOptions(claim.status);
+    const canUpdate = (permissions?.update ?? false) && nextStatusOptions.length > 0;
+    const statusForm = useForm({
+        status: nextStatusOptions[0]?.value ?? '',
+        remarks: '',
+    });
+
+    useEffect(() => {
+        statusForm.setData('status', nextStatusOptions[0]?.value ?? '');
+        statusForm.clearErrors();
+    }, [claim.status]);
+
+    const submitStatusUpdate = (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+
+        if (!routeNames.updateStatus) {
+            return;
+        }
+
+        statusForm.put(route(routeNames.updateStatus, claim.claims_id), {
+            preserveScroll: true,
+            onSuccess: () => statusForm.reset('remarks'),
+        });
     };
 
     return (
@@ -120,6 +150,47 @@ export default function ClaimShow({ claim, linkedDistribution, attachments, atta
                         <Info label="Resolution Type" value={claim.resolution_type ?? 'Pending review'} />
                         <Info label="Remarks" value={claim.remarks ?? 'No remarks provided.'} />
                     </div>
+                    {permissions?.update ? (
+                        <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">GSO Claim Follow-up</h3>
+                            {canUpdate ? (
+                                <form onSubmit={submitStatusUpdate} className="mt-3 grid gap-3 md:grid-cols-[minmax(180px,240px)_1fr_auto] md:items-start">
+                                    <div>
+                                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Next Status</label>
+                                        <select
+                                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                                            value={statusForm.data.status}
+                                            onChange={(event) => statusForm.setData('status', event.target.value)}
+                                        >
+                                            {nextStatusOptions.map((option) => (
+                                                <option key={option.value} value={option.value}>{option.label}</option>
+                                            ))}
+                                        </select>
+                                        {statusForm.errors.status ? <p className="mt-1 text-xs text-rose-600">{statusForm.errors.status}</p> : null}
+                                    </div>
+                                    <div>
+                                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Follow-up Remarks</label>
+                                        <textarea
+                                            className="min-h-20 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                                            value={statusForm.data.remarks}
+                                            onChange={(event) => statusForm.setData('remarks', event.target.value)}
+                                            placeholder="Record investigation notes, resolution details, or rejection reason."
+                                        />
+                                        {statusForm.errors.remarks ? <p className="mt-1 text-xs text-rose-600">{statusForm.errors.remarks}</p> : null}
+                                    </div>
+                                    <button
+                                        type="submit"
+                                        disabled={statusForm.processing || statusForm.data.status === ''}
+                                        className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60 md:mt-5"
+                                    >
+                                        {statusForm.processing ? 'Saving...' : 'Save Follow-up'}
+                                    </button>
+                                </form>
+                            ) : (
+                                <p className="mt-2 text-sm text-slate-600">This claim has already been closed and can only be viewed.</p>
+                            )}
+                        </div>
+                    ) : null}
                     </div>
                 ) : null}
 
@@ -191,9 +262,20 @@ export default function ClaimShow({ claim, linkedDistribution, attachments, atta
                 {activeTab === 'status' ? (
                     <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
                         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Workflow History</h3>
-                        <p className="mt-2 text-sm text-slate-600">
-                            Detailed status and approval history is intentionally omitted from this tab to keep claim review focused.
-                        </p>
+                        <div className="mt-4 space-y-3">
+                            {statusHistory.map((entry) => (
+                                <div key={entry.id} className="rounded-lg border border-slate-200 p-3">
+                                    <p className="text-sm font-semibold text-slate-800">
+                                        {entry.old_status ? `${displayClaimStatus(entry.old_status)} to ` : ''}{displayClaimStatus(entry.new_status)}
+                                    </p>
+                                    <p className="mt-1 text-xs text-slate-500">
+                                        {formatDateTime(entry.changed_at)} by {entry.changed_by?.name ?? 'System'}
+                                    </p>
+                                    {entry.remarks ? <p className="mt-2 text-sm text-slate-600">{entry.remarks}</p> : null}
+                                </div>
+                            ))}
+                            {statusHistory.length === 0 ? <p className="text-sm text-slate-600">No status history has been recorded.</p> : null}
+                        </div>
                     </section>
                 ) : null}
 
@@ -228,6 +310,16 @@ function formatDate(value?: string | null): string {
     return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+function formatDateTime(value?: string | null): string {
+    if (!value) {
+        return '-';
+    }
+
+    const parsed = new Date(value);
+
+    return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString('en-PH', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
 function displayClaimType(type: string): string {
     const map: Record<string, string> = {
         MISSING_ITEM: 'Missing Item',
@@ -251,7 +343,17 @@ function displayClaimStatus(status: string): string {
     return map[status] ?? humanizeEnum(status);
 }
 
+function getNextStatusOptions(status: string): Array<{ value: string; label: string }> {
+    const transitions: Record<string, string[]> = {
+        OPEN: ['IN_REVIEW', 'RESOLVED', 'REJECTED'],
+        IN_REVIEW: ['RESOLVED', 'REJECTED'],
+    };
 
+    return (transitions[status] ?? []).map((value) => ({
+        value,
+        label: displayClaimStatus(value),
+    }));
+}
 
 
 

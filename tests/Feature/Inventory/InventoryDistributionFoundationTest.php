@@ -280,6 +280,14 @@ class InventoryDistributionFoundationTest extends TestCase
             'new_status' => 'OPEN',
         ]);
 
+        $this->actingAs($this->gsoOfficer)
+            ->get(route('inventory.claims.show', $claim->claims_id))
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Inventory/Claim/Show')
+                ->where('permissions.update', true)
+                ->where('routes.updateStatus', 'inventory.claims.update-status')
+            );
+
         $this->actingAs($this->officeUserA)
             ->post(route('office.claims.store'), [
                 'distribution_record_id' => $recordB->distribution_record_id,

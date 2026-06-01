@@ -224,6 +224,10 @@ class ClaimController
             'routes' => [
                 'index' => $routePrefix.'.index',
                 'show' => $routePrefix.'.show',
+                'updateStatus' => 'inventory.claims.update-status',
+            ],
+            'permissions' => [
+                'update' => $user->can('claim.update', $claim),
             ],
             'statusHistory' => $history['status']->map(fn ($entry): array => [
                 'id' => (int) $entry->id,
