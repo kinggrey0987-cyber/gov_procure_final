@@ -44,10 +44,11 @@ type Props = {
 export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpItemOptions: initialOptions, requestDate }: Props) {
     const [itemOptions, setItemOptions] = useState<Option[]>(initialOptions);
     const [loadingOptions, setLoadingOptions] = useState(false);
+    const today = todayInputValue();
 
     const form = useForm({
         ppmp_id: selectedPpmpId ? String(selectedPpmpId) : '',
-        needed_by_date: todayInputValue(),
+        needed_by_date: today,
         request_category: 'GENERAL',
         purpose: '',
         priority_level: 'MEDIUM',
@@ -57,20 +58,35 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
     const fetchedItemsForPpmpRef = useRef<string | null>(initialOptions.length > 0 && selectedPpmpId ? String(selectedPpmpId) : null);
 
     const hasPpmp = form.data.ppmp_id !== '';
+    const neededByDateError = useMemo(() => {
+        if (form.data.needed_by_date.trim() === '') {
+            return '';
+        }
+
+        return form.data.needed_by_date < today
+            ? 'The needed by date field must be a date after or equal to today.'
+            : '';
+    }, [form.data.needed_by_date, today]);
+
     const isFormComplete = useMemo(() => {
         return Boolean(
             form.data.ppmp_id.trim() !== ''
             && form.data.needed_by_date.trim() !== ''
+            && neededByDateError === ''
             && form.data.request_category.trim() !== ''
             && form.data.priority_level.trim() !== ''
             && form.data.purpose.trim() !== ''
             && form.data.items.length > 0
             && form.data.items.every((item) => item.ppmp_item_id.trim() !== '' && Number(item.quantity_requested) > 0),
         );
-    }, [form.data.items, form.data.needed_by_date, form.data.ppmp_id, form.data.priority_level, form.data.purpose, form.data.request_category]);
+    }, [form.data.items, form.data.needed_by_date, form.data.ppmp_id, form.data.priority_level, form.data.purpose, form.data.request_category, neededByDateError]);
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
+        if (neededByDateError) {
+            return;
+        }
+
         form.post(route('office.supply-requests.store'));
     };
 
@@ -290,10 +306,14 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                 type="date"
                                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                                 value={form.data.needed_by_date}
-                                onChange={(event) => form.setData('needed_by_date', event.target.value)}
+                                min={today}
+                                onChange={(event) => {
+                                    form.setData('needed_by_date', event.target.value);
+                                    form.clearErrors('needed_by_date');
+                                }}
                                 required
                             />
-                            {form.errors.needed_by_date ? <p className="mt-1 text-xs text-rose-600">{form.errors.needed_by_date}</p> : null}
+                            {neededByDateError || form.errors.needed_by_date ? <p className="mt-1 text-xs text-rose-600">{neededByDateError || form.errors.needed_by_date}</p> : null}
                         </Field>
 
                         <Field label="Request Category">
@@ -563,5 +583,3 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
         </label>
     );
 }
-
-
