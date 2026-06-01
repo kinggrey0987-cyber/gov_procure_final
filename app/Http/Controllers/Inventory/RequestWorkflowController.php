@@ -318,6 +318,80 @@ class RequestWorkflowController
         ]);
     }
 
+    public function procurementRequestShow(Request $request, PurchaseRequest $purchaseRequest): Response
+    {
+        abort_unless($request->user()?->can('inventory.view-any'), 403);
+
+        $purchaseRequest->load([
+            'office',
+            'requester',
+            'supplyRequest.requester',
+            'supplyRequest.items.item.inventory',
+            'items.item.category',
+            'purchaseOrders.supplier',
+            'purchaseOrders.deliveries.distributionRecords',
+        ]);
+
+        return Inertia::render('Inventory/ProcurementRequests/Show', [
+            'purchaseRequest' => [
+                'purchase_request_id' => (int) $purchaseRequest->purchase_request_id,
+                'status' => (string) $purchaseRequest->status,
+                'remarks' => $purchaseRequest->remarks,
+                'created_at' => optional($purchaseRequest->created_at)?->toIso8601String(),
+                'office' => $purchaseRequest->office ? [
+                    'name' => (string) $purchaseRequest->office->name,
+                ] : null,
+                'requester' => $purchaseRequest->requester ? [
+                    'name' => (string) $purchaseRequest->requester->name,
+                ] : null,
+                'supply_request' => $purchaseRequest->supplyRequest ? [
+                    'supply_request_id' => (int) $purchaseRequest->supplyRequest->supply_request_id,
+                    'request_code' => (string) $purchaseRequest->supplyRequest->request_code,
+                    'status' => (string) $purchaseRequest->supplyRequest->status,
+                    'purpose' => (string) $purchaseRequest->supplyRequest->purpose,
+                    'requester' => $purchaseRequest->supplyRequest->requester ? [
+                        'name' => (string) $purchaseRequest->supplyRequest->requester->name,
+                    ] : null,
+                ] : null,
+                'items' => $purchaseRequest->items
+                    ->map(fn ($item): array => [
+                        'purchase_request_item_id' => (int) $item->purchase_request_item_id,
+                        'item_name' => (string) ($item->item?->item_name ?? 'Unknown Item'),
+                        'category_name' => (string) ($item->item?->category?->category_name ?? 'Uncategorized'),
+                        'quantity_requested' => (float) $item->quantity_requested,
+                        'unit' => (string) ($item->item?->default_unit ?? 'UNIT'),
+                        'available_stock' => (float) ($item->item?->inventory?->available_stock ?? 0),
+                        'remarks' => $item->remarks,
+                    ])
+                    ->values(),
+                'purchase_orders' => $purchaseRequest->purchaseOrders
+                    ->sortByDesc('purchase_order_id')
+                    ->map(fn ($purchaseOrder): array => [
+                        'purchase_order_id' => (int) $purchaseOrder->purchase_order_id,
+                        'po_number' => (string) $purchaseOrder->po_number,
+                        'status' => (string) $purchaseOrder->status,
+                        'supplier_name' => (string) ($purchaseOrder->supplier?->supplier_name ?? '-'),
+                        'total_amount' => (float) $purchaseOrder->total_amount,
+                        'expected_delivery_date' => optional($purchaseOrder->expected_delivery_date)?->toDateString(),
+                        'deliveries' => $purchaseOrder->deliveries
+                            ->sortByDesc('delivery_id')
+                            ->map(fn ($delivery): array => [
+                                'delivery_id' => (int) $delivery->delivery_id,
+                                'delivery_code' => (string) $delivery->delivery_code,
+                                'receipt_status' => (string) $delivery->receipt_status,
+                                'actual_delivery_date' => optional($delivery->actual_delivery_date)?->toDateString(),
+                                'distribution_count' => (int) $delivery->distributionRecords->count(),
+                            ])
+                            ->values(),
+                    ])
+                    ->values(),
+            ],
+            'backFilters' => [
+                'page' => (int) $request->query('page', 0) > 0 ? (int) $request->query('page') : null,
+            ],
+        ]);
+    }
+
     private function purchaseRequestRecords()
     {
         return PurchaseRequest::query()

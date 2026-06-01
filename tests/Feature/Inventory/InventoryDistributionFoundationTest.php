@@ -911,6 +911,29 @@ class InventoryDistributionFoundationTest extends TestCase
             );
     }
 
+    public function test_gso_can_view_specific_procurement_request_record(): void
+    {
+        $context = $this->createVerifiedDeliveryContext($this->officeA, $this->officeUserA, $this->procurementOfficer, $this->gsoOfficer, 9025);
+        $purchaseRequest = PurchaseRequest::query()
+            ->where('supply_request_id', $context['supplyRequest']->supply_request_id)
+            ->firstOrFail();
+
+        $this->actingAs($this->gsoOfficer)
+            ->get(route('inventory.procurement-requests.show', [
+                'purchase_request' => $purchaseRequest->purchase_request_id,
+                'page' => 2,
+            ]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Inventory/ProcurementRequests/Show')
+                ->where('purchaseRequest.purchase_request_id', $purchaseRequest->purchase_request_id)
+                ->where('purchaseRequest.supply_request.request_code', $context['supplyRequest']->request_code)
+                ->where('purchaseRequest.purchase_orders.0.status', 'PLACED')
+                ->where('purchaseRequest.purchase_orders.0.deliveries.0.receipt_status', 'VERIFIED')
+                ->where('backFilters.page', 2)
+            );
+    }
+
     public function test_low_stock_signal_initiation_creates_purchase_request_and_redirects_to_procurement_requests(): void
     {
         $context = $this->createSubmittedSupplyRequestForQueue($this->officeA, $this->officeUserA, 9020, 10, 1);

@@ -610,6 +610,9 @@ Route::middleware(['auth', 'twofactor', 'must-change-password'])->group(function
                 Route::post('/low-stock/{inventory}/initiate', [RequestWorkflowController::class, 'initiateLowStockProcurement'])
                     ->middleware('can:inventory.view-any')
                     ->name('initiate-low-stock');
+                Route::get('/{purchase_request}', [RequestWorkflowController::class, 'procurementRequestShow'])
+                    ->middleware('can:inventory.view-any')
+                    ->name('show');
             });
 
             Route::prefix('deliveries')->name('deliveries.')->group(function () {

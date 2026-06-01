@@ -46,6 +46,7 @@ type Props = {
     purchaseRequests: {
         data: PurchaseRequestRow[];
         links: PaginationLink[];
+        current_page?: number;
     };
     shortageCandidates: ShortageCandidate[];
     lowStockItems: LowStockItem[];
@@ -122,12 +123,7 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
     return (
         <AuthenticatedLayout
             header={
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <h2 className="text-xl font-semibold leading-tight text-gray-800">Purchase Requests</h2>
-                    <Link href={route('inventory.office-supply-requests.index')} className="rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
-                        Back to Office Request Review
-                    </Link>
-                </div>
+                <h2 className="text-xl font-semibold leading-tight text-gray-800">Purchase Requests</h2>
             }
         >
             <Head title="Procurement Requests" />
@@ -282,6 +278,7 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Office</th>
                                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Status</th>
                                 <th className="px-4 py-3 text-right font-semibold text-slate-700">Reference</th>
+                                <th className="px-4 py-3 text-right font-semibold text-slate-700">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -290,14 +287,25 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                                     <td className="px-4 py-3 font-mono text-xs text-slate-700">{request.supply_request?.request_code ?? '-'}</td>
                                     <td className="px-4 py-3 text-slate-700">{request.office?.name ?? '-'}</td>
                                     <td className="px-4 py-3">
-                                        <span className="inline-flex rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">{displayPurchaseRequestStatus(request.status)}</span>
+                                        <span className={statusClass(request.status)}>{displayPurchaseRequestStatus(request.status)}</span>
                                     </td>
                                     <td className="px-4 py-3 text-right text-xs font-semibold text-slate-700">PR-{String(request.purchase_request_id).padStart(6, '0')}</td>
+                                    <td className="px-4 py-3 text-right">
+                                        <Link
+                                            href={route('inventory.procurement-requests.show', {
+                                                purchase_request: request.purchase_request_id,
+                                                page: purchaseRequests.current_page || undefined,
+                                            })}
+                                            className="text-sm font-semibold text-red-700 hover:text-red-900"
+                                        >
+                                            View
+                                        </Link>
+                                    </td>
                                 </tr>
                             ))}
                             {purchaseRequests.data.length === 0 ? (
                                 <tr>
-                                    <td colSpan={4} className="px-4 py-8 text-center text-sm text-slate-500">
+                                    <td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-500">
                                         No procurement request records available.
                                     </td>
                                 </tr>
@@ -323,6 +331,19 @@ function displayPurchaseRequestStatus(status: string): string {
     };
 
     return map[status] ?? humanizeEnum(status);
+}
+
+function statusClass(status: string) {
+    const base = 'inline-flex rounded-full px-2.5 py-1 text-xs font-semibold';
+    const map: Record<string, string> = {
+        OPEN: `${base} bg-amber-100 text-amber-700`,
+        PROCESSING: `${base} bg-blue-100 text-blue-700`,
+        COMPLETED: `${base} bg-emerald-100 text-emerald-700`,
+        RETURNED_FOR_REVISION: `${base} bg-violet-100 text-violet-700`,
+        REJECTED: `${base} bg-rose-100 text-rose-700`,
+    };
+
+    return map[status] ?? `${base} bg-slate-100 text-slate-700`;
 }
 
 
