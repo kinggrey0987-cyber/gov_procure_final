@@ -15,6 +15,8 @@ type Props = {
         claim_location: string;
         quantity_disputed?: number;
         resolution_type?: string | null;
+        replacement_quantity?: number;
+        replacement_available_stock?: number | null;
         remarks?: string | null;
     };
     linkedDistribution?: {
@@ -82,11 +84,17 @@ export default function ClaimShow({ claim, linkedDistribution, attachments, atta
     const canUpdate = (permissions?.update ?? false) && nextStatusOptions.length > 0;
     const statusForm = useForm({
         status: nextStatusOptions[0]?.value ?? '',
+        resolution_type: '',
+        replacement_quantity: '',
         remarks: '',
     });
+    const needsResolution = statusForm.data.status !== '' && statusForm.data.status !== 'IN_REVIEW';
+    const usesReplacement = ['REPLACEMENT_RELEASED', 'PARTIAL_REPLACEMENT'].includes(statusForm.data.resolution_type);
 
     useEffect(() => {
         statusForm.setData('status', nextStatusOptions[0]?.value ?? '');
+        statusForm.setData('resolution_type', '');
+        statusForm.setData('replacement_quantity', '');
         statusForm.clearErrors();
     }, [claim.status]);
 
@@ -99,7 +107,7 @@ export default function ClaimShow({ claim, linkedDistribution, attachments, atta
 
         statusForm.put(route(routeNames.updateStatus, claim.claims_id), {
             preserveScroll: true,
-            onSuccess: () => statusForm.reset('remarks'),
+            onSuccess: () => statusForm.reset('resolution_type', 'replacement_quantity', 'remarks'),
         });
     };
 
@@ -148,13 +156,15 @@ export default function ClaimShow({ claim, linkedDistribution, attachments, atta
                         <Info label="Issue Location" value={claim.claim_location} />
                         <Info label="Disputed Quantity" value={String(claim.quantity_disputed ?? 0)} />
                         <Info label="Resolution Type" value={claim.resolution_type ?? 'Pending review'} />
+                        <Info label="Replacement Released" value={String(claim.replacement_quantity ?? 0)} />
+                        <Info label="Available Replacement Stock" value={claim.replacement_available_stock === null || claim.replacement_available_stock === undefined ? '-' : String(claim.replacement_available_stock)} />
                         <Info label="Remarks" value={claim.remarks ?? 'No remarks provided.'} />
                     </div>
                     {permissions?.update ? (
                         <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4">
                             <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">GSO Claim Follow-up</h3>
                             {canUpdate ? (
-                                <form onSubmit={submitStatusUpdate} className="mt-3 grid gap-3 md:grid-cols-[minmax(180px,240px)_1fr_auto] md:items-start">
+                                <form onSubmit={submitStatusUpdate} className="mt-3 grid gap-3 md:grid-cols-[minmax(180px,240px)_minmax(200px,260px)_minmax(140px,180px)_1fr_auto] md:items-start">
                                     <div>
                                         <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Next Status</label>
                                         <select
@@ -167,6 +177,39 @@ export default function ClaimShow({ claim, linkedDistribution, attachments, atta
                                             ))}
                                         </select>
                                         {statusForm.errors.status ? <p className="mt-1 text-xs text-rose-600">{statusForm.errors.status}</p> : null}
+                                    </div>
+                                    <div>
+                                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Resolution Type</label>
+                                        <select
+                                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm disabled:bg-slate-100"
+                                            value={statusForm.data.resolution_type}
+                                            disabled={!needsResolution}
+                                            onChange={(event) => {
+                                                statusForm.setData('resolution_type', event.target.value);
+                                                if (!['REPLACEMENT_RELEASED', 'PARTIAL_REPLACEMENT'].includes(event.target.value)) {
+                                                    statusForm.setData('replacement_quantity', '');
+                                                }
+                                            }}
+                                        >
+                                            <option value="">{needsResolution ? 'Select resolution' : 'Not required'}</option>
+                                            {getResolutionTypeOptions(statusForm.data.status).map((option) => (
+                                                <option key={option.value} value={option.value}>{option.label}</option>
+                                            ))}
+                                        </select>
+                                        {statusForm.errors.resolution_type ? <p className="mt-1 text-xs text-rose-600">{statusForm.errors.resolution_type}</p> : null}
+                                    </div>
+                                    <div>
+                                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Replacement Qty</label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm disabled:bg-slate-100"
+                                            value={statusForm.data.replacement_quantity}
+                                            disabled={!usesReplacement}
+                                            onChange={(event) => statusForm.setData('replacement_quantity', event.target.value)}
+                                        />
+                                        {statusForm.errors.replacement_quantity ? <p className="mt-1 text-xs text-rose-600">{statusForm.errors.replacement_quantity}</p> : null}
                                     </div>
                                     <div>
                                         <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Follow-up Remarks</label>
@@ -336,6 +379,8 @@ function displayClaimStatus(status: string): string {
     const map: Record<string, string> = {
         OPEN: 'Pending Review',
         IN_REVIEW: 'In Claim Review',
+        PENDING_REPLACEMENT: 'Pending Replacement',
+        PARTIALLY_RESOLVED: 'Partially Resolved',
         RESOLVED: 'Resolved',
         REJECTED: 'Rejected',
     };
@@ -345,8 +390,10 @@ function displayClaimStatus(status: string): string {
 
 function getNextStatusOptions(status: string): Array<{ value: string; label: string }> {
     const transitions: Record<string, string[]> = {
-        OPEN: ['IN_REVIEW', 'RESOLVED', 'REJECTED'],
-        IN_REVIEW: ['RESOLVED', 'REJECTED'],
+        OPEN: ['IN_REVIEW', 'PENDING_REPLACEMENT', 'PARTIALLY_RESOLVED', 'RESOLVED', 'REJECTED'],
+        IN_REVIEW: ['PENDING_REPLACEMENT', 'PARTIALLY_RESOLVED', 'RESOLVED', 'REJECTED'],
+        PENDING_REPLACEMENT: ['PARTIALLY_RESOLVED', 'RESOLVED', 'REJECTED'],
+        PARTIALLY_RESOLVED: ['PENDING_REPLACEMENT', 'RESOLVED', 'REJECTED'],
     };
 
     return (transitions[status] ?? []).map((value) => ({
@@ -355,5 +402,30 @@ function getNextStatusOptions(status: string): Array<{ value: string; label: str
     }));
 }
 
+function getResolutionTypeOptions(status: string): Array<{ value: string; label: string }> {
+    const common = [
+        { value: 'NO_STOCK_ACTION', label: 'No Stock Action' },
+        { value: 'COUNT_CORRECTED', label: 'Count Corrected' },
+        { value: 'OTHER_RESOLUTION', label: 'Other Resolution' },
+    ];
+
+    if (status === 'PENDING_REPLACEMENT') {
+        return [{ value: 'PENDING_REPLACEMENT', label: 'Pending Replacement' }];
+    }
+
+    if (status === 'PARTIALLY_RESOLVED') {
+        return [{ value: 'PARTIAL_REPLACEMENT', label: 'Partial Replacement' }];
+    }
+
+    if (status === 'RESOLVED') {
+        return [{ value: 'REPLACEMENT_RELEASED', label: 'Replacement Released' }, ...common];
+    }
+
+    if (status === 'REJECTED') {
+        return common;
+    }
+
+    return [];
+}
 
 

@@ -4,6 +4,7 @@ namespace App\Services\Inventory;
 
 use App\Models\ApprovalHistory;
 use App\Models\Claim;
+use App\Models\Inventory;
 use App\Models\StatusHistory;
 use App\Models\User;
 use App\Services\AuditLogService;
@@ -14,6 +15,7 @@ use Illuminate\Validation\ValidationException;
 class ClaimService
 {
     public function __construct(
+        private readonly InventoryService $inventoryService,
         private readonly AuditLogService $auditLogService,
         private readonly NotificationService $notificationService,
     ) {
@@ -121,8 +123,10 @@ class ClaimService
         $currentStatus = (string) $claim->status;
 
         $validTransitions = [
-            'OPEN' => ['IN_REVIEW', 'REJECTED', 'RESOLVED'],
-            'IN_REVIEW' => ['REJECTED', 'RESOLVED'],
+            'OPEN' => ['IN_REVIEW', 'REJECTED', 'RESOLVED', 'PENDING_REPLACEMENT', 'PARTIALLY_RESOLVED'],
+            'IN_REVIEW' => ['REJECTED', 'RESOLVED', 'PENDING_REPLACEMENT', 'PARTIALLY_RESOLVED'],
+            'PENDING_REPLACEMENT' => ['REJECTED', 'RESOLVED', 'PARTIALLY_RESOLVED'],
+            'PARTIALLY_RESOLVED' => ['REJECTED', 'RESOLVED', 'PENDING_REPLACEMENT', 'PARTIALLY_RESOLVED'],
             'REJECTED' => [],
             'RESOLVED' => [],
         ];
@@ -134,8 +138,20 @@ class ClaimService
         }
 
         return DB::transaction(function () use ($claim, $actor, $payload, $currentStatus, $newStatus): Claim {
+            $resolutionType = isset($payload['resolution_type']) ? strtoupper((string) $payload['resolution_type']) : null;
+            $replacementQuantity = round((float) ($payload['replacement_quantity'] ?? 0), 2);
+            $appliedReplacementQuantity = in_array($resolutionType, ['REPLACEMENT_RELEASED', 'PARTIAL_REPLACEMENT'], true)
+                ? $replacementQuantity
+                : 0.0;
+
+            if (in_array($resolutionType, ['REPLACEMENT_RELEASED', 'PARTIAL_REPLACEMENT'], true)) {
+                $this->releaseClaimReplacement($claim, $actor, $resolutionType, $replacementQuantity, (string) ($payload['remarks'] ?? ''));
+            }
+
             $claim->forceFill([
                 'status' => $newStatus,
+                'resolution_type' => $resolutionType ?: $claim->resolution_type,
+                'replacement_quantity' => (float) $claim->replacement_quantity + $appliedReplacementQuantity,
                 'remarks' => $payload['remarks'] ?? $claim->remarks,
             ])->save();
 
@@ -159,6 +175,58 @@ class ClaimService
 
             return $claim->fresh(['distributionRecord', 'claimant', 'office']) ?? $claim;
         });
+    }
+
+    private function releaseClaimReplacement(Claim $claim, User $actor, string $resolutionType, float $replacementQuantity, string $remarks): void
+    {
+        $claim->loadMissing('distributionItem.item.inventory');
+
+        $distributionItem = $claim->distributionItem;
+        if ($distributionItem === null) {
+            throw ValidationException::withMessages([
+                'replacement_quantity' => 'Replacement release requires a linked claimed distribution item.',
+            ]);
+        }
+
+        $disputedQuantity = (float) $claim->quantity_disputed;
+        $alreadyReplaced = (float) $claim->replacement_quantity;
+        $remainingDisputed = max($disputedQuantity - $alreadyReplaced, 0);
+
+        if ($replacementQuantity - $remainingDisputed > 0.0001) {
+            throw ValidationException::withMessages([
+                'replacement_quantity' => sprintf('Replacement quantity cannot exceed the remaining disputed quantity of %.2f.', $remainingDisputed),
+            ]);
+        }
+
+        if ($resolutionType === 'REPLACEMENT_RELEASED' && abs($replacementQuantity - $remainingDisputed) > 0.0001) {
+            throw ValidationException::withMessages([
+                'replacement_quantity' => 'Full replacement resolution must cover the remaining disputed quantity.',
+            ]);
+        }
+
+        if ($resolutionType === 'PARTIAL_REPLACEMENT' && $replacementQuantity >= $remainingDisputed) {
+            throw ValidationException::withMessages([
+                'replacement_quantity' => 'Use resolved replacement when the replacement covers the full remaining disputed quantity.',
+            ]);
+        }
+
+        $itemId = (int) $distributionItem->item_id;
+        $availableStock = (float) (Inventory::query()->where('item_id', $itemId)->value('available_stock') ?? 0);
+
+        if ($availableStock < $replacementQuantity) {
+            throw ValidationException::withMessages([
+                'replacement_quantity' => sprintf('Only %.2f replacement stock is available. Use partial or pending replacement instead.', $availableStock),
+            ]);
+        }
+
+        $this->inventoryService->releaseClaimReplacementStock(
+            itemId: $itemId,
+            quantity: $replacementQuantity,
+            actor: $actor,
+            referenceType: Claim::class,
+            referenceId: (int) $claim->claims_id,
+            remarks: trim($remarks) !== '' ? $remarks : 'Replacement stock released for claim resolution.',
+        );
     }
 
     private function generateClaimCode(): string

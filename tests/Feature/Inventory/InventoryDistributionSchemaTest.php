@@ -85,8 +85,12 @@ class InventoryDistributionSchemaTest extends TestCase
             'claim_type',
             'claim_date',
             'claim_location',
+            'distribution_item_id',
+            'quantity_disputed',
             'remarks',
             'status',
+            'resolution_type',
+            'replacement_quantity',
             'created_at',
             'updated_at',
         ]));

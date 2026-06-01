@@ -358,6 +358,8 @@ function displayClaimStatus(status: string): string {
     const map: Record<string, string> = {
         OPEN: 'Pending Review',
         IN_REVIEW: 'In Claim Review',
+        PENDING_REPLACEMENT: 'Pending Replacement',
+        PARTIALLY_RESOLVED: 'Partially Resolved',
         RESOLVED: 'Resolved',
         REJECTED: 'Rejected',
     };

@@ -54,7 +54,7 @@ class DocumentAccessService
             'model' => Claim::class,
             'key' => 'claims_id',
             'view_ability' => 'claim.view',
-            'manage_ability' => 'claim.view',
+            'manage_ability' => 'claim.attachments.manage',
         ],
         'public_disclosures' => [
             'model' => PublicDisclosure::class,

@@ -175,6 +175,68 @@ class InventoryService
         });
     }
 
+    public function releaseClaimReplacementStock(
+        int $itemId,
+        float $quantity,
+        User $actor,
+        string $referenceType,
+        int $referenceId,
+        string $remarks,
+    ): Inventory {
+        $this->assertGsoOfficer($actor);
+
+        if ($quantity <= 0) {
+            throw ValidationException::withMessages([
+                'replacement_quantity' => 'Replacement quantity must be greater than zero.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($itemId, $quantity, $actor, $referenceType, $referenceId, $remarks): Inventory {
+            /** @var Inventory|null $inventory */
+            $inventory = Inventory::query()->where('item_id', $itemId)->lockForUpdate()->first();
+            if (!$inventory instanceof Inventory) {
+                throw ValidationException::withMessages([
+                    'replacement_quantity' => 'No inventory stock exists for the claim replacement item.',
+                ]);
+            }
+
+            if ((float) $inventory->available_stock < $quantity) {
+                throw ValidationException::withMessages([
+                    'replacement_quantity' => sprintf(
+                        'Replacement quantity cannot exceed available stock of %.2f.',
+                        (float) $inventory->available_stock,
+                    ),
+                ]);
+            }
+
+            $inventory->forceFill([
+                'stock_on_hand' => (float) $inventory->stock_on_hand - $quantity,
+                'available_stock' => (float) $inventory->available_stock - $quantity,
+                'released_quantity' => (float) $inventory->released_quantity + $quantity,
+                'last_updated' => now(),
+            ])->save();
+
+            $this->movementService->record(
+                inventoryId: (int) $inventory->inventory_id,
+                movementType: 'CLAIM_REPLACEMENT',
+                referenceType: $referenceType,
+                referenceId: $referenceId,
+                quantity: $quantity,
+                actor: $actor,
+                remarks: $remarks,
+            );
+
+            $this->recordAudit($actor, 'CLAIM_REPLACEMENT_STOCK', $inventory, [
+                'item_id' => $itemId,
+                'quantity' => $quantity,
+                'reference_type' => $referenceType,
+                'reference_id' => $referenceId,
+            ]);
+
+            return $inventory->fresh() ?? $inventory;
+        });
+    }
+
     public function restoreReleasedStock(
         int $itemId,
         float $quantity,

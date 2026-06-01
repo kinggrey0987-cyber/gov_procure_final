@@ -173,7 +173,11 @@ class ClaimController
         $history = $this->historyTimelineService->forRecord($user, $claim);
         $routePrefix = $user->isOfficeUser() ? 'office.claims' : 'inventory.claims';
 
-        $claim->load(['distributionRecord.items.item.category', 'distributionRecord.office', 'distributionRecord.supplyRequest', 'claimant', 'office']);
+        $claim->load(['distributionRecord.items.item.category', 'distributionRecord.office', 'distributionRecord.supplyRequest', 'distributionItem.item.inventory', 'claimant', 'office']);
+
+        $replacementAvailableStock = $claim->distributionItem?->item?->inventory
+            ? (float) $claim->distributionItem->item->inventory->available_stock
+            : null;
 
         $documents = $this->documentService
             ->listForRelated($user, 'claims', (int) $claim->claims_id)
@@ -196,6 +200,8 @@ class ClaimController
                 'claim_location' => (string) $claim->claim_location,
                 'quantity_disputed' => (float) $claim->quantity_disputed,
                 'resolution_type' => $claim->resolution_type,
+                'replacement_quantity' => (float) $claim->replacement_quantity,
+                'replacement_available_stock' => $replacementAvailableStock,
                 'remarks' => $claim->remarks,
             ],
             'linkedDistribution' => $claim->distributionRecord ? [
@@ -218,8 +224,8 @@ class ClaimController
             ] : null,
             'attachments' => $documents,
             'attachmentPermissions' => [
-                'upload' => $user->can('claim.view', $claim),
-                'delete' => $user->can('claim.view', $claim),
+                'upload' => $user->can('claim.attachments.manage', $claim),
+                'delete' => $user->can('claim.attachments.manage', $claim),
             ],
             'routes' => [
                 'index' => $routePrefix.'.index',

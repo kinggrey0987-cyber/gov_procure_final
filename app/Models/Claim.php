@@ -35,6 +35,7 @@ class Claim extends Model
         'remarks',
         'status',
         'resolution_type',
+        'replacement_quantity',
     ];
 
     protected $casts = [
@@ -44,6 +45,7 @@ class Claim extends Model
         'office_id' => 'integer',
         'claim_date' => 'date',
         'quantity_disputed' => 'decimal:2',
+        'replacement_quantity' => 'decimal:2',
     ];
 
     public function distributionRecord(): BelongsTo

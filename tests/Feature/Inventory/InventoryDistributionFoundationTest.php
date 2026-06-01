@@ -27,6 +27,7 @@ use App\Models\SupplyRequestItem;
 use App\Models\User;
 use App\Services\Inventory\DistributionRecordService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Inertia\Testing\AssertableInertia as Assert;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
@@ -345,8 +346,28 @@ class InventoryDistributionFoundationTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Inventory/Claim/Show')
                 ->where('permissions.update', true)
+                ->where('attachmentPermissions.upload', false)
+                ->where('attachmentPermissions.delete', false)
                 ->where('routes.updateStatus', 'inventory.claims.update-status')
             );
+
+        $this->actingAs($this->officeUserA)
+            ->get(route('office.claims.show', $claim->claims_id))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('permissions.update', false)
+                ->where('attachmentPermissions.upload', true)
+                ->where('attachmentPermissions.delete', true)
+            );
+
+        $this->actingAs($this->gsoOfficer)
+            ->post(route('documents.store', [
+                'related_module' => 'claims',
+                'related_reference_id' => $claim->claims_id,
+            ]), [
+                'title' => 'GSO review attachment',
+                'file' => UploadedFile::fake()->create('review.pdf', 12, 'application/pdf'),
+            ])
+            ->assertForbidden();
 
         $this->actingAs($this->officeUserA)
             ->post(route('office.claims.store'), [
@@ -495,6 +516,85 @@ class InventoryDistributionFoundationTest extends TestCase
                 'claim_location' => 'Mismatch Test',
             ])
             ->assertSessionHasErrors('office_id');
+    }
+
+    public function test_claim_replacement_resolution_cannot_exceed_available_stock(): void
+    {
+        $record = $this->createReleasedDistributionRecordForOffice($this->officeA, 90110);
+        $distributionItem = $record->items()->firstOrFail();
+
+        $this->actingAs($this->officeUserA)
+            ->post(route('office.claims.store'), [
+                'distribution_record_id' => $record->distribution_record_id,
+                'distribution_item_id' => $distributionItem->distribution_item_id,
+                'office_id' => $this->officeA->id,
+                'claim_type' => 'MISSING_ITEM',
+                'claim_date' => now()->toDateString(),
+                'claim_location' => 'Office A Storage',
+                'quantity_disputed' => 3,
+                'remarks' => 'Three units need replacement.',
+            ])
+            ->assertRedirect();
+
+        $claim = Claim::query()->where('distribution_item_id', $distributionItem->distribution_item_id)->firstOrFail();
+
+        Inventory::query()
+            ->where('item_id', (int) $distributionItem->item_id)
+            ->update([
+                'available_stock' => 1,
+                'stock_on_hand' => 1,
+                'released_quantity' => 0,
+            ]);
+
+        $this->actingAs($this->gsoOfficer)
+            ->put(route('inventory.claims.update-status', $claim->claims_id), [
+                'status' => 'RESOLVED',
+                'resolution_type' => 'REPLACEMENT_RELEASED',
+                'replacement_quantity' => 3,
+                'remarks' => 'Attempt full replacement.',
+            ])
+            ->assertSessionHasErrors('replacement_quantity');
+
+        $claim->refresh();
+        $this->assertSame('OPEN', (string) $claim->status);
+        $this->assertSame('0.00', (string) $claim->replacement_quantity);
+
+        $this->actingAs($this->gsoOfficer)
+            ->put(route('inventory.claims.update-status', $claim->claims_id), [
+                'status' => 'PARTIALLY_RESOLVED',
+                'resolution_type' => 'PARTIAL_REPLACEMENT',
+                'replacement_quantity' => 1,
+                'remarks' => 'One unit replaced; remaining units pending stock.',
+            ])
+            ->assertRedirect();
+
+        $claim->refresh();
+        $inventory = Inventory::query()->where('item_id', (int) $distributionItem->item_id)->firstOrFail();
+
+        $this->assertSame('PARTIALLY_RESOLVED', (string) $claim->status);
+        $this->assertSame('PARTIAL_REPLACEMENT', (string) $claim->resolution_type);
+        $this->assertSame('1.00', (string) $claim->replacement_quantity);
+        $this->assertSame('0.00', (string) $inventory->available_stock);
+        $this->assertSame('0.00', (string) $inventory->stock_on_hand);
+        $this->assertDatabaseHas('inventory_movements', [
+            'movement_type' => 'CLAIM_REPLACEMENT',
+            'reference_type' => Claim::class,
+            'reference_id' => $claim->claims_id,
+            'quantity' => 1,
+        ]);
+
+        $this->actingAs($this->gsoOfficer)
+            ->put(route('inventory.claims.update-status', $claim->claims_id), [
+                'status' => 'PENDING_REPLACEMENT',
+                'resolution_type' => 'PENDING_REPLACEMENT',
+                'replacement_quantity' => 0,
+                'remarks' => 'Remaining replacement is pending replenishment.',
+            ])
+            ->assertRedirect();
+
+        $claim->refresh();
+        $this->assertSame('PENDING_REPLACEMENT', (string) $claim->status);
+        $this->assertSame('1.00', (string) $claim->replacement_quantity);
     }
 
     public function test_gso_queue_procurement_creates_purchase_request_and_items_for_shortage(): void

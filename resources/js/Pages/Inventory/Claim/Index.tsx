@@ -112,7 +112,7 @@ export default function ClaimIndex({ claims, filters, filter_options, routes, pe
                         onChange={(event) => setStatus(event.target.value)}
                     >
                         <option value="">All statuses</option>
-                        {['OPEN', 'IN_REVIEW', 'RESOLVED', 'REJECTED'].map((option) => <option key={option} value={option}>{displayClaimStatus(option)}</option>)}
+                        {['OPEN', 'IN_REVIEW', 'PENDING_REPLACEMENT', 'PARTIALLY_RESOLVED', 'RESOLVED', 'REJECTED'].map((option) => <option key={option} value={option}>{displayClaimStatus(option)}</option>)}
                     </select>
                     <select
                         className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
@@ -194,7 +194,7 @@ export default function ClaimIndex({ claims, filters, filter_options, routes, pe
                                     <td className="px-4 py-3 text-slate-600">{row.office?.name ?? row.office_id ?? '-'}</td>
                                     <td className="px-4 py-3 text-right">
                                         <Link href={route(routeNames.show, row.claims_id)} className="text-sm font-semibold text-red-700 hover:text-red-900">
-                                            {canProcess && ['OPEN', 'IN_REVIEW'].includes(row.status) ? 'Review' : 'View'}
+                                            {canProcess && ['OPEN', 'IN_REVIEW', 'PENDING_REPLACEMENT', 'PARTIALLY_RESOLVED'].includes(row.status) ? 'Review' : 'View'}
                                         </Link>
                                     </td>
                                 </tr>
@@ -216,6 +216,8 @@ function displayClaimStatus(status: string): string {
         OPEN: 'Pending Review',
         FILED: 'Pending Review',
         IN_REVIEW: 'In Claim Review',
+        PENDING_REPLACEMENT: 'Pending Replacement',
+        PARTIALLY_RESOLVED: 'Partially Resolved',
         RESOLVED: 'Resolved',
         REJECTED: 'Rejected',
     };
@@ -229,6 +231,8 @@ function statusClass(status: string) {
         OPEN: `${base} bg-amber-100 text-amber-700`,
         FILED: `${base} bg-amber-100 text-amber-700`,
         IN_REVIEW: `${base} bg-blue-100 text-blue-700`,
+        PENDING_REPLACEMENT: `${base} bg-orange-100 text-orange-700`,
+        PARTIALLY_RESOLVED: `${base} bg-cyan-100 text-cyan-700`,
         RESOLVED: `${base} bg-emerald-100 text-emerald-700`,
         REJECTED: `${base} bg-rose-100 text-rose-700`,
     };

@@ -173,6 +173,11 @@ class AppServiceProvider extends ServiceProvider
             return $user->isGsoOfficer() || ($user->isOfficeUser() && (int) $claim->office_id === (int) $user->office_id);
         });
         Gate::define('claim.update', fn (User $user, Claim $claim): bool => $user->isGsoOfficer());
+        Gate::define('claim.attachments.manage', function (User $user, Claim $claim): bool {
+            return $user->isOfficeUser()
+                && (int) $claim->office_id === (int) $user->office_id
+                && in_array((string) $claim->status, ['OPEN', 'IN_REVIEW'], true);
+        });
 
         Gate::define('executive.monitoring.view', fn (User $user): bool => $user->isExecutive());
         Gate::define('executive.record-archive.view-any', fn (User $user): bool => $user->isExecutive());
