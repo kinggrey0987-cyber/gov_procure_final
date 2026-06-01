@@ -337,15 +337,43 @@ class DistributionRecordController
             'claims.claimant',
             'supplyRequest.office',
             'supplyRequest.items.item.category',
+            'supplyRequest.items.item.inventory',
+            'supplyRequest.distributionRecords.items',
             'delivery',
+            'delivery.items.purchaseOrderItem',
+            'delivery.distributionRecords.items',
             'office',
             'preparer',
             'receiver',
         ]);
 
-        $releasedByItemId = $distribution_record->items
+        $currentRecordReleasedByItemId = $distribution_record->items
             ->groupBy(fn ($item) => (int) $item->item_id)
             ->map(fn ($group) => (float) $group->sum('quantity_released'));
+
+        $requestReleasedByItemId = $distribution_record->supplyRequest?->distributionRecords
+            ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
+            ->flatMap(fn ($record) => $record->items)
+            ->groupBy(fn ($item) => (int) $item->item_id)
+            ->map(fn ($group) => (float) $group->sum('quantity_released')) ?? collect();
+
+        $deliveryRemainingByItemId = null;
+        if ($distribution_record->delivery_id !== null && $distribution_record->delivery !== null) {
+            $deliveryAcceptedByItemId = $distribution_record->delivery->items
+                ->groupBy(fn ($item) => (int) ($item->purchaseOrderItem?->item_id ?? 0))
+                ->map(fn ($group): float => (float) $group->sum(
+                    fn ($item): float => max((float) $item->received_quantity - (float) $item->damaged_quantity, 0)
+                ));
+
+            $deliveryReleasedByItemId = $distribution_record->delivery->distributionRecords
+                ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
+                ->flatMap(fn ($record) => $record->items)
+                ->groupBy(fn ($item) => (int) $item->item_id)
+                ->map(fn ($group) => (float) $group->sum('quantity_released'));
+
+            $deliveryRemainingByItemId = $deliveryAcceptedByItemId
+                ->map(fn (float $accepted, int $itemId): float => max($accepted - (float) ($deliveryReleasedByItemId->get($itemId) ?? 0.0), 0));
+        }
 
         return Inertia::render('Inventory/Distribution/Show', [
             'record' => [
@@ -363,10 +391,17 @@ class DistributionRecordController
                     'supply_request_id' => (int) $distribution_record->supplyRequest->supply_request_id,
                     'request_code' => (string) $distribution_record->supplyRequest->request_code,
                     'status' => (string) $distribution_record->supplyRequest->status,
-                    'items' => $distribution_record->supplyRequest->items->map(function ($item) use ($releasedByItemId): array {
+                    'items' => $distribution_record->supplyRequest->items->map(function ($item) use ($currentRecordReleasedByItemId, $requestReleasedByItemId, $deliveryRemainingByItemId): array {
                         $itemId = (int) $item->item_id;
                         $requestedQuantity = (float) $item->quantity_requested;
-                        $releasedQuantity = (float) ($releasedByItemId->get($itemId) ?? 0.0);
+                        $releasedQuantity = (float) ($currentRecordReleasedByItemId->get($itemId) ?? 0.0);
+                        $requestRemaining = max($requestedQuantity - (float) ($requestReleasedByItemId->get($itemId) ?? 0.0), 0);
+                        $availableStock = (float) ($item->item?->inventory?->available_stock ?? 0);
+                        $maxReleasable = min($requestRemaining, $availableStock);
+
+                        if ($deliveryRemainingByItemId !== null) {
+                            $maxReleasable = min($maxReleasable, (float) ($deliveryRemainingByItemId->get($itemId) ?? 0.0));
+                        }
 
                         return [
                             'supply_request_item_id' => (int) $item->supply_request_item_id,
@@ -375,9 +410,10 @@ class DistributionRecordController
                             'category_name' => (string) ($item->item?->category?->category_name ?? '-'),
                             'quantity_requested' => $requestedQuantity,
                             'quantity_released' => $releasedQuantity,
-                            'quantity_remaining' => max($requestedQuantity - $releasedQuantity, 0),
+                            'quantity_remaining' => $requestRemaining,
                             'unit' => (string) ($item->item?->default_unit ?? 'UNIT'),
-                            'available_stock' => (float) ($item->item?->inventory?->available_stock ?? 0),
+                            'available_stock' => $availableStock,
+                            'max_releasable' => max($maxReleasable, 0),
                         ];
                     })->values(),
                 ] : null,

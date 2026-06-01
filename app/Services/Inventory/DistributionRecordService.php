@@ -149,6 +149,7 @@ class DistributionRecordService
 
         return DB::transaction(function () use ($record, $actor, $payload): DistributionItem {
             $releasedQuantity = (float) $payload['quantity_released'];
+            $this->assertDistributionQuantityIsReleasable($record, (int) $payload['item_id'], $releasedQuantity);
 
             $this->inventoryService->releaseStock(
                 itemId: (int) $payload['item_id'],
@@ -222,6 +223,12 @@ class DistributionRecordService
             $currentQuantity = (float) $item->quantity_released;
             $newQuantity = (float) ($payload['quantity_released'] ?? $item->quantity_released);
             $delta = $newQuantity - $currentQuantity;
+            $this->assertDistributionQuantityIsReleasable(
+                $record,
+                (int) $item->item_id,
+                $newQuantity,
+                (int) $item->distribution_item_id,
+            );
 
             if ($delta > 0) {
                 $this->inventoryService->releaseStock(
@@ -367,6 +374,76 @@ class DistributionRecordService
         if ((int) $record->supplyRequest->office_id !== (int) $record->office_id) {
             throw ValidationException::withMessages([
                 'office_id' => 'Distribution office must match the linked supply request office.',
+            ]);
+        }
+    }
+
+    private function assertDistributionQuantityIsReleasable(
+        DistributionRecord $record,
+        int $itemId,
+        float $quantity,
+        ?int $ignoreDistributionItemId = null,
+    ): void {
+        $record->loadMissing([
+            'supplyRequest.items',
+            'supplyRequest.distributionRecords.items',
+            'delivery.items.purchaseOrderItem',
+            'delivery.distributionRecords.items',
+        ]);
+
+        $requestedQuantity = (float) $record->supplyRequest->items
+            ->where('item_id', $itemId)
+            ->sum('quantity_requested');
+
+        if ($requestedQuantity <= 0) {
+            throw ValidationException::withMessages([
+                'item_id' => 'Selected item is not part of the linked supply request.',
+            ]);
+        }
+
+        $releasedForRequest = $record->supplyRequest->distributionRecords
+            ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
+            ->flatMap(fn ($distributionRecord) => $distributionRecord->items)
+            ->filter(function ($distributionItem) use ($itemId, $ignoreDistributionItemId): bool {
+                if ((int) $distributionItem->item_id !== $itemId) {
+                    return false;
+                }
+
+                return $ignoreDistributionItemId === null
+                    || (int) $distributionItem->distribution_item_id !== $ignoreDistributionItemId;
+            })
+            ->sum(fn ($distributionItem): float => (float) $distributionItem->quantity_released);
+
+        $maxReleasable = max($requestedQuantity - (float) $releasedForRequest, 0);
+
+        if ($record->delivery_id !== null) {
+            $acceptedFromDelivery = $record->delivery->items
+                ->filter(fn ($deliveryItem): bool => (int) ($deliveryItem->purchaseOrderItem?->item_id ?? 0) === $itemId)
+                ->sum(fn ($deliveryItem): float => max((float) $deliveryItem->received_quantity - (float) $deliveryItem->damaged_quantity, 0));
+
+            $releasedForDelivery = $record->delivery->distributionRecords
+                ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
+                ->flatMap(fn ($distributionRecord) => $distributionRecord->items)
+                ->filter(function ($distributionItem) use ($itemId, $ignoreDistributionItemId): bool {
+                    if ((int) $distributionItem->item_id !== $itemId) {
+                        return false;
+                    }
+
+                    return $ignoreDistributionItemId === null
+                        || (int) $distributionItem->distribution_item_id !== $ignoreDistributionItemId;
+                })
+                ->sum(fn ($distributionItem): float => (float) $distributionItem->quantity_released);
+
+            $maxReleasable = min($maxReleasable, max((float) $acceptedFromDelivery - (float) $releasedForDelivery, 0));
+        }
+
+        if ($quantity - $maxReleasable > 0.0001) {
+            throw ValidationException::withMessages([
+                'quantity_released' => sprintf(
+                    'Quantity released cannot exceed the remaining releasable quantity of %.2f for this request%s.',
+                    $maxReleasable,
+                    $record->delivery_id !== null ? ' and verified delivery' : ''
+                ),
             ]);
         }
     }

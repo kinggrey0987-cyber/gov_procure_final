@@ -210,6 +210,66 @@ class InventoryDistributionFoundationTest extends TestCase
             ->assertSessionHasErrors('quantity_released');
     }
 
+    public function test_delivery_backed_distribution_cannot_release_more_than_delivery_accepted_quantity(): void
+    {
+        $category = ItemCategory::query()->create([
+            'category_name' => 'Delivery Cap Category '.uniqid(),
+            'standard_delivery_days' => 7,
+            'description' => 'Delivery cap test category',
+            'status' => 'ACTIVE',
+        ]);
+
+        $item = Item::query()->create([
+            'item_category_id' => $category->item_category_id,
+            'item_name' => 'Delivery Cap Item',
+            'description' => 'Delivery cap test item',
+            'default_unit' => 'PCS',
+            'status' => 'ACTIVE',
+        ]);
+
+        $context = $this->createVerifiedDeliveryContext($this->officeA, $this->officeUserA, $this->procurementOfficer, $this->gsoOfficer, (int) $item->item_id);
+
+        Inventory::query()->create([
+            'item_id' => (int) $item->item_id,
+            'available_stock' => 10,
+            'stock_on_hand' => 10,
+            'reserved_quantity' => 0,
+            'released_quantity' => 0,
+            'low_stock_threshold' => 2,
+            'last_updated' => now(),
+        ]);
+
+        $record = DistributionRecord::query()->create([
+            'distribution_code' => 'DIST-DELIVERY-CAP-'.uniqid(),
+            'supply_request_id' => $context['supplyRequest']->supply_request_id,
+            'delivery_id' => $context['delivery']->delivery_id,
+            'office_id' => $this->officeA->id,
+            'prepared_by' => $this->gsoOfficer->id,
+            'status' => 'DRAFT',
+        ]);
+
+        $this->actingAs($this->gsoOfficer)
+            ->get(route('inventory.distribution-records.show', $record->distribution_record_id))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('record.supply_request.items.0.quantity_requested', 5)
+                ->where('record.supply_request.items.0.max_releasable', 4)
+            );
+
+        $this->actingAs($this->gsoOfficer)
+            ->post(route('inventory.distribution-records.items.store', $record->distribution_record_id), [
+                'item_id' => (int) $item->item_id,
+                'item_name_snapshot' => $item->item_name,
+                'quantity_released' => 5,
+                'unit' => 'PCS',
+            ])
+            ->assertSessionHasErrors('quantity_released');
+
+        $this->assertDatabaseMissing('distribution_items', [
+            'distribution_record_id' => $record->distribution_record_id,
+            'item_id' => (int) $item->item_id,
+        ]);
+    }
+
     public function test_office_user_can_receive_own_distribution_but_not_other_office(): void
     {
         $own = $this->createReleasedDistributionRecordForOffice($this->officeA, 9004);
@@ -583,10 +643,10 @@ class InventoryDistributionFoundationTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->where('focusSupplyRequestId', $context['supplyRequest']->supply_request_id)
                 ->where('focusReleasableReason', null)
-                ->where('eligibleRows.0.supply_request_id', $context['supplyRequest']->supply_request_id)
-                ->where('eligibleRows.0.release_basis', 'AVAILABLE_INVENTORY')
-                ->where('eligibleRows.0.release_basis_label', 'From Available Inventory')
-                ->where('eligibleRows.0.delivery_id', null)
+                ->where('eligibleRows.data.0.supply_request_id', $context['supplyRequest']->supply_request_id)
+                ->where('eligibleRows.data.0.release_basis', 'AVAILABLE_INVENTORY')
+                ->where('eligibleRows.data.0.release_basis_label', 'From Available Inventory')
+                ->where('eligibleRows.data.0.delivery_id', null)
             );
     }
 

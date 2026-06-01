@@ -4,6 +4,7 @@ namespace Tests\Feature\Office;
 
 use App\Enums\UserRole;
 use App\Models\Anomaly;
+use App\Models\Delivery;
 use App\Models\DistributionItem;
 use App\Models\DistributionRecord;
 use App\Models\Item;
@@ -1269,6 +1270,204 @@ class OfficeTransactionalFlowTest extends TestCase
                 ->where('supplyRequest.items.0.quantity_requested', 500)
                 ->where('supplyRequest.items.0.quantity_released', 8)
                 ->where('supplyRequest.items.0.quantity_received', 8)
+            );
+    }
+
+    public function test_original_supply_request_counts_linked_follow_up_distribution_as_fulfillment(): void
+    {
+        $office = $this->createOffice();
+        $officeUser = $this->createUser(UserRole::OFFICE_USER, $office);
+        $gsoOfficer = $this->createUser(UserRole::GSO_OFFICER, $office);
+        $procurementOfficer = $this->createUser(UserRole::PROCUREMENT_OFFICER, $office);
+        [$ppmp, $ppmpItem, $item] = $this->createApprovedPpmpItemContext($office, $officeUser, 50);
+
+        $supplier = Supplier::query()->create([
+            'supplier_name' => 'Follow-up Fulfillment Supplier',
+            'contact_person' => 'Contact',
+            'email' => uniqid('supplier', true).'@test.local',
+            'phone' => '09123456789',
+            'address' => 'Address',
+            'status' => 'ACTIVE',
+        ]);
+
+        $originalRequest = SupplyRequest::query()->create([
+            'request_code' => 'SR-FOLLOW-UP-FULFILL-ORIG',
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'ppmp_id' => $ppmp->ppmp_id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(3)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Original 50 item request',
+            'priority_level' => 'MEDIUM',
+            'status' => 'SUBMITTED',
+            'review_notes' => null,
+            'approved_by' => null,
+            'approved_at' => null,
+        ]);
+
+        SupplyRequestItem::query()->create([
+            'supply_request_id' => $originalRequest->supply_request_id,
+            'item_id' => $item->item_id,
+            'ppmp_item_id' => $ppmpItem->ppmp_item_id,
+            'item_name_snapshot' => $item->item_name,
+            'quantity_requested' => 50,
+        ]);
+
+        $originalPurchaseRequest = PurchaseRequest::query()->create([
+            'supply_request_id' => $originalRequest->supply_request_id,
+            'office_id' => $office->id,
+            'requested_by' => $procurementOfficer->id,
+            'status' => 'PROCESSING',
+            'remarks' => 'Original procurement.',
+        ]);
+
+        $originalPurchaseOrder = PurchaseOrder::query()->create([
+            'purchase_request_id' => $originalPurchaseRequest->purchase_request_id,
+            'supply_request_id' => $originalRequest->supply_request_id,
+            'supplier_id' => $supplier->supplier_id,
+            'created_by' => $procurementOfficer->id,
+            'po_number' => 'PO-FOLLOW-UP-FULFILL-ORIG',
+            'procurement_method' => 'SMALL_VALUE_PROCUREMENT',
+            'status' => 'PLACED',
+            'expected_delivery_date' => now()->addDays(2)->toDateString(),
+            'total_amount' => 500,
+        ]);
+
+        $originalDelivery = Delivery::query()->create([
+            'delivery_code' => 'DEL-FOLLOW-UP-FULFILL-ORIG',
+            'purchase_order_id' => $originalPurchaseOrder->purchase_order_id,
+            'supplier_id' => $supplier->supplier_id,
+            'actual_delivery_date' => now()->toDateString(),
+            'expected_arrival_date' => now()->addDay()->toDateString(),
+            'received_by' => $gsoOfficer->id,
+            'receipt_status' => 'VERIFIED',
+            'remarks' => 'Original delivery accepted only 40 of 50.',
+        ]);
+
+        $originalDistribution = DistributionRecord::query()->create([
+            'distribution_code' => 'DIST-FOLLOW-UP-FULFILL-ORIG',
+            'supply_request_id' => $originalRequest->supply_request_id,
+            'delivery_id' => $originalDelivery->delivery_id,
+            'office_id' => $office->id,
+            'prepared_by' => $gsoOfficer->id,
+            'received_by' => $officeUser->id,
+            'release_date' => now()->toDateString(),
+            'storage_location' => 'GSO',
+            'status' => 'RECEIVED',
+            'notes' => null,
+        ]);
+
+        DistributionItem::query()->create([
+            'distribution_record_id' => $originalDistribution->distribution_record_id,
+            'item_id' => $item->item_id,
+            'received_by' => $officeUser->id,
+            'item_name_snapshot' => $item->item_name,
+            'quantity_released' => 40,
+            'quantity_received' => 40,
+            'quantity_damaged' => 0,
+            'quantity_missing' => 0,
+            'receipt_condition' => 'GOOD',
+            'unit' => 'PCS',
+            'remarks' => null,
+        ]);
+
+        $followUpRequest = SupplyRequest::query()->create([
+            'request_code' => 'SR-FOLLOW-UP-FULFILL-10',
+            'office_id' => $office->id,
+            'requested_by' => $gsoOfficer->id,
+            'ppmp_id' => $ppmp->ppmp_id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(7)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Follow-up procurement for missing 10',
+            'priority_level' => 'MEDIUM',
+            'status' => 'SUBMITTED',
+            'review_notes' => 'Generated from original delivery discrepancy.',
+            'approved_by' => null,
+            'approved_at' => null,
+        ]);
+
+        SupplyRequestItem::query()->create([
+            'supply_request_id' => $followUpRequest->supply_request_id,
+            'item_id' => $item->item_id,
+            'ppmp_item_id' => $ppmpItem->ppmp_item_id,
+            'item_name_snapshot' => $item->item_name,
+            'quantity_requested' => 10,
+        ]);
+
+        $followUpPurchaseRequest = PurchaseRequest::query()->create([
+            'supply_request_id' => $followUpRequest->supply_request_id,
+            'office_id' => $office->id,
+            'requested_by' => $gsoOfficer->id,
+            'source_delivery_id' => $originalDelivery->delivery_id,
+            'source_type' => 'PARTIAL_DELIVERY_FOLLOW_UP',
+            'status' => 'PROCESSING',
+            'remarks' => 'Generated from original delivery discrepancy.',
+        ]);
+
+        $followUpPurchaseOrder = PurchaseOrder::query()->create([
+            'purchase_request_id' => $followUpPurchaseRequest->purchase_request_id,
+            'supply_request_id' => $followUpRequest->supply_request_id,
+            'supplier_id' => $supplier->supplier_id,
+            'created_by' => $procurementOfficer->id,
+            'po_number' => 'PO-FOLLOW-UP-FULFILL-10',
+            'procurement_method' => 'SMALL_VALUE_PROCUREMENT',
+            'status' => 'PLACED',
+            'expected_delivery_date' => now()->addDays(2)->toDateString(),
+            'total_amount' => 100,
+        ]);
+
+        $followUpDelivery = Delivery::query()->create([
+            'delivery_code' => 'DEL-FOLLOW-UP-FULFILL-10',
+            'purchase_order_id' => $followUpPurchaseOrder->purchase_order_id,
+            'supplier_id' => $supplier->supplier_id,
+            'actual_delivery_date' => now()->toDateString(),
+            'expected_arrival_date' => now()->addDay()->toDateString(),
+            'received_by' => $gsoOfficer->id,
+            'receipt_status' => 'VERIFIED',
+            'remarks' => 'Follow-up delivery accepted 10.',
+        ]);
+
+        $followUpDistribution = DistributionRecord::query()->create([
+            'distribution_code' => 'DIST-FOLLOW-UP-FULFILL-10',
+            'supply_request_id' => $followUpRequest->supply_request_id,
+            'delivery_id' => $followUpDelivery->delivery_id,
+            'office_id' => $office->id,
+            'prepared_by' => $gsoOfficer->id,
+            'received_by' => $officeUser->id,
+            'release_date' => now()->toDateString(),
+            'storage_location' => 'GSO',
+            'status' => 'RECEIVED',
+            'notes' => null,
+        ]);
+
+        DistributionItem::query()->create([
+            'distribution_record_id' => $followUpDistribution->distribution_record_id,
+            'item_id' => $item->item_id,
+            'received_by' => $officeUser->id,
+            'item_name_snapshot' => $item->item_name,
+            'quantity_released' => 10,
+            'quantity_received' => 10,
+            'quantity_damaged' => 0,
+            'quantity_missing' => 0,
+            'receipt_condition' => 'GOOD',
+            'unit' => 'PCS',
+            'remarks' => null,
+        ]);
+
+        $this->actingAs($officeUser)
+            ->get(route('office.supply-requests.show', $originalRequest->supply_request_id))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Office/SupplyRequests/Show')
+                ->where('supplyRequest.status', 'RECEIVED')
+                ->where('supplyRequest.items.0.quantity_requested', 50)
+                ->where('supplyRequest.items.0.quantity_released', 50)
+                ->where('supplyRequest.items.0.quantity_received', 50)
+                ->has('distributionRecords', 2)
+                ->where('distributionRecords.0.is_follow_up_fulfillment', true)
+                ->where('distributionRecords.1.is_follow_up_fulfillment', false)
             );
     }
 

@@ -25,6 +25,7 @@ type Props = {
                 quantity_remaining: number;
                 unit: string;
                 available_stock: number;
+                max_releasable: number;
             }>;
         } | null;
         delivery?: { delivery_code: string } | null;
@@ -176,7 +177,7 @@ export default function DistributionShow({ record }: Props) {
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {(record.supply_request?.items ?? []).map((requestItem) => {
-                                const maxReleasable = Math.min(requestItem.quantity_remaining, requestItem.available_stock);
+                                const maxReleasable = requestItem.max_releasable;
                                 const canAdd = canManageDistribution && maxReleasable > 0;
 
                                 return (
