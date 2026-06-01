@@ -88,16 +88,60 @@ class DeliveryVerificationService
             $this->recordStatus($delivery, $oldStatus, $newStatus, $actor, 'Delivery verified.');
             $this->recordAudit($actor, 'CREATE_VERIFICATION', $delivery);
 
-            if ($newStatus === 'VERIFIED') {
-                $this->inventoryService->updateFromVerifiedDelivery($delivery->fresh() ?? $delivery, $actor);
+            $verifiedDelivery = $delivery->fresh() ?? $delivery;
+
+            if (in_array($newStatus, ['VERIFIED', 'PARTIALLY_RECEIVED'], true)) {
+                $this->inventoryService->updateFromVerifiedDelivery($verifiedDelivery, $actor);
             }
 
             if ($newStatus === 'PARTIALLY_RECEIVED') {
                 $this->recordAudit($actor, 'DISCREPANCY_FOR_BAC_FOLLOW_UP', $delivery);
             }
 
+            if ($newStatus === 'VERIFIED') {
+                $this->resolveSourcePartialDeliveryIfFollowUpCompleted($verifiedDelivery, $actor);
+            }
+
             return $verification;
         });
+    }
+
+    private function resolveSourcePartialDeliveryIfFollowUpCompleted(Delivery $delivery, User $actor): void
+    {
+        $delivery->loadMissing('purchaseOrder.purchaseRequest.sourceDelivery');
+
+        $purchaseRequest = $delivery->purchaseOrder?->purchaseRequest;
+        if (
+            ! $purchaseRequest
+            || (string) $purchaseRequest->source_type !== 'PARTIAL_DELIVERY_FOLLOW_UP'
+            || (int) ($purchaseRequest->source_delivery_id ?? 0) <= 0
+        ) {
+            return;
+        }
+
+        $sourceDelivery = $purchaseRequest->sourceDelivery;
+        if (! $sourceDelivery instanceof Delivery || (string) $sourceDelivery->receipt_status !== 'PARTIALLY_RECEIVED') {
+            return;
+        }
+
+        $oldStatus = (string) $sourceDelivery->receipt_status;
+
+        $sourceDelivery->forceFill([
+            'receipt_status' => 'VERIFIED',
+        ])->save();
+
+        $this->recordStatus(
+            $sourceDelivery,
+            $oldStatus,
+            'VERIFIED',
+            $actor,
+            sprintf(
+                'Partial delivery discrepancy resolved by accepted follow-up delivery %s.',
+                (string) $delivery->delivery_code
+            )
+        );
+
+        $this->recordAudit($actor, 'RESOLVE_PARTIAL_DELIVERY_FROM_FOLLOW_UP', $sourceDelivery);
     }
 
     private function assertGsoOfficer(User $actor): void

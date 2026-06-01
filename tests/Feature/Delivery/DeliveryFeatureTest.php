@@ -334,6 +334,108 @@ class DeliveryFeatureTest extends TestCase
         ]);
     }
 
+    public function test_accepted_follow_up_delivery_resolves_original_partial_delivery(): void
+    {
+        $originalDelivery = $this->createDelivery(status: 'RECEIVED');
+        DeliveryItem::query()->create([
+            'delivery_id' => $originalDelivery->delivery_id,
+            'purchase_order_item_id' => $this->purchaseOrderItem->purchase_order_item_id,
+            'expected_quantity' => 5,
+            'received_quantity' => 4,
+            'damaged_quantity' => 1,
+            'missing_quantity' => 1,
+            'item_condition' => 'DAMAGED',
+        ]);
+
+        $verificationService = app(DeliveryVerificationService::class);
+        $verificationService->create($originalDelivery, $this->gsoOfficer, [
+            'verification_date' => now()->toDateString(),
+            'verification_status' => 'REJECTED',
+            'discrepancy_notes' => 'One damaged and one missing item require follow-up.',
+        ]);
+
+        $inventory = Inventory::query()->where('item_id', $this->purchaseOrderItem->item_id)->firstOrFail();
+        $this->assertSame('3.00', (string) $inventory->available_stock);
+        $this->assertSame('3.00', (string) $inventory->stock_on_hand);
+
+        $followUpPurchaseRequest = PurchaseRequest::query()->create([
+            'supply_request_id' => $this->purchaseOrder->supply_request_id,
+            'office_id' => $this->office->id,
+            'requested_by' => $this->gsoOfficer->id,
+            'source_delivery_id' => $originalDelivery->delivery_id,
+            'source_type' => 'PARTIAL_DELIVERY_FOLLOW_UP',
+            'status' => 'PROCESSING',
+            'remarks' => 'Follow-up PR for damaged and missing quantity.',
+        ]);
+
+        $followUpPurchaseOrder = PurchaseOrder::query()->create([
+            'purchase_request_id' => $followUpPurchaseRequest->purchase_request_id,
+            'supply_request_id' => $this->purchaseOrder->supply_request_id,
+            'supplier_id' => $this->supplier->supplier_id,
+            'created_by' => $this->procurementOfficer->id,
+            'po_number' => 'PO-DEL-FOLLOW-UP',
+            'procurement_method' => 'SMALL_VALUE_PROCUREMENT',
+            'status' => 'PLACED',
+            'expected_delivery_date' => now()->addDays(3)->toDateString(),
+            'total_amount' => 200,
+            'terms_notes' => 'Net 30',
+            'remarks' => 'Follow-up PO',
+        ]);
+
+        $followUpPurchaseOrderItem = PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $followUpPurchaseOrder->purchase_order_id,
+            'supply_request_item_id' => $this->purchaseOrderItem->supply_request_item_id,
+            'item_id' => $this->purchaseOrderItem->item_id,
+            'item_name_snapshot' => $this->purchaseOrderItem->item_name_snapshot,
+            'specification' => 'Follow-up quantity',
+            'quantity_ordered' => 2,
+            'unit' => 'PCS',
+            'unit_price' => 100,
+            'total_price' => 200,
+        ]);
+
+        $followUpDelivery = Delivery::query()->create([
+            'delivery_code' => 'DEL-FOLLOW-UP',
+            'purchase_order_id' => $followUpPurchaseOrder->purchase_order_id,
+            'supplier_id' => $this->supplier->supplier_id,
+            'actual_delivery_date' => now()->toDateString(),
+            'expected_arrival_date' => now()->addDay()->toDateString(),
+            'received_by' => $this->gsoOfficer->id,
+            'receipt_status' => 'RECEIVED',
+            'remarks' => 'Follow-up delivery received.',
+        ]);
+
+        DeliveryItem::query()->create([
+            'delivery_id' => $followUpDelivery->delivery_id,
+            'purchase_order_item_id' => $followUpPurchaseOrderItem->purchase_order_item_id,
+            'expected_quantity' => 2,
+            'received_quantity' => 2,
+            'damaged_quantity' => 0,
+            'missing_quantity' => 0,
+            'item_condition' => 'GOOD',
+        ]);
+
+        $verificationService->create($followUpDelivery, $this->gsoOfficer, [
+            'verification_date' => now()->toDateString(),
+            'verification_status' => 'APPROVED',
+            'discrepancy_notes' => 'Replacement quantity accepted.',
+        ]);
+
+        $this->assertDatabaseHas('deliveries', [
+            'delivery_id' => $originalDelivery->delivery_id,
+            'receipt_status' => 'VERIFIED',
+        ]);
+
+        $this->assertDatabaseHas('deliveries', [
+            'delivery_id' => $followUpDelivery->delivery_id,
+            'receipt_status' => 'VERIFIED',
+        ]);
+
+        $inventory->refresh();
+        $this->assertSame('5.00', (string) $inventory->available_stock);
+        $this->assertSame('5.00', (string) $inventory->stock_on_hand);
+    }
+
     public function test_gso_can_create_follow_up_purchase_request_from_partially_received_delivery(): void
     {
         $delivery = $this->createDelivery(status: 'PARTIALLY_RECEIVED');
