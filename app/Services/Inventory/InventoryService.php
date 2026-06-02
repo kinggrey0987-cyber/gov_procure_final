@@ -98,17 +98,15 @@ class InventoryService
                 $inventories->push($inventory->fresh());
             }
 
-            $requester = $delivery->purchaseOrder?->supplyRequest?->requester;
-            if ($requester instanceof User) {
-                $this->notificationService->notifyUser(
-                    user: $requester,
-                    title: 'Inventory Updated',
+            $supplyRequest = $delivery->purchaseOrder?->supplyRequest;
+            if ($supplyRequest) {
+                $this->notificationService->notifySupplyRequestOfficeRequester(
+                    supplyRequest: $supplyRequest,
+                    title: 'Delivery Inventory Updated',
                     message: (string) $delivery->receipt_status === 'PARTIALLY_RECEIVED'
-                        ? 'Inventory has been updated from the accepted quantity of your partially received delivery.'
-                        : 'Inventory has been updated from your verified delivery context.',
+                        ? sprintf('GSO updated inventory from the accepted quantity of the partially received delivery for supply request %s.', (string) $supplyRequest->request_code)
+                        : sprintf('GSO updated inventory from the verified delivery for supply request %s.', (string) $supplyRequest->request_code),
                     notificationType: 'INVENTORY_UPDATED',
-                    referenceType: Delivery::class,
-                    referenceId: (int) $delivery->delivery_id,
                 );
             }
 

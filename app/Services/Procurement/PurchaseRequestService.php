@@ -87,17 +87,12 @@ class PurchaseRequestService
             $this->recordStatus($purchaseRequest, null, 'OPEN', $actor, 'Purchase request created from submitted supply request.');
             $this->recordAudit($actor, 'CREATE', $purchaseRequest);
 
-            $requester = User::query()->find($purchaseRequest->requested_by);
-            if ($requester instanceof User) {
-                $this->notificationService->notifyUser(
-                    user: $requester,
-                    title: 'Purchase Request Created',
-                    message: 'Procurement has created a purchase request from your submitted supply request.',
-                    notificationType: 'PROCUREMENT_PURCHASE_REQUEST_CREATED',
-                    referenceType: PurchaseRequest::class,
-                    referenceId: (int) $purchaseRequest->purchase_request_id,
-                );
-            }
+            $this->notificationService->notifySupplyRequestOfficeRequester(
+                supplyRequest: $supplyRequest,
+                title: 'Supply Request Routed to Procurement',
+                message: sprintf('Your supply request %s was converted into a purchase request by Procurement.', (string) $supplyRequest->request_code),
+                notificationType: 'PROCUREMENT_PURCHASE_REQUEST_CREATED',
+            );
 
             return $purchaseRequest->fresh(['items', 'office', 'requester', 'supplyRequest']) ?? $purchaseRequest;
         });
@@ -196,17 +191,12 @@ class PurchaseRequestService
                 'Supply request queued by GSO for procurement due to stock shortage.'
             );
 
-            $requester = User::query()->find($purchaseRequest->requested_by);
-            if ($requester instanceof User) {
-                $this->notificationService->notifyUser(
-                    user: $requester,
-                    title: 'Purchase Request Queued',
-                    message: 'GSO has queued your supply request for procurement due to stock shortage.',
-                    notificationType: 'PROCUREMENT_PURCHASE_REQUEST_CREATED',
-                    referenceType: PurchaseRequest::class,
-                    referenceId: (int) $purchaseRequest->purchase_request_id,
-                );
-            }
+            $this->notificationService->notifySupplyRequestOfficeRequester(
+                supplyRequest: $supplyRequest,
+                title: 'Supply Request Forwarded to Procurement',
+                message: sprintf('GSO forwarded your supply request %s to Procurement due to stock shortage.', (string) $supplyRequest->request_code),
+                notificationType: 'OFFICE_SUPPLY_REQUEST_FORWARDED_TO_PROCUREMENT',
+            );
 
             return $purchaseRequest->fresh(['items', 'office', 'requester', 'supplyRequest']) ?? $purchaseRequest;
         });
@@ -578,6 +568,16 @@ class PurchaseRequestService
 
             $this->recordAudit($actor, 'PROCESS', $purchaseRequest);
 
+            $supplyRequest = $purchaseRequest->supplyRequest()->first();
+            if ($supplyRequest instanceof SupplyRequest) {
+                $this->notificationService->notifySupplyRequestOfficeRequester(
+                    supplyRequest: $supplyRequest,
+                    title: 'Supply Request Processing Started',
+                    message: sprintf('Procurement started processing your supply request %s.', (string) $supplyRequest->request_code),
+                    notificationType: 'OFFICE_SUPPLY_REQUEST_PROCUREMENT_PROCESSING',
+                );
+            }
+
             return $purchaseRequest->fresh(['items', 'office', 'requester', 'supplyRequest']) ?? $purchaseRequest;
         });
     }
@@ -832,24 +832,19 @@ class PurchaseRequestService
             'approved_at' => null,
         ]);
 
-        $requester = User::query()->find($supplyRequest->requested_by);
-        if ($requester instanceof User) {
-            $message = match ($newStatus) {
-                'DRAFT' => 'Your supply request was returned for revision by Procurement. Please review the remarks and resubmit it after updating.',
-                'REJECTED' => 'Your supply request was rejected by Procurement. Please review the remarks for the reason.',
-                'FOR_PROCUREMENT' => 'Your supply request is now being processed by Procurement.',
-                default => 'Your supply request status was updated by Procurement.',
-            };
+        $message = match ($newStatus) {
+            'DRAFT' => 'Your supply request was returned for revision by Procurement. Please review the remarks and resubmit it after updating.',
+            'REJECTED' => 'Your supply request was rejected by Procurement. Please review the remarks for the reason.',
+            'FOR_PROCUREMENT' => 'Your supply request is now being processed by Procurement.',
+            default => 'Your supply request status was updated by Procurement.',
+        };
 
-            $this->notificationService->notifyUser(
-                user: $requester,
-                title: 'Supply Request Status Updated',
-                message: $message,
-                notificationType: 'OFFICE_SUPPLY_REQUEST_STATUS_UPDATED',
-                referenceType: SupplyRequest::class,
-                referenceId: (int) $supplyRequest->supply_request_id,
-            );
-        }
+        $this->notificationService->notifySupplyRequestOfficeRequester(
+            supplyRequest: $supplyRequest,
+            title: 'Supply Request Status Updated',
+            message: $message,
+            notificationType: 'OFFICE_SUPPLY_REQUEST_STATUS_UPDATED',
+        );
     }
 
     private function recordAudit(User $actor, string $actionType, PurchaseRequest $purchaseRequest): void

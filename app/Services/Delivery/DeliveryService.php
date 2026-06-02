@@ -74,16 +74,13 @@ class DeliveryService
             $this->recordStatus($delivery, null, 'PENDING', $actor, 'Delivery created.');
             $this->recordAudit($actor, 'CREATE', $delivery);
 
-            // Send notification to purchaser
-            $requester = User::query()->find($purchaseOrder->purchaseRequest->requested_by);
-            if ($requester instanceof User) {
-                $this->notificationService->notifyUser(
-                    user: $requester,
-                    title: 'Delivery Created',
-                    message: 'GSO has created a delivery record for your purchase order.',
+            $purchaseOrder->loadMissing('supplyRequest');
+            if ($purchaseOrder->supplyRequest) {
+                $this->notificationService->notifySupplyRequestOfficeRequester(
+                    supplyRequest: $purchaseOrder->supplyRequest,
+                    title: 'Delivery Intake Created',
+                    message: sprintf('GSO created a delivery intake for your supply request %s.', (string) $purchaseOrder->supplyRequest->request_code),
                     notificationType: 'DELIVERY_CREATED',
-                    referenceType: Delivery::class,
-                    referenceId: (int) $delivery->delivery_id,
                 );
             }
 

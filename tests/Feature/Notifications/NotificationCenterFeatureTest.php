@@ -4,10 +4,15 @@ namespace Tests\Feature\Notifications;
 
 use App\Enums\UserRole;
 use App\Models\Alert;
+use App\Models\Delivery;
 use App\Models\Notification;
 use App\Models\Office;
+use App\Models\PurchaseOrder;
+use App\Models\PurchaseRequest;
 use App\Models\PublicDisclosure;
 use App\Models\Role;
+use App\Models\Supplier;
+use App\Models\SupplyRequest;
 use App\Models\User;
 use App\Services\NotificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -235,6 +240,73 @@ class NotificationCenterFeatureTest extends TestCase
         ]);
     }
 
+    public function test_office_workflow_notifications_for_procurement_records_open_the_owned_supply_request(): void
+    {
+        $workflow = $this->createProcurementWorkflowContext($this->office, $this->officeUserA);
+
+        foreach ([
+            PurchaseRequest::class => $workflow['purchase_request']->purchase_request_id,
+            PurchaseOrder::class => $workflow['purchase_order']->purchase_order_id,
+            Delivery::class => $workflow['delivery']->delivery_id,
+        ] as $referenceType => $referenceId) {
+            Notification::query()->create([
+                'user_id' => $this->officeUserA->id,
+                'title' => 'Workflow Updated',
+                'message' => 'A linked workflow record was updated.',
+                'notification_type' => 'WORKFLOW_UPDATE',
+                'reference_type' => $referenceType,
+                'reference_id' => $referenceId,
+                'is_read' => false,
+            ]);
+        }
+
+        $this->actingAs($this->officeUserA)
+            ->get(route('notifications.index'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('notifications.data.0.target_url', route('office.supply-requests.show', $workflow['supply_request']->supply_request_id))
+                ->where('notifications.data.0.target_label', 'View Supply Request')
+                ->where('notifications.data.1.target_url', route('office.supply-requests.show', $workflow['supply_request']->supply_request_id))
+                ->where('notifications.data.1.target_label', 'View Supply Request')
+                ->where('notifications.data.2.target_url', route('office.supply-requests.show', $workflow['supply_request']->supply_request_id))
+                ->where('notifications.data.2.target_label', 'View Supply Request')
+            );
+    }
+
+    public function test_office_workflow_notification_does_not_open_another_offices_supply_request(): void
+    {
+        $workflow = $this->createProcurementWorkflowContext($this->office, $this->officeUserA);
+        $otherOffice = Office::query()->create([
+            'name' => 'Other Notification Office',
+            'code' => 'OTHER_NOTIF',
+            'description' => 'Other office',
+            'is_active' => true,
+        ]);
+        $otherOfficeUser = $this->createUser(UserRole::OFFICE_USER, $otherOffice);
+
+        $notification = Notification::query()->create([
+            'user_id' => $otherOfficeUser->id,
+            'title' => 'Wrong Office Workflow',
+            'message' => 'This linked record belongs to another office.',
+            'notification_type' => 'WORKFLOW_UPDATE',
+            'reference_type' => PurchaseOrder::class,
+            'reference_id' => $workflow['purchase_order']->purchase_order_id,
+            'is_read' => false,
+        ]);
+
+        $this->actingAs($otherOfficeUser)
+            ->get(route('notifications.index'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('notifications.data.0.target_url', null)
+                ->where('notifications.data.0.target_label', null)
+            );
+
+        $this->actingAs($otherOfficeUser)
+            ->get(route('notifications.show', $notification->notification_id))
+            ->assertRedirect(route('notifications.index'));
+    }
+
     public function test_public_cannot_access_internal_notification_pages(): void
     {
         $this->actingAs($this->publicUser)
@@ -259,8 +331,9 @@ class NotificationCenterFeatureTest extends TestCase
             ->assertForbidden();
     }
 
-    private function createUser(UserRole $role): User
+    private function createUser(UserRole $role, ?Office $office = null): User
     {
+        $office ??= $this->office;
         $roleModel = Role::query()->firstOrCreate(
             ['code' => $role->value],
             [
@@ -270,9 +343,73 @@ class NotificationCenterFeatureTest extends TestCase
             ],
         );
 
-        return User::factory()->withRole($role)->forOffice($this->office)->create([
+        return User::factory()->withRole($role)->forOffice($office)->create([
             'role_id' => $roleModel->id,
-            'office_id' => $this->office->id,
+            'office_id' => $office->id,
         ]);
+    }
+
+    /**
+     * @return array{supply_request: SupplyRequest, purchase_request: PurchaseRequest, purchase_order: PurchaseOrder, delivery: Delivery}
+     */
+    private function createProcurementWorkflowContext(Office $office, User $officeUser): array
+    {
+        $supplyRequest = SupplyRequest::query()->create([
+            'request_code' => 'SR-NOTIF-'.uniqid(),
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'ppmp_id' => null,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(3)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Notification workflow target',
+            'priority_level' => 'MEDIUM',
+            'status' => 'FOR_PROCUREMENT',
+            'review_notes' => null,
+            'approved_by' => null,
+            'approved_at' => null,
+        ]);
+
+        $purchaseRequest = PurchaseRequest::query()->create([
+            'supply_request_id' => $supplyRequest->supply_request_id,
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'status' => 'PROCESSING',
+            'remarks' => null,
+        ]);
+
+        $supplier = Supplier::factory()->create();
+
+        $purchaseOrder = PurchaseOrder::query()->create([
+            'purchase_request_id' => $purchaseRequest->purchase_request_id,
+            'supply_request_id' => $supplyRequest->supply_request_id,
+            'supplier_id' => $supplier->supplier_id,
+            'created_by' => $this->adminUser->id,
+            'po_number' => 'PO-NOTIF-'.uniqid(),
+            'procurement_method' => 'SMALL_VALUE_PROCUREMENT',
+            'status' => 'PLACED',
+            'expected_delivery_date' => now()->addDays(7)->toDateString(),
+            'total_amount' => 100,
+            'terms_notes' => null,
+            'remarks' => null,
+        ]);
+
+        $delivery = Delivery::query()->create([
+            'delivery_code' => 'DEL-NOTIF-'.uniqid(),
+            'purchase_order_id' => $purchaseOrder->purchase_order_id,
+            'supplier_id' => $supplier->supplier_id,
+            'actual_delivery_date' => null,
+            'expected_arrival_date' => now()->addDays(7)->toDateString(),
+            'received_by' => null,
+            'receipt_status' => 'PENDING',
+            'remarks' => null,
+        ]);
+
+        return [
+            'supply_request' => $supplyRequest,
+            'purchase_request' => $purchaseRequest,
+            'purchase_order' => $purchaseOrder,
+            'delivery' => $delivery,
+        ];
     }
 }

@@ -172,6 +172,8 @@ class DistributionRecordService
                 'remarks' => $payload['remarks'] ?? null,
             ]);
 
+            $releasedNow = false;
+
             if ((string) $record->status === 'DRAFT') {
                 $oldStatus = (string) $record->status;
                 $record->forceFill([
@@ -181,6 +183,7 @@ class DistributionRecordService
 
                 $this->recordStatus($record, $oldStatus, 'RELEASED', $actor, 'Distribution record released.');
                 $this->recordApproval($record, $actor, 'RELEASED', 'Distribution released by GSO.');
+                $releasedNow = true;
             }
 
             $this->recordAudit($actor, 'ADD_ITEM', $record, [
@@ -189,15 +192,12 @@ class DistributionRecordService
                 'quantity_released' => (float) $item->quantity_released,
             ]);
 
-            $receiver = $record->receiver;
-            if ($receiver instanceof User) {
-                $this->notificationService->notifyUser(
-                    user: $receiver,
-                    title: 'Items Released',
-                    message: 'Items were released for your office distribution record.',
+            if ($releasedNow) {
+                $this->notificationService->notifyDistributionOfficeRecipient(
+                    record: $record,
+                    title: 'Supplies Released for Distribution',
+                    message: sprintf('GSO released supplies for %s. They are ready for your office to claim.', (string) $record->supplyRequest?->request_code),
                     notificationType: 'DISTRIBUTION_RELEASED',
-                    referenceType: DistributionRecord::class,
-                    referenceId: (int) $record->distribution_record_id,
                 );
             }
 

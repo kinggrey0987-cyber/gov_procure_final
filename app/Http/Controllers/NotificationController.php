@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\Notification\MarkAllNotificationsReadRequest;
 use App\Http\Requests\Notification\MarkNotificationReadRequest;
 use App\Models\Notification;
+use App\Models\User;
 use App\Services\Notifications\NotificationCenterService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -36,7 +37,7 @@ class NotificationController extends Controller
                     'reference_id' => $notification->reference_id ? (int) $notification->reference_id : null,
                     'reference_label' => $this->referenceLabel($notification),
                     'target_url' => $targetUrl,
-                    'target_label' => $targetUrl ? $this->targetLabel($notification) : null,
+                    'target_label' => $targetUrl ? $this->targetLabel($notification, $request->user()) : null,
                     'is_read' => (bool) $notification->is_read,
                     'created_at' => optional($notification->created_at)?->toIso8601String(),
                 ];
@@ -100,8 +101,16 @@ class NotificationController extends Controller
         return sprintf('%s #%d', class_basename((string) $notification->reference_type), (int) $notification->reference_id);
     }
 
-    private function targetLabel(Notification $notification): string
+    private function targetLabel(Notification $notification, ?User $user): string
     {
+        if ($user?->isOfficeUser() && in_array((string) $notification->reference_type, [
+            \App\Models\Delivery::class,
+            \App\Models\PurchaseOrder::class,
+            \App\Models\PurchaseRequest::class,
+        ], true)) {
+            return 'View Supply Request';
+        }
+
         return match ((string) $notification->reference_type) {
             \App\Models\Alert::class => 'View Alert Queue',
             \App\Models\Anomaly::class => 'Review Anomaly',

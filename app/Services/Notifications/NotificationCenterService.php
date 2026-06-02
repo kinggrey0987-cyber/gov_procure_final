@@ -82,26 +82,61 @@ class NotificationCenterService
         }
 
         if ($referenceType === PurchaseRequest::class) {
-            $record = PurchaseRequest::query()->where('purchase_request_id', $referenceId)->first();
+            $record = PurchaseRequest::query()
+                ->with('supplyRequest')
+                ->where('purchase_request_id', $referenceId)
+                ->first();
 
-            return $record && $user->can('procurement.purchase-request.view', $record)
-                ? route('procurement.purchase-requests.show', $record->purchase_request_id)
+            if (! $record) {
+                return null;
+            }
+
+            if ($user->can('procurement.purchase-request.view', $record)) {
+                return route('procurement.purchase-requests.show', $record->purchase_request_id);
+            }
+
+            return $record->supplyRequest && $user->can('office.supply-request.view', $record->supplyRequest)
+                ? route('office.supply-requests.show', $record->supplyRequest->supply_request_id)
                 : null;
         }
 
         if ($referenceType === PurchaseOrder::class) {
-            $record = PurchaseOrder::query()->where('purchase_order_id', $referenceId)->first();
+            $record = PurchaseOrder::query()
+                ->with('supplyRequest')
+                ->where('purchase_order_id', $referenceId)
+                ->first();
 
-            return $record && $user->can('procurement.purchase-order.view', $record)
-                ? route('procurement.purchase-orders.show', $record->purchase_order_id)
+            if (! $record) {
+                return null;
+            }
+
+            if ($user->can('procurement.purchase-order.view', $record)) {
+                return route('procurement.purchase-orders.show', $record->purchase_order_id);
+            }
+
+            return $record->supplyRequest && $user->can('office.supply-request.view', $record->supplyRequest)
+                ? route('office.supply-requests.show', $record->supplyRequest->supply_request_id)
                 : null;
         }
 
         if ($referenceType === Delivery::class) {
-            $record = Delivery::query()->where('delivery_id', $referenceId)->first();
+            $record = Delivery::query()
+                ->with('purchaseOrder.supplyRequest')
+                ->where('delivery_id', $referenceId)
+                ->first();
 
-            return $record && $user->can('delivery.view', $record)
-                ? route('inventory.deliveries.show', $record->delivery_id)
+            if (! $record) {
+                return null;
+            }
+
+            if ($user->can('delivery.view', $record)) {
+                return route('inventory.deliveries.show', $record->delivery_id);
+            }
+
+            $supplyRequest = $record->purchaseOrder?->supplyRequest;
+
+            return $supplyRequest && $user->can('office.supply-request.view', $supplyRequest)
+                ? route('office.supply-requests.show', $supplyRequest->supply_request_id)
                 : null;
         }
 

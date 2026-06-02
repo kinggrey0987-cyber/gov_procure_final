@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Enums\UserRole;
+use App\Models\DistributionRecord;
 use App\Models\Notification as GovernanceNotification;
+use App\Models\SupplyRequest;
 use App\Models\User;
 use Illuminate\Support\Collection;
 
@@ -83,5 +85,69 @@ class NotificationService
             referenceType: $referenceType,
             referenceId: $referenceId,
         );
+    }
+
+    public function notifySupplyRequestOfficeRequester(
+        SupplyRequest $supplyRequest,
+        string $title,
+        string $message,
+        string $notificationType,
+        ?string $referenceType = null,
+        ?int $referenceId = null
+    ): ?GovernanceNotification {
+        $supplyRequest->loadMissing('requester');
+
+        $requester = $supplyRequest->requester;
+        if (! $requester instanceof User || ! $this->isOfficeUserForOffice($requester, (int) $supplyRequest->office_id)) {
+            return null;
+        }
+
+        return $this->notifyUser(
+            user: $requester,
+            title: $title,
+            message: $message,
+            notificationType: $notificationType,
+            referenceType: $referenceType ?? SupplyRequest::class,
+            referenceId: $referenceId ?? (int) $supplyRequest->supply_request_id,
+        );
+    }
+
+    public function notifyDistributionOfficeRecipient(
+        DistributionRecord $record,
+        string $title,
+        string $message,
+        string $notificationType
+    ): ?GovernanceNotification {
+        $record->loadMissing('receiver', 'supplyRequest.requester');
+
+        $recipient = $record->receiver instanceof User
+            && $this->isOfficeUserForOffice($record->receiver, (int) $record->office_id)
+                ? $record->receiver
+                : null;
+
+        if (! $recipient instanceof User) {
+            $requester = $record->supplyRequest?->requester;
+            $recipient = $requester instanceof User && $this->isOfficeUserForOffice($requester, (int) $record->office_id)
+                ? $requester
+                : null;
+        }
+
+        if (! $recipient instanceof User) {
+            return null;
+        }
+
+        return $this->notifyUser(
+            user: $recipient,
+            title: $title,
+            message: $message,
+            notificationType: $notificationType,
+            referenceType: DistributionRecord::class,
+            referenceId: (int) $record->distribution_record_id,
+        );
+    }
+
+    private function isOfficeUserForOffice(User $user, int $officeId): bool
+    {
+        return $user->isOfficeUser() && (int) $user->office_id === $officeId;
     }
 }

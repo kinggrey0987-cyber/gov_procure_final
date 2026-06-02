@@ -61,15 +61,13 @@ class PurchaseOrderService
             $this->recordStatus($purchaseOrder, null, 'DRAFT', $actor, 'Purchase order created.');
             $this->recordAudit($actor, 'CREATE', $purchaseOrder);
 
-            $requester = User::query()->find($purchaseRequest->requested_by);
-            if ($requester instanceof User) {
-                $this->notificationService->notifyUser(
-                    user: $requester,
+            $purchaseRequest->loadMissing('supplyRequest');
+            if ($purchaseRequest->supplyRequest) {
+                $this->notificationService->notifySupplyRequestOfficeRequester(
+                    supplyRequest: $purchaseRequest->supplyRequest,
                     title: 'Purchase Order Drafted',
-                    message: 'Procurement drafted a purchase order for your request.',
+                    message: sprintf('Procurement drafted PO %s for your supply request %s.', (string) $purchaseOrder->po_number, (string) $purchaseRequest->supplyRequest->request_code),
                     notificationType: 'PROCUREMENT_PURCHASE_ORDER_DRAFTED',
-                    referenceType: PurchaseOrder::class,
-                    referenceId: (int) $purchaseOrder->purchase_order_id,
                 );
             }
 
@@ -186,6 +184,16 @@ class PurchaseOrderService
                         referenceId: (int) $delivery->delivery_id,
                     );
                 }
+            }
+
+            $purchaseOrder->loadMissing('supplyRequest');
+            if ($purchaseOrder->supplyRequest) {
+                $this->notificationService->notifySupplyRequestOfficeRequester(
+                    supplyRequest: $purchaseOrder->supplyRequest,
+                    title: 'Purchase Order Placed',
+                    message: sprintf('PO %s for your supply request %s was placed and queued for GSO receiving.', (string) $purchaseOrder->po_number, (string) $purchaseOrder->supplyRequest->request_code),
+                    notificationType: 'PROCUREMENT_PURCHASE_ORDER_PLACED',
+                );
             }
 
             $purchaseOrder->loadMissing('items');
