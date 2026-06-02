@@ -36,6 +36,8 @@ class ProcurementFoundationHardeningTest extends TestCase
 
         $context = $this->createSubmittedSupplyRequestContext($office, $officeUser, 'SR-PO-DUP-1');
         $purchaseRequest = $this->createProcessingPurchaseRequest($procurementOfficer, $context['supplyRequest']);
+        $secondContext = $this->createSubmittedSupplyRequestContext($office, $officeUser, 'SR-PO-DUP-2', 'SUBMITTED', 502);
+        $secondPurchaseRequest = $this->createProcessingPurchaseRequest($procurementOfficer, $secondContext['supplyRequest']);
         $supplier = $this->createSupplier($procurementOfficer, 'ACTIVE');
 
         $payload = [
@@ -52,6 +54,8 @@ class ProcurementFoundationHardeningTest extends TestCase
             ->post(route('procurement.purchase-orders.store'), $payload)
             ->assertRedirect();
 
+        $payload['purchase_request_id'] = $secondPurchaseRequest->purchase_request_id;
+
         $this->actingAs($procurementOfficer)
             ->post(route('procurement.purchase-orders.store'), $payload)
             ->assertRedirect();
@@ -62,6 +66,72 @@ class ProcurementFoundationHardeningTest extends TestCase
         $this->assertNotSame('PO-HARD-0001', (string) $orders[0]->po_number);
         $this->assertNotSame('PO-HARD-0001', (string) $orders[1]->po_number);
         $this->assertNotSame((string) $orders[0]->po_number, (string) $orders[1]->po_number);
+    }
+
+    public function test_purchase_order_creation_rejects_purchase_request_that_already_has_po(): void
+    {
+        $office = $this->createOffice();
+        $officeUser = $this->createUser(UserRole::OFFICE_USER, $office);
+        $procurementOfficer = $this->createUser(UserRole::PROCUREMENT_OFFICER, $office);
+
+        $context = $this->createSubmittedSupplyRequestContext($office, $officeUser, 'SR-PO-USED-1');
+        $purchaseRequest = $this->createProcessingPurchaseRequest($procurementOfficer, $context['supplyRequest']);
+        $supplier = $this->createSupplier($procurementOfficer, 'ACTIVE');
+
+        $payload = [
+            'purchase_request_id' => $purchaseRequest->purchase_request_id,
+            'supplier_id' => $supplier->supplier_id,
+            'po_number' => 'PO-USED-0001',
+            'procurement_method' => 'SMALL_VALUE_PROCUREMENT',
+            'expected_delivery_date' => now()->addDays(5)->toDateString(),
+            'terms_notes' => 'Net 30',
+        ];
+
+        $this->actingAs($procurementOfficer)
+            ->post(route('procurement.purchase-orders.store'), $payload)
+            ->assertRedirect();
+
+        $this->actingAs($procurementOfficer)
+            ->post(route('procurement.purchase-orders.store'), $payload)
+            ->assertSessionHasErrors('purchase_request_id');
+
+        $this->assertSame(1, PurchaseOrder::query()->where('purchase_request_id', $purchaseRequest->purchase_request_id)->count());
+    }
+
+    public function test_purchase_order_create_dropdown_excludes_purchase_requests_with_existing_po(): void
+    {
+        $office = $this->createOffice();
+        $officeUser = $this->createUser(UserRole::OFFICE_USER, $office);
+        $procurementOfficer = $this->createUser(UserRole::PROCUREMENT_OFFICER, $office);
+
+        $usedContext = $this->createSubmittedSupplyRequestContext($office, $officeUser, 'SR-PO-DROPDOWN-USED');
+        $availableContext = $this->createSubmittedSupplyRequestContext($office, $officeUser, 'SR-PO-DROPDOWN-OPEN', 'SUBMITTED', 502);
+        $usedPurchaseRequest = $this->createProcessingPurchaseRequest($procurementOfficer, $usedContext['supplyRequest']);
+        $availablePurchaseRequest = $this->createProcessingPurchaseRequest($procurementOfficer, $availableContext['supplyRequest']);
+        $supplier = $this->createSupplier($procurementOfficer, 'ACTIVE');
+
+        PurchaseOrder::query()->create([
+            'purchase_request_id' => $usedPurchaseRequest->purchase_request_id,
+            'supply_request_id' => $usedContext['supplyRequest']->supply_request_id,
+            'supplier_id' => $supplier->supplier_id,
+            'created_by' => $procurementOfficer->id,
+            'po_number' => 'PO-DROPDOWN-0001',
+            'procurement_method' => 'SMALL_VALUE_PROCUREMENT',
+            'status' => 'PLACED',
+            'expected_delivery_date' => now()->addDays(5)->toDateString(),
+            'total_amount' => 100,
+            'terms_notes' => null,
+            'remarks' => null,
+        ]);
+
+        $this->actingAs($procurementOfficer)
+            ->get(route('procurement.purchase-orders.create'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Procurement/PurchaseOrders/Create')
+                ->has('eligiblePurchaseRequests', 1)
+                ->where('eligiblePurchaseRequests.0.purchase_request_id', $availablePurchaseRequest->purchase_request_id)
+            );
     }
 
     public function test_invalid_status_transitions_are_rejected_for_purchase_requests_and_purchase_orders(): void

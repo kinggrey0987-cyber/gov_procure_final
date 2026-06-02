@@ -63,6 +63,7 @@ class PurchaseOrderController extends Controller
 
         $eligiblePurchaseRequests = PurchaseRequest::query()
             ->processing()
+            ->whereDoesntHave('purchaseOrders')
             ->with([
                 'office:id,code,name',
                 'supplyRequest:supply_request_id,request_code,requested_by',

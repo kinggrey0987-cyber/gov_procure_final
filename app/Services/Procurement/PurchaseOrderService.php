@@ -32,18 +32,17 @@ class PurchaseOrderService
     {
         $this->assertProcurementActor($actor);
 
-        $purchaseRequest = PurchaseRequest::query()->where('purchase_request_id', (int) $payload['purchase_request_id'])->firstOrFail();
-
-        if ((string) $purchaseRequest->status !== 'PROCESSING') {
-            throw ValidationException::withMessages([
-                'purchase_request_id' => 'Only PROCESSING purchase requests can be used for purchase order creation.',
-            ]);
-        }
-
         $supplier = Supplier::query()->where('supplier_id', (int) $payload['supplier_id'])->firstOrFail();
         $this->assertSupplierIsAllowed($supplier);
 
-        return DB::transaction(function () use ($actor, $payload, $purchaseRequest): PurchaseOrder {
+        return DB::transaction(function () use ($actor, $payload): PurchaseOrder {
+            $purchaseRequest = PurchaseRequest::query()
+                ->lockForUpdate()
+                ->where('purchase_request_id', (int) $payload['purchase_request_id'])
+                ->firstOrFail();
+
+            $this->assertPurchaseRequestCanCreatePurchaseOrder($purchaseRequest);
+
             $purchaseOrder = PurchaseOrder::query()->create([
                 'purchase_request_id' => (int) $payload['purchase_request_id'],
                 'supply_request_id' => (int) $purchaseRequest->supply_request_id,
@@ -375,6 +374,25 @@ class PurchaseOrderService
         if ((string) $supplier->status !== 'ACTIVE') {
             throw ValidationException::withMessages([
                 'supplier_id' => 'Only ACTIVE suppliers can be used for purchase orders.',
+            ]);
+        }
+    }
+
+    private function assertPurchaseRequestCanCreatePurchaseOrder(PurchaseRequest $purchaseRequest): void
+    {
+        if ((string) $purchaseRequest->status !== 'PROCESSING') {
+            throw ValidationException::withMessages([
+                'purchase_request_id' => 'Only PROCESSING purchase requests can be used for purchase order creation.',
+            ]);
+        }
+
+        $hasExistingPurchaseOrder = PurchaseOrder::query()
+            ->where('purchase_request_id', (int) $purchaseRequest->purchase_request_id)
+            ->exists();
+
+        if ($hasExistingPurchaseOrder) {
+            throw ValidationException::withMessages([
+                'purchase_request_id' => 'This purchase request already has a purchase order and cannot be selected again.',
             ]);
         }
     }
