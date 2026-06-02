@@ -158,8 +158,8 @@ export default function Authenticated({
             .replace(/\b\w/g, (char) => char.toUpperCase());
 
         return (
-            <div className="min-h-screen bg-slate-100 md:flex">
-                <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white md:flex">
+            <div className="min-h-screen bg-slate-100 md:flex md:h-screen md:overflow-hidden">
+                <aside className="hidden h-screen w-64 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white md:flex">
                     <div className="border-b border-slate-200 px-5 py-4">
                         <div className="flex items-center gap-3">
                             <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover" />
@@ -198,8 +198,8 @@ export default function Authenticated({
                     </div>
                 </aside>
 
-                <div className="flex-1">
-                    <header className="border-b border-slate-200 bg-white">
+                <div className="flex min-h-screen flex-1 flex-col md:min-h-0">
+                    <header className="shrink-0 border-b border-slate-200 bg-white">
                         <div className="mx-auto flex min-h-16 w-full max-w-[1300px] items-center justify-between gap-3 px-4 py-3 sm:min-h-20 sm:px-6">
                             <div className="flex items-center gap-3 md:hidden">
                                 <img src="/logo.jpg" alt="GovSupply Connect" className="h-9 w-9 rounded-full border border-slate-300 bg-white object-cover sm:h-10 sm:w-10" />
@@ -267,7 +267,7 @@ export default function Authenticated({
                         </div>
                     </nav>
 
-                    <div className="mx-auto w-full max-w-[1300px] px-3 py-4 sm:px-6 sm:py-6">
+                    <div className="mx-auto w-full max-w-[1300px] flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 md:h-0">
                         {header && (
                             <header className="mb-6">
                                 <p className="mt-1 text-sm text-slate-500 sm:text-xl">Municipality of E.B. Magalona - {roleLabel}</p>
@@ -329,8 +329,8 @@ export default function Authenticated({
                 .replace(/\b\w/g, (char) => char.toUpperCase());
 
         return (
-            <div className="min-h-screen bg-slate-100 md:flex">
-                <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white md:flex">
+            <div className="min-h-screen bg-slate-100 md:flex md:h-screen md:overflow-hidden">
+                <aside className="hidden h-screen w-72 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white md:flex">
                     <div className="border-b border-slate-200 px-5 py-4">
                         <div className="flex items-center gap-3">
                             <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover" />
@@ -368,8 +368,8 @@ export default function Authenticated({
                     </div>
                 </aside>
 
-                <div className="flex-1">
-                    <header className="border-b border-slate-200 bg-white">
+                <div className="flex min-h-screen flex-1 flex-col md:min-h-0">
+                    <header className="shrink-0 border-b border-slate-200 bg-white">
                         <div className="mx-auto flex min-h-16 w-full max-w-[1400px] items-center justify-between gap-3 px-4 py-3 sm:min-h-20 sm:px-6">
                             <div className="flex items-center gap-3 md:hidden">
                                 <img src="/logo.jpg" alt="GovSupply Connect" className="h-9 w-9 rounded-full border border-slate-300 bg-white object-cover sm:h-11 sm:w-11" />
@@ -379,7 +379,7 @@ export default function Authenticated({
                                 </div>
                             </div>
 
-                            <div className="flex shrink-0 items-center gap-3 sm:gap-5">
+                            <div className="ms-auto flex shrink-0 items-center gap-3 sm:gap-5">
                                 <BellPanel unreadCount={notifications.unread_count} recent={notifications.recent} />
 
                                 <div className="flex items-center gap-3">
@@ -439,7 +439,7 @@ export default function Authenticated({
                         </div>
                     </nav>
 
-                    <div className="mx-auto w-full max-w-[1400px] px-3 py-4 sm:px-6 sm:py-6">
+                    <div className="mx-auto w-full max-w-[1400px] flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 md:h-0">
                         {header && (
                             <header className="mb-6 border-b border-slate-200 pb-4">
                                 <p className="mt-1 text-sm text-slate-500 sm:text-xl">Municipality of E.B. Magalona - Procurement Unit Staff</p>
@@ -507,8 +507,8 @@ export default function Authenticated({
             : 'Municipal Department';
 
         return (
-            <div className="min-h-screen bg-slate-100 md:flex">
-                <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white md:flex">
+            <div className="min-h-screen bg-slate-100 md:flex md:h-screen md:overflow-hidden">
+                <aside className="hidden h-screen w-72 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white md:flex">
                     <div className="border-b border-slate-200 px-5 py-4">
                         <div className="flex items-center gap-3">
                             <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover" />
@@ -546,8 +546,8 @@ export default function Authenticated({
                     </div>
                 </aside>
 
-                <div className="flex-1">
-                    <header className="border-b border-slate-200 bg-white">
+                <div className="flex min-h-screen flex-1 flex-col md:min-h-0">
+                    <header className="shrink-0 border-b border-slate-200 bg-white">
                         <div className="mx-auto flex min-h-16 w-full max-w-[1400px] items-center justify-between gap-3 px-4 py-3 sm:min-h-20 sm:px-6">
                             <div className="flex items-center gap-3 md:hidden">
                                 <img src="/logo.jpg" alt="GovSupply Connect" className="h-9 w-9 rounded-full border border-slate-300 bg-white object-cover sm:h-11 sm:w-11" />
@@ -557,7 +557,7 @@ export default function Authenticated({
                                 </div>
                             </div>
 
-                            <div className="flex shrink-0 items-center gap-3 sm:gap-5">
+                            <div className="ms-auto flex shrink-0 items-center gap-3 sm:gap-5">
                                 <BellPanel unreadCount={notifications.unread_count} recent={notifications.recent} />
 
                                 <div className="flex items-center gap-3">
@@ -617,7 +617,7 @@ export default function Authenticated({
                         </div>
                     </nav>
 
-                    <div className="mx-auto w-full max-w-[1400px] px-3 py-4 sm:px-6 sm:py-6">
+                    <div className="mx-auto w-full max-w-[1400px] flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 md:h-0">
                         {header && (
                             <header className="mb-6 border-b border-slate-200 pb-4">
                                 <p className="mt-1 text-sm text-slate-500 sm:text-xl">Municipality of E.B. Magalona - {officeLabel}</p>
@@ -686,8 +686,8 @@ export default function Authenticated({
             .replace(/\b\w/g, (char) => char.toUpperCase());
 
         return (
-            <div className="min-h-screen bg-slate-100 md:flex">
-                <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col overflow-y-auto border-r border-red-200 bg-white md:flex">
+            <div className="min-h-screen bg-slate-100 md:flex md:h-screen md:overflow-hidden">
+                <aside className="hidden h-screen w-72 shrink-0 flex-col overflow-y-auto border-r border-red-200 bg-white md:flex">
                     <div className="border-b border-slate-200 px-5 py-4">
                         <div className="flex items-center gap-3">
                             <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover" />
@@ -725,8 +725,8 @@ export default function Authenticated({
                     </div>
                 </aside>
 
-                <div className="flex-1">
-                    <header className="border-b border-slate-200 bg-white">
+                <div className="flex min-h-screen flex-1 flex-col md:min-h-0">
+                    <header className="shrink-0 border-b border-slate-200 bg-white">
                         <div className="mx-auto flex min-h-16 w-full max-w-[1400px] items-center justify-between gap-3 px-4 py-3 sm:min-h-20 sm:px-6">
                             <div className="flex items-center gap-3 md:hidden">
                                 <img src="/logo.jpg" alt="GovSupply Connect" className="h-9 w-9 rounded-full border border-slate-300 bg-white object-cover sm:h-11 sm:w-11" />
@@ -736,7 +736,7 @@ export default function Authenticated({
                                 </div>
                             </div>
 
-                            <div className="flex shrink-0 items-center gap-3 sm:gap-5">
+                            <div className="ms-auto flex shrink-0 items-center gap-3 sm:gap-5">
                                 <BellPanel unreadCount={notifications.unread_count} recent={notifications.recent} />
 
                                 <div className="flex items-center gap-3">
@@ -796,7 +796,7 @@ export default function Authenticated({
                         </div>
                     </nav>
 
-                    <div className="mx-auto w-full max-w-[1400px] px-3 py-4 sm:px-6 sm:py-6">
+                    <div className="mx-auto w-full max-w-[1400px] flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 md:h-0">
                         {header && (
                             <header className="mb-6 border-b border-slate-200 pb-4">
                                 <p className="mt-1 text-sm text-slate-500 sm:text-xl">Municipality of E.B. Magalona - Executive Oversight</p>
@@ -892,8 +892,8 @@ export default function Authenticated({
             .replace(/\b\w/g, (char) => char.toUpperCase());
 
         return (
-            <div className="min-h-screen bg-slate-100 md:flex">
-                <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white md:flex">
+            <div className="min-h-screen bg-slate-100 md:flex md:h-screen md:overflow-hidden">
+                <aside className="hidden h-screen w-72 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white md:flex">
                     <div className="border-b border-slate-200 px-5 py-4">
                         <div className="flex items-center gap-3">
                             <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover" />
@@ -931,8 +931,8 @@ export default function Authenticated({
                     </div>
                 </aside>
 
-                <div className="flex-1">
-                    <header className="border-b border-slate-200 bg-white">
+                <div className="flex min-h-screen flex-1 flex-col md:min-h-0">
+                    <header className="shrink-0 border-b border-slate-200 bg-white">
                         <div className="mx-auto flex min-h-16 w-full max-w-[1400px] items-center justify-between gap-3 px-4 py-3 sm:min-h-20 sm:px-6">
                             <div className="flex items-center gap-3 md:hidden">
                                 <img src="/logo.jpg" alt="GovSupply Connect" className="h-9 w-9 rounded-full border border-slate-300 bg-white object-cover sm:h-11 sm:w-11" />
@@ -942,7 +942,7 @@ export default function Authenticated({
                                 </div>
                             </div>
 
-                            <div className="flex shrink-0 items-center gap-3 sm:gap-5">
+                            <div className="ms-auto flex shrink-0 items-center gap-3 sm:gap-5">
                                 <BellPanel unreadCount={notifications.unread_count} recent={notifications.recent} />
 
                                 <div className="flex items-center gap-3">
@@ -1002,7 +1002,7 @@ export default function Authenticated({
                         </div>
                     </nav>
 
-                    <div className="mx-auto w-full max-w-[1400px] px-3 py-4 sm:px-6 sm:py-6">
+                    <div className="mx-auto w-full max-w-[1400px] flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 md:h-0">
                         {header && (
                             <header className="mb-6 border-b border-slate-200 pb-4">
                                 <p className="mt-1 text-sm text-slate-500 sm:text-xl">Municipality of E.B. Magalona - Inventory and Logistics</p>
