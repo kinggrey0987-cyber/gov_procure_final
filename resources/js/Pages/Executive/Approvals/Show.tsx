@@ -1,17 +1,8 @@
-import AttachmentsPanel from '@/Components/AttachmentsPanel';
 import PpmpDecisionModal from '@/Components/PpmpDecisionModal';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { getFundSourceLabel } from '@/constants/fundSources';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { useState } from 'react';
-
-type Attachment = {
-    document_id: number;
-    title: string;
-    file_name: string;
-    uploaded_at?: string | null;
-    uploader_name?: string | null;
-};
 
 type Props = {
     ppmp: {
@@ -46,19 +37,12 @@ type Props = {
         items_count: number;
         estimated_budget_total: number;
     }>;
-    attachments: Attachment[];
-    attachmentPermissions: {
-        upload: boolean;
-        delete: boolean;
-    };
     canSignoff: boolean;
 };
 
 export default function ExecutiveApprovalShow({
     ppmp,
     categorySummary,
-    attachments,
-    attachmentPermissions,
     canSignoff,
 }: Props) {
     const [decisionTarget, setDecisionTarget] = useState<{ status: 'APPROVED' | 'REJECTED' | 'RETURNED_FOR_REVISION' } | null>(null);
@@ -270,16 +254,6 @@ export default function ExecutiveApprovalShow({
                     </section>
                 )}
 
-                <AttachmentsPanel
-                    title="PPMP Attachments"
-                    attachments={attachments}
-                    uploadRoute={route('documents.store', { related_module: 'ppmp', related_reference_id: ppmp.ppmp_id })}
-                    canUpload={attachmentPermissions.upload}
-                    canDelete={attachmentPermissions.delete}
-                    downloadRouteFor={(documentId: number) => route('documents.show', documentId)}
-                    deleteRouteFor={(documentId: number) => route('documents.destroy', documentId)}
-                />
-
             </div>
 
             <PpmpDecisionModal
@@ -337,5 +311,4 @@ function formatDate(value?: string | null): string {
     if (Number.isNaN(parsed.getTime())) return '-';
     return parsed.toLocaleDateString();
 }
-
 

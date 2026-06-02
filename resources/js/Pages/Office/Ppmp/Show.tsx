@@ -116,7 +116,6 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
                                     <tr>
                                         <th className="px-4 py-3 text-left font-semibold text-slate-700">Item</th>
                                         <th className="px-4 py-3 text-left font-semibold text-slate-700">Qty</th>
-                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Unit</th>
                                         <th className="px-4 py-3 text-left font-semibold text-slate-700">Unit Cost</th>
                                         <th className="px-4 py-3 text-left font-semibold text-slate-700">Subtotal</th>
                                         <th className="px-4 py-3 text-left font-semibold text-slate-700">Schedule</th>
@@ -128,8 +127,7 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
                                     {ppmp.items.map((item) => (
                                         <tr key={item.ppmp_item_id}>
                                             <td className="px-4 py-3 text-slate-700">{item.item?.item_name ?? `Item #${item.ppmp_item_id}`}</td>
-                                            <td className="px-4 py-3 text-slate-700">{item.quantity} {item.item?.default_unit ?? ''}</td>
-                                            <td className="px-4 py-3 text-slate-700">{item.item?.default_unit ?? '-'}</td>
+                                            <td className="px-4 py-3 text-slate-700">{formatQuantity(item.quantity, item.item?.default_unit)}</td>
                                             <td className="px-4 py-3 text-slate-700">{formatMoney(item.unit_cost)}</td>
                                             <td className="px-4 py-3 text-slate-700">{formatMoney(item.quantity * item.unit_cost)}</td>
                                             <td className="px-4 py-3 text-slate-700">{item.procurement_schedule}</td>
@@ -209,6 +207,12 @@ function formatMoney(value: number): string {
     return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(value);
 }
 
+function formatQuantity(value: number, unit?: string | null): string {
+    const quantity = new Intl.NumberFormat('en-PH', { maximumFractionDigits: 2 }).format(value);
+
+    return unit ? `${quantity} ${unit}` : quantity;
+}
+
 function formatDate(value?: string | null): string {
     if (!value) {
         return '-';
@@ -236,7 +240,6 @@ function StatusBadge({ status }: { status: string }) {
 
     return <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${style}`}>{status.replaceAll('_', ' ')}</span>;
 }
-
 
 
 

@@ -7,7 +7,6 @@ use App\Http\Requests\Executive\UpdatePpmpApprovalStatusRequest;
 use App\Models\Office;
 use App\Models\Ppmp;
 use App\Support\DashboardStatusGroups;
-use App\Services\Documents\DocumentService;
 use App\Services\Executive\PpmpApprovalService;
 use App\Services\History\HistoryTimelineService;
 use Illuminate\Http\RedirectResponse;
@@ -21,7 +20,6 @@ class PpmpApprovalController extends Controller
     public function __construct(
         private readonly PpmpApprovalService $approvalService,
         private readonly HistoryTimelineService $historyTimelineService,
-        private readonly DocumentService $documentService,
     ) {
     }
 
@@ -197,7 +195,6 @@ class PpmpApprovalController extends Controller
         ]);
 
         $history = $this->historyTimelineService->forRecord($request->user(), $ppmp);
-        $attachments = $this->approvalAttachments($request, $ppmp);
         $categorySummary = $this->approvalCategorySummary($ppmp);
         $submittedAt = $this->ppmpSubmittedAt($ppmp);
         $workflowTimeline = $this->approvalWorkflowTimeline($history['status']);
@@ -241,29 +238,9 @@ class PpmpApprovalController extends Controller
                 ])->values(),
             ],
             'categorySummary' => $categorySummary,
-            'attachments' => $attachments,
-            'attachmentPermissions' => [
-                'upload' => false,
-                'delete' => false,
-            ],
             'workflowTimeline' => $workflowTimeline,
             'canSignoff' => $request->user()?->can('executive.ppmp-approval.signoff', $ppmp) ?? false,
         ]);
-    }
-
-    private function approvalAttachments(Request $request, Ppmp $ppmp)
-    {
-        return $this->documentService
-            ->listForRelated($request->user(), 'ppmp', (int) $ppmp->ppmp_id)
-            ->map(fn ($document): array => [
-                'document_id' => (int) $document->document_id,
-                'title' => (string) $document->title,
-                'file_name' => (string) $document->file_name,
-                'uploaded_at' => optional($document->uploaded_at)?->toIso8601String(),
-                'uploaded_by' => (int) $document->uploaded_by,
-                'uploader_name' => $document->uploader?->name,
-            ])
-            ->values();
     }
 
     private function approvalCategorySummary(Ppmp $ppmp)
