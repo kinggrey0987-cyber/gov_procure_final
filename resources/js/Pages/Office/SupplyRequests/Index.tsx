@@ -139,7 +139,7 @@ export default function SupplyRequestsIndex({ supplyRequests, filters, filter_op
                                 className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                             >
                                 <option value="">All statuses</option>
-                                {['DRAFT', 'SUBMITTED', 'IN_REVIEW', 'PROCUREMENT_PLACED', 'PROCESSING', 'PARTIALLY_RELEASED', 'PARTIALLY_RECEIVED', 'RELEASED', 'RECEIVED', 'REJECTED', 'RETURNED_FOR_REVISION'].map((option) => (
+                                {['DRAFT', 'SUBMITTED', 'IN_REVIEW', 'PROCUREMENT_PLACED', 'PROCESSING', 'PARTIALLY_RELEASED', 'PARTIALLY_RECEIVED', 'RELEASED', 'RECEIVED', 'COMPLETED', 'REJECTED', 'RETURNED_FOR_REVISION'].map((option) => (
                                     <option key={option} value={option}>{option.replaceAll('_', ' ')}</option>
                                 ))}
                             </select>
@@ -311,7 +311,6 @@ function StatusBadge({ status }: { status: string }) {
 
     return <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${style}`}>{status.replaceAll('_', ' ')}</span>;
 }
-
 
 
 

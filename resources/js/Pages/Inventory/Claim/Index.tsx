@@ -53,7 +53,7 @@ export default function ClaimIndex({ claims, filters, filter_options, routes, pe
     const [search, setSearch] = useState(filters?.search ?? '');
     const debouncedSearch = useDebouncedValue(search, 450);
     const hasMountedRef = useRef(false);
-    const statusOptions = ['OPEN', 'PENDING_REPLACEMENT', 'RESOLVED', 'REJECTED'];
+    const statusOptions = ['OPEN', 'IN_REVIEW', 'PENDING_REPLACEMENT', 'PARTIALLY_RESOLVED', 'RESOLVED', 'REJECTED'];
 
     useEffect(() => {
         setStatus(filters?.status ?? '');
@@ -240,7 +240,6 @@ function statusClass(status: string) {
 
     return map[status] ?? `${base} bg-slate-100 text-slate-700`;
 }
-
 
 
 

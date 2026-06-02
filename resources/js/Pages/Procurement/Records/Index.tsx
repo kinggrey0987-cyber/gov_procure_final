@@ -32,7 +32,7 @@ type Props = {
     };
 };
 
-const statuses = ['PLACED'];
+const statuses = ['PLACED', 'COMPLETED'];
 
 export default function ProcurementRecordsIndex({ records, filters }: Props) {
     const [status, setStatus] = useState(filters.status ?? '');
@@ -175,7 +175,6 @@ function formatDate(value?: string) {
 
     return new Date(value).toLocaleDateString();
 }
-
 
 
 
