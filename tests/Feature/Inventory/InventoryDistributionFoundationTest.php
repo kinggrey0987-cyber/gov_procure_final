@@ -649,6 +649,28 @@ class InventoryDistributionFoundationTest extends TestCase
         );
     }
 
+    public function test_claim_creation_rejects_decimal_quantities(): void
+    {
+        $record = $this->createReleasedDistributionRecordForOffice($this->officeA, 90113);
+        $distributionItem = $record->items()->firstOrFail();
+        $distributionItem->forceFill(['quantity_released' => 20])->save();
+
+        $this->actingAs($this->officeUserA)
+            ->post(route('office.claims.store'), [
+                'distribution_record_id' => $record->distribution_record_id,
+                'distribution_item_id' => $distributionItem->distribution_item_id,
+                'office_id' => $this->officeA->id,
+                'claim_type' => 'MISSING_ITEM',
+                'claim_date' => now()->toDateString(),
+                'claim_location' => 'Office A Storage',
+                'quantity_disputed' => 1.5,
+                'remarks' => 'Decimal quantities should not be accepted.',
+            ])
+            ->assertSessionHasErrors('quantity_disputed');
+
+        $this->assertSame(0, Claim::query()->where('distribution_item_id', $distributionItem->distribution_item_id)->count());
+    }
+
     public function test_claim_replacement_resolution_cannot_exceed_available_stock(): void
     {
         $record = $this->createReleasedDistributionRecordForOffice($this->officeA, 90110);

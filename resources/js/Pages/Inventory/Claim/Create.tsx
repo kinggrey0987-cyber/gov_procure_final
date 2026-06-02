@@ -33,6 +33,7 @@ type Props = {
 
 type IssueLine = {
     id: number;
+    distribution_item_id: string;
     claim_type: string;
     quantity: string;
     notes: string;
@@ -104,7 +105,7 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
     const missingQuantity = issueLines.reduce((total, line) => total + (line.claim_type === 'MISSING_ITEM' ? toWholeQuantity(line.quantity) : 0), 0);
     const totalIssueQuantity = issueLines.reduce((total, line) => total + toWholeQuantity(line.quantity), 0);
     const derivedClaimType = getClaimTypeFromIssueLines(issueLines);
-    const selectedItemName = selectedItem?.item_name ?? '';
+    const selectedRecordItems = selectedRecord?.items ?? [];
 
     return (
         <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">File Claim</h2>}>
@@ -228,22 +229,41 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                 <button
                                     type="button"
                                     className="rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
-                                    disabled={!selectedItem}
-                                    onClick={() => setIssueLines((lines) => [...lines, createIssueLine('MISSING_ITEM')])}
+                                    disabled={selectedRecordItems.length === 0}
+                                    onClick={() => setIssueLines((lines) => [...lines, createIssueLine('MISSING_ITEM', '', form.data.distribution_item_id ? String(form.data.distribution_item_id) : '')])}
                                 >
                                     Add Issue Line
                                 </button>
                             </div>
 
                             <div className="mt-3 space-y-3">
-                                {issueLines.map((line) => (
+                                {issueLines.map((line) => {
+                                    const lineItem = selectedRecordItems.find((item) => item.distribution_item_id === Number(line.distribution_item_id)) ?? selectedItem;
+                                    const lineMaxQuantity = Math.trunc(lineItem?.quantity_released ?? 0);
+
+                                    return (
                                     <div key={line.id} className="grid gap-2 rounded-lg border border-amber-200 bg-white p-3 sm:grid-cols-[1.2fr_1.1fr_0.7fr_0.9fr_auto]">
-                                        <input
-                                            className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700"
-                                            value={selectedItemName}
-                                            placeholder="Select an affected item"
-                                            readOnly
-                                        />
+                                        <select
+                                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                            value={line.distribution_item_id}
+                                            onChange={(e) => {
+                                                const distributionItemId = e.target.value;
+                                                const nextItem = selectedRecordItems.find((item) => item.distribution_item_id === Number(distributionItemId));
+
+                                                form.setData('distribution_item_id', distributionItemId);
+                                                form.setData('quantity_disputed', String(Math.trunc((nextItem?.quantity_missing ?? 0) + (nextItem?.quantity_damaged ?? 0))));
+                                                form.setData('quantity_damaged', String(Math.trunc(nextItem?.quantity_damaged ?? 0)));
+                                                form.setData('quantity_missing', String(Math.trunc(nextItem?.quantity_missing ?? 0)));
+                                                setIssueLines(buildInitialIssueLines(nextItem ?? null));
+                                            }}
+                                        >
+                                            <option value="">Select item</option>
+                                            {selectedRecordItems.map((item) => (
+                                                <option key={item.distribution_item_id} value={item.distribution_item_id}>
+                                                    {item.item_name}
+                                                </option>
+                                            ))}
+                                        </select>
                                         <select
                                             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                                             value={line.claim_type}
@@ -255,15 +275,17 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                         </select>
                                         <input
                                             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                                            type="number"
-                                            min="0"
-                                            max={selectedItem ? selectedItemReleasedQuantity : undefined}
-                                            step="1"
+                                            type="text"
                                             inputMode="numeric"
                                             pattern="[0-9]*"
                                             placeholder="Qty"
                                             value={line.quantity}
-                                            onChange={(e) => updateIssueLine(setIssueLines, line.id, { quantity: e.target.value.replace(/\D/g, '') })}
+                                            onChange={(e) => {
+                                                const wholeQuantity = e.target.value.replace(/\D/g, '');
+                                                const cappedQuantity = lineMaxQuantity > 0 && Number(wholeQuantity) > lineMaxQuantity ? String(lineMaxQuantity) : wholeQuantity;
+
+                                                updateIssueLine(setIssueLines, line.id, { quantity: cappedQuantity });
+                                            }}
                                         />
                                         <input
                                             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
@@ -280,7 +302,8 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                             Remove
                                         </button>
                                     </div>
-                                ))}
+                                    );
+                                })}
                             </div>
 
                             <p className="mt-3 text-xs font-semibold text-amber-900">
@@ -341,9 +364,10 @@ function toWholeQuantity(value: number | string): number {
     return Math.max(Number.parseInt(String(value || 0), 10) || 0, 0);
 }
 
-function createIssueLine(claimType: string, quantity = ''): IssueLine {
+function createIssueLine(claimType: string, quantity = '', distributionItemId: number | string = ''): IssueLine {
     return {
         id: Date.now() + Math.floor(Math.random() * 1000),
+        distribution_item_id: String(distributionItemId),
         claim_type: claimType,
         quantity,
         notes: '',
@@ -356,14 +380,14 @@ function buildInitialIssueLines(item: DistributionItemOption | null): IssueLine[
     const lines: IssueLine[] = [];
 
     if (missingQuantity > 0) {
-        lines.push(createIssueLine('MISSING_ITEM', String(missingQuantity)));
+        lines.push(createIssueLine('MISSING_ITEM', String(missingQuantity), item?.distribution_item_id ?? ''));
     }
 
     if (damagedQuantity > 0) {
-        lines.push(createIssueLine('DAMAGED_ITEM', String(damagedQuantity)));
+        lines.push(createIssueLine('DAMAGED_ITEM', String(damagedQuantity), item?.distribution_item_id ?? ''));
     }
 
-    return lines.length > 0 ? lines : [createIssueLine('MISSING_ITEM')];
+    return lines.length > 0 ? lines : [createIssueLine('MISSING_ITEM', '', item?.distribution_item_id ?? '')];
 }
 
 function updateIssueLine(setIssueLines: Dispatch<SetStateAction<IssueLine[]>>, id: number, patch: Partial<IssueLine>): void {
