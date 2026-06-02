@@ -88,9 +88,6 @@ export default function SupplyRequestShow({
     const [confirmingDelete, setConfirmingDelete] = useState(false);
     const [activeTab, setActiveTab] = useState<'overview' | 'items' | 'status' | 'related' | 'notes'>('overview');
 
-    const overAllocationCount = useMemo(() => {
-        return supplyRequest.items.filter((item) => item.exceeds_ppmp_allocation).length;
-    }, [supplyRequest.items]);
     const procurementDecision = useMemo(() => {
         const currentStatus = supplyRequest.status.toUpperCase();
         if (!['RETURNED_FOR_REVISION', 'REJECTED'].includes(currentStatus)) {
@@ -289,12 +286,6 @@ export default function SupplyRequestShow({
                     <div className="border-b border-slate-200 px-6 py-4">
                         <h4 className="text-xl font-semibold text-slate-800">Requested Items</h4>
                         <p className="mt-1 text-sm text-slate-600">Track each requested item against release/receipt progress and PPMP allocation context.</p>
-                        {overAllocationCount > 0 ? (
-                            <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                                <p className="font-semibold">{overAllocationCount} line item(s) exceed PPMP allocation.</p>
-                                <p>This request was flagged for executive monitoring and review.</p>
-                            </div>
-                        ) : null}
                     </div>
 
                     {supplyRequest.items.length === 0 ? (

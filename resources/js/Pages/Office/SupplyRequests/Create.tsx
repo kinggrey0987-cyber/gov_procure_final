@@ -213,19 +213,6 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
         return new Map(itemOptions.map((option) => [String(option.ppmp_item_id), option]));
     }, [itemOptions]);
 
-    const overPlanLineCount = useMemo(() => {
-        return form.data.items.reduce((count, item) => {
-            const option = optionById.get(item.ppmp_item_id);
-            if (!option) {
-                return count;
-            }
-
-            const rowQuantity = Number(item.quantity_requested || '0');
-
-            return rowQuantity > option.remaining_quantity ? count + 1 : count;
-        }, 0);
-    }, [form.data.items, optionById]);
-
     const selectedPpmpItemIds = useMemo(() => {
         return form.data.items
             .map((item) => item.ppmp_item_id)
@@ -397,13 +384,6 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                         </div>
                     ) : null}
 
-                    {overPlanLineCount > 0 ? (
-                        <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                            <p className="font-semibold">{overPlanLineCount} line item(s) exceed remaining PPMP allocation.</p>
-                            <p>You may still submit for urgent or unplanned needs, but this request will be flagged for executive review.</p>
-                        </div>
-                    ) : null}
-
                     {scheduleMismatchLineCount > 0 ? (
                         <div className="mb-3 rounded-lg border border-orange-300 bg-orange-50 px-3 py-2 text-xs text-orange-900">
                             <p className="font-semibold">{scheduleMismatchLineCount} out-of-schedule PPMP line(s) detected.</p>
@@ -421,9 +401,6 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                     <div className="space-y-4">
                         {form.data.items.map((item, index) => {
                             const option = optionById.get(item.ppmp_item_id);
-                            const rowQuantity = Number(item.quantity_requested || '0');
-                            const remaining = option?.remaining_quantity ?? null;
-                            const exceedsRemaining = remaining !== null && rowQuantity > remaining;
                             const isDuplicate = item.ppmp_item_id !== '' && duplicatePpmpItemIds.includes(item.ppmp_item_id);
 
                             return (
@@ -501,13 +478,6 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                         <div className="mt-2 rounded-md border border-orange-300 bg-orange-50 px-3 py-2 text-xs text-orange-900">
                                             <p className="font-semibold">Out-of-schedule PPMP consumption detected.</p>
                                             <p>This item is planned for {option.procurement_schedule || 'a later schedule'} but the request is being made in {option.current_quarter || 'the current quarter'}. It can proceed to GSO but will be flagged for Executive anomaly review.</p>
-                                        </div>
-                                    ) : null}
-
-                                    {exceedsRemaining ? (
-                                        <div className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                                            <p className="font-semibold">This request exceeds the remaining PPMP allocation for this item.</p>
-                                            <p>You may still submit for urgent or unplanned needs, but it will be flagged for executive review.</p>
                                         </div>
                                     ) : null}
 

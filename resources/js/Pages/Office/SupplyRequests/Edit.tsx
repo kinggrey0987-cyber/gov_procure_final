@@ -82,21 +82,6 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
         return new Map(itemOptions.map((option) => [String(option.ppmp_item_id), option]));
     }, [itemOptions]);
 
-    const overPlanExistingLineCount = useMemo(() => {
-        return supplyRequest.items.reduce((count, item) => {
-            const row = editingRows[item.supply_request_item_id];
-            const context = optionById.get(String(row.ppmp_item_id));
-
-            if (!context) {
-                return count;
-            }
-
-            const exceeds = Number(row.quantity_requested) > (context.remaining_quantity + Number(item.quantity_requested));
-
-            return exceeds ? count + 1 : count;
-        }, 0);
-    }, [editingRows, optionById, supplyRequest.items]);
-
     const newItemOption = useMemo(() => optionById.get(newItem.ppmp_item_id), [newItem.ppmp_item_id, optionById]);
     const existingPpmpItemIds = useMemo(() => {
         return Object.values(editingRows).map((item) => String(item.ppmp_item_id));
@@ -112,14 +97,6 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
             return context?.is_schedule_mismatch ? count + 1 : count;
         }, 0);
     }, [editingRows, optionById, supplyRequest.items]);
-
-    const newItemExceedsRemaining = useMemo(() => {
-        if (!newItemOption) {
-            return false;
-        }
-
-        return Number(newItem.quantity_requested || '0') > newItemOption.remaining_quantity;
-    }, [newItem.quantity_requested, newItemOption]);
 
     const submitHeader = (event: FormEvent) => {
         event.preventDefault();
@@ -255,12 +232,6 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
 
                 <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                     <h4 className="text-xl font-semibold text-slate-800">Edit Existing Items</h4>
-                    {overPlanExistingLineCount > 0 ? (
-                        <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                            <p className="font-semibold">{overPlanExistingLineCount} existing line item(s) exceed remaining PPMP allocation.</p>
-                            <p>You may still submit for urgent or unplanned needs, but this request will be flagged for executive review.</p>
-                        </div>
-                    ) : null}
                     {scheduleMismatchExistingLineCount > 0 ? (
                         <div className="rounded-lg border border-orange-300 bg-orange-50 px-3 py-2 text-xs text-orange-900">
                             <p className="font-semibold">{scheduleMismatchExistingLineCount} out-of-schedule PPMP line(s) detected.</p>
@@ -275,8 +246,6 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                                 const row = editingRows[item.supply_request_item_id];
                                 const context = optionById.get(String(row.ppmp_item_id));
                                 const unit = context?.default_unit || '-';
-                                const exceeds = context ? Number(row.quantity_requested) > (context.remaining_quantity + Number(item.quantity_requested)) : false;
-
                                 return (
                                     <div key={item.supply_request_item_id} className="rounded-xl border border-slate-200 p-4">
                                         <div className="grid gap-3 md:grid-cols-6">
@@ -336,12 +305,6 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                                             </div>
                                         ) : null}
 
-                                        {exceeds ? (
-                                            <div className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                                                <p className="font-semibold">This request exceeds the remaining PPMP allocation for this item.</p>
-                                                <p>You may still submit for urgent or unplanned needs, but it will be flagged for executive review.</p>
-                                            </div>
-                                        ) : null}
                                     </div>
                                 );
                             })}
@@ -402,12 +365,6 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                         </div>
                     ) : null}
 
-                    {newItemExceedsRemaining ? (
-                        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                            <p className="font-semibold">This request exceeds the remaining PPMP allocation for this item.</p>
-                            <p>You may still submit for urgent or unplanned needs, but it will be flagged for executive review.</p>
-                        </div>
-                    ) : null}
                 </section>
             </div>
         </AuthenticatedLayout>
@@ -423,6 +380,5 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
         </label>
     );
 }
-
 
 
