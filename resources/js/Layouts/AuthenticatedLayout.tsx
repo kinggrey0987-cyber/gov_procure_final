@@ -893,8 +893,8 @@ export default function Authenticated({
 
         return (
             <div className="min-h-screen bg-slate-100 md:flex md:h-screen md:overflow-hidden">
-                <aside className="hidden h-screen w-72 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white md:flex">
-                    <div className="border-b border-slate-200 px-5 py-4">
+                <aside className="hidden h-screen w-72 shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white md:flex">
+                    <div className="shrink-0 border-b border-slate-200 px-5 py-4">
                         <div className="flex items-center gap-3">
                             <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover" />
                             <div>
@@ -904,7 +904,7 @@ export default function Authenticated({
                         </div>
                     </div>
 
-                    <nav className="space-y-2 px-3 py-4">
+                    <nav className="sidebar-scroll min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-4">
                         {inventoryLinks.map((item) => (
                             <Link
                                 key={item.label}
@@ -920,7 +920,7 @@ export default function Authenticated({
                         ))}
                     </nav>
 
-                    <div className="mt-auto border-t border-slate-200 px-4 py-4">
+                    <div className="shrink-0 border-t border-slate-200 px-4 py-4">
                         <div className="flex items-center gap-2 text-sm text-slate-600">
                             <img src="/logo.jpg" alt="GovSupply Connect" className="h-8 w-8 rounded-full border border-slate-300 bg-white object-cover" />
                             <div>
