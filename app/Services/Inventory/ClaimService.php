@@ -277,6 +277,12 @@ class ClaimService
             ]);
         }
 
+        if ($parentClaim->parent_claim_id !== null) {
+            throw ValidationException::withMessages([
+                'parent_claim_id' => 'Follow-up claims can only be filed once from the original claim.',
+            ]);
+        }
+
         if ((int) $parentClaim->office_id !== (int) $distributionRecord->office_id) {
             throw ValidationException::withMessages([
                 'parent_claim_id' => 'Follow-up claim must belong to the same office as the original claim.',
@@ -295,6 +301,16 @@ class ClaimService
         if ($sourceType !== '' && $sourceType !== self::FOLLOW_UP_SOURCE_TYPE) {
             throw ValidationException::withMessages([
                 'source_type' => 'Claim follow-up source type is invalid.',
+            ]);
+        }
+
+        $hasExistingFollowUpClaim = Claim::query()
+            ->where('parent_claim_id', (int) $parentClaim->claims_id)
+            ->exists();
+
+        if ($hasExistingFollowUpClaim) {
+            throw ValidationException::withMessages([
+                'parent_claim_id' => 'A follow-up claim has already been filed for this original claim.',
             ]);
         }
 

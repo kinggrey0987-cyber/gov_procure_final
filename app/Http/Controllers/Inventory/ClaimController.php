@@ -102,6 +102,8 @@ class ClaimController
                 ->where('claims_id', $requestedParentClaimId)
                 ->where('office_id', (int) $user->office_id)
                 ->where('status', 'RESOLVED')
+                ->whereNull('parent_claim_id')
+                ->doesntHave('followUpClaims')
                 ->firstOrFail();
 
             $parentClaim = $candidateParentClaim;
@@ -278,6 +280,8 @@ class ClaimController
                 'createFollowUp' => $user->can('claim.create')
                     && $user->isOfficeUser()
                     && (string) $claim->status === 'RESOLVED'
+                    && $claim->parent_claim_id === null
+                    && $claim->followUpClaims->isEmpty()
                     && $claim->distribution_record_id !== null
                     && $claim->distribution_item_id !== null,
             ],

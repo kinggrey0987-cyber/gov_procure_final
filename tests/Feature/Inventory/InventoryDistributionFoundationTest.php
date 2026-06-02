@@ -1018,6 +1018,52 @@ class InventoryDistributionFoundationTest extends TestCase
         $this->assertSame('CLAIM_REPLACEMENT_FOLLOW_UP', (string) $followUpClaim->source_type);
         $this->assertSame('OPEN', (string) $followUpClaim->status);
 
+        $this->actingAs($this->officeUserA)
+            ->get(route('office.claims.show', $parentClaim->claims_id))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('permissions.createFollowUp', false)
+                ->has('followUpClaims', 1)
+            );
+
+        $this->actingAs($this->officeUserA)
+            ->get(route('office.claims.show', $followUpClaim->claims_id))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('permissions.createFollowUp', false)
+            );
+
+        $this->actingAs($this->officeUserA)
+            ->post(route('office.claims.store'), [
+                'distribution_record_id' => $record->distribution_record_id,
+                'distribution_item_id' => $distributionItem->distribution_item_id,
+                'parent_claim_id' => $parentClaim->claims_id,
+                'source_type' => 'CLAIM_REPLACEMENT_FOLLOW_UP',
+                'office_id' => $this->officeA->id,
+                'claim_type' => 'DAMAGED_ITEM',
+                'claim_date' => now()->toDateString(),
+                'claim_location' => 'Office A Storage',
+                'quantity_disputed' => 1,
+                'remarks' => 'Attempt to file another follow-up claim.',
+            ])
+            ->assertSessionHasErrors('parent_claim_id');
+
+        $this->actingAs($this->officeUserA)
+            ->post(route('office.claims.store'), [
+                'distribution_record_id' => $record->distribution_record_id,
+                'distribution_item_id' => $distributionItem->distribution_item_id,
+                'parent_claim_id' => $followUpClaim->claims_id,
+                'source_type' => 'CLAIM_REPLACEMENT_FOLLOW_UP',
+                'office_id' => $this->officeA->id,
+                'claim_type' => 'DAMAGED_ITEM',
+                'claim_date' => now()->toDateString(),
+                'claim_location' => 'Office A Storage',
+                'quantity_disputed' => 1,
+                'remarks' => 'Attempt to chain a follow-up claim.',
+            ])
+            ->assertSessionHasErrors('parent_claim_id');
+
+        $this->assertSame(1, Claim::query()->where('parent_claim_id', $parentClaim->claims_id)->count());
+        $this->assertSame(0, Claim::query()->where('parent_claim_id', $followUpClaim->claims_id)->count());
+
         Inventory::query()
             ->where('item_id', (int) $distributionItem->item_id)
             ->update([
