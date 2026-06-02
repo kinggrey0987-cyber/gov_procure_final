@@ -159,7 +159,7 @@ export default function Authenticated({
 
         return (
             <div className="min-h-screen bg-slate-100 md:flex">
-                <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
+                <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white md:flex">
                     <div className="border-b border-slate-200 px-5 py-4">
                         <div className="flex items-center gap-3">
                             <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover" />
@@ -330,7 +330,7 @@ export default function Authenticated({
 
         return (
             <div className="min-h-screen bg-slate-100 md:flex">
-                <aside className="hidden w-72 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
+                <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white md:flex">
                     <div className="border-b border-slate-200 px-5 py-4">
                         <div className="flex items-center gap-3">
                             <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover" />
@@ -357,16 +357,21 @@ export default function Authenticated({
                         ))}
                     </nav>
 
-                    <div className="mt-auto border-t border-slate-200 bg-slate-50 px-4 py-4">
-                        <p className="text-sm font-semibold text-slate-800">Procurement Operations Suite</p>
-                        <p className="text-xs text-slate-600">Procurement Unit request review, supplier management, and PO execution.</p>
+                    <div className="mt-auto border-t border-slate-200 px-4 py-4">
+                        <div className="flex items-center gap-2 text-sm text-slate-600">
+                            <img src="/logo.jpg" alt="GovSupply Connect" className="h-8 w-8 rounded-full border border-slate-300 bg-white object-cover" />
+                            <div>
+                                <p className="font-semibold text-slate-700">GovSupply Connect</p>
+                                <p>Version 2.0.1</p>
+                            </div>
+                        </div>
                     </div>
                 </aside>
 
                 <div className="flex-1">
                     <header className="border-b border-slate-200 bg-white">
                         <div className="mx-auto flex min-h-16 w-full max-w-[1400px] items-center justify-between gap-3 px-4 py-3 sm:min-h-20 sm:px-6">
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-3 md:hidden">
                                 <img src="/logo.jpg" alt="GovSupply Connect" className="h-9 w-9 rounded-full border border-slate-300 bg-white object-cover sm:h-11 sm:w-11" />
                                 <div className="min-w-0">
                                     <p className="truncate text-sm font-bold leading-tight text-red-700 sm:text-2xl">GovSupply Connect</p>
@@ -503,7 +508,7 @@ export default function Authenticated({
 
         return (
             <div className="min-h-screen bg-slate-100 md:flex">
-                <aside className="hidden w-72 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
+                <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white md:flex">
                     <div className="border-b border-slate-200 px-5 py-4">
                         <div className="flex items-center gap-3">
                             <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover" />
@@ -544,7 +549,7 @@ export default function Authenticated({
                 <div className="flex-1">
                     <header className="border-b border-slate-200 bg-white">
                         <div className="mx-auto flex min-h-16 w-full max-w-[1400px] items-center justify-between gap-3 px-4 py-3 sm:min-h-20 sm:px-6">
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-3 md:hidden">
                                 <img src="/logo.jpg" alt="GovSupply Connect" className="h-9 w-9 rounded-full border border-slate-300 bg-white object-cover sm:h-11 sm:w-11" />
                                 <div className="min-w-0">
                                     <p className="truncate text-sm font-bold leading-tight text-red-700 sm:text-2xl">GovSupply Connect</p>
@@ -682,7 +687,7 @@ export default function Authenticated({
 
         return (
             <div className="min-h-screen bg-slate-100 md:flex">
-                <aside className="hidden w-72 shrink-0 flex-col border-r border-red-200 bg-white md:flex">
+                <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col overflow-y-auto border-r border-red-200 bg-white md:flex">
                     <div className="border-b border-slate-200 px-5 py-4">
                         <div className="flex items-center gap-3">
                             <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover" />
@@ -709,16 +714,21 @@ export default function Authenticated({
                         ))}
                     </nav>
 
-                    <div className="mt-auto border-t border-red-100 bg-red-50/70 px-4 py-4">
-                        <p className="text-sm font-semibold text-red-800">Executive Governance Suite</p>
-                        <p className="text-xs text-red-700/80">Executive disclosure preparation, review, and publication governance workflow.</p>
+                    <div className="mt-auto border-t border-slate-200 px-4 py-4">
+                        <div className="flex items-center gap-2 text-sm text-slate-600">
+                            <img src="/logo.jpg" alt="GovSupply Connect" className="h-8 w-8 rounded-full border border-slate-300 bg-white object-cover" />
+                            <div>
+                                <p className="font-semibold text-slate-700">GovSupply Connect</p>
+                                <p>Version 2.0.1</p>
+                            </div>
+                        </div>
                     </div>
                 </aside>
 
                 <div className="flex-1">
                     <header className="border-b border-slate-200 bg-white">
                         <div className="mx-auto flex min-h-16 w-full max-w-[1400px] items-center justify-between gap-3 px-4 py-3 sm:min-h-20 sm:px-6">
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-3 md:hidden">
                                 <img src="/logo.jpg" alt="GovSupply Connect" className="h-9 w-9 rounded-full border border-slate-300 bg-white object-cover sm:h-11 sm:w-11" />
                                 <div className="min-w-0">
                                     <p className="truncate text-sm font-bold leading-tight text-red-700 sm:text-2xl">GovSupply Connect</p>
@@ -883,7 +893,7 @@ export default function Authenticated({
 
         return (
             <div className="min-h-screen bg-slate-100 md:flex">
-                <aside className="hidden w-72 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
+                <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white md:flex">
                     <div className="border-b border-slate-200 px-5 py-4">
                         <div className="flex items-center gap-3">
                             <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover" />
@@ -910,16 +920,21 @@ export default function Authenticated({
                         ))}
                     </nav>
 
-                    <div className="mt-auto border-t border-slate-200 bg-slate-50 px-4 py-4">
-                        <p className="text-sm font-semibold text-slate-800">Inventory Operations Suite</p>
-                        <p className="text-xs text-slate-600">Delivery, stock, and distribution control. Version 2.0.1</p>
+                    <div className="mt-auto border-t border-slate-200 px-4 py-4">
+                        <div className="flex items-center gap-2 text-sm text-slate-600">
+                            <img src="/logo.jpg" alt="GovSupply Connect" className="h-8 w-8 rounded-full border border-slate-300 bg-white object-cover" />
+                            <div>
+                                <p className="font-semibold text-slate-700">GovSupply Connect</p>
+                                <p>Version 2.0.1</p>
+                            </div>
+                        </div>
                     </div>
                 </aside>
 
                 <div className="flex-1">
                     <header className="border-b border-slate-200 bg-white">
                         <div className="mx-auto flex min-h-16 w-full max-w-[1400px] items-center justify-between gap-3 px-4 py-3 sm:min-h-20 sm:px-6">
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-3 md:hidden">
                                 <img src="/logo.jpg" alt="GovSupply Connect" className="h-9 w-9 rounded-full border border-slate-300 bg-white object-cover sm:h-11 sm:w-11" />
                                 <div className="min-w-0">
                                     <p className="truncate text-sm font-bold leading-tight text-red-700 sm:text-2xl">GovSupply Connect</p>
