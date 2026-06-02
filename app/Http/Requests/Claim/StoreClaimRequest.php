@@ -26,6 +26,8 @@ class StoreClaimRequest extends FormRequest
             'claim_code' => ['nullable', 'string', 'max:80', 'unique:claims,claim_code'],
             'distribution_record_id' => ['required', 'integer', 'exists:distribution_records,distribution_record_id'],
             'distribution_item_id' => ['nullable', 'integer', 'exists:distribution_items,distribution_item_id'],
+            'parent_claim_id' => ['nullable', 'integer', 'exists:claims,claims_id'],
+            'source_type' => ['nullable', 'string', 'max:60'],
             'office_id' => ['required', 'integer', 'exists:offices,id'],
             'claim_type' => ['required', 'string', 'max:80'],
             'claim_date' => ['required', 'date', 'after_or_equal:'.$earliestClaimDate, 'before_or_equal:today'],

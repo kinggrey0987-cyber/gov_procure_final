@@ -21,7 +21,19 @@ type Props = {
         replacement_quantity?: number;
         replacement_available_stock?: number | null;
         remarks?: string | null;
+        parent_claim_id?: number | null;
+        source_type?: string | null;
     };
+    parentClaim?: {
+        claims_id: number;
+        claim_code: string;
+        status: string;
+    } | null;
+    followUpClaims?: Array<{
+        claims_id: number;
+        claim_code: string;
+        status: string;
+    }>;
     linkedDistribution?: {
         distribution_record_id: number;
         distribution_code: string;
@@ -68,15 +80,17 @@ type Props = {
     }>;
     routes?: {
         index: string;
+        create?: string;
         show: string;
         updateStatus?: string;
     };
     permissions?: {
         update: boolean;
+        createFollowUp?: boolean;
     };
 };
 
-export default function ClaimShow({ claim, linkedDistribution, attachments, attachmentPermissions, statusHistory, approvalHistory, routes, permissions }: Props) {
+export default function ClaimShow({ claim, parentClaim, followUpClaims = [], linkedDistribution, attachments, attachmentPermissions, statusHistory, approvalHistory, routes, permissions }: Props) {
     const [activeTab, setActiveTab] = useState<'overview' | 'items' | 'status' | 'related' | 'notes'>('overview');
     const routeNames = routes ?? {
         index: 'inventory.claims.index',
@@ -102,6 +116,7 @@ export default function ClaimShow({ claim, linkedDistribution, attachments, atta
     }) ?? [];
     const hasSpecificClaimedItem = claim.distribution_item_id !== null && claim.distribution_item_id !== undefined;
     const claimedIssueQuantities = getClaimIssueQuantities(claim);
+    const canCreateFollowUp = (permissions?.createFollowUp ?? false) && linkedDistribution !== null && claim.distribution_item_id !== null && claim.distribution_item_id !== undefined;
 
     useEffect(() => {
         statusForm.setData('status', nextStatusOptions[0]?.value ?? '');
@@ -163,6 +178,7 @@ export default function ClaimShow({ claim, linkedDistribution, attachments, atta
                     <div className="mt-3 grid gap-4 md:grid-cols-2">
                         <Info label="Claim Code" value={claim.claim_code} mono />
                         <Info label="Status" value={displayClaimStatus(claim.status)} />
+                        {parentClaim ? <Info label="Original Claim" value={parentClaim.claim_code} mono /> : null}
                         <Info label="Issue Type" value={displayClaimType(claim.claim_type)} />
                         <Info label="Date Observed" value={formatDate(claim.claim_date)} />
                         <Info label="Issue Location" value={claim.claim_location} />
@@ -174,6 +190,36 @@ export default function ClaimShow({ claim, linkedDistribution, attachments, atta
                         <Info label="Available Replacement Stock" value={claim.replacement_available_stock === null || claim.replacement_available_stock === undefined ? '-' : formatQuantity(claim.replacement_available_stock)} />
                         <Info label="Remarks" value={claim.remarks ?? 'No remarks provided.'} />
                     </div>
+                    {canCreateFollowUp && routeNames.create ? (
+                        <div className="mt-5">
+                            <Link
+                                href={route(routeNames.create, {
+                                    parent_claim_id: claim.claims_id,
+                                    distribution_record_id: linkedDistribution?.distribution_record_id,
+                                    distribution_item_id: claim.distribution_item_id,
+                                })}
+                                className="inline-flex rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
+                            >
+                                File Follow-up Claim
+                            </Link>
+                        </div>
+                    ) : null}
+                    {followUpClaims.length > 0 ? (
+                        <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Follow-up Claims</h3>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                                {followUpClaims.map((followUp) => (
+                                    <Link
+                                        key={followUp.claims_id}
+                                        href={route(routeNames.show, followUp.claims_id)}
+                                        className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                    >
+                                        {followUp.claim_code} - {displayClaimStatus(followUp.status)}
+                                    </Link>
+                                ))}
+                            </div>
+                        </div>
+                    ) : null}
                     {permissions?.update ? (
                         <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4">
                             <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">GSO Claim Follow-up</h3>

@@ -29,6 +29,13 @@ type DistributionRecordOption = {
 type Props = {
     distributionRecords: DistributionRecordOption[];
     preselectedDistributionRecordId?: number | null;
+    preselectedDistributionItemId?: number | null;
+    parentClaim?: {
+        claims_id: number;
+        claim_code: string;
+        status: string;
+        distribution_item_id?: number | null;
+    } | null;
 };
 
 type IssueLine = {
@@ -67,17 +74,22 @@ function formatDate(value?: string | null): string {
     return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-export default function ClaimCreate({ distributionRecords, preselectedDistributionRecordId = null }: Props) {
+export default function ClaimCreate({ distributionRecords, preselectedDistributionRecordId = null, preselectedDistributionItemId = null, parentClaim = null }: Props) {
     const { auth } = usePage<PageProps>().props;
     const isOfficeUser = auth?.user?.role_code === 'OFFICE_USER';
     const preselectedRecord = preselectedDistributionRecordId
         ? distributionRecords.find((record) => record.distribution_record_id === preselectedDistributionRecordId)
         : null;
     const first = preselectedRecord ?? distributionRecords[0];
-    const initialItem = first?.items?.[0] ?? null;
+    const initialItem = (preselectedDistributionItemId
+        ? first?.items?.find((item) => item.distribution_item_id === preselectedDistributionItemId)
+        : null) ?? first?.items?.[0] ?? null;
+    const isFollowUpClaim = parentClaim !== null;
     const form = useForm({
         distribution_record_id: first?.distribution_record_id ?? '',
         distribution_item_id: initialItem?.distribution_item_id ?? '',
+        parent_claim_id: parentClaim?.claims_id ?? '',
+        source_type: isFollowUpClaim ? 'CLAIM_REPLACEMENT_FOLLOW_UP' : '',
         office_id: first?.office_id ?? 0,
         claim_type: '',
         claim_date: todayDate(),
@@ -114,6 +126,11 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                     <div className="mb-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                         <p className="text-sm text-slate-600">Claims are post-distribution issue records. Select an existing released or received distribution record first.</p>
                         <p className="mt-2 text-xs text-slate-500">Typical claim types: missing items, damaged items, quantity mismatch, or wrong item received.</p>
+                        {parentClaim ? (
+                            <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
+                                Follow-up claim for {parentClaim.claim_code}. Resolving this follow-up will also resolve the original claim.
+                            </p>
+                        ) : null}
                     </div>
 
                     <form
@@ -135,6 +152,7 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                             <select
                                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                                 value={form.data.distribution_record_id}
+                                disabled={isFollowUpClaim}
                                 onChange={(e) => {
                                     const selectedRecordId = Number(e.target.value);
                                     const selected = distributionRecords.find((record) => record.distribution_record_id === selectedRecordId);
@@ -157,6 +175,8 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                 ))}
                             </select>
                             {form.errors.distribution_record_id ? <p className="mt-1 text-xs text-rose-600">{form.errors.distribution_record_id}</p> : null}
+                            {form.errors.parent_claim_id ? <p className="mt-1 text-xs text-rose-600">{form.errors.parent_claim_id}</p> : null}
+                            {form.errors.source_type ? <p className="mt-1 text-xs text-rose-600">{form.errors.source_type}</p> : null}
                         </div>
 
                         {selectedRecord ? (
@@ -272,7 +292,7 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
 
                             <p className="mt-3 text-xs font-semibold text-amber-900">
                                 Total claimed quantity: {formatQuantity(totalIssueQuantity)} {selectedItem?.unit ?? ''}
-                                {derivedClaimType ? ` · Claim type: ${displayClaimType(derivedClaimType)}` : ''}
+                                {derivedClaimType ? ` - Claim type: ${displayClaimType(derivedClaimType)}` : ''}
                             </p>
                             {form.errors.claim_type ? <p className="mt-1 text-xs text-rose-600 sm:col-span-3">{form.errors.claim_type}</p> : null}
                             {form.errors.distribution_item_id ? <p className="mt-1 text-xs text-rose-600 sm:col-span-3">{form.errors.distribution_item_id}</p> : null}
@@ -310,9 +330,11 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                         {form.hasErrors ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">Please review the highlighted claim form fields before submitting.</p> : null}
 
                         <input type="hidden" value={form.data.office_id} readOnly />
+                        <input type="hidden" value={form.data.parent_claim_id} readOnly />
+                        <input type="hidden" value={form.data.source_type} readOnly />
 
                         <button type="submit" disabled={form.processing} className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-60">
-                            {form.processing ? 'Submitting Claim...' : 'Submit Claim'}
+                            {form.processing ? 'Submitting Claim...' : isFollowUpClaim ? 'Submit Follow-up Claim' : 'Submit Claim'}
                         </button>
                     </form>
                 </div>

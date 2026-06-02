@@ -95,6 +95,18 @@ class ClaimController
 
         abort_unless($user->can('claim.create'), 403);
 
+        $parentClaim = null;
+        $requestedParentClaimId = (int) $request->query('parent_claim_id', 0);
+        if ($requestedParentClaimId > 0) {
+            $candidateParentClaim = Claim::query()
+                ->where('claims_id', $requestedParentClaimId)
+                ->where('office_id', (int) $user->office_id)
+                ->whereNotIn('status', ['RESOLVED', 'REJECTED'])
+                ->firstOrFail();
+
+            $parentClaim = $candidateParentClaim;
+        }
+
         $distributionRecords = DistributionRecord::query()
             ->where('office_id', (int) $user->office_id)
             ->whereIn('status', ['RELEASED', 'RECEIVED'])
@@ -104,6 +116,7 @@ class ClaimController
             ->get();
 
         $requestedDistributionRecordId = (int) $request->query('distribution_record_id', 0);
+        $requestedDistributionItemId = (int) $request->query('distribution_item_id', 0);
         $preselectedDistributionRecordId = $requestedDistributionRecordId > 0
             && $distributionRecords->contains(fn (DistributionRecord $record): bool => (int) $record->distribution_record_id === $requestedDistributionRecordId)
                 ? $requestedDistributionRecordId
@@ -130,6 +143,13 @@ class ClaimController
                 ])->values(),
             ])->values(),
             'preselectedDistributionRecordId' => $preselectedDistributionRecordId,
+            'preselectedDistributionItemId' => $requestedDistributionItemId > 0 ? $requestedDistributionItemId : null,
+            'parentClaim' => $parentClaim instanceof Claim ? [
+                'claims_id' => (int) $parentClaim->claims_id,
+                'claim_code' => (string) $parentClaim->claim_code,
+                'status' => (string) $parentClaim->status,
+                'distribution_item_id' => $parentClaim->distribution_item_id ? (int) $parentClaim->distribution_item_id : null,
+            ] : null,
         ]);
     }
 
@@ -173,7 +193,7 @@ class ClaimController
         $history = $this->historyTimelineService->forRecord($user, $claim);
         $routePrefix = $user->isOfficeUser() ? 'office.claims' : 'inventory.claims';
 
-        $claim->load(['distributionRecord.items.item.category', 'distributionRecord.office', 'distributionRecord.supplyRequest', 'distributionItem.item.inventory', 'claimant', 'office']);
+        $claim->load(['distributionRecord.items.item.category', 'distributionRecord.office', 'distributionRecord.supplyRequest', 'distributionItem.item.inventory', 'claimant', 'office', 'parentClaim', 'followUpClaims']);
 
         $replacementAvailableStock = $claim->distributionItem?->item?->inventory
             ? (float) $claim->distributionItem->item->inventory->available_stock
@@ -206,7 +226,19 @@ class ClaimController
                 'replacement_quantity' => (float) $claim->replacement_quantity,
                 'replacement_available_stock' => $replacementAvailableStock,
                 'remarks' => $claim->remarks,
+                'parent_claim_id' => $claim->parent_claim_id ? (int) $claim->parent_claim_id : null,
+                'source_type' => $claim->source_type,
             ],
+            'parentClaim' => $claim->parentClaim ? [
+                'claims_id' => (int) $claim->parentClaim->claims_id,
+                'claim_code' => (string) $claim->parentClaim->claim_code,
+                'status' => (string) $claim->parentClaim->status,
+            ] : null,
+            'followUpClaims' => $claim->followUpClaims->map(fn (Claim $followUp): array => [
+                'claims_id' => (int) $followUp->claims_id,
+                'claim_code' => (string) $followUp->claim_code,
+                'status' => (string) $followUp->status,
+            ])->values(),
             'linkedDistribution' => $claim->distributionRecord ? [
                 'distribution_record_id' => (int) $claim->distributionRecord->distribution_record_id,
                 'distribution_code' => (string) $claim->distributionRecord->distribution_code,
@@ -232,11 +264,17 @@ class ClaimController
             ],
             'routes' => [
                 'index' => $routePrefix.'.index',
+                'create' => $routePrefix.'.create',
                 'show' => $routePrefix.'.show',
                 'updateStatus' => 'inventory.claims.update-status',
             ],
             'permissions' => [
                 'update' => $user->can('claim.update', $claim),
+                'createFollowUp' => $user->can('claim.create')
+                    && $user->isOfficeUser()
+                    && ! in_array((string) $claim->status, ['RESOLVED', 'REJECTED'], true)
+                    && $claim->distribution_record_id !== null
+                    && $claim->distribution_item_id !== null,
             ],
             'statusHistory' => $history['status']->map(fn ($entry): array => [
                 'id' => (int) $entry->id,

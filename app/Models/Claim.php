@@ -26,6 +26,8 @@ class Claim extends Model
         'claim_code',
         'distribution_record_id',
         'distribution_item_id',
+        'parent_claim_id',
+        'source_type',
         'claimed_by',
         'office_id',
         'claim_type',
@@ -43,6 +45,7 @@ class Claim extends Model
     protected $casts = [
         'distribution_record_id' => 'integer',
         'distribution_item_id' => 'integer',
+        'parent_claim_id' => 'integer',
         'claimed_by' => 'integer',
         'office_id' => 'integer',
         'claim_date' => 'date',
@@ -60,6 +63,16 @@ class Claim extends Model
     public function distributionItem(): BelongsTo
     {
         return $this->belongsTo(DistributionItem::class, 'distribution_item_id', 'distribution_item_id');
+    }
+
+    public function parentClaim(): BelongsTo
+    {
+        return $this->belongsTo(Claim::class, 'parent_claim_id', 'claims_id');
+    }
+
+    public function followUpClaims(): HasMany
+    {
+        return $this->hasMany(Claim::class, 'parent_claim_id', 'claims_id');
     }
 
     public function claimant(): BelongsTo

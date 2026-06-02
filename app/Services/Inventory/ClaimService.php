@@ -10,15 +10,21 @@ use App\Models\StatusHistory;
 use App\Models\User;
 use App\Services\AuditLogService;
 use App\Services\NotificationService;
+use App\Services\Procurement\PurchaseRequestService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class ClaimService
 {
+    private const ACTIVE_STATUSES = ['OPEN', 'IN_REVIEW', 'PENDING_REPLACEMENT', 'PARTIALLY_RESOLVED'];
+
+    private const FOLLOW_UP_SOURCE_TYPE = 'CLAIM_REPLACEMENT_FOLLOW_UP';
+
     public function __construct(
         private readonly InventoryService $inventoryService,
         private readonly AuditLogService $auditLogService,
         private readonly NotificationService $notificationService,
+        private readonly PurchaseRequestService $purchaseRequestService,
     ) {
     }
 
@@ -46,6 +52,8 @@ class ClaimService
                 'office_id' => 'Claim office must match the distribution office.',
             ]);
         }
+
+        $parentClaim = $this->resolveParentClaim($payload, $distributionRecord);
 
         $distributionItem = null;
         if (! empty($payload['distribution_item_id'])) {
@@ -89,6 +97,8 @@ class ClaimService
                     'quantity_disputed' => sprintf('Disputed quantity cannot exceed the released quantity of %.2f.', $releasedQuantity),
                 ]);
             }
+
+            $this->ensureNoActiveDuplicateItemClaim($distributionItem->distribution_item_id, $parentClaim);
         }
 
         if ((int) $actor->office_id !== (int) $payload['office_id']) {
@@ -107,11 +117,13 @@ class ClaimService
 
         $claimType = $this->resolveClaimType($submittedClaimType, $damagedQuantity, $missingQuantity);
 
-        return DB::transaction(function () use ($actor, $payload, $claimCode, $claimType, $disputedQuantity, $damagedQuantity, $missingQuantity): Claim {
+        return DB::transaction(function () use ($actor, $payload, $claimCode, $claimType, $disputedQuantity, $damagedQuantity, $missingQuantity, $parentClaim): Claim {
             $claim = Claim::query()->create([
                 'claim_code' => $claimCode,
                 'distribution_record_id' => (int) $payload['distribution_record_id'],
                 'distribution_item_id' => ! empty($payload['distribution_item_id']) ? (int) $payload['distribution_item_id'] : null,
+                'parent_claim_id' => $parentClaim?->claims_id,
+                'source_type' => $parentClaim instanceof Claim ? self::FOLLOW_UP_SOURCE_TYPE : null,
                 'claimed_by' => (int) $actor->id,
                 'office_id' => (int) $payload['office_id'],
                 'claim_type' => $claimType,
@@ -140,7 +152,7 @@ class ClaimService
                 );
             }
 
-            return $claim->fresh(['distributionRecord', 'claimant', 'office']) ?? $claim;
+            return $claim->fresh(['distributionRecord', 'claimant', 'office', 'parentClaim']) ?? $claim;
         });
     }
 
@@ -184,6 +196,10 @@ class ClaimService
                 $this->releaseClaimReplacement($claim, $actor, $resolutionType, $replacementQuantity, (string) ($payload['remarks'] ?? ''));
             }
 
+            if ($newStatus === 'PENDING_REPLACEMENT' && $this->claimNeedsReplacementProcurement($claim)) {
+                $this->purchaseRequestService->createFromPendingClaimReplacement($claim, $actor, (string) ($payload['remarks'] ?? ''));
+            }
+
             $claim->forceFill([
                 'status' => $newStatus,
                 'resolution_type' => $resolutionType ?: $claim->resolution_type,
@@ -198,6 +214,10 @@ class ClaimService
                 'new_status' => $newStatus,
             ]);
 
+            if ($newStatus === 'RESOLVED') {
+                $this->resolveParentClaimFromFollowUp($claim, $actor, (string) ($payload['remarks'] ?? ''));
+            }
+
             if ($claim->claimant instanceof User) {
                 $this->notificationService->notifyUser(
                     user: $claim->claimant,
@@ -209,8 +229,136 @@ class ClaimService
                 );
             }
 
-            return $claim->fresh(['distributionRecord', 'claimant', 'office']) ?? $claim;
+            return $claim->fresh(['distributionRecord', 'claimant', 'office', 'parentClaim']) ?? $claim;
         });
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function resolveParentClaim(array $payload, DistributionRecord $distributionRecord): ?Claim
+    {
+        $parentClaimId = (int) ($payload['parent_claim_id'] ?? 0);
+        $sourceType = strtoupper(trim((string) ($payload['source_type'] ?? '')));
+
+        if ($parentClaimId <= 0) {
+            if ($sourceType === self::FOLLOW_UP_SOURCE_TYPE) {
+                throw ValidationException::withMessages([
+                    'parent_claim_id' => 'A follow-up claim must reference the original unresolved claim.',
+                ]);
+            }
+
+            return null;
+        }
+
+        $parentClaim = Claim::query()->find($parentClaimId);
+
+        if (! $parentClaim instanceof Claim) {
+            throw ValidationException::withMessages([
+                'parent_claim_id' => 'Original claim was not found.',
+            ]);
+        }
+
+        if (in_array((string) $parentClaim->status, ['RESOLVED', 'REJECTED'], true)) {
+            throw ValidationException::withMessages([
+                'parent_claim_id' => 'Follow-up claims can only reference unresolved claims.',
+            ]);
+        }
+
+        if ((int) $parentClaim->office_id !== (int) $distributionRecord->office_id) {
+            throw ValidationException::withMessages([
+                'parent_claim_id' => 'Follow-up claim must belong to the same office as the original claim.',
+            ]);
+        }
+
+        if (! empty($payload['distribution_item_id'])
+            && $parentClaim->distribution_item_id !== null
+            && (int) $parentClaim->distribution_item_id !== (int) $payload['distribution_item_id']
+        ) {
+            throw ValidationException::withMessages([
+                'distribution_item_id' => 'Follow-up claim must reference the same item line as the original claim.',
+            ]);
+        }
+
+        if ($sourceType !== '' && $sourceType !== self::FOLLOW_UP_SOURCE_TYPE) {
+            throw ValidationException::withMessages([
+                'source_type' => 'Claim follow-up source type is invalid.',
+            ]);
+        }
+
+        return $parentClaim;
+    }
+
+    private function ensureNoActiveDuplicateItemClaim(int $distributionItemId, ?Claim $parentClaim): void
+    {
+        if ($parentClaim instanceof Claim) {
+            return;
+        }
+
+        $hasActiveClaim = Claim::query()
+            ->where('distribution_item_id', $distributionItemId)
+            ->whereNull('parent_claim_id')
+            ->whereIn('status', self::ACTIVE_STATUSES)
+            ->exists();
+
+        if ($hasActiveClaim) {
+            throw ValidationException::withMessages([
+                'quantity_disputed' => 'An active claim already exists for this item line. Resolve it before filing another claim, or file a follow-up claim from the existing claim.',
+            ]);
+        }
+    }
+
+    private function resolveParentClaimFromFollowUp(Claim $claim, User $actor, string $remarks): void
+    {
+        if ($claim->parent_claim_id === null || (string) $claim->source_type !== self::FOLLOW_UP_SOURCE_TYPE) {
+            return;
+        }
+
+        $parentClaim = Claim::query()->find((int) $claim->parent_claim_id);
+
+        if (! $parentClaim instanceof Claim || in_array((string) $parentClaim->status, ['RESOLVED', 'REJECTED'], true)) {
+            return;
+        }
+
+        $oldStatus = (string) $parentClaim->status;
+        $parentRemarks = trim($remarks) !== ''
+            ? $remarks
+            : sprintf('Resolved through follow-up claim %s.', (string) $claim->claim_code);
+
+        $parentClaim->forceFill([
+            'status' => 'RESOLVED',
+            'resolution_type' => 'FOLLOW_UP_RESOLVED',
+            'remarks' => $parentRemarks,
+        ])->save();
+
+        $this->recordStatus($parentClaim, $oldStatus, 'RESOLVED', $actor, sprintf('Parent claim resolved through follow-up claim %s.', (string) $claim->claim_code));
+        $this->recordApproval($parentClaim, $actor, 'RESOLVED', 'Parent claim resolution cascaded from resolved follow-up claim.');
+        $this->recordAudit($actor, 'UPDATE_STATUS', $parentClaim, [
+            'old_status' => $oldStatus,
+            'new_status' => 'RESOLVED',
+            'resolved_by_follow_up_claim_id' => (int) $claim->claims_id,
+        ]);
+    }
+
+    private function claimNeedsReplacementProcurement(Claim $claim): bool
+    {
+        $claim->loadMissing('distributionItem');
+
+        $distributionItem = $claim->distributionItem;
+        if ($distributionItem === null) {
+            return true;
+        }
+
+        $remainingDisputed = max((float) $claim->quantity_disputed - (float) $claim->replacement_quantity, 0);
+        if ($remainingDisputed <= 0) {
+            return false;
+        }
+
+        $availableStock = (float) (Inventory::query()
+            ->where('item_id', (int) $distributionItem->item_id)
+            ->value('available_stock') ?? 0);
+
+        return $availableStock < $remainingDisputed;
     }
 
     private function releaseClaimReplacement(Claim $claim, User $actor, string $resolutionType, float $replacementQuantity, string $remarks): void

@@ -675,6 +675,7 @@ class InventoryDistributionFoundationTest extends TestCase
     {
         $record = $this->createReleasedDistributionRecordForOffice($this->officeA, 90110);
         $distributionItem = $record->items()->firstOrFail();
+        $distributionItem->forceFill(['quantity_released' => 3])->save();
 
         $this->actingAs($this->officeUserA)
             ->post(route('office.claims.store'), [
@@ -743,11 +744,116 @@ class InventoryDistributionFoundationTest extends TestCase
                 'replacement_quantity' => 0,
                 'remarks' => 'Remaining replacement is pending replenishment.',
             ])
-            ->assertRedirect();
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
 
         $claim->refresh();
         $this->assertSame('PENDING_REPLACEMENT', (string) $claim->status);
         $this->assertSame('1.00', (string) $claim->replacement_quantity);
+
+        $replacementPurchaseRequest = PurchaseRequest::query()
+            ->where('source_claim_id', $claim->claims_id)
+            ->where('source_type', 'CLAIM_REPLACEMENT_FOLLOW_UP')
+            ->firstOrFail();
+
+        $this->assertSame('OPEN', (string) $replacementPurchaseRequest->status);
+        $this->assertSame((int) $this->gsoOfficer->id, (int) $replacementPurchaseRequest->requested_by);
+
+        $this->assertDatabaseHas('purchase_request_items', [
+            'purchase_request_id' => $replacementPurchaseRequest->purchase_request_id,
+            'item_id' => $distributionItem->item_id,
+            'quantity_requested' => 2,
+        ]);
+
+        $this->assertDatabaseHas('status_history', [
+            'reference_type' => PurchaseRequest::class,
+            'reference_id' => $replacementPurchaseRequest->purchase_request_id,
+            'new_status' => 'OPEN',
+        ]);
+    }
+
+    public function test_resolved_follow_up_claim_resolves_unresolved_parent_claim(): void
+    {
+        $record = $this->createReleasedDistributionRecordForOffice($this->officeA, 90114);
+        $distributionItem = $record->items()->firstOrFail();
+
+        $this->actingAs($this->officeUserA)
+            ->post(route('office.claims.store'), [
+                'distribution_record_id' => $record->distribution_record_id,
+                'distribution_item_id' => $distributionItem->distribution_item_id,
+                'office_id' => $this->officeA->id,
+                'claim_type' => 'MISSING_ITEM',
+                'claim_date' => now()->toDateString(),
+                'claim_location' => 'Office A Storage',
+                'quantity_disputed' => 1,
+                'remarks' => 'Original item was missing.',
+            ])
+            ->assertRedirect();
+
+        $parentClaim = Claim::query()
+            ->where('distribution_item_id', $distributionItem->distribution_item_id)
+            ->firstOrFail();
+
+        $this->actingAs($this->gsoOfficer)
+            ->put(route('inventory.claims.update-status', $parentClaim->claims_id), [
+                'status' => 'PENDING_REPLACEMENT',
+                'resolution_type' => 'PENDING_REPLACEMENT',
+                'remarks' => 'Replacement will be released by GSO.',
+            ])
+            ->assertRedirect();
+
+        $parentClaim->refresh();
+        $this->assertSame('PENDING_REPLACEMENT', (string) $parentClaim->status);
+
+        $this->actingAs($this->officeUserA)
+            ->post(route('office.claims.store'), [
+                'distribution_record_id' => $record->distribution_record_id,
+                'distribution_item_id' => $distributionItem->distribution_item_id,
+                'parent_claim_id' => $parentClaim->claims_id,
+                'source_type' => 'CLAIM_REPLACEMENT_FOLLOW_UP',
+                'office_id' => $this->officeA->id,
+                'claim_type' => 'DAMAGED_ITEM',
+                'claim_date' => now()->toDateString(),
+                'claim_location' => 'Office A Storage',
+                'quantity_disputed' => 1,
+                'remarks' => 'Replacement item was damaged.',
+            ])
+            ->assertRedirect();
+
+        $followUpClaim = Claim::query()
+            ->where('parent_claim_id', $parentClaim->claims_id)
+            ->firstOrFail();
+
+        $this->assertSame('CLAIM_REPLACEMENT_FOLLOW_UP', (string) $followUpClaim->source_type);
+        $this->assertSame('OPEN', (string) $followUpClaim->status);
+
+        $this->actingAs($this->gsoOfficer)
+            ->put(route('inventory.claims.update-status', $followUpClaim->claims_id), [
+                'status' => 'RESOLVED',
+                'resolution_type' => 'OTHER_RESOLUTION',
+                'remarks' => 'Follow-up replacement issue was resolved.',
+            ])
+            ->assertRedirect();
+
+        $parentClaim->refresh();
+        $followUpClaim->refresh();
+
+        $this->assertSame('RESOLVED', (string) $followUpClaim->status);
+        $this->assertSame('RESOLVED', (string) $parentClaim->status);
+        $this->assertSame('FOLLOW_UP_RESOLVED', (string) $parentClaim->resolution_type);
+
+        $this->assertDatabaseHas('status_history', [
+            'reference_type' => Claim::class,
+            'reference_id' => $parentClaim->claims_id,
+            'old_status' => 'PENDING_REPLACEMENT',
+            'new_status' => 'RESOLVED',
+        ]);
+
+        $this->assertDatabaseHas('approval_history', [
+            'reference_type' => Claim::class,
+            'reference_id' => $parentClaim->claims_id,
+            'status' => 'RESOLVED',
+        ]);
     }
 
     public function test_gso_queue_procurement_creates_purchase_request_and_items_for_shortage(): void

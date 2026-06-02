@@ -3,6 +3,7 @@
 namespace App\Services\Procurement;
 
 use App\Enums\UserRole;
+use App\Models\Claim;
 use App\Models\Delivery;
 use App\Models\DeliveryItem;
 use App\Models\Inventory;
@@ -342,6 +343,145 @@ class PurchaseRequestService
             }
 
             return $purchaseRequest->fresh(['items', 'office', 'requester', 'supplyRequest']) ?? $purchaseRequest;
+        });
+    }
+
+    public function createFromPendingClaimReplacement(Claim $claim, User $actor, ?string $remarks = null): PurchaseRequest
+    {
+        $this->assertGsoActor($actor);
+
+        $claim->loadMissing(['distributionItem.item', 'office']);
+
+        if ($claim->distributionItem === null) {
+            throw ValidationException::withMessages([
+                'replacement_quantity' => 'Pending replacement procurement requires a linked claimed item line.',
+            ]);
+        }
+
+        $distributionItem = $claim->distributionItem;
+        $item = $distributionItem->item;
+        $itemId = (int) $distributionItem->item_id;
+        $itemName = (string) ($item?->item_name ?? $distributionItem->item_name_snapshot ?? 'Claim Replacement Item');
+
+        $remainingDisputed = round(max((float) $claim->quantity_disputed - (float) $claim->replacement_quantity, 0), 2);
+        if ($remainingDisputed <= 0) {
+            throw ValidationException::withMessages([
+                'replacement_quantity' => 'No remaining disputed quantity needs replacement procurement.',
+            ]);
+        }
+
+        $availableStock = (float) (Inventory::query()->where('item_id', $itemId)->value('available_stock') ?? 0);
+        $quantityToProcure = round(max($remainingDisputed - $availableStock, 0), 2);
+        if ($quantityToProcure <= 0) {
+            throw ValidationException::withMessages([
+                'replacement_quantity' => 'Replacement stock is available. Release the replacement instead of marking the claim pending procurement.',
+            ]);
+        }
+
+        $existing = PurchaseRequest::query()
+            ->where('source_claim_id', (int) $claim->claims_id)
+            ->where('source_type', 'CLAIM_REPLACEMENT_FOLLOW_UP')
+            ->whereIn('status', ['OPEN', 'PROCESSING', 'RETURNED_FOR_REVISION'])
+            ->latest('purchase_request_id')
+            ->first();
+
+        if ($existing instanceof PurchaseRequest) {
+            throw ValidationException::withMessages([
+                'replacement_quantity' => sprintf(
+                    'A replacement purchase request is already active for this claim (PR-%06d).',
+                    (int) $existing->purchase_request_id
+                ),
+            ]);
+        }
+
+        $officeId = (int) ($actor->office_id ?? 0);
+        if ($officeId <= 0) {
+            throw ValidationException::withMessages([
+                'office_id' => 'GSO officer must belong to an office before creating claim replacement purchase requests.',
+            ]);
+        }
+
+        $baseRemarks = trim((string) $remarks) !== ''
+            ? trim((string) $remarks)
+            : 'Generated from claim pending replacement due to insufficient GSO stock.';
+
+        return DB::transaction(function () use ($actor, $claim, $itemId, $itemName, $officeId, $quantityToProcure, $baseRemarks): PurchaseRequest {
+            $supplyRequest = SupplyRequest::query()->create([
+                'request_code' => $this->buildRequestCode($officeId),
+                'office_id' => $officeId,
+                'requested_by' => (int) $actor->id,
+                'ppmp_id' => null,
+                'request_date' => now()->toDateString(),
+                'needed_by_date' => now()->addDays(7)->toDateString(),
+                'request_category' => 'GENERAL',
+                'purpose' => sprintf(
+                    'Claim replacement procurement for %s from claim %s.',
+                    $itemName,
+                    (string) $claim->claim_code
+                ),
+                'priority_level' => 'HIGH',
+                'status' => 'SUBMITTED',
+                'review_notes' => sprintf(
+                    'Generated because claim %s is pending replacement and GSO stock is insufficient. %s',
+                    (string) $claim->claim_code,
+                    $baseRemarks
+                ),
+                'approved_by' => null,
+                'approved_at' => null,
+            ]);
+
+            SupplyRequestItem::query()->create([
+                'supply_request_id' => (int) $supplyRequest->supply_request_id,
+                'item_id' => $itemId,
+                'ppmp_item_id' => null,
+                'item_name_snapshot' => $itemName,
+                'quantity_requested' => $quantityToProcure,
+            ]);
+
+            $purchaseRequest = PurchaseRequest::query()->create([
+                'supply_request_id' => (int) $supplyRequest->supply_request_id,
+                'office_id' => $officeId,
+                'requested_by' => (int) $actor->id,
+                'source_claim_id' => (int) $claim->claims_id,
+                'source_type' => 'CLAIM_REPLACEMENT_FOLLOW_UP',
+                'status' => 'OPEN',
+                'remarks' => sprintf(
+                    'Replacement procurement generated from claim %s. %s',
+                    (string) $claim->claim_code,
+                    $baseRemarks
+                ),
+            ]);
+
+            PurchaseRequestItem::query()->create([
+                'purchase_request_id' => (int) $purchaseRequest->purchase_request_id,
+                'item_id' => $itemId,
+                'quantity_requested' => $quantityToProcure,
+                'remarks' => sprintf(
+                    'Claim replacement quantity for claim %s; remaining unavailable quantity %.2f.',
+                    (string) $claim->claim_code,
+                    $quantityToProcure
+                ),
+            ]);
+
+            $this->recordStatus($purchaseRequest, null, 'OPEN', $actor, 'Claim replacement purchase request queued due to insufficient GSO stock.');
+            $this->recordAudit($actor, 'CREATE_FROM_CLAIM_REPLACEMENT', $purchaseRequest);
+
+            $procurementUsers = User::query()
+                ->whereHas('role', fn ($query) => $query->where('code', UserRole::PROCUREMENT_OFFICER->value))
+                ->get();
+
+            if ($procurementUsers->isNotEmpty()) {
+                $this->notificationService->notifyUsers(
+                    users: $procurementUsers,
+                    title: 'Claim Replacement Purchase Request Queued',
+                    message: sprintf('GSO queued replacement procurement for claim %s.', (string) $claim->claim_code),
+                    notificationType: 'PROCUREMENT_PURCHASE_REQUEST_CREATED',
+                    referenceType: PurchaseRequest::class,
+                    referenceId: (int) $purchaseRequest->purchase_request_id,
+                );
+            }
+
+            return $purchaseRequest->fresh(['items', 'office', 'requester', 'supplyRequest', 'sourceClaim']) ?? $purchaseRequest;
         });
     }
 
