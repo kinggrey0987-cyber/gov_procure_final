@@ -35,7 +35,7 @@ export default function SuppliesReadyForClaimIndex({ records }: Props) {
                     <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                             <h3 className="text-2xl font-semibold text-slate-800">Released Supplies</h3>
-                            <p className="text-sm text-slate-600">Confirm receipt and file claims for missing or damaged items.</p>
+                            <p className="text-sm text-slate-600">Confirm receipt first, then file claims from the received supply request.</p>
                             <Link
                                 href={route('office.supply-requests.index')}
                                 className="mt-3 inline-flex rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
@@ -103,14 +103,20 @@ export default function SuppliesReadyForClaimIndex({ records }: Props) {
                                                     >
                                                         Open Distribution
                                                     </Link>
-                                                    <Link
-                                                        href={route('office.claims.create', {
-                                                            distribution_record_id: record.distribution_record_id,
-                                                        })}
-                                                        className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
-                                                    >
-                                                        File Claim
-                                                    </Link>
+                                                    {record.status.toUpperCase() === 'RECEIVED' ? (
+                                                        <Link
+                                                            href={route('office.claims.create', {
+                                                                supply_request_id: record.supply_request_id,
+                                                            })}
+                                                            className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
+                                                        >
+                                                            File Claim
+                                                        </Link>
+                                                    ) : (
+                                                        <span className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-400">
+                                                            Claim after receipt
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
@@ -138,7 +144,6 @@ function StatusBadge({ status }: { status: string }) {
 
     return <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${style}`}>{status.replaceAll('_', ' ')}</span>;
 }
-
 
 
 

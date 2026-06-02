@@ -129,7 +129,7 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                     </Link>
 
                     <div className="mb-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <p className="text-sm text-slate-600">Claims are post-distribution issue records. Select an existing released or received distribution record first.</p>
+                        <p className="text-sm text-slate-600">Claims are filed against supply requests your office has already confirmed received.</p>
                         <p className="mt-2 text-xs text-slate-500">Typical claim types: missing items, damaged items, quantity mismatch, or wrong item received.</p>
                         {parentClaim ? (
                             <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
@@ -153,7 +153,7 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                         }}
                     >
                         <div>
-                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Select Released Distribution Record</label>
+                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Select Received Supply Request</label>
                             <select
                                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                                 value={form.data.distribution_record_id}
@@ -172,10 +172,10 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                     setIssueLines(buildInitialIssueLines(firstItem));
                                 }}
                             >
-                                <option value="">Select Distribution Record</option>
+                                <option value="">Select Received Supply Request</option>
                                 {distributionRecords.map((record) => (
                                     <option key={record.distribution_record_id} value={record.distribution_record_id}>
-                                        {record.distribution_code} - {record.office_name}
+                                        {record.request_code} - {record.office_name}
                                     </option>
                                 ))}
                             </select>
@@ -187,10 +187,9 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                         {selectedRecord ? (
                             <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
                                 <p><span className="font-semibold text-slate-800">Office:</span> {selectedRecord.office_name}</p>
-                                <p><span className="font-semibold text-slate-800">Distribution Code:</span> {selectedRecord.distribution_code}</p>
-                                <p><span className="font-semibold text-slate-800">Linked Request:</span> {selectedRecord.request_code}</p>
-                                <p><span className="font-semibold text-slate-800">Release Date:</span> {formatDate(selectedRecord.release_date)}</p>
-                                <p><span className="font-semibold text-slate-800">Distribution Status:</span> {selectedRecord.status}</p>
+                                <p><span className="font-semibold text-slate-800">Received Supply Request:</span> {selectedRecord.request_code}</p>
+                                <p><span className="font-semibold text-slate-800">Ready Since:</span> {formatDate(selectedRecord.release_date)}</p>
+                                <p><span className="font-semibold text-slate-800">Receipt Status:</span> {selectedRecord.status}</p>
                             </div>
                         ) : null}
 

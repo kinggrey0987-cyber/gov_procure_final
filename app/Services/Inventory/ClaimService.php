@@ -107,9 +107,9 @@ class ClaimService
             ]);
         }
 
-        if (!(in_array((string) $distributionRecord->status, ['RELEASED', 'RECEIVED'], true))) {
+        if ((string) $distributionRecord->status !== 'RECEIVED') {
             throw ValidationException::withMessages([
-                'distribution_record_id' => 'Claims can only be filed for RELEASED or RECEIVED distribution records.',
+                'distribution_record_id' => 'Claims can only be filed after the supply request has been confirmed received.',
             ]);
         }
 

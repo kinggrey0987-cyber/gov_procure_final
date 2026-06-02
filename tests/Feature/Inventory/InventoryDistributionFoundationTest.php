@@ -384,6 +384,7 @@ class InventoryDistributionFoundationTest extends TestCase
     {
         $recordA = $this->createReleasedDistributionRecordForOffice($this->officeA, 9006);
         $recordB = $this->createReleasedDistributionRecordForOffice($this->officeB, 9007);
+        $recordA->forceFill(['status' => 'RECEIVED'])->save();
 
         $this->actingAs($this->officeUserA)
             ->post(route('office.claims.store'), [
@@ -588,9 +589,38 @@ class InventoryDistributionFoundationTest extends TestCase
             ->assertSessionHasErrors('office_id');
     }
 
+    public function test_claim_creation_requires_received_supply_request(): void
+    {
+        $record = $this->createReleasedDistributionRecordForOffice($this->officeA, 90115);
+        $distributionItem = $record->items()->firstOrFail();
+
+        $this->actingAs($this->officeUserA)
+            ->post(route('office.claims.store'), [
+                'distribution_record_id' => $record->distribution_record_id,
+                'distribution_item_id' => $distributionItem->distribution_item_id,
+                'office_id' => $this->officeA->id,
+                'claim_type' => 'MISSING_ITEM',
+                'claim_date' => now()->toDateString(),
+                'claim_location' => 'Office A Storage',
+                'quantity_disputed' => 1,
+                'remarks' => 'Attempt to file claim before confirming receipt.',
+            ])
+            ->assertSessionHasErrors('distribution_record_id');
+
+        $this->actingAs($this->officeUserA)
+            ->get(route('office.claims.create', [
+                'distribution_record_id' => $record->distribution_record_id,
+            ]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('preselectedDistributionRecordId', null)
+                ->where('distributionRecords', [])
+            );
+    }
+
     public function test_claim_creation_totals_issue_quantities_and_rejects_above_released_item_balance(): void
     {
         $record = $this->createReleasedDistributionRecordForOffice($this->officeA, 90112);
+        $record->forceFill(['status' => 'RECEIVED'])->save();
         $distributionItem = $record->items()->firstOrFail();
         $distributionItem->forceFill(['quantity_released' => 20])->save();
 
@@ -652,6 +682,7 @@ class InventoryDistributionFoundationTest extends TestCase
     public function test_claim_creation_rejects_decimal_quantities(): void
     {
         $record = $this->createReleasedDistributionRecordForOffice($this->officeA, 90113);
+        $record->forceFill(['status' => 'RECEIVED'])->save();
         $distributionItem = $record->items()->firstOrFail();
         $distributionItem->forceFill(['quantity_released' => 20])->save();
 
@@ -674,6 +705,7 @@ class InventoryDistributionFoundationTest extends TestCase
     public function test_claim_replacement_resolution_cannot_exceed_available_stock(): void
     {
         $record = $this->createReleasedDistributionRecordForOffice($this->officeA, 90110);
+        $record->forceFill(['status' => 'RECEIVED'])->save();
         $distributionItem = $record->items()->firstOrFail();
         $distributionItem->forceFill(['quantity_released' => 3])->save();
 
@@ -775,6 +807,7 @@ class InventoryDistributionFoundationTest extends TestCase
     public function test_resolved_follow_up_claim_resolves_unresolved_parent_claim(): void
     {
         $record = $this->createReleasedDistributionRecordForOffice($this->officeA, 90114);
+        $record->forceFill(['status' => 'RECEIVED'])->save();
         $distributionItem = $record->items()->firstOrFail();
 
         $this->actingAs($this->officeUserA)

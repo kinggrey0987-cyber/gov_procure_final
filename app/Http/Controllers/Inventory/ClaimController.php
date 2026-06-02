@@ -109,18 +109,23 @@ class ClaimController
 
         $distributionRecords = DistributionRecord::query()
             ->where('office_id', (int) $user->office_id)
-            ->whereIn('status', ['RELEASED', 'RECEIVED'])
+            ->where('status', 'RECEIVED')
             ->with(['office', 'supplyRequest', 'items.item'])
             ->orderByDesc('release_date')
             ->orderByDesc('distribution_record_id')
             ->get();
 
         $requestedDistributionRecordId = (int) $request->query('distribution_record_id', 0);
+        $requestedSupplyRequestId = (int) $request->query('supply_request_id', 0);
         $requestedDistributionItemId = (int) $request->query('distribution_item_id', 0);
         $preselectedDistributionRecordId = $requestedDistributionRecordId > 0
             && $distributionRecords->contains(fn (DistributionRecord $record): bool => (int) $record->distribution_record_id === $requestedDistributionRecordId)
                 ? $requestedDistributionRecordId
-                : null;
+                : ($requestedSupplyRequestId > 0
+                    ? $distributionRecords
+                        ->first(fn (DistributionRecord $record): bool => (int) $record->supply_request_id === $requestedSupplyRequestId)
+                        ?->distribution_record_id
+                    : null);
 
         return Inertia::render('Inventory/Claim/Create', [
             'distributionRecords' => $distributionRecords->map(fn (DistributionRecord $record): array => [
