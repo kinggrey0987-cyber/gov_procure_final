@@ -199,6 +199,19 @@ class PurchaseRequestService
                 notificationType: 'OFFICE_SUPPLY_REQUEST_FORWARDED_TO_PROCUREMENT',
             );
 
+            $this->notificationService->notifyRole(
+                role: UserRole::PROCUREMENT_OFFICER,
+                title: 'Purchase Request Queued for Review',
+                message: sprintf(
+                    'GSO queued PR-%06d from supply request %s for Procurement Unit review.',
+                    (int) $purchaseRequest->purchase_request_id,
+                    (string) $supplyRequest->request_code,
+                ),
+                notificationType: 'PROCUREMENT_PURCHASE_REQUEST_QUEUED',
+                referenceType: PurchaseRequest::class,
+                referenceId: (int) $purchaseRequest->purchase_request_id,
+            );
+
             return $purchaseRequest->fresh(['items', 'office', 'requester', 'supplyRequest']) ?? $purchaseRequest;
         });
     }

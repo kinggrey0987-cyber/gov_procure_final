@@ -240,6 +240,49 @@ class NotificationCenterFeatureTest extends TestCase
         ]);
     }
 
+    public function test_gso_supply_request_notification_opens_inventory_review_target(): void
+    {
+        $supplyRequest = SupplyRequest::query()->create([
+            'request_code' => 'SR-GSO-NOTIF-'.uniqid(),
+            'office_id' => $this->office->id,
+            'requested_by' => $this->officeUserA->id,
+            'ppmp_id' => null,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(3)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'GSO notification target',
+            'priority_level' => 'MEDIUM',
+            'status' => 'SUBMITTED',
+            'review_notes' => null,
+            'approved_by' => null,
+            'approved_at' => null,
+        ]);
+
+        $notification = Notification::query()->create([
+            'user_id' => $this->gsoOfficer->id,
+            'title' => 'New Supply Request Submitted',
+            'message' => 'An office submitted a supply request for GSO review.',
+            'notification_type' => 'GSO_SUPPLY_REQUEST_SUBMITTED',
+            'reference_type' => SupplyRequest::class,
+            'reference_id' => $supplyRequest->supply_request_id,
+            'is_read' => false,
+        ]);
+
+        $target = route('inventory.office-supply-requests.show', $supplyRequest->supply_request_id);
+
+        $this->actingAs($this->gsoOfficer)
+            ->get(route('notifications.index'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('notifications.data.0.target_label', 'View Supply Request')
+                ->where('notifications.data.0.target_url', $target)
+            );
+
+        $this->actingAs($this->gsoOfficer)
+            ->get(route('notifications.show', $notification->notification_id))
+            ->assertRedirect($target);
+    }
+
     public function test_office_workflow_notifications_for_procurement_records_open_the_owned_supply_request(): void
     {
         $workflow = $this->createProcurementWorkflowContext($this->office, $this->officeUserA);

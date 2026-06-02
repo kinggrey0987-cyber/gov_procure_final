@@ -1077,6 +1077,14 @@ class InventoryDistributionFoundationTest extends TestCase
             'item_id' => $context['item']->item_id,
             'quantity_requested' => 10,
         ]);
+
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $this->procurementOfficer->id,
+            'notification_type' => 'PROCUREMENT_PURCHASE_REQUEST_QUEUED',
+            'reference_type' => PurchaseRequest::class,
+            'reference_id' => $purchaseRequest->purchase_request_id,
+            'is_read' => false,
+        ]);
     }
 
     public function test_gso_queue_procurement_rejects_duplicate_queueing(): void

@@ -1743,6 +1743,7 @@ class OfficeTransactionalFlowTest extends TestCase
     {
         $office = $this->createOffice();
         $officeUser = $this->createUser(UserRole::OFFICE_USER, $office);
+        $gsoOfficer = $this->createUser(UserRole::GSO_OFFICER, $office);
         [$ppmp, $ppmpItem, $item] = $this->createApprovedPpmpItemContext($office, $officeUser, 20);
 
         $response = $this->actingAs($officeUser)->post(route('office.supply-requests.store'), [
@@ -1771,6 +1772,14 @@ class OfficeTransactionalFlowTest extends TestCase
             'reference_type' => SupplyRequest::class,
             'reference_id' => $supplyRequest->supply_request_id,
             'new_status' => 'SUBMITTED',
+        ]);
+
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $gsoOfficer->id,
+            'notification_type' => 'GSO_SUPPLY_REQUEST_SUBMITTED',
+            'reference_type' => SupplyRequest::class,
+            'reference_id' => $supplyRequest->supply_request_id,
+            'is_read' => false,
         ]);
     }
 

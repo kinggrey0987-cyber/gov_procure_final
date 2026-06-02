@@ -2,6 +2,7 @@
 
 namespace App\Services\Office;
 
+use App\Enums\UserRole;
 use App\Models\ApprovalHistory;
 use App\Models\Office;
 use App\Models\Ppmp;
@@ -132,6 +133,19 @@ class SupplyRequestService
                 title: 'Supply Request Submitted',
                 message: 'Your supply request was submitted successfully.',
                 notificationType: 'OFFICE_SUPPLY_REQUEST_SUBMITTED',
+                referenceType: SupplyRequest::class,
+                referenceId: (int) $supplyRequest->supply_request_id,
+            );
+
+            $this->notificationService->notifyRole(
+                role: UserRole::GSO_OFFICER,
+                title: 'New Supply Request Submitted',
+                message: sprintf(
+                    '%s submitted supply request %s for GSO review.',
+                    (string) ($supplyRequest->office?->name ?? 'An office'),
+                    (string) $supplyRequest->request_code,
+                ),
+                notificationType: 'GSO_SUPPLY_REQUEST_SUBMITTED',
                 referenceType: SupplyRequest::class,
                 referenceId: (int) $supplyRequest->supply_request_id,
             );

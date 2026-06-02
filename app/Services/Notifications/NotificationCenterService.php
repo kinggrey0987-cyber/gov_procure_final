@@ -76,6 +76,10 @@ class NotificationCenterService
         if ($referenceType === SupplyRequest::class) {
             $record = SupplyRequest::query()->where('supply_request_id', $referenceId)->first();
 
+            if ($record && $user->can('inventory.view-any')) {
+                return route('inventory.office-supply-requests.show', $record->supply_request_id);
+            }
+
             return $record && $user->can('office.supply-request.view', $record)
                 ? route('office.supply-requests.show', $record->supply_request_id)
                 : null;
