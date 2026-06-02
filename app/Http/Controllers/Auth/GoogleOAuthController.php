@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\Auth\TwoFactorChallengeService;
@@ -207,11 +208,11 @@ class GoogleOAuthController extends Controller
         $role = optional($user->role)->code;
 
         $allowedRoles = [
-            'ADMIN',
-            'OFFICE_USER',
-            'PROCUREMENT_OFFICER',
-            'GSO_OFFICER',
-            'EXECUTIVE_OFFICER',
+            UserRole::ADMIN->value,
+            UserRole::OFFICE_USER->value,
+            UserRole::PROCUREMENT_OFFICER->value,
+            UserRole::GSO_OFFICER->value,
+            UserRole::EXECUTIVE_OFFICER->value,
         ];
 
         return in_array($role, $allowedRoles, true);

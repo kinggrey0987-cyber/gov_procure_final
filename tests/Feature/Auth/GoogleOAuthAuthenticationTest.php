@@ -71,6 +71,30 @@ class GoogleOAuthAuthenticationTest extends TestCase
         $this->assertSame((int) $user->id, (int) session('two_factor.user_id'));
     }
 
+    public function test_google_callback_allows_procurement_and_executive_role_codes(): void
+    {
+        $office = $this->createOffice();
+
+        foreach ([UserRole::PROCUREMENT_OFFICER, UserRole::EXECUTIVE_OFFICER] as $role) {
+            $this->post(route('logout'));
+
+            $user = $this->createUser($role, $office, strtolower($role->value).'@gov.local');
+
+            $googleUser = \Mockery::mock(SocialiteUser::class);
+            $googleUser->shouldReceive('getEmail')->andReturn($user->email);
+            $googleUser->shouldReceive('getId')->andReturn('google-'.$role->value);
+            $googleUser->shouldReceive('getAvatar')->andReturn(null);
+
+            Socialite::shouldReceive('driver->user')->once()->andReturn($googleUser);
+
+            $response = $this->get(route('google.callback'));
+
+            $response->assertRedirect(route('two-factor.challenge.show'));
+            $this->assertAuthenticatedAs($user->fresh());
+            $this->assertSame((int) $user->id, (int) session('two_factor.user_id'));
+        }
+    }
+
     public function test_google_callback_denies_unknown_email_with_visible_error(): void
     {
         $googleUser = \Mockery::mock(SocialiteUser::class);
