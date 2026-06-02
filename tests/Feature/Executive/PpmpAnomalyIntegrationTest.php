@@ -19,6 +19,7 @@ use App\Models\SupplyRequest;
 use App\Models\SupplyRequestItem;
 use App\Models\User;
 use App\Services\Analytics\AnomalyDetectionService;
+use App\Services\Procurement\PurchaseOrderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -178,6 +179,232 @@ class PpmpAnomalyIntegrationTest extends TestCase
             );
     }
 
+    public function test_early_depletion_submission_is_visible_to_exec_without_manual_detection_run(): void
+    {
+        $context = $this->createApprovedPpmpRequestContext(9706, 100);
+
+        foreach ([20, 30] as $quantity) {
+            $supplyRequest = SupplyRequest::query()->create([
+                'request_code' => 'SR-PPA-'.uniqid(),
+                'office_id' => $this->office->id,
+                'requested_by' => $this->officeUser->id,
+                'ppmp_id' => $context['ppmp']->ppmp_id,
+                'request_date' => now()->toDateString(),
+                'needed_by_date' => now()->addDays(7)->toDateString(),
+                'request_category' => 'GENERAL',
+                'purpose' => 'Earlier PPMP consumption',
+                'priority_level' => 'HIGH',
+                'status' => 'SUBMITTED',
+                'review_notes' => null,
+                'approved_by' => null,
+                'approved_at' => null,
+            ]);
+
+            SupplyRequestItem::query()->create([
+                'supply_request_id' => $supplyRequest->supply_request_id,
+                'item_id' => $context['item']->item_id,
+                'ppmp_item_id' => $context['ppmpItem']->ppmp_item_id,
+                'item_name_snapshot' => $context['item']->item_name,
+                'quantity_requested' => $quantity,
+            ]);
+        }
+
+        $createResponse = $this->actingAs($this->officeUser)
+            ->post(route('office.supply-requests.store'), [
+                'ppmp_id' => $context['ppmp']->ppmp_id,
+                'needed_by_date' => now()->addDays(10)->toDateString(),
+                'request_category' => 'GENERAL',
+                'purpose' => 'Consumption reaches early depletion threshold',
+                'priority_level' => 'HIGH',
+                'review_notes' => 'Early depletion submission',
+                'items' => [[
+                    'item_id' => $context['item']->item_id,
+                    'ppmp_item_id' => $context['ppmpItem']->ppmp_item_id,
+                    'item_name_snapshot' => $context['item']->item_name,
+                    'quantity_requested' => 36,
+                ]],
+            ]);
+
+        $createResponse->assertRedirect();
+
+        $supplyRequest = SupplyRequest::query()->latest('supply_request_id')->firstOrFail();
+
+        $this->actingAs($this->officeUser)
+            ->post(route('office.supply-requests.submit', $supplyRequest->supply_request_id), [
+                'review_notes' => 'Submit early depletion request',
+            ])
+            ->assertRedirect(route('office.supply-requests.show', $supplyRequest->supply_request_id));
+
+        $this->assertDatabaseHas('anomalies', [
+            'anomaly_type' => 'PPMP_EARLY_DEPLETION',
+            'office_id' => $this->office->id,
+            'detection_method' => 'PPMP_EARLY_DEPLETION_WINDOW',
+            'detected_value' => 86,
+            'expected_value' => 50,
+            'threshold_value' => 85,
+            'status' => 'OPEN',
+        ]);
+
+        $this->assertDatabaseMissing('anomalies', [
+            'anomaly_type' => 'PPMP_OVER_REQUEST',
+            'office_id' => $this->office->id,
+            'item_id' => $context['item']->item_id,
+        ]);
+
+        $anomaly = Anomaly::query()
+            ->where('anomaly_type', 'PPMP_EARLY_DEPLETION')
+            ->where('office_id', $this->office->id)
+            ->firstOrFail();
+
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $this->executive->id,
+            'notification_type' => 'EXEC_ANOMALY_DETECTED',
+            'reference_type' => Anomaly::class,
+            'reference_id' => $anomaly->anomaly_id,
+            'is_read' => false,
+        ]);
+    }
+
+    public function test_remaining_supply_request_anomalies_are_created_on_submission_without_manual_detection_run(): void
+    {
+        $context = $this->createApprovedPpmpRequestContext(9707, 1000);
+        $otherOffice = $this->createOffice('PPMP Anomaly Other Office', 'PPAO2');
+        $otherOfficeUser = $this->createUser(UserRole::OFFICE_USER, $otherOffice);
+
+        $secondItem = Item::query()->create([
+            'item_category_id' => $context['item']->item_category_id,
+            'item_name' => 'Approved PPMP Secondary Item 9707',
+            'description' => null,
+            'default_unit' => 'PCS',
+            'status' => 'active',
+        ]);
+
+        $secondPpmpItem = PpmpItem::query()->create([
+            'ppmp_id' => $context['ppmp']->ppmp_id,
+            'item_id' => $secondItem->item_id,
+            'item_category_id' => $context['item']->item_category_id,
+            'quantity' => 1000,
+            'unit_cost' => 50,
+            'estimated_budget' => 50000,
+            'procurement_schedule' => 'Q1',
+            'remarks' => null,
+        ]);
+
+        for ($index = 0; $index < 9; $index++) {
+            $supplyRequest = SupplyRequest::query()->create([
+                'request_code' => 'SR-PPA-'.uniqid(),
+                'office_id' => $this->office->id,
+                'requested_by' => $this->officeUser->id,
+                'ppmp_id' => $context['ppmp']->ppmp_id,
+                'request_date' => now()->subDays($index + 1)->toDateString(),
+                'needed_by_date' => now()->addDays(7)->toDateString(),
+                'request_category' => 'GENERAL',
+                'purpose' => 'Historical request volume sample',
+                'priority_level' => 'HIGH',
+                'status' => 'SUBMITTED',
+                'review_notes' => null,
+                'approved_by' => null,
+                'approved_at' => null,
+            ]);
+
+            SupplyRequestItem::query()->create([
+                'supply_request_id' => $supplyRequest->supply_request_id,
+                'item_id' => $context['item']->item_id,
+                'ppmp_item_id' => $context['ppmpItem']->ppmp_item_id,
+                'item_name_snapshot' => $context['item']->item_name,
+                'quantity_requested' => 5,
+            ]);
+        }
+
+        $otherItemRequest = SupplyRequest::query()->create([
+            'request_code' => 'SR-PPA-'.uniqid(),
+            'office_id' => $this->office->id,
+            'requested_by' => $this->officeUser->id,
+            'ppmp_id' => $context['ppmp']->ppmp_id,
+            'request_date' => now()->subDay()->toDateString(),
+            'needed_by_date' => now()->addDays(7)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Other PPMP item request sample',
+            'priority_level' => 'HIGH',
+            'status' => 'SUBMITTED',
+            'review_notes' => null,
+            'approved_by' => null,
+            'approved_at' => null,
+        ]);
+
+        SupplyRequestItem::query()->create([
+            'supply_request_id' => $otherItemRequest->supply_request_id,
+            'item_id' => $secondItem->item_id,
+            'ppmp_item_id' => $secondPpmpItem->ppmp_item_id,
+            'item_name_snapshot' => $secondItem->item_name,
+            'quantity_requested' => 5,
+        ]);
+
+        SupplyRequest::query()->create([
+            'request_code' => 'SR-PPA-'.uniqid(),
+            'office_id' => $otherOffice->id,
+            'requested_by' => $otherOfficeUser->id,
+            'ppmp_id' => null,
+            'request_date' => now()->subDay()->toDateString(),
+            'needed_by_date' => now()->addDays(7)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Cross-office frequency baseline',
+            'priority_level' => 'HIGH',
+            'status' => 'SUBMITTED',
+            'review_notes' => null,
+            'approved_by' => null,
+            'approved_at' => null,
+        ]);
+
+        $this->actingAs($this->officeUser)
+            ->post(route('office.supply-requests.store'), [
+                'ppmp_id' => $context['ppmp']->ppmp_id,
+                'needed_by_date' => now()->addDays(10)->toDateString(),
+                'request_category' => 'GENERAL',
+                'purpose' => 'Submission triggers remaining SR anomaly algorithms',
+                'priority_level' => 'HIGH',
+                'review_notes' => 'Automatic anomaly submission',
+                'items' => [[
+                    'item_id' => $context['item']->item_id,
+                    'ppmp_item_id' => $context['ppmpItem']->ppmp_item_id,
+                    'item_name_snapshot' => $context['item']->item_name,
+                    'quantity_requested' => 50,
+                ]],
+            ])
+            ->assertRedirect();
+
+        $supplyRequest = SupplyRequest::query()->latest('supply_request_id')->firstOrFail();
+
+        $this->actingAs($this->officeUser)
+            ->post(route('office.supply-requests.submit', $supplyRequest->supply_request_id), [
+                'review_notes' => 'Submit automatic anomaly request',
+            ])
+            ->assertRedirect(route('office.supply-requests.show', $supplyRequest->supply_request_id));
+
+        $this->assertDatabaseHas('anomalies', [
+            'anomaly_type' => 'FREQUENT_REQUEST_WINDOW',
+            'office_id' => $this->office->id,
+            'detection_method' => 'SLIDING_WINDOW_30D',
+            'status' => 'OPEN',
+        ]);
+
+        $this->assertDatabaseHas('anomalies', [
+            'anomaly_type' => 'EXCESSIVE_QUANTITY',
+            'office_id' => $this->office->id,
+            'item_id' => $context['item']->item_id,
+            'detection_method' => 'MEAN_PLUS_2_SIGMA',
+            'status' => 'OPEN',
+        ]);
+
+        $this->assertDatabaseHas('anomalies', [
+            'anomaly_type' => 'PPMP_FREQUENCY_IRREGULARITY',
+            'office_id' => $this->office->id,
+            'item_id' => $context['item']->item_id,
+            'detection_method' => 'PPMP_SLIDING_WINDOW_30D',
+            'status' => 'OPEN',
+        ]);
+    }
+
     public function test_non_exec_roles_are_denied_from_exec_ppmp_anomaly_pages(): void
     {
         $this->createPpmpOverRequestContext(9704, 10, [7, 6]);
@@ -211,6 +438,44 @@ class PpmpAnomalyIntegrationTest extends TestCase
             'anomaly_type' => 'PRICE_Z_SCORE',
             'reference_type' => SupplyRequestItem::class,
             'item_id' => $context['item']->item_id,
+        ]);
+    }
+
+    public function test_price_anomaly_is_visible_to_exec_when_procurement_encodes_outlier_po_price(): void
+    {
+        $context = $this->createProcurementPriceHistoryContext(9803, [100, 101, 102, 103, 104]);
+
+        $purchaseOrderItem = app(PurchaseOrderService::class)->addItem(
+            $context['purchaseOrder'],
+            $this->procurementUser,
+            [
+                'supply_request_item_id' => $context['supplyRequestItem']->supply_request_item_id,
+                'unit' => 'PCS',
+                'unit_price' => 260,
+            ],
+        );
+
+        $this->assertDatabaseHas('anomalies', [
+            'anomaly_type' => 'PRICE_Z_SCORE',
+            'reference_type' => PurchaseOrderItem::class,
+            'reference_id' => $purchaseOrderItem->purchase_order_item_id,
+            'item_id' => $context['item']->item_id,
+            'office_id' => $this->office->id,
+            'detection_method' => 'Z_SCORE',
+            'status' => 'OPEN',
+        ]);
+
+        $anomaly = Anomaly::query()
+            ->where('anomaly_type', 'PRICE_Z_SCORE')
+            ->where('reference_id', $purchaseOrderItem->purchase_order_item_id)
+            ->firstOrFail();
+
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $this->executive->id,
+            'notification_type' => 'EXEC_ANOMALY_DETECTED',
+            'reference_type' => Anomaly::class,
+            'reference_id' => $anomaly->anomaly_id,
+            'is_read' => false,
         ]);
     }
 
@@ -373,6 +638,105 @@ class PpmpAnomalyIntegrationTest extends TestCase
         }
 
         return $context;
+    }
+
+    /**
+     * @param  array<int, float|int>  $unitPrices
+     * @return array<string, mixed>
+     */
+    private function createProcurementPriceHistoryContext(int $itemId, array $unitPrices): array
+    {
+        $context = $this->createPpmpOverRequestContext(
+            $itemId,
+            100,
+            array_fill(0, count($unitPrices) + 1, 2)
+        );
+
+        $supplier = Supplier::query()->create([
+            'supplier_name' => 'Auto Price Anomaly Supplier '.$itemId,
+            'contact_person' => 'Supplier Contact',
+            'email' => 'auto-price-anomaly-'.$itemId.'@test.local',
+            'phone' => '09123456789',
+            'address' => 'Supplier Address',
+            'status' => 'ACTIVE',
+        ]);
+
+        $supplyItems = SupplyRequestItem::query()
+            ->where('item_id', $context['item']->item_id)
+            ->with('supplyRequest:supply_request_id,office_id')
+            ->orderBy('supply_request_item_id')
+            ->get();
+
+        foreach ($unitPrices as $index => $unitPrice) {
+            $supplyItem = $supplyItems->get($index);
+            if (! $supplyItem instanceof SupplyRequestItem) {
+                continue;
+            }
+
+            $purchaseRequest = PurchaseRequest::query()->create([
+                'supply_request_id' => $supplyItem->supply_request_id,
+                'office_id' => $this->office->id,
+                'requested_by' => $this->procurementUser->id,
+                'status' => 'PROCESSING',
+                'remarks' => 'Procurement price history test PR',
+            ]);
+
+            $purchaseOrder = PurchaseOrder::query()->create([
+                'purchase_request_id' => $purchaseRequest->purchase_request_id,
+                'supply_request_id' => $supplyItem->supply_request_id,
+                'supplier_id' => $supplier->supplier_id,
+                'created_by' => $this->procurementUser->id,
+                'po_number' => 'PO-APPA-'.$itemId.'-'.$index,
+                'procurement_method' => 'SMALL_VALUE_PROCUREMENT',
+                'status' => 'PLACED',
+                'expected_delivery_date' => now()->addDays(7)->toDateString(),
+                'total_amount' => (float) $unitPrice,
+                'terms_notes' => 'Net 30',
+                'remarks' => 'Price history testing PO',
+            ]);
+
+            PurchaseOrderItem::query()->create([
+                'purchase_order_id' => $purchaseOrder->purchase_order_id,
+                'supply_request_item_id' => $supplyItem->supply_request_item_id,
+                'item_id' => $context['item']->item_id,
+                'item_name_snapshot' => $context['item']->item_name,
+                'specification' => 'Procurement price history sample',
+                'quantity_ordered' => 1,
+                'unit' => 'PCS',
+                'unit_price' => (float) $unitPrice,
+                'total_price' => (float) $unitPrice,
+            ]);
+        }
+
+        $latestSupplyItem = $supplyItems->last();
+
+        $purchaseRequest = PurchaseRequest::query()->create([
+            'supply_request_id' => $latestSupplyItem->supply_request_id,
+            'office_id' => $this->office->id,
+            'requested_by' => $this->procurementUser->id,
+            'status' => 'PROCESSING',
+            'remarks' => 'Procurement outlier price test PR',
+        ]);
+
+        $purchaseOrder = PurchaseOrder::query()->create([
+            'purchase_request_id' => $purchaseRequest->purchase_request_id,
+            'supply_request_id' => $latestSupplyItem->supply_request_id,
+            'supplier_id' => $supplier->supplier_id,
+            'created_by' => $this->procurementUser->id,
+            'po_number' => 'PO-APPA-'.$itemId.'-latest',
+            'procurement_method' => 'SMALL_VALUE_PROCUREMENT',
+            'status' => 'DRAFT',
+            'expected_delivery_date' => now()->addDays(7)->toDateString(),
+            'total_amount' => 0,
+            'terms_notes' => 'Net 30',
+            'remarks' => 'Outlier price testing PO',
+        ]);
+
+        return [
+            ...$context,
+            'purchaseOrder' => $purchaseOrder,
+            'supplyRequestItem' => $latestSupplyItem,
+        ];
     }
 
     private function createOffice(string $name, string $code): Office

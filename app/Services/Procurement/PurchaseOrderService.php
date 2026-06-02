@@ -12,6 +12,7 @@ use App\Models\Supplier;
 use App\Models\SupplyRequestItem;
 use App\Models\StatusHistory;
 use App\Models\User;
+use App\Services\Analytics\AnomalyService;
 use App\Services\AuditLogService;
 use App\Services\NotificationService;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +23,7 @@ class PurchaseOrderService
     public function __construct(
         private readonly AuditLogService $auditLogService,
         private readonly NotificationService $notificationService,
+        private readonly AnomalyService $anomalyService,
     ) {
     }
 
@@ -264,6 +266,7 @@ class PurchaseOrderService
             $this->recomputeTotalAmount($purchaseOrder);
             $this->recordStatus($purchaseOrder, (string) $purchaseOrder->status, (string) $purchaseOrder->status, $actor, 'Purchase order item added.');
             $this->recordAudit($actor, 'ADD_ITEM', $purchaseOrder);
+            $this->createOrUpdatePriceZScoreAnomaly($item);
 
             return $item;
         });
@@ -309,6 +312,7 @@ class PurchaseOrderService
             $this->recomputeTotalAmount($purchaseOrder);
             $this->recordStatus($purchaseOrder, (string) $purchaseOrder->status, (string) $purchaseOrder->status, $actor, 'Purchase order item updated.');
             $this->recordAudit($actor, 'UPDATE_ITEM', $purchaseOrder);
+            $this->createOrUpdatePriceZScoreAnomaly($item);
 
             return $item;
         });
@@ -349,6 +353,65 @@ class PurchaseOrderService
         $purchaseOrder->forceFill([
             'total_amount' => round($total, 2),
         ])->save();
+    }
+
+    private function createOrUpdatePriceZScoreAnomaly(PurchaseOrderItem $purchaseOrderItem): void
+    {
+        if (! $purchaseOrderItem->item_id) {
+            return;
+        }
+
+        $rows = PurchaseOrderItem::query()
+            ->with(['purchaseOrder.purchaseRequest:purchase_request_id,office_id', 'purchaseOrder.supplyRequest:supply_request_id,office_id'])
+            ->where('item_id', (int) $purchaseOrderItem->item_id)
+            ->whereHas('purchaseOrder')
+            ->get(['purchase_order_item_id', 'purchase_order_id', 'item_id', 'unit_price']);
+
+        $prices = $rows->pluck('unit_price')->map(fn ($value): float => (float) $value);
+
+        if ($prices->count() < 3) {
+            return;
+        }
+
+        $mean = $prices->avg();
+        $variance = $prices->map(fn (float $price): float => ($price - $mean) ** 2)->avg();
+        $std = sqrt((float) $variance);
+
+        if ($std <= 0) {
+            return;
+        }
+
+        $latest = $rows->sortByDesc('purchase_order_item_id')->first();
+
+        if (! $latest instanceof PurchaseOrderItem) {
+            return;
+        }
+
+        $latestPrice = (float) $latest->unit_price;
+        $zScore = ($latestPrice - $mean) / $std;
+
+        if (abs($zScore) < 2.0) {
+            return;
+        }
+
+        $purchaseOrder = $latest->purchaseOrder;
+        $officeId = (int) ($purchaseOrder?->purchaseRequest?->office_id ?? $purchaseOrder?->supplyRequest?->office_id ?? 0) ?: null;
+
+        $this->anomalyService->createOrUpdateSystemDetected([
+            'anomaly_type' => 'PRICE_Z_SCORE',
+            'reference_type' => PurchaseOrderItem::class,
+            'reference_id' => (int) $latest->purchase_order_item_id,
+            'item_id' => (int) $latest->item_id,
+            'office_id' => $officeId,
+            'detected_value' => $latestPrice,
+            'expected_value' => $mean,
+            'threshold_value' => 2.0,
+            'z_score' => round($zScore, 4),
+            'detection_method' => 'Z_SCORE',
+            'severity' => abs($zScore) >= 3 ? 'HIGH' : 'MEDIUM',
+            'detected_at' => now(),
+            'remarks' => 'Detected procurement-side price outlier when purchase order item pricing was encoded.',
+        ]);
     }
 
     private function assertProcurementActor(User $actor): void

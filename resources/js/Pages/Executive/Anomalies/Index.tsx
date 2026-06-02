@@ -115,12 +115,6 @@ export default function ExecutiveAnomalyIndex({ anomalies, filters, filter_optio
                             placeholder="Search office/type/status"
                             onChange={(e) => setSearch(e.target.value)}
                         />
-                        <button
-                            className="rounded bg-indigo-600 px-4 py-2 text-sm text-white md:col-span-5 md:justify-self-start"
-                            onClick={() => router.post(route('executive.anomalies.detect'))}
-                        >
-                            Run Detection
-                        </button>
                     </div>
 
                     <div className="responsive-table-wrap rounded border bg-white">
