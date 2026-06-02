@@ -39,9 +39,9 @@ class PurchaseOrderController extends Controller
             ->when($status !== '', fn ($query) => $query->where('status', $status))
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($nested) use ($search): void {
-                    $nested->where('po_number', 'like', '%'.$search.'%')
-                        ->orWhereHas('supplier', fn ($supplierQuery) => $supplierQuery->where('supplier_name', 'like', '%'.$search.'%'))
-                        ->orWhereHas('purchaseRequest.office', fn ($officeQuery) => $officeQuery->where('name', 'like', '%'.$search.'%'));
+                    $nested->whereLikeInsensitive('po_number', $search)
+                        ->orWhereHas('supplier', fn ($supplierQuery) => $supplierQuery->whereLikeInsensitive('supplier_name', $search))
+                        ->orWhereHas('purchaseRequest.office', fn ($officeQuery) => $officeQuery->whereLikeInsensitive('name', $search));
                 });
             })
             ->latest('purchase_order_id')

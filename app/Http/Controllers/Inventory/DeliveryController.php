@@ -46,9 +46,9 @@ class DeliveryController
             ->when(preg_match('/^\d{1,2}$/', $month) === 1, fn ($query) => $query->whereMonth('created_at', (int) $month))
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($nested) use ($search): void {
-                    $nested->where('delivery_code', 'like', '%'.$search.'%')
-                        ->orWhereHas('purchaseOrder', fn ($purchaseOrderQuery) => $purchaseOrderQuery->where('po_number', 'like', '%'.$search.'%'))
-                        ->orWhereHas('supplier', fn ($supplierQuery) => $supplierQuery->where('supplier_name', 'like', '%'.$search.'%'));
+                    $nested->whereLikeInsensitive('delivery_code', $search)
+                        ->orWhereHas('purchaseOrder', fn ($purchaseOrderQuery) => $purchaseOrderQuery->whereLikeInsensitive('po_number', $search))
+                        ->orWhereHas('supplier', fn ($supplierQuery) => $supplierQuery->whereLikeInsensitive('supplier_name', $search));
                 });
             })
             ->orderByDesc('created_at')

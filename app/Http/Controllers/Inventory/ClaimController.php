@@ -57,9 +57,9 @@ class ClaimController
             ->when(preg_match('/^\d{1,2}$/', $month) === 1, fn ($builder) => $builder->whereMonth('created_at', (int) $month))
             ->when($search !== '', function ($builder) use ($search): void {
                 $builder->where(function ($nested) use ($search): void {
-                    $nested->where('claim_code', 'like', '%'.$search.'%')
-                        ->orWhere('claim_type', 'like', '%'.$search.'%')
-                        ->orWhereHas('office', fn ($officeQuery) => $officeQuery->where('name', 'like', '%'.$search.'%'));
+                    $nested->whereLikeInsensitive('claim_code', $search)
+                        ->orWhereLikeInsensitive('claim_type', $search)
+                        ->orWhereHas('office', fn ($officeQuery) => $officeQuery->whereLikeInsensitive('name', $search));
                 });
             })
             ->orderByDesc('created_at')

@@ -62,9 +62,9 @@ class SupplyRequestController extends Controller
             ->when(preg_match('/^\d{1,2}$/', $month) === 1, fn ($query) => $query->whereMonth('request_date', (int) $month))
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($nested) use ($search): void {
-                    $nested->where('request_code', 'like', '%'.$search.'%')
-                        ->orWhere('status', 'like', '%'.$search.'%')
-                        ->orWhere('purpose', 'like', '%'.$search.'%');
+                    $nested->whereLikeInsensitive('request_code', $search)
+                        ->orWhereLikeInsensitive('status', $search)
+                        ->orWhereLikeInsensitive('purpose', $search);
                 });
             })
             ->latest('supply_request_id')

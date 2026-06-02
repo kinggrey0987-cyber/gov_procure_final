@@ -36,8 +36,8 @@ class PurchaseRequestController extends Controller
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($nested) use ($search): void {
                     $nested->where('purchase_request_id', 'like', '%'.$search.'%')
-                        ->orWhereHas('supplyRequest', fn ($supplyRequestQuery) => $supplyRequestQuery->where('request_code', 'like', '%'.$search.'%'))
-                        ->orWhereHas('office', fn ($officeQuery) => $officeQuery->where('name', 'like', '%'.$search.'%'));
+                        ->orWhereHas('supplyRequest', fn ($supplyRequestQuery) => $supplyRequestQuery->whereLikeInsensitive('request_code', $search))
+                        ->orWhereHas('office', fn ($officeQuery) => $officeQuery->whereLikeInsensitive('name', $search));
                 });
             })
             ->latest('purchase_request_id')

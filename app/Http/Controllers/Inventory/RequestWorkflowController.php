@@ -76,9 +76,9 @@ class RequestWorkflowController
         if ($search !== '') {
             $query->where(function ($builder) use ($search): void {
                 $builder
-                    ->where('request_code', 'like', '%'.$search.'%')
-                    ->orWhere('purpose', 'like', '%'.$search.'%')
-                    ->orWhereHas('office', fn ($officeQuery) => $officeQuery->where('name', 'like', '%'.$search.'%'));
+                    ->whereLikeInsensitive('request_code', $search)
+                    ->orWhereLikeInsensitive('purpose', $search)
+                    ->orWhereHas('office', fn ($officeQuery) => $officeQuery->whereLikeInsensitive('name', $search));
             });
         }
 

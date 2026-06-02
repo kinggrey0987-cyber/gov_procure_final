@@ -44,12 +44,12 @@ class DomainDashboardController extends Controller
             ->when($filters['search'] ?? null, function ($q, $search) {
                 $q->where(function ($searchQuery) use ($search) {
                     $searchQuery
-                        ->where('module_name', 'like', "%{$search}%")
-                        ->orWhere('action_type', 'like', "%{$search}%");
+                        ->whereLikeInsensitive('module_name', $search)
+                        ->orWhereLikeInsensitive('action_type', $search);
                 });
             })
             ->when($filters['actor'] ?? null, function ($q, $actor) {
-                $q->whereHas('user', fn ($userQuery) => $userQuery->where('name', 'like', "%{$actor}%"));
+                $q->whereHas('user', fn ($userQuery) => $userQuery->whereLikeInsensitive('name', $actor));
             })
             ->latest('created_at');
 

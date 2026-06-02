@@ -47,8 +47,8 @@ class UserManagementController extends Controller
         if ($filters['search'] ?? null) {
             $search = $filters['search'];
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
+                $q->whereLikeInsensitive('name', $search)
+                    ->orWhereLikeInsensitive('email', $search);
             });
         }
 

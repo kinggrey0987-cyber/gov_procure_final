@@ -30,8 +30,8 @@ class InventoryController
         if ($search !== '') {
             $query->whereHas('item', function ($builder) use ($search): void {
                 $builder
-                    ->where('item_name', 'like', '%'.$search.'%')
-                    ->orWhere('description', 'like', '%'.$search.'%');
+                    ->whereLikeInsensitive('item_name', $search)
+                    ->orWhereLikeInsensitive('description', $search);
             });
         }
 

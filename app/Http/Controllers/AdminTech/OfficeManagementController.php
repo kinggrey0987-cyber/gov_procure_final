@@ -36,8 +36,8 @@ class OfficeManagementController extends Controller
             ])
             ->when($filters['search'] ?? null, function ($q, $search) {
                 $q->where(function ($query) use ($search) {
-                    $query->where('name', 'like', "%{$search}%")
-                        ->orWhere('code', 'like', "%{$search}%");
+                    $query->whereLikeInsensitive('name', $search)
+                        ->orWhereLikeInsensitive('code', $search);
                 });
             })
             ->when($filters['status'] ?? null, function ($q, $status) {

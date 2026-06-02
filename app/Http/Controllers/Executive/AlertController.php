@@ -49,10 +49,10 @@ class AlertController
             })
             ->when($search !== '', function ($q) use ($search): void {
                 $q->where(function ($nested) use ($search): void {
-                    $nested->where('alert_type', 'like', '%'.$search.'%')
-                        ->orWhere('severity', 'like', '%'.$search.'%')
-                        ->orWhere('status', 'like', '%'.$search.'%')
-                        ->orWhereHas('office', fn ($officeQuery) => $officeQuery->where('name', 'like', '%'.$search.'%'));
+                    $nested->whereLikeInsensitive('alert_type', $search)
+                        ->orWhereLikeInsensitive('severity', $search)
+                        ->orWhereLikeInsensitive('status', $search)
+                        ->orWhereHas('office', fn ($officeQuery) => $officeQuery->whereLikeInsensitive('name', $search));
                 });
             })
             ->orderByDesc('detected_at')

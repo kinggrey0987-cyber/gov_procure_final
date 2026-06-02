@@ -81,9 +81,9 @@ class PpmpApprovalController extends Controller
                 }
 
                 $searchQuery
-                    ->orWhere('remarks', 'like', "%{$search}%")
-                    ->orWhereHas('office', static fn ($officeQuery) => $officeQuery->where('name', 'like', "%{$search}%"))
-                    ->orWhereHas('preparer', static fn ($preparerQuery) => $preparerQuery->where('name', 'like', "%{$search}%"));
+                    ->orWhereLikeInsensitive('remarks', $search)
+                    ->orWhereHas('office', static fn ($officeQuery) => $officeQuery->whereLikeInsensitive('name', $search))
+                    ->orWhereHas('preparer', static fn ($preparerQuery) => $preparerQuery->whereLikeInsensitive('name', $search));
             });
         }
 

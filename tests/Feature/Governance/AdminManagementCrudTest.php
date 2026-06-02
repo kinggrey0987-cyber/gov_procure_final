@@ -212,6 +212,22 @@ class AdminManagementCrudTest extends TestCase
         $this->actingAs($officeUser)->delete(route('admin-tech.offices.destroy', $this->office->id))->assertForbidden();
     }
 
+    public function test_admin_user_search_is_case_insensitive(): void
+    {
+        $targetUser = $this->createUser(UserRole::OFFICE_USER, $this->office, 'case.search@gsc.local');
+        $targetUser->forceFill(['name' => 'Mixed Case Search User'])->save();
+
+        $this->actingAs($this->admin)
+            ->get(route('admin-tech.users.index', ['search' => 'mixed case search']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('AdminTech/Users/Index')
+                ->where('filters.search', 'mixed case search')
+                ->where('users.data.0.id', $targetUser->id)
+                ->where('users.data.0.name', 'Mixed Case Search User')
+            );
+    }
+
     public function test_public_role_is_excluded_from_internal_user_management(): void
     {
         $publicRole = $this->roleByCode(UserRole::PUBLIC->value);

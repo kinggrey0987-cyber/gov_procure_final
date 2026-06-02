@@ -44,10 +44,10 @@ class AnomalyController
             })
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($nested) use ($search): void {
-                    $nested->where('anomaly_type', 'like', '%'.$search.'%')
-                        ->orWhere('severity', 'like', '%'.$search.'%')
-                        ->orWhere('status', 'like', '%'.$search.'%')
-                        ->orWhereHas('office', fn ($officeQuery) => $officeQuery->where('name', 'like', '%'.$search.'%'));
+                    $nested->whereLikeInsensitive('anomaly_type', $search)
+                        ->orWhereLikeInsensitive('severity', $search)
+                        ->orWhereLikeInsensitive('status', $search)
+                        ->orWhereHas('office', fn ($officeQuery) => $officeQuery->whereLikeInsensitive('name', $search));
                 });
             })
             ->orderByDesc('detected_at')

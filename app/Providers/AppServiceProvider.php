@@ -24,6 +24,7 @@ use App\Policies\AnalyticsVisibilityPolicy;
 use App\Policies\DashboardAccessPolicy;
 use App\Policies\OfficeScopedAccessPolicy;
 use App\Policies\PublicDisclosurePolicy;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
@@ -43,6 +44,18 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Builder::macro('whereLikeInsensitive', function (string $column, string $value, string $boolean = 'and'): Builder {
+            /** @var Builder $this */
+            $wrappedColumn = $this->getQuery()->getGrammar()->wrap($column);
+
+            return $this->whereRaw('LOWER('.$wrappedColumn.') LIKE ?', ['%'.strtolower($value).'%'], $boolean);
+        });
+
+        Builder::macro('orWhereLikeInsensitive', function (string $column, string $value): Builder {
+            /** @var Builder $this */
+            return $this->whereLikeInsensitive($column, $value, 'or');
+        });
+
         Vite::prefetch(concurrency: 3);
 
         Gate::define('domain.admin-tech.access', [DashboardAccessPolicy::class, 'adminTech']);

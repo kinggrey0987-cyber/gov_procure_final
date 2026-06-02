@@ -51,8 +51,8 @@ class ProcurementDocumentController extends Controller
             ->when(in_array($module, self::PROCUREMENT_MODULES, true), fn ($query) => $query->where('related_module', $module))
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($nested) use ($search): void {
-                    $nested->where('title', 'like', '%'.$search.'%')
-                        ->orWhere('file_name', 'like', '%'.$search.'%');
+                    $nested->whereLikeInsensitive('title', $search)
+                        ->orWhereLikeInsensitive('file_name', $search);
                 });
             })
             ->orderByDesc('uploaded_at')

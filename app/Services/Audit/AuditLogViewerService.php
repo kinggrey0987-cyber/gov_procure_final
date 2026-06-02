@@ -161,8 +161,8 @@ class AuditLogViewerService
     {
         return AuditLog::query()
             ->with(['user', 'office'])
-            ->when(isset($filters['module_name']) && $filters['module_name'] !== '', fn (Builder $query): Builder => $query->where('module_name', 'like', '%'.$filters['module_name'].'%'))
-            ->when(isset($filters['action_type']) && $filters['action_type'] !== '', fn (Builder $query): Builder => $query->where('action_type', 'like', '%'.$filters['action_type'].'%'))
+            ->when(isset($filters['module_name']) && $filters['module_name'] !== '', fn (Builder $query): Builder => $query->whereLikeInsensitive('module_name', (string) $filters['module_name']))
+            ->when(isset($filters['action_type']) && $filters['action_type'] !== '', fn (Builder $query): Builder => $query->whereLikeInsensitive('action_type', (string) $filters['action_type']))
             ->when(isset($filters['user_id']) && $filters['user_id'] !== null && $filters['user_id'] !== '', fn (Builder $query): Builder => $query->where('user_id', (int) $filters['user_id']))
             ->when(isset($filters['from_date']) && $filters['from_date'] !== '', fn (Builder $query): Builder => $query->whereDate('created_at', '>=', (string) $filters['from_date']))
             ->when(isset($filters['to_date']) && $filters['to_date'] !== '', fn (Builder $query): Builder => $query->whereDate('created_at', '<=', (string) $filters['to_date']));

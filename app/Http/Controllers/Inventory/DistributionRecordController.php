@@ -48,10 +48,10 @@ class DistributionRecordController
             ->when(preg_match('/^\d{1,2}$/', $month) === 1, fn ($query) => $query->whereMonth('created_at', (int) $month))
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($nested) use ($search): void {
-                    $nested->where('distribution_code', 'like', '%'.$search.'%')
-                        ->orWhere('status', 'like', '%'.$search.'%')
-                        ->orWhereHas('supplyRequest', fn ($supplyRequestQuery) => $supplyRequestQuery->where('request_code', 'like', '%'.$search.'%'))
-                        ->orWhereHas('office', fn ($officeQuery) => $officeQuery->where('name', 'like', '%'.$search.'%'));
+                    $nested->whereLikeInsensitive('distribution_code', $search)
+                        ->orWhereLikeInsensitive('status', $search)
+                        ->orWhereHas('supplyRequest', fn ($supplyRequestQuery) => $supplyRequestQuery->whereLikeInsensitive('request_code', $search))
+                        ->orWhereHas('office', fn ($officeQuery) => $officeQuery->whereLikeInsensitive('name', $search));
                 });
             })
             ->orderByDesc('created_at')

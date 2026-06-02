@@ -25,7 +25,7 @@ class ItemCategoryController
 
         $search = trim((string) $request->query('q', ''));
         if ($search !== '') {
-            $query->where('category_name', 'like', '%'.$search.'%');
+            $query->whereLikeInsensitive('category_name', $search);
         }
 
         $status = trim((string) $request->query('status', ''));
