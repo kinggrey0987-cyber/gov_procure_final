@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { PageProps } from '@/types';
-import { Head, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 
@@ -117,12 +117,17 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
     const totalIssueQuantity = issueLines.reduce((total, line) => total + toWholeQuantity(line.quantity), 0);
     const derivedClaimType = getClaimTypeFromIssueLines(issueLines);
     const selectedRecordItems = selectedRecord?.items ?? [];
+    const backRouteName = isOfficeUser ? 'office.claims.index' : 'inventory.claims.index';
 
     return (
         <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">File Claim</h2>}>
             <Head title="File Claim" />
             <div className="py-10">
                 <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+                    <Link href={route(backRouteName)} className="mb-4 inline-flex rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
+                        Back to Claims and Adjustments
+                    </Link>
+
                     <div className="mb-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                         <p className="text-sm text-slate-600">Claims are post-distribution issue records. Select an existing released or received distribution record first.</p>
                         <p className="mt-2 text-xs text-slate-500">Typical claim types: missing items, damaged items, quantity mismatch, or wrong item received.</p>
