@@ -60,16 +60,18 @@ class ClaimService
             }
         }
 
+        $submittedClaimType = (string) ($payload['claim_type'] ?? '');
+        $submittedDisputedQuantity = max((float) ($payload['quantity_disputed'] ?? 0), 0);
         $damagedQuantity = max((float) ($payload['quantity_damaged'] ?? 0), 0);
         $missingQuantity = max((float) ($payload['quantity_missing'] ?? 0), 0);
         $disputedQuantity = $damagedQuantity + $missingQuantity;
 
-        if ($disputedQuantity <= 0 && (float) ($payload['quantity_disputed'] ?? 0) > 0) {
-            $disputedQuantity = (float) $payload['quantity_disputed'];
-            $claimType = (string) ($payload['claim_type'] ?? '');
-            if ($claimType === 'DAMAGED_ITEM') {
+        if ($submittedDisputedQuantity > $disputedQuantity) {
+            $disputedQuantity = $submittedDisputedQuantity;
+
+            if ($submittedClaimType === 'DAMAGED_ITEM' && $damagedQuantity <= 0 && $missingQuantity <= 0) {
                 $damagedQuantity = $disputedQuantity;
-            } else {
+            } elseif (in_array($submittedClaimType, ['MISSING_ITEM', 'SHORTAGE'], true) && $damagedQuantity <= 0 && $missingQuantity <= 0) {
                 $missingQuantity = $disputedQuantity;
             }
         }
@@ -77,7 +79,7 @@ class ClaimService
         if ($distributionItem !== null) {
             if ($disputedQuantity <= 0) {
                 throw ValidationException::withMessages([
-                    'quantity_disputed' => 'Enter at least one missing or damaged quantity for this claim.',
+                    'quantity_disputed' => 'Enter at least one issue quantity for this claim.',
                 ]);
             }
 
@@ -85,18 +87,6 @@ class ClaimService
             if ($disputedQuantity - $releasedQuantity > 0.0001) {
                 throw ValidationException::withMessages([
                     'quantity_disputed' => sprintf('Disputed quantity cannot exceed the released quantity of %.2f.', $releasedQuantity),
-                ]);
-            }
-
-            $alreadyClaimedQuantity = (float) Claim::query()
-                ->where('distribution_item_id', (int) $distributionItem->distribution_item_id)
-                ->where('status', '!=', 'REJECTED')
-                ->sum('quantity_disputed');
-            $remainingClaimableQuantity = max($releasedQuantity - $alreadyClaimedQuantity, 0);
-
-            if ($disputedQuantity - $remainingClaimableQuantity > 0.0001) {
-                throw ValidationException::withMessages([
-                    'quantity_disputed' => sprintf('Only %.2f unit(s) remain claimable for this released item after existing active claims.', $remainingClaimableQuantity),
                 ]);
             }
         }
@@ -115,7 +105,7 @@ class ClaimService
 
         $claimCode = $payload['claim_code'] ?? $this->generateClaimCode();
 
-        $claimType = $this->resolveClaimType((string) $payload['claim_type'], $damagedQuantity, $missingQuantity);
+        $claimType = $this->resolveClaimType($submittedClaimType, $damagedQuantity, $missingQuantity);
 
         return DB::transaction(function () use ($actor, $payload, $claimCode, $claimType, $disputedQuantity, $damagedQuantity, $missingQuantity): Claim {
             $claim = Claim::query()->create([
@@ -285,6 +275,10 @@ class ClaimService
 
     private function resolveClaimType(string $submittedType, float $damagedQuantity, float $missingQuantity): string
     {
+        if (in_array($submittedType, ['MULTIPLE_ISSUES', 'WRONG_ITEM', 'QUANTITY_MISMATCH'], true)) {
+            return $submittedType;
+        }
+
         if ($damagedQuantity > 0 && $missingQuantity > 0) {
             return 'MISSING_AND_DAMAGED';
         }

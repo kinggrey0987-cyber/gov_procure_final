@@ -166,12 +166,12 @@ export default function ClaimShow({ claim, linkedDistribution, attachments, atta
                         <Info label="Issue Type" value={displayClaimType(claim.claim_type)} />
                         <Info label="Date Observed" value={formatDate(claim.claim_date)} />
                         <Info label="Issue Location" value={claim.claim_location} />
-                        <Info label="Disputed Quantity" value={String(claim.quantity_disputed ?? 0)} />
+                        <Info label="Disputed Quantity" value={formatQuantity(claim.quantity_disputed ?? 0)} />
                         <Info label="Claimed Damaged Qty" value={formatQuantity(claimedIssueQuantities.damaged)} />
                         <Info label="Claimed Missing Qty" value={formatQuantity(claimedIssueQuantities.missing)} />
                         <Info label="Resolution Type" value={claim.resolution_type ?? 'Pending review'} />
-                        <Info label="Replacement Released" value={String(claim.replacement_quantity ?? 0)} />
-                        <Info label="Available Replacement Stock" value={claim.replacement_available_stock === null || claim.replacement_available_stock === undefined ? '-' : String(claim.replacement_available_stock)} />
+                        <Info label="Replacement Released" value={formatQuantity(claim.replacement_quantity ?? 0)} />
+                        <Info label="Available Replacement Stock" value={claim.replacement_available_stock === null || claim.replacement_available_stock === undefined ? '-' : formatQuantity(claim.replacement_available_stock)} />
                         <Info label="Remarks" value={claim.remarks ?? 'No remarks provided.'} />
                     </div>
                     {permissions?.update ? (
@@ -218,10 +218,12 @@ export default function ClaimShow({ claim, linkedDistribution, attachments, atta
                                             type="number"
                                             min="0"
                                             step="1"
+                                            inputMode="numeric"
+                                            pattern="[0-9]*"
                                             className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm disabled:bg-slate-100"
                                             value={statusForm.data.replacement_quantity}
                                             disabled={!usesReplacement}
-                                            onChange={(event) => statusForm.setData('replacement_quantity', event.target.value)}
+                                            onChange={(event) => statusForm.setData('replacement_quantity', event.target.value.replace(/\D/g, ''))}
                                         />
                                         {statusForm.errors.replacement_quantity ? <p className="mt-1 text-xs text-rose-600">{statusForm.errors.replacement_quantity}</p> : null}
                                     </div>
@@ -281,10 +283,10 @@ export default function ClaimShow({ claim, linkedDistribution, attachments, atta
                                         <tr key={item.distribution_item_id} className="hover:bg-slate-50/60">
                                             <td className="px-4 py-2 text-slate-700">{item.item_name}</td>
                                             <td className="px-4 py-2 text-slate-600">{item.category_name || '-'}</td>
-                                            <td className="px-4 py-2 text-right font-semibold text-slate-700">{item.quantity_released.toFixed(2)}</td>
-                                            <td className="px-4 py-2 text-right font-semibold text-emerald-700">{(item.quantity_received ?? 0).toFixed(2)}</td>
-                                            <td className="px-4 py-2 text-right text-rose-600">{(item.quantity_damaged ?? 0).toFixed(2)}</td>
-                                            <td className="px-4 py-2 text-right text-amber-600">{(item.quantity_missing ?? 0).toFixed(2)}</td>
+                                            <td className="px-4 py-2 text-right font-semibold text-slate-700">{formatQuantity(item.quantity_released)}</td>
+                                            <td className="px-4 py-2 text-right font-semibold text-emerald-700">{formatQuantity(item.quantity_received ?? 0)}</td>
+                                            <td className="px-4 py-2 text-right text-rose-600">{formatQuantity(item.quantity_damaged ?? 0)}</td>
+                                            <td className="px-4 py-2 text-right text-amber-600">{formatQuantity(item.quantity_missing ?? 0)}</td>
                                             <td className="px-4 py-2 text-slate-700">{item.unit}</td>
                                         </tr>
                                     ))}
@@ -369,8 +371,8 @@ export default function ClaimShow({ claim, linkedDistribution, attachments, atta
                                             <tr key={item.distribution_item_id} className="hover:bg-slate-50/60">
                                                 <td className="px-4 py-3 text-slate-700">{item.item_name}</td>
                                                 <td className="px-4 py-3 text-slate-600">{item.category_name || '-'}</td>
-                                                <td className="px-4 py-3 text-right font-semibold text-slate-700">{item.quantity_released.toFixed(2)}</td>
-                                                <td className="px-4 py-3 text-right font-semibold text-emerald-700">{(item.quantity_received ?? 0).toFixed(2)}</td>
+                                                <td className="px-4 py-3 text-right font-semibold text-slate-700">{formatQuantity(item.quantity_released)}</td>
+                                                <td className="px-4 py-3 text-right font-semibold text-emerald-700">{formatQuantity(item.quantity_received ?? 0)}</td>
                                                 <td className="px-4 py-3 text-right text-rose-600">{rowClaimedDamaged}</td>
                                                 <td className="px-4 py-3 text-right text-amber-600">{rowClaimedMissing}</td>
                                                 <td className="px-4 py-3 text-right font-semibold text-red-700">
@@ -474,7 +476,7 @@ function getClaimIssueQuantities(claim: Props['claim']): { damaged: number; miss
 }
 
 function formatQuantity(value: number): string {
-    return value.toFixed(2);
+    return new Intl.NumberFormat('en-PH', { maximumFractionDigits: 0 }).format(Math.trunc(value));
 }
 
 function getNextStatusOptions(status: string): Array<{ value: string; label: string }> {

@@ -36,7 +36,7 @@ class UpdateClaimStatusRequest extends FormRequest
         return [
             'status' => ['required', 'string', 'in:IN_REVIEW,RESOLVED,REJECTED,PENDING_REPLACEMENT,PARTIALLY_RESOLVED'],
             'resolution_type' => ['nullable', 'string', 'in:'.implode(',', self::RESOLUTION_TYPES)],
-            'replacement_quantity' => ['nullable', 'numeric', 'min:0'],
+            'replacement_quantity' => ['nullable', 'integer', 'min:0'],
             'remarks' => ['nullable', 'string'],
         ];
     }
