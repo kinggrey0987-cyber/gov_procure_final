@@ -809,6 +809,24 @@ class DemoWorkflowSeeder extends Seeder
         string $priority,
         array $lines,
     ): SupplyRequest {
+        if ((int) $actor->office_id !== (int) $ppmp->office_id) {
+            throw new RuntimeException(sprintf(
+                'Supply request %s office mismatch: actor office_id %d cannot use PPMP office_id %d.',
+                $requestCode,
+                (int) $actor->office_id,
+                (int) $ppmp->office_id,
+            ));
+        }
+
+        $officeCode = (string) ($actor->office?->code ?? Office::query()->whereKey((int) $actor->office_id)->value('code') ?? '');
+        if ($officeCode !== '' && ! str_starts_with($requestCode, sprintf('SR-%s-', $officeCode))) {
+            throw new RuntimeException(sprintf(
+                'Supply request %s prefix does not match actor office code %s.',
+                $requestCode,
+                $officeCode,
+            ));
+        }
+
         $request = SupplyRequest::query()->updateOrCreate(
             ['request_code' => $requestCode],
             [
@@ -1007,6 +1025,24 @@ class DemoWorkflowSeeder extends Seeder
         string $neededByDate,
         array $lines,
     ): SupplyRequest {
+        if ((int) $actor->office_id !== (int) $ppmp->office_id) {
+            throw new RuntimeException(sprintf(
+                'Supply request %s office mismatch: actor office_id %d cannot use PPMP office_id %d.',
+                $requestCode,
+                (int) $actor->office_id,
+                (int) $ppmp->office_id,
+            ));
+        }
+
+        $officeCode = (string) ($actor->office?->code ?? Office::query()->whereKey((int) $actor->office_id)->value('code') ?? '');
+        if ($officeCode !== '' && ! str_starts_with($requestCode, sprintf('SR-%s-', $officeCode))) {
+            throw new RuntimeException(sprintf(
+                'Supply request %s prefix does not match actor office code %s.',
+                $requestCode,
+                $officeCode,
+            ));
+        }
+
         $supplyRequest = SupplyRequest::query()->updateOrCreate(
             ['request_code' => $requestCode],
             [

@@ -127,7 +127,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                 );
 
                 return [
-                'OFFICE_A' => $this->seedPpmp(
+                    'MPDO' => $this->seedPpmp(
                         officeId: $mpdoOfficeId,
                         preparer: $mpdoUser,
                         approver: $execUser,
@@ -140,7 +140,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                         desiredStatus: 'APPROVED',
                         remarks: 'Late-2025 planning for Q1 office stationery and filing support.',
                     ),
-                    'OFFICE_B' => $this->seedPpmp(
+                    'MSWDO' => $this->seedPpmp(
                         officeId: $mswdoOfficeId,
                         preparer: $mswdoUser,
                         approver: $execUser,
@@ -153,7 +153,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                         desiredStatus: 'APPROVED',
                         remarks: 'MSWDO revised PPMP approved for FY 2026 execution scenarios.',
                     ),
-                    'OFFICE_C' => $this->seedPpmp(
+                    'ENG' => $this->seedPpmp(
                         officeId: $engOfficeId,
                         preparer: $engUser,
                         approver: $execUser,
@@ -177,7 +177,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
             $this->seedAt('2026-01-08', function () use (&$requests, $mpdoUser, $mswdoUser, $engUser, $approvedPpmps): void {
                     $requests['mpdo-jan-paper'] = $this->seedSupplyRequest(
                         actor: $mpdoUser,
-                        ppmp: $approvedPpmps['OFFICE_A'],
+                        ppmp: $approvedPpmps['MPDO'],
                         requestCode: 'SR-MPDO-202601-01',
                         purpose: 'January planning office stationery replenishment.',
                         requestCategory: 'Office Supplies',
@@ -190,7 +190,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
 
                     $requests['mpdo-jan-file'] = $this->seedSupplyRequest(
                         actor: $mpdoUser,
-                        ppmp: $approvedPpmps['OFFICE_A'],
+                        ppmp: $approvedPpmps['MPDO'],
                         requestCode: 'SR-MPDO-202601-02',
                         purpose: 'January filing and meeting pack support.',
                         requestCategory: 'Office Supplies',
@@ -203,7 +203,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
 
                     $requests['mswdo-jan-hygiene'] = $this->seedSupplyRequest(
                         actor: $mswdoUser,
-                        ppmp: $approvedPpmps['OFFICE_B'],
+                        ppmp: $approvedPpmps['MSWDO'],
                         requestCode: 'SR-MSWDO-202601-01',
                         purpose: 'January sanitation and desk replenishment.',
                         requestCategory: 'Cleaning Supplies',
@@ -216,7 +216,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
 
                     $requests['eng-jan-ink'] = $this->seedSupplyRequest(
                         actor: $engUser,
-                        ppmp: $approvedPpmps['OFFICE_C'],
+                        ppmp: $approvedPpmps['ENG'],
                         requestCode: 'SR-ENG-202601-01',
                         purpose: 'January engineering office print queue support.',
                         requestCategory: 'Office Supplies',
@@ -281,7 +281,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
             $this->seedAt('2026-02-18', function () use (&$requests, $mpdoUser, $mswdoUser, $engUser, $approvedPpmps): void {
                     $requests['mpdo-feb-paper'] = $this->seedSupplyRequest(
                         actor: $mpdoUser,
-                        ppmp: $approvedPpmps['OFFICE_A'],
+                        ppmp: $approvedPpmps['MPDO'],
                         requestCode: 'SR-MPDO-202602-01',
                         purpose: 'February planning office paper replenishment.',
                         requestCategory: 'Office Supplies',
@@ -294,7 +294,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
 
                     $requests['mswdo-feb-cleaning'] = $this->seedSupplyRequest(
                         actor: $mswdoUser,
-                        ppmp: $approvedPpmps['OFFICE_B'],
+                        ppmp: $approvedPpmps['MSWDO'],
                         requestCode: 'SR-MSWDO-202602-01',
                         purpose: 'February hygiene support for desk and outreach use.',
                         requestCategory: 'Cleaning Supplies',
@@ -307,7 +307,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
 
                     $requests['eng-feb-mouse'] = $this->seedSupplyRequest(
                         actor: $engUser,
-                        ppmp: $approvedPpmps['OFFICE_C'],
+                        ppmp: $approvedPpmps['ENG'],
                         requestCode: 'SR-ENG-202602-01',
                         purpose: 'February workstation replacement mouse request.',
                         requestCategory: 'Office Supplies',
@@ -361,7 +361,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
             $this->seedAt('2026-03-18', function () use (&$requests, $mpdoUser, $mswdoUser, $engUser, $approvedPpmps): void {
                     $requests['mpdo-mar-forms'] = $this->seedSupplyRequest(
                         actor: $mpdoUser,
-                        ppmp: $approvedPpmps['OFFICE_A'],
+                        ppmp: $approvedPpmps['MPDO'],
                         requestCode: 'SR-MPDO-202603-01',
                         purpose: 'March routing forms and filing replenishment.',
                         requestCategory: 'Office Supplies',
@@ -375,7 +375,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
 
                     $requests['mswdo-mar-cleaning'] = $this->seedSupplyRequest(
                         actor: $mswdoUser,
-                        ppmp: $approvedPpmps['OFFICE_B'],
+                        ppmp: $approvedPpmps['MSWDO'],
                         requestCode: 'SR-MSWDO-202603-01',
                         purpose: 'March hygiene replenishment for outreach desk use.',
                         requestCategory: 'Cleaning Supplies',
@@ -389,7 +389,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
 
                     $requests['eng-mar-print'] = $this->seedSupplyRequest(
                         actor: $engUser,
-                        ppmp: $approvedPpmps['OFFICE_C'],
+                        ppmp: $approvedPpmps['ENG'],
                         requestCode: 'SR-ENG-202603-01',
                         purpose: 'March engineering print queue replenishment.',
                         requestCategory: 'Office Supplies',
@@ -468,7 +468,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
             $this->seedAt('2026-04-10', function () use (&$requests, &$purchaseOrders, $gsoUser, $mpdoUser, $engUser, $approvedPpmps, $procUser, $supplier, $secondarySupplier): void {
                     $requests['mpdo-apr-paper'] = $this->seedSupplyRequest(
                         actor: $mpdoUser,
-                        ppmp: $approvedPpmps['OFFICE_A'],
+                        ppmp: $approvedPpmps['MPDO'],
                         requestCode: 'SR-MPDO-202604-01',
                         purpose: 'April paper surge for report printing and archive work.',
                         requestCategory: 'Office Supplies',
@@ -481,7 +481,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
 
                     $requests['mpdo-apr-surge'] = $this->seedSupplyRequest(
                         actor: $mpdoUser,
-                        ppmp: $approvedPpmps['OFFICE_A'],
+                        ppmp: $approvedPpmps['MPDO'],
                         requestCode: 'SR-MPDO-202604-02',
                         purpose: 'April supplemental stationery request after meeting season.',
                         requestCategory: 'Office Supplies',
@@ -494,7 +494,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
 
                     $requests['eng-apr-ink'] = $this->seedSupplyRequest(
                         actor: $engUser,
-                        ppmp: $approvedPpmps['OFFICE_C'],
+                        ppmp: $approvedPpmps['ENG'],
                         requestCode: 'SR-ENG-202604-01',
                         purpose: 'April engineering ink replenishment for drawing production.',
                         requestCategory: 'Office Supplies',
@@ -542,7 +542,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
             $this->seedAt('2026-04-21', function () use (&$requests, $mpdoUser, $mswdoUser, $engUser, $approvedPpmps): void {
                     $requests['mpdo-apr-burst-1'] = $this->seedSupplyRequest(
                         actor: $mpdoUser,
-                        ppmp: $approvedPpmps['OFFICE_A'],
+                        ppmp: $approvedPpmps['MPDO'],
                         requestCode: 'SR-MPDO-202604-03',
                         purpose: 'April routing and filing burst after committee consultations.',
                         requestCategory: 'Office Supplies',
@@ -555,7 +555,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
 
                     $requests['mpdo-apr-burst-2'] = $this->seedSupplyRequest(
                         actor: $mpdoUser,
-                        ppmp: $approvedPpmps['OFFICE_A'],
+                        ppmp: $approvedPpmps['MPDO'],
                         requestCode: 'SR-MPDO-202604-04',
                         purpose: 'April follow-up paper batch for planning outputs.',
                         requestCategory: 'Office Supplies',
@@ -568,7 +568,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
 
                     $requests['mpdo-apr-burst-3'] = $this->seedSupplyRequest(
                         actor: $mpdoUser,
-                        ppmp: $approvedPpmps['OFFICE_A'],
+                        ppmp: $approvedPpmps['MPDO'],
                         requestCode: 'SR-MPDO-202604-05',
                         purpose: 'April exceptional paper surge tied to quarterly report printing.',
                         requestCategory: 'Office Supplies',
@@ -581,7 +581,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
 
                     $requests['mpdo-apr-ready'] = $this->seedSupplyRequest(
                         actor: $mpdoUser,
-                        ppmp: $approvedPpmps['OFFICE_A'],
+                        ppmp: $approvedPpmps['MPDO'],
                         requestCode: 'SR-MPDO-202604-06',
                         purpose: 'April stock-ready ballpen requisition for immediate release.',
                         requestCategory: 'Office Supplies',
@@ -594,7 +594,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
 
                     $requests['mswdo-apr-hygiene'] = $this->seedSupplyRequest(
                         actor: $mswdoUser,
-                        ppmp: $approvedPpmps['OFFICE_B'],
+                        ppmp: $approvedPpmps['MSWDO'],
                         requestCode: 'SR-MSWDO-202604-01',
                         purpose: 'April hygiene replenishment for outreach and desk work.',
                         requestCategory: 'Cleaning Supplies',
@@ -607,7 +607,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
 
                     $requests['eng-apr-ink-burst'] = $this->seedSupplyRequest(
                         actor: $engUser,
-                        ppmp: $approvedPpmps['OFFICE_C'],
+                        ppmp: $approvedPpmps['ENG'],
                         requestCode: 'SR-ENG-202604-02',
                         purpose: 'April engineering print burst for drawings and logs.',
                         requestCategory: 'Office Supplies',
@@ -1027,6 +1027,15 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                 $requestCode,
                 (int) $actor->office_id,
                 (int) $ppmp->office_id,
+            ));
+        }
+
+        $officeCode = (string) ($actor->office?->code ?? Office::query()->whereKey((int) $actor->office_id)->value('code') ?? '');
+        if ($officeCode !== '' && ! str_starts_with($requestCode, sprintf('SR-%s-', $officeCode))) {
+            throw new RuntimeException(sprintf(
+                'Supply request %s prefix does not match actor office code %s.',
+                $requestCode,
+                $officeCode,
             ));
         }
 
