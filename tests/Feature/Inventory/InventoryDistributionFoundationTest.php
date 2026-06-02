@@ -134,15 +134,14 @@ class InventoryDistributionFoundationTest extends TestCase
             'last_updated' => now(),
         ]);
 
-        $this->actingAs($this->gsoOfficer)
-            ->post(route('inventory.distribution-records.store'), [
-                'supply_request_id' => $context['supplyRequest']->supply_request_id,
-                'delivery_id' => $context['delivery']->delivery_id,
-                'office_id' => $this->officeA->id,
-            ])
-            ->assertRedirect();
-
-        $record = DistributionRecord::query()->firstOrFail();
+        $record = DistributionRecord::query()->create([
+            'distribution_code' => 'DIST-MANUAL-'.uniqid(),
+            'supply_request_id' => $context['supplyRequest']->supply_request_id,
+            'delivery_id' => null,
+            'office_id' => $this->officeA->id,
+            'prepared_by' => $this->gsoOfficer->id,
+            'status' => 'DRAFT',
+        ]);
 
         $this->actingAs($this->gsoOfficer)
             ->post(route('inventory.distribution-records.items.store', $record->distribution_record_id), [
@@ -1195,9 +1194,25 @@ class InventoryDistributionFoundationTest extends TestCase
 
         $this->actingAs($this->gsoOfficer)
             ->post(route('inventory.office-supply-requests.process-distribution', $context['supplyRequest']->supply_request_id))
-            ->assertRedirect(route('inventory.distribution-records.create', [
-                'supply_request_id' => $context['supplyRequest']->supply_request_id,
-            ]));
+            ->assertRedirect();
+
+        $record = DistributionRecord::query()
+            ->where('supply_request_id', $context['supplyRequest']->supply_request_id)
+            ->firstOrFail();
+
+        $this->assertSame('RELEASED', (string) $record->status);
+        $this->assertNotNull($record->release_date);
+
+        $this->assertDatabaseHas('distribution_items', [
+            'distribution_record_id' => $record->distribution_record_id,
+            'item_id' => $context['item']->item_id,
+            'quantity_released' => 4,
+        ]);
+
+        $inventory = Inventory::query()->where('item_id', $context['item']->item_id)->firstOrFail();
+        $this->assertSame('6.00', (string) $inventory->available_stock);
+        $this->assertSame('6.00', (string) $inventory->stock_on_hand);
+        $this->assertSame('4.00', (string) $inventory->released_quantity);
     }
 
     public function test_process_distribution_rejects_stock_ready_draft_request(): void
@@ -1262,7 +1277,17 @@ class InventoryDistributionFoundationTest extends TestCase
             'supply_request_id' => $context['supplyRequest']->supply_request_id,
             'office_id' => $this->officeA->id,
             'delivery_id' => null,
-            'status' => 'DRAFT',
+            'status' => 'RELEASED',
+        ]);
+
+        $record = DistributionRecord::query()
+            ->where('supply_request_id', $context['supplyRequest']->supply_request_id)
+            ->firstOrFail();
+
+        $this->assertDatabaseHas('distribution_items', [
+            'distribution_record_id' => $record->distribution_record_id,
+            'item_id' => $context['item']->item_id,
+            'quantity_released' => 2,
         ]);
     }
 

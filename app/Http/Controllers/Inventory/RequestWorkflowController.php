@@ -10,6 +10,7 @@ use App\Models\SupplyRequest;
 use App\Models\SupplyRequestItem;
 use App\Models\User;
 use App\Services\Analytics\AlertService;
+use App\Services\Inventory\DistributionRecordService;
 use App\Services\Procurement\PurchaseRequestService;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\RedirectResponse;
@@ -24,6 +25,7 @@ class RequestWorkflowController
     public function __construct(
         private readonly PurchaseRequestService $purchaseRequestService,
         private readonly AlertService $alertService,
+        private readonly DistributionRecordService $distributionService,
     ) {
     }
 
@@ -610,9 +612,25 @@ class RequestWorkflowController
                 ->with('error', 'Stock shortage detected. Queue this request for procurement initiation instead of distribution release.');
         }
 
+        try {
+            $record = $this->distributionService->createRecordWithAutomaticRelease($request->user(), [
+                'supply_request_id' => (int) $supplyRequest->supply_request_id,
+                'office_id' => (int) $supplyRequest->office_id,
+            ]);
+        } catch (ValidationException $exception) {
+            $message = collect($exception->errors())
+                ->flatten()
+                ->first() ?: 'This supply request is not eligible for automatic distribution release.';
+
+            return redirect()
+                ->route('inventory.office-supply-requests.index', $request->query())
+                ->withErrors($exception->errors())
+                ->with('error', $message);
+        }
+
         return redirect()
-            ->route('inventory.distribution-records.create', ['supply_request_id' => (int) $supplyRequest->supply_request_id])
-            ->with('success', 'Supply request opened in Supply Distribution workflow.');
+            ->route('inventory.distribution-records.show', (int) $record->distribution_record_id)
+            ->with('success', 'Distribution record created and releasable items were released automatically.');
     }
 
     public function queueProcurement(Request $request, SupplyRequest $supplyRequest): RedirectResponse

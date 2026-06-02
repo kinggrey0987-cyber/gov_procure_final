@@ -58,6 +58,29 @@ class DistributionRecordService
     /**
      * @param  array<string, mixed>  $payload
      */
+    public function createRecordWithAutomaticRelease(User $actor, array $payload): DistributionRecord
+    {
+        return DB::transaction(function () use ($actor, $payload): DistributionRecord {
+            $record = $this->createRecord($actor, $payload);
+            $releaseItems = $this->automaticReleaseItems($record);
+
+            if ($releaseItems === []) {
+                throw ValidationException::withMessages([
+                    'supply_request_id' => 'No requested item currently has a releasable quantity.',
+                ]);
+            }
+
+            foreach ($releaseItems as $itemPayload) {
+                $this->addDistributionItem($record->fresh() ?? $record, $actor, $itemPayload);
+            }
+
+            return $record->fresh(['supplyRequest', 'delivery', 'office', 'items.item']) ?? $record;
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
     public function updateRecord(DistributionRecord $record, User $actor, array $payload): DistributionRecord
     {
         $this->assertGsoOfficer($actor);
@@ -388,7 +411,7 @@ class DistributionRecordService
         float $quantity,
         ?int $ignoreDistributionItemId = null,
     ): void {
-        $record->loadMissing([
+        $record->load([
             'supplyRequest.items',
             'supplyRequest.distributionRecords.items',
             'delivery.items.purchaseOrderItem',
@@ -450,6 +473,72 @@ class DistributionRecordService
                 ),
             ]);
         }
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function automaticReleaseItems(DistributionRecord $record): array
+    {
+        $record->load([
+            'supplyRequest.items.item.inventory',
+            'supplyRequest.distributionRecords.items',
+            'delivery.items.purchaseOrderItem',
+            'delivery.distributionRecords.items',
+        ]);
+
+        $requestReleasedByItemId = $record->supplyRequest->distributionRecords
+            ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
+            ->flatMap(fn ($distributionRecord) => $distributionRecord->items)
+            ->groupBy(fn ($item) => (int) $item->item_id)
+            ->map(fn ($items): float => (float) $items->sum('quantity_released'));
+
+        $deliveryRemainingByItemId = collect();
+        if ($record->delivery_id !== null && $record->delivery !== null) {
+            $deliveryAcceptedByItemId = $record->delivery->items
+                ->groupBy(fn ($item) => (int) ($item->purchaseOrderItem?->item_id ?? 0))
+                ->map(fn ($items): float => (float) $items->sum(
+                    fn ($item): float => max((float) $item->received_quantity - (float) $item->damaged_quantity, 0)
+                ));
+
+            $deliveryReleasedByItemId = $record->delivery->distributionRecords
+                ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
+                ->flatMap(fn ($distributionRecord) => $distributionRecord->items)
+                ->groupBy(fn ($item) => (int) $item->item_id)
+                ->map(fn ($items): float => (float) $items->sum('quantity_released'));
+
+            $deliveryRemainingByItemId = $deliveryAcceptedByItemId
+                ->map(fn (float $accepted, int $itemId): float => max($accepted - (float) ($deliveryReleasedByItemId->get($itemId) ?? 0.0), 0));
+        }
+
+        return $record->supplyRequest->items
+            ->groupBy(fn ($item) => (int) $item->item_id)
+            ->map(function ($items, int $itemId) use ($requestReleasedByItemId, $deliveryRemainingByItemId, $record): ?array {
+                $first = $items->first();
+                $requested = (float) $items->sum('quantity_requested');
+                $requestRemaining = max($requested - (float) ($requestReleasedByItemId->get($itemId) ?? 0.0), 0);
+                $availableStock = (float) ($first?->item?->inventory?->available_stock ?? 0);
+                $quantity = min($requestRemaining, $availableStock);
+
+                if ($record->delivery_id !== null) {
+                    $quantity = min($quantity, (float) ($deliveryRemainingByItemId->get($itemId) ?? 0.0));
+                }
+
+                if ($quantity <= 0.0001) {
+                    return null;
+                }
+
+                return [
+                    'item_id' => $itemId,
+                    'item_name_snapshot' => (string) ($first?->item?->item_name ?? $first?->item_name_snapshot ?? 'Unknown Item'),
+                    'quantity_released' => $quantity,
+                    'unit' => (string) ($first?->item?->default_unit ?? 'UNIT'),
+                    'remarks' => sprintf('Automatically released against %s.', (string) $record->supplyRequest->request_code),
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
     }
 
     private function generateDistributionCode(): string

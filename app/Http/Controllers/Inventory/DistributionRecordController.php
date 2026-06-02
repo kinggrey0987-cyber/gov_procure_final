@@ -322,10 +322,10 @@ class DistributionRecordController
     {
         abort_unless(request()->user()->can('distribution.manage'), 403);
 
-        $record = $this->distributionService->createRecord(request()->user(), $request->validated());
+        $record = $this->distributionService->createRecordWithAutomaticRelease(request()->user(), $request->validated());
 
         return Redirect::route('inventory.distribution-records.show', $record->distribution_record_id)
-            ->with('success', 'Distribution record created successfully.');
+            ->with('success', 'Distribution record created and releasable items were released automatically.');
     }
 
     public function show(DistributionRecord $distribution_record): Response

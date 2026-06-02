@@ -115,9 +115,7 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
 
     const processDistribution = (requestId: number) => {
         setProcessingRequestId(requestId);
-        router.get(route('inventory.distribution-records.create'), {
-            supply_request_id: requestId,
-        }, {
+        router.post(route('inventory.office-supply-requests.process-distribution', requestId), {}, {
             preserveScroll: true,
             onFinish: () => setProcessingRequestId(null),
         });
@@ -259,7 +257,7 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                                                     onClick={() => processDistribution(request.supply_request_id)}
                                                     className="inline-flex rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-100 hover:text-red-900 disabled:cursor-not-allowed disabled:opacity-60"
                                                 >
-                                                    {processingRequestId === request.supply_request_id ? 'Opening Supply Distribution...' : 'Process Distribution'}
+                                                    {processingRequestId === request.supply_request_id ? 'Releasing...' : 'Process Distribution'}
                                                 </button>
                                             ) : request.stock_assessment === 'STOCK_READY' ? (
                                                 <div className="max-w-[240px] rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
@@ -360,7 +358,6 @@ function distributionBlockReason(request: RequestRow): string {
 
     return 'Stock-ready request is awaiting a release context.';
 }
-
 
 
 
