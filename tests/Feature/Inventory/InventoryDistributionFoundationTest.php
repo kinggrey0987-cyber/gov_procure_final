@@ -1035,6 +1035,7 @@ class InventoryDistributionFoundationTest extends TestCase
         $inventoryId = (int) Inventory::query()
             ->where('item_id', (int) $context['item']->item_id)
             ->value('inventory_id');
+        $ppmpCountBefore = Ppmp::query()->count();
 
         $this->actingAs($this->gsoOfficer)
             ->post(route('inventory.procurement-requests.initiate-low-stock', $inventoryId))
@@ -1046,8 +1047,16 @@ class InventoryDistributionFoundationTest extends TestCase
         $createdSupplyRequest = SupplyRequest::query()->latest('supply_request_id')->firstOrFail();
 
         $this->assertSame('OPEN', (string) $created->status);
+        $this->assertNull($createdSupplyRequest->ppmp_id);
+        $this->assertSame($ppmpCountBefore, Ppmp::query()->count());
         $this->assertStringStartsWith('SR-'.$this->gsoOfficer->office?->code.'-'.now()->format('Ym').'-', (string) $createdSupplyRequest->request_code);
         $this->assertStringContainsString('LOW_STOCK_SIGNAL:inventory:'.$inventoryId, (string) $created->remarks);
+
+        $createdSupplyRequestItem = SupplyRequestItem::query()
+            ->where('supply_request_id', (int) $createdSupplyRequest->supply_request_id)
+            ->firstOrFail();
+
+        $this->assertNull($createdSupplyRequestItem->ppmp_item_id);
 
         $this->assertDatabaseHas('purchase_request_items', [
             'purchase_request_id' => (int) $created->purchase_request_id,
@@ -1081,6 +1090,7 @@ class InventoryDistributionFoundationTest extends TestCase
             'low_stock_threshold' => 4,
             'last_updated' => now(),
         ]);
+        $ppmpCountBefore = Ppmp::query()->count();
 
         $this->actingAs($this->gsoOfficer)
             ->post(route('inventory.procurement-requests.initiate-low-stock', (int) $inventory->inventory_id))
@@ -1089,10 +1099,19 @@ class InventoryDistributionFoundationTest extends TestCase
             ]));
 
         $created = PurchaseRequest::query()->latest('purchase_request_id')->firstOrFail();
+        $createdSupplyRequest = SupplyRequest::query()->latest('supply_request_id')->firstOrFail();
 
         $this->assertSame('OPEN', (string) $created->status);
         $this->assertSame((int) $this->gsoOfficer->id, (int) $created->requested_by);
+        $this->assertNull($createdSupplyRequest->ppmp_id);
+        $this->assertSame($ppmpCountBefore, Ppmp::query()->count());
         $this->assertStringContainsString('LOW_STOCK_SIGNAL:inventory:'.$inventory->inventory_id, (string) $created->remarks);
+
+        $createdSupplyRequestItem = SupplyRequestItem::query()
+            ->where('supply_request_id', (int) $createdSupplyRequest->supply_request_id)
+            ->firstOrFail();
+
+        $this->assertNull($createdSupplyRequestItem->ppmp_item_id);
 
         $this->assertDatabaseHas('purchase_request_items', [
             'purchase_request_id' => (int) $created->purchase_request_id,

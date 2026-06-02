@@ -2,14 +2,11 @@
 
 namespace App\Services\Procurement;
 
-use App\Enums\FundSource;
 use App\Enums\UserRole;
 use App\Models\Delivery;
 use App\Models\DeliveryItem;
 use App\Models\Inventory;
 use App\Models\Office;
-use App\Models\Ppmp;
-use App\Models\PpmpItem;
 use App\Models\ApprovalHistory;
 use App\Models\PurchaseRequest;
 use App\Models\PurchaseRequestItem;
@@ -283,35 +280,11 @@ class PurchaseRequestService
                 ]);
             }
 
-            $ppmp = Ppmp::query()->create([
-                'office_id' => $officeId,
-                'prepared_by' => (int) $actor->id,
-                'approved_by' => null,
-                'fiscal_year' => (int) now()->format('Y'),
-                'fund_source' => FundSource::APPROPRIATION_ORDINANCE->value,
-                'status' => 'SUBMITTED',
-                'total_estimated_budget' => 0,
-                'date_prepared' => now()->toDateString(),
-                'date_approved' => null,
-                'remarks' => $governanceLabel,
-            ]);
-
-            $ppmpItem = PpmpItem::query()->create([
-                'ppmp_id' => (int) $ppmp->ppmp_id,
-                'item_id' => (int) $inventory->item_id,
-                'item_category_id' => $itemCategoryId,
-                'quantity' => round($quantityRequested, 2),
-                'unit_cost' => 0,
-                'estimated_budget' => 0,
-                'procurement_schedule' => 'IMMEDIATE',
-                'remarks' => $governanceLabel,
-            ]);
-
             $supplyRequest = SupplyRequest::query()->create([
                     'request_code' => $this->buildRequestCode($officeId),
                 'office_id' => $officeId,
                 'requested_by' => (int) $actor->id,
-                'ppmp_id' => (int) $ppmp->ppmp_id,
+                'ppmp_id' => null,
                 'request_date' => now()->toDateString(),
                 'needed_by_date' => now()->addDays(7)->toDateString(),
                 'request_category' => 'GENERAL',
@@ -330,7 +303,7 @@ class PurchaseRequestService
             SupplyRequestItem::query()->create([
                 'supply_request_id' => (int) $supplyRequest->supply_request_id,
                 'item_id' => (int) $inventory->item_id,
-                'ppmp_item_id' => (int) $ppmpItem->ppmp_item_id,
+                'ppmp_item_id' => null,
                 'item_name_snapshot' => (string) ($item?->item_name ?? 'Unassigned Item'),
                 'quantity_requested' => round($quantityRequested, 2),
             ]);
