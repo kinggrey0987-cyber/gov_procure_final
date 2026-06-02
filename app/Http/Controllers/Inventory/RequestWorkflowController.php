@@ -142,7 +142,8 @@ class RequestWorkflowController
         $stockAssessment = $shortageTotal > 0 ? 'SHORTAGE_REQUIRES_PROCUREMENT' : 'STOCK_READY';
         $distributionRecordsCount = (int) $request->distribution_records_count;
         $hasDraftDistribution = $request->distributionRecords->contains(fn ($record): bool => (string) $record->status === 'DRAFT');
-        $canCreateInventoryDistribution = $stockAssessment === 'STOCK_READY' && ! $hasPurchaseRequest && $hasRemainingQuantity && ! $hasDraftDistribution;
+        $isSubmitted = (string) $request->status === 'SUBMITTED';
+        $canCreateInventoryDistribution = $isSubmitted && $stockAssessment === 'STOCK_READY' && ! $hasPurchaseRequest && $hasRemainingQuantity && ! $hasDraftDistribution;
 
         return [
             'supply_request_id' => (int) $request->supply_request_id,
@@ -544,6 +545,12 @@ class RequestWorkflowController
             return redirect()
                 ->route('inventory.office-supply-requests.index', $request->query())
                 ->with('error', 'GSO-origin supply requests are internal logistics records and are not eligible for office distribution release.');
+        }
+
+        if ((string) $supplyRequest->status !== 'SUBMITTED') {
+            return redirect()
+                ->route('inventory.office-supply-requests.index', $request->query())
+                ->with('error', 'Only SUBMITTED supply requests can be processed for distribution. Ask the office to submit or resubmit this request first.');
         }
 
         $existingDraftRecord = $supplyRequest->distributionRecords

@@ -802,6 +802,17 @@ class InventoryDistributionFoundationTest extends TestCase
             ]));
     }
 
+    public function test_process_distribution_rejects_stock_ready_draft_request(): void
+    {
+        $context = $this->createSubmittedSupplyRequestForQueue($this->officeA, $this->officeUserA, 90151, 4, 10);
+        $context['supplyRequest']->forceFill(['status' => 'DRAFT'])->save();
+
+        $this->actingAs($this->gsoOfficer)
+            ->post(route('inventory.office-supply-requests.process-distribution', $context['supplyRequest']->supply_request_id))
+            ->assertRedirect(route('inventory.office-supply-requests.index'))
+            ->assertSessionHas('error', 'Only SUBMITTED supply requests can be processed for distribution. Ask the office to submit or resubmit this request first.');
+    }
+
     public function test_distribution_create_lists_stock_ready_inventory_backed_request_without_delivery_context(): void
     {
         $context = $this->createSubmittedSupplyRequestForQueue($this->officeA, $this->officeUserA, 9016, 4, 10);

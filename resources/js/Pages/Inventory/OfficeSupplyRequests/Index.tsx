@@ -252,7 +252,7 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                                                 View Full Request
                                             </Link>
 
-                                            {request.stock_assessment === 'STOCK_READY' ? (
+                                            {request.stock_assessment === 'STOCK_READY' && request.has_distribution_candidate ? (
                                                 <button
                                                     type="button"
                                                     disabled={processingRequestId === request.supply_request_id}
@@ -261,6 +261,10 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                                                 >
                                                     {processingRequestId === request.supply_request_id ? 'Opening Supply Distribution...' : 'Process Distribution'}
                                                 </button>
+                                            ) : request.stock_assessment === 'STOCK_READY' ? (
+                                                <div className="max-w-[240px] rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                                                    {distributionBlockReason(request)}
+                                                </div>
                                             ) : request.has_purchase_request ? (
                                                 <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">Queued for Procurement</span>
                                             ) : queueBlockReason ? (
@@ -345,6 +349,17 @@ function procurementQueueBlockReason(request: RequestRow): string | null {
     return null;
 }
 
+function distributionBlockReason(request: RequestRow): string {
+    if (request.status !== 'SUBMITTED') {
+        if (request.status === 'DRAFT') {
+            return 'Awaiting office submission before GSO can release this request.';
+        }
+
+        return `Cannot release while status is ${displaySupplyRequestStatus(request.status)}.`;
+    }
+
+    return 'Stock-ready request is awaiting a release context.';
+}
 
 
 
