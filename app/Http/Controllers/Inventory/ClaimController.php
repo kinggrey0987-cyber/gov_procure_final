@@ -101,7 +101,7 @@ class ClaimController
             $candidateParentClaim = Claim::query()
                 ->where('claims_id', $requestedParentClaimId)
                 ->where('office_id', (int) $user->office_id)
-                ->whereNotIn('status', ['RESOLVED', 'REJECTED'])
+                ->where('status', 'RESOLVED')
                 ->firstOrFail();
 
             $parentClaim = $candidateParentClaim;
@@ -277,7 +277,7 @@ class ClaimController
                 'update' => $user->can('claim.update', $claim),
                 'createFollowUp' => $user->can('claim.create')
                     && $user->isOfficeUser()
-                    && ! in_array((string) $claim->status, ['RESOLVED', 'REJECTED'], true)
+                    && (string) $claim->status === 'RESOLVED'
                     && $claim->distribution_record_id !== null
                     && $claim->distribution_item_id !== null,
             ],

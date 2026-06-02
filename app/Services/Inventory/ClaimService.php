@@ -177,9 +177,9 @@ class ClaimService
         $currentStatus = (string) $claim->status;
 
         $validTransitions = [
-            'OPEN' => ['IN_REVIEW', 'REJECTED', 'RESOLVED', 'PENDING_REPLACEMENT', 'PARTIALLY_RESOLVED'],
-            'IN_REVIEW' => ['REJECTED', 'RESOLVED', 'PENDING_REPLACEMENT', 'PARTIALLY_RESOLVED'],
-            'PENDING_REPLACEMENT' => ['REJECTED', 'RESOLVED', 'PARTIALLY_RESOLVED'],
+            'OPEN' => ['REJECTED', 'RESOLVED', 'PENDING_REPLACEMENT'],
+            'IN_REVIEW' => ['REJECTED', 'RESOLVED', 'PENDING_REPLACEMENT'],
+            'PENDING_REPLACEMENT' => ['REJECTED', 'RESOLVED'],
             'PARTIALLY_RESOLVED' => ['REJECTED', 'RESOLVED', 'PENDING_REPLACEMENT', 'PARTIALLY_RESOLVED'],
             'REJECTED' => [],
             'RESOLVED' => [],
@@ -202,7 +202,13 @@ class ClaimService
                 $this->releaseClaimReplacement($claim, $actor, $resolutionType, $replacementQuantity, (string) ($payload['remarks'] ?? ''));
             }
 
-            if ($newStatus === 'PENDING_REPLACEMENT' && $this->claimNeedsReplacementProcurement($claim)) {
+            if ($newStatus === 'PENDING_REPLACEMENT') {
+                if (! $this->claimNeedsReplacementProcurement($claim)) {
+                    throw ValidationException::withMessages([
+                        'status' => 'Replacement stock is available. Resolve the claim by releasing stock instead.',
+                    ]);
+                }
+
                 $this->purchaseRequestService->createFromPendingClaimReplacement($claim, $actor, (string) ($payload['remarks'] ?? ''));
             }
 
@@ -265,9 +271,9 @@ class ClaimService
             ]);
         }
 
-        if (in_array((string) $parentClaim->status, ['RESOLVED', 'REJECTED'], true)) {
+        if ((string) $parentClaim->status !== 'RESOLVED') {
             throw ValidationException::withMessages([
-                'parent_claim_id' => 'Follow-up claims can only reference unresolved claims.',
+                'parent_claim_id' => 'Follow-up claims can only reference resolved replacement claims.',
             ]);
         }
 

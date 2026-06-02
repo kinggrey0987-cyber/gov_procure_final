@@ -53,6 +53,7 @@ export default function ClaimIndex({ claims, filters, filter_options, routes, pe
     const [search, setSearch] = useState(filters?.search ?? '');
     const debouncedSearch = useDebouncedValue(search, 450);
     const hasMountedRef = useRef(false);
+    const statusOptions = ['OPEN', 'PENDING_REPLACEMENT', 'RESOLVED', 'REJECTED'];
 
     useEffect(() => {
         setStatus(filters?.status ?? '');
@@ -112,7 +113,7 @@ export default function ClaimIndex({ claims, filters, filter_options, routes, pe
                         onChange={(event) => setStatus(event.target.value)}
                     >
                         <option value="">All statuses</option>
-                        {['OPEN', 'IN_REVIEW', 'PENDING_REPLACEMENT', 'PARTIALLY_RESOLVED', 'RESOLVED', 'REJECTED'].map((option) => <option key={option} value={option}>{displayClaimStatus(option)}</option>)}
+                        {statusOptions.map((option) => <option key={option} value={option}>{displayClaimStatus(option)}</option>)}
                     </select>
                     <select
                         className="rounded-lg border border-slate-300 px-3 py-2 text-sm"

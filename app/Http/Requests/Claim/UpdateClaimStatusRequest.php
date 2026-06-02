@@ -11,7 +11,6 @@ class UpdateClaimStatusRequest extends FormRequest
         'RESOLVED',
         'REJECTED',
         'PENDING_REPLACEMENT',
-        'PARTIALLY_RESOLVED',
     ];
 
     private const RESOLUTION_TYPES = [
@@ -28,13 +27,33 @@ class UpdateClaimStatusRequest extends FormRequest
         return auth()->user()?->can('claim.update', $this->route('claim')) ?? false;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $status = strtoupper(trim((string) $this->input('status')));
+        $resolutionType = strtoupper(trim((string) $this->input('resolution_type')));
+
+        if ($resolutionType === '') {
+            $resolutionType = match ($status) {
+                'RESOLVED' => 'REPLACEMENT_RELEASED',
+                'PENDING_REPLACEMENT' => 'PENDING_REPLACEMENT',
+                'REJECTED' => 'OTHER_RESOLUTION',
+                default => '',
+            };
+        }
+
+        $this->merge([
+            'status' => $status,
+            'resolution_type' => $resolutionType,
+        ]);
+    }
+
     /**
      * @return array<string, array<int, string>>
      */
     public function rules(): array
     {
         return [
-            'status' => ['required', 'string', 'in:IN_REVIEW,RESOLVED,REJECTED,PENDING_REPLACEMENT,PARTIALLY_RESOLVED'],
+            'status' => ['required', 'string', 'in:RESOLVED,REJECTED,PENDING_REPLACEMENT'],
             'resolution_type' => ['nullable', 'string', 'in:'.implode(',', self::RESOLUTION_TYPES)],
             'replacement_quantity' => ['nullable', 'integer', 'min:0'],
             'remarks' => ['nullable', 'string'],
@@ -52,26 +71,22 @@ class UpdateClaimStatusRequest extends FormRequest
                 $validator->errors()->add('remarks', 'Remarks are required when closing or deferring a claim.');
             }
 
-            if ($status === 'IN_REVIEW') {
-                return;
-            }
-
             if ($resolutionType === '') {
                 $validator->errors()->add('resolution_type', 'Select a resolution type for this claim decision.');
 
                 return;
             }
 
-            if ($status === 'RESOLVED' && $resolutionType === 'PENDING_REPLACEMENT') {
-                $validator->errors()->add('resolution_type', 'Pending replacement cannot close a claim as resolved.');
+            if ($status === 'RESOLVED' && $resolutionType !== 'REPLACEMENT_RELEASED') {
+                $validator->errors()->add('resolution_type', 'Resolved claims require released replacement stock.');
             }
 
             if ($status === 'PENDING_REPLACEMENT' && $resolutionType !== 'PENDING_REPLACEMENT') {
                 $validator->errors()->add('resolution_type', 'Pending replacement status requires the pending replacement resolution type.');
             }
 
-            if ($status === 'PARTIALLY_RESOLVED' && $resolutionType !== 'PARTIAL_REPLACEMENT') {
-                $validator->errors()->add('resolution_type', 'Partially resolved claims require the partial replacement resolution type.');
+            if ($status === 'REJECTED' && in_array($resolutionType, ['REPLACEMENT_RELEASED', 'PARTIAL_REPLACEMENT', 'PENDING_REPLACEMENT'], true)) {
+                $validator->errors()->add('resolution_type', 'Rejected claims cannot use a replacement resolution.');
             }
 
             if (in_array($resolutionType, ['REPLACEMENT_RELEASED', 'PARTIAL_REPLACEMENT'], true) && $replacementQuantity <= 0) {
