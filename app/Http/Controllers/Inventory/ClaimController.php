@@ -200,6 +200,8 @@ class ClaimController
                 'claim_date' => optional($claim->claim_date)?->toDateString(),
                 'claim_location' => (string) $claim->claim_location,
                 'quantity_disputed' => (float) $claim->quantity_disputed,
+                'quantity_damaged' => (float) $claim->quantity_damaged,
+                'quantity_missing' => (float) $claim->quantity_missing,
                 'resolution_type' => $claim->resolution_type,
                 'replacement_quantity' => (float) $claim->replacement_quantity,
                 'replacement_available_stock' => $replacementAvailableStock,

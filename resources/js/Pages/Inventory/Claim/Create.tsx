@@ -1,7 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { PageProps } from '@/types';
 import { Head, useForm, usePage } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 
 type DistributionRecordOption = {
     distribution_record_id: number;
@@ -53,7 +53,6 @@ function formatDate(value?: string | null): string {
 export default function ClaimCreate({ distributionRecords, preselectedDistributionRecordId = null }: Props) {
     const { auth } = usePage<PageProps>().props;
     const isOfficeUser = auth?.user?.role_code === 'OFFICE_USER';
-    const [additionalIssues, setAdditionalIssues] = useState<Array<{ itemName: string; claimType: string; quantity: string; remarks: string }>>([]);
     const preselectedRecord = preselectedDistributionRecordId
         ? distributionRecords.find((record) => record.distribution_record_id === preselectedDistributionRecordId)
         : null;
@@ -66,6 +65,8 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
         claim_date: todayDate(),
         claim_location: '',
         quantity_disputed: '',
+        quantity_damaged: '',
+        quantity_missing: '',
         remarks: '',
         attachment_title: '',
         attachment_file: null as File | null,
@@ -79,6 +80,11 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
         () => selectedRecord?.items?.find((item) => item.distribution_item_id === Number(form.data.distribution_item_id)) ?? null,
         [selectedRecord, form.data.distribution_item_id],
     );
+    const selectedItemReleasedQuantity = Math.trunc(selectedItem?.quantity_released ?? 0);
+    const damagedQuantity = toWholeQuantity(form.data.quantity_damaged);
+    const missingQuantity = toWholeQuantity(form.data.quantity_missing);
+    const disputedQuantity = damagedQuantity + missingQuantity;
+    const derivedClaimType = getClaimTypeFromQuantities(damagedQuantity, missingQuantity, form.data.claim_type);
 
     return (
         <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">File Claim</h2>}>
@@ -94,18 +100,11 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                         className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
                         onSubmit={(e) => {
                             e.preventDefault();
-                            const extraRemarks = additionalIssues
-                                .filter((issue) => issue.itemName || issue.quantity || issue.remarks)
-                                .map((issue, index) => `${index + 1}. ${issue.itemName || 'Unspecified item'} - ${issue.claimType.replaceAll('_', ' ')} - Qty: ${issue.quantity || '0'}${issue.remarks ? ` - ${issue.remarks}` : ''}`)
-                                .join('\n');
-
-                            if (extraRemarks) {
-                                form.transform((data) => ({
-                                    ...data,
-                                    remarks: `${data.remarks ?? ''}\n\nAdditional affected items/issues:\n${extraRemarks}`.trim(),
-                                }));
-                            }
-
+                            form.transform((data) => ({
+                                ...data,
+                                claim_type: derivedClaimType,
+                                quantity_disputed: String(disputedQuantity),
+                            }));
                             form.post(route(isOfficeUser ? 'office.claims.store' : 'inventory.claims.store'), { forceFormData: true });
                         }}
                     >
@@ -122,6 +121,8 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                     form.setData('office_id', selected?.office_id ?? 0);
                                     form.setData('claim_date', todayDate());
                                     form.setData('quantity_disputed', '');
+                                    form.setData('quantity_damaged', '');
+                                    form.setData('quantity_missing', '');
                                 }}
                             >
                                 <option value="">Select Distribution Record</option>
@@ -154,6 +155,8 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                     const nextItem = selectedRecord?.items?.find((item) => item.distribution_item_id === Number(distributionItemId));
                                     form.setData('distribution_item_id', distributionItemId);
                                     form.setData('quantity_disputed', String(Math.trunc((nextItem?.quantity_missing ?? 0) + (nextItem?.quantity_damaged ?? 0))));
+                                    form.setData('quantity_damaged', String(Math.trunc(nextItem?.quantity_damaged ?? 0)));
+                                    form.setData('quantity_missing', String(Math.trunc(nextItem?.quantity_missing ?? 0)));
                                 }}
                             >
                                 <option value="">Select affected released item</option>
@@ -169,23 +172,6 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                     Received: {formatQuantity(selectedItem.quantity_received)} {selectedItem.unit} · Damaged: {formatQuantity(selectedItem.quantity_damaged)} · Missing: {formatQuantity(selectedItem.quantity_missing)}
                                 </p>
                             ) : null}
-                        </div>
-
-                        <div>
-                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Claim Type</label>
-                            <select
-                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                                value={form.data.claim_type}
-                                onChange={(e) => form.setData('claim_type', e.target.value)}
-                            >
-                                <option value="">Select issue type</option>
-                                <option value="MISSING_ITEM">Missing Item</option>
-                                <option value="DAMAGED_ITEM">Damaged Item</option>
-                                <option value="QUANTITY_MISMATCH">Quantity Mismatch</option>
-                                <option value="WRONG_ITEM_RECEIVED">Wrong Item Received</option>
-                                <option value="SHORTAGE">Shortage</option>
-                            </select>
-                            {form.errors.claim_type ? <p className="mt-1 text-xs text-rose-600">{form.errors.claim_type}</p> : null}
                         </div>
 
                         <div className="grid gap-3 sm:grid-cols-2">
@@ -209,51 +195,51 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                             </div>
                         </div>
 
-                        <div>
-                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Disputed Quantity</label>
-                            <input
-                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                                type="number"
-                                min="0"
-                                step="1"
-                                value={form.data.quantity_disputed}
-                                onChange={(e) => form.setData('quantity_disputed', e.target.value.replace(/\D/g, ''))}
-                            />
-                            {form.errors.quantity_disputed ? <p className="mt-1 text-xs text-rose-600">{form.errors.quantity_disputed}</p> : null}
-                        </div>
-
-                        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                <div>
-                                    <p className="text-sm font-semibold text-amber-900">Multiple affected items or issue types?</p>
-                                    <p className="text-xs text-amber-800">Add other issue lines here. They will be appended to this claim for GSO review.</p>
-                                </div>
-                                <button type="button" onClick={() => setAdditionalIssues((issues) => [...issues, { itemName: '', claimType: 'MISSING_ITEM', quantity: '', remarks: '' }])} className="rounded-md border border-amber-400 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100">
-                                    Add Issue Line
-                                </button>
+                        <div className="grid gap-3 sm:grid-cols-3">
+                            <div>
+                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Missing Qty</label>
+                                <input
+                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                    type="number"
+                                    min="0"
+                                    max={selectedItem ? selectedItemReleasedQuantity : undefined}
+                                    step="1"
+                                    value={form.data.quantity_missing}
+                                    onChange={(e) => form.setData('quantity_missing', e.target.value.replace(/\D/g, ''))}
+                                />
+                                {form.errors.quantity_missing ? <p className="mt-1 text-xs text-rose-600">{form.errors.quantity_missing}</p> : null}
                             </div>
-                            {additionalIssues.length > 0 ? (
-                                <div className="mt-3 space-y-3">
-                                    {additionalIssues.map((issue, index) => (
-                                        <div key={index} className="grid gap-2 rounded-md border border-amber-200 bg-white p-3 md:grid-cols-4">
-                                            <input className="rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Affected item" value={issue.itemName} onChange={(event) => setAdditionalIssues((issues) => issues.map((row, rowIndex) => rowIndex === index ? { ...row, itemName: event.target.value } : row))} />
-                                            <select className="rounded-lg border border-slate-300 px-3 py-2 text-sm" value={issue.claimType} onChange={(event) => setAdditionalIssues((issues) => issues.map((row, rowIndex) => rowIndex === index ? { ...row, claimType: event.target.value } : row))}>
-                                                <option value="MISSING_ITEM">Missing Item</option>
-                                                <option value="DAMAGED_ITEM">Damaged Item</option>
-                                                <option value="QUANTITY_MISMATCH">Quantity Mismatch</option>
-                                                <option value="WRONG_ITEM_RECEIVED">Wrong Item Received</option>
-                                                <option value="SHORTAGE">Shortage</option>
-                                            </select>
-                                            <input className="rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Qty" inputMode="numeric" value={issue.quantity} onChange={(event) => setAdditionalIssues((issues) => issues.map((row, rowIndex) => rowIndex === index ? { ...row, quantity: event.target.value.replace(/\D/g, '') } : row))} />
-                                            <div className="flex gap-2">
-                                                <input className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Notes" value={issue.remarks} onChange={(event) => setAdditionalIssues((issues) => issues.map((row, rowIndex) => rowIndex === index ? { ...row, remarks: event.target.value } : row))} />
-                                                <button type="button" onClick={() => setAdditionalIssues((issues) => issues.filter((_, rowIndex) => rowIndex !== index))} className="rounded-md border border-rose-300 px-2 text-xs font-semibold text-rose-700">
-                                                    Remove
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
+                            <div>
+                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Damaged Qty</label>
+                                <input
+                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                    type="number"
+                                    min="0"
+                                    max={selectedItem ? selectedItemReleasedQuantity : undefined}
+                                    step="1"
+                                    value={form.data.quantity_damaged}
+                                    onChange={(e) => form.setData('quantity_damaged', e.target.value.replace(/\D/g, ''))}
+                                />
+                                {form.errors.quantity_damaged ? <p className="mt-1 text-xs text-rose-600">{form.errors.quantity_damaged}</p> : null}
+                            </div>
+                            <div>
+                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Disputed Qty</label>
+                                <input
+                                    className="w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700"
+                                    type="number"
+                                    min="0"
+                                    max={selectedItem ? selectedItemReleasedQuantity : undefined}
+                                    step="1"
+                                    value={disputedQuantity}
+                                    readOnly
+                                />
+                            </div>
+                            {form.errors.claim_type ? <p className="mt-1 text-xs text-rose-600 sm:col-span-3">{form.errors.claim_type}</p> : null}
+                            {form.errors.quantity_disputed ? <p className="mt-1 text-xs text-rose-600 sm:col-span-3">{form.errors.quantity_disputed}</p> : null}
+                            {selectedItem ? (
+                                <p className="mt-1 text-xs text-slate-500 sm:col-span-3">
+                                    Maximum for this claim: {formatQuantity(selectedItemReleasedQuantity)} {selectedItem.unit}.
+                                </p>
                             ) : null}
                         </div>
 
@@ -296,7 +282,22 @@ function formatQuantity(value: number): string {
     return new Intl.NumberFormat('en-PH', { maximumFractionDigits: 0 }).format(Math.trunc(value));
 }
 
+function toWholeQuantity(value: number | string): number {
+    return Math.max(Number.parseInt(String(value || 0), 10) || 0, 0);
+}
 
+function getClaimTypeFromQuantities(damagedQuantity: number, missingQuantity: number, fallback: string): string {
+    if (damagedQuantity > 0 && missingQuantity > 0) {
+        return 'MISSING_AND_DAMAGED';
+    }
 
+    if (damagedQuantity > 0) {
+        return 'DAMAGED_ITEM';
+    }
 
+    if (missingQuantity > 0) {
+        return 'MISSING_ITEM';
+    }
 
+    return fallback || 'QUANTITY_MISMATCH';
+}

@@ -32,6 +32,8 @@ class Claim extends Model
         'claim_date',
         'claim_location',
         'quantity_disputed',
+        'quantity_damaged',
+        'quantity_missing',
         'remarks',
         'status',
         'resolution_type',
@@ -45,6 +47,8 @@ class Claim extends Model
         'office_id' => 'integer',
         'claim_date' => 'date',
         'quantity_disputed' => 'decimal:2',
+        'quantity_damaged' => 'decimal:2',
+        'quantity_missing' => 'decimal:2',
         'replacement_quantity' => 'decimal:2',
     ];
 

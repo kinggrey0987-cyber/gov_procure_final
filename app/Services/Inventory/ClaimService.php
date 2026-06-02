@@ -4,6 +4,7 @@ namespace App\Services\Inventory;
 
 use App\Models\ApprovalHistory;
 use App\Models\Claim;
+use App\Models\DistributionRecord;
 use App\Models\Inventory;
 use App\Models\StatusHistory;
 use App\Models\User;
@@ -34,7 +35,7 @@ class ClaimService
 
         $distributionRecord = $payload['distribution_record'];
 
-        if (!$distributionRecord instanceof \App\Models\DistributionRecord) {
+        if (!$distributionRecord instanceof DistributionRecord) {
             throw ValidationException::withMessages([
                 'distribution_record_id' => 'Distribution record context is required.',
             ]);
@@ -59,6 +60,47 @@ class ClaimService
             }
         }
 
+        $damagedQuantity = max((float) ($payload['quantity_damaged'] ?? 0), 0);
+        $missingQuantity = max((float) ($payload['quantity_missing'] ?? 0), 0);
+        $disputedQuantity = $damagedQuantity + $missingQuantity;
+
+        if ($disputedQuantity <= 0 && (float) ($payload['quantity_disputed'] ?? 0) > 0) {
+            $disputedQuantity = (float) $payload['quantity_disputed'];
+            $claimType = (string) ($payload['claim_type'] ?? '');
+            if ($claimType === 'DAMAGED_ITEM') {
+                $damagedQuantity = $disputedQuantity;
+            } else {
+                $missingQuantity = $disputedQuantity;
+            }
+        }
+
+        if ($distributionItem !== null) {
+            if ($disputedQuantity <= 0) {
+                throw ValidationException::withMessages([
+                    'quantity_disputed' => 'Enter at least one missing or damaged quantity for this claim.',
+                ]);
+            }
+
+            $releasedQuantity = (float) $distributionItem->quantity_released;
+            if ($disputedQuantity - $releasedQuantity > 0.0001) {
+                throw ValidationException::withMessages([
+                    'quantity_disputed' => sprintf('Disputed quantity cannot exceed the released quantity of %.2f.', $releasedQuantity),
+                ]);
+            }
+
+            $alreadyClaimedQuantity = (float) Claim::query()
+                ->where('distribution_item_id', (int) $distributionItem->distribution_item_id)
+                ->where('status', '!=', 'REJECTED')
+                ->sum('quantity_disputed');
+            $remainingClaimableQuantity = max($releasedQuantity - $alreadyClaimedQuantity, 0);
+
+            if ($disputedQuantity - $remainingClaimableQuantity > 0.0001) {
+                throw ValidationException::withMessages([
+                    'quantity_disputed' => sprintf('Only %.2f unit(s) remain claimable for this released item after existing active claims.', $remainingClaimableQuantity),
+                ]);
+            }
+        }
+
         if ((int) $actor->office_id !== (int) $payload['office_id']) {
             throw ValidationException::withMessages([
                 'office_id' => 'Office users can only file claims for their own office.',
@@ -73,17 +115,21 @@ class ClaimService
 
         $claimCode = $payload['claim_code'] ?? $this->generateClaimCode();
 
-        return DB::transaction(function () use ($actor, $payload, $claimCode): Claim {
+        $claimType = $this->resolveClaimType((string) $payload['claim_type'], $damagedQuantity, $missingQuantity);
+
+        return DB::transaction(function () use ($actor, $payload, $claimCode, $claimType, $disputedQuantity, $damagedQuantity, $missingQuantity): Claim {
             $claim = Claim::query()->create([
                 'claim_code' => $claimCode,
                 'distribution_record_id' => (int) $payload['distribution_record_id'],
                 'distribution_item_id' => ! empty($payload['distribution_item_id']) ? (int) $payload['distribution_item_id'] : null,
                 'claimed_by' => (int) $actor->id,
                 'office_id' => (int) $payload['office_id'],
-                'claim_type' => $payload['claim_type'],
+                'claim_type' => $claimType,
                 'claim_date' => $payload['claim_date'],
                 'claim_location' => $payload['claim_location'],
-                'quantity_disputed' => (float) ($payload['quantity_disputed'] ?? 0),
+                'quantity_disputed' => $disputedQuantity,
+                'quantity_damaged' => $damagedQuantity,
+                'quantity_missing' => $missingQuantity,
                 'remarks' => $payload['remarks'] ?? null,
                 'status' => 'OPEN',
                 'resolution_type' => null,
@@ -235,6 +281,23 @@ class ClaimService
         $next = ((int) ($last?->claims_id ?? 0)) + 1;
 
         return sprintf('CLM-%s-%05d', date('Y'), $next);
+    }
+
+    private function resolveClaimType(string $submittedType, float $damagedQuantity, float $missingQuantity): string
+    {
+        if ($damagedQuantity > 0 && $missingQuantity > 0) {
+            return 'MISSING_AND_DAMAGED';
+        }
+
+        if ($damagedQuantity > 0) {
+            return 'DAMAGED_ITEM';
+        }
+
+        if ($missingQuantity > 0) {
+            return 'MISSING_ITEM';
+        }
+
+        return $submittedType;
     }
 
     private function recordStatus(Claim $claim, ?string $oldStatus, string $newStatus, User $actor, string $remarks): void

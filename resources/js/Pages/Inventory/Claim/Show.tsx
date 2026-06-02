@@ -15,6 +15,8 @@ type Props = {
         claim_date: string;
         claim_location: string;
         quantity_disputed?: number;
+        quantity_damaged?: number;
+        quantity_missing?: number;
         resolution_type?: string | null;
         replacement_quantity?: number;
         replacement_available_stock?: number | null;
@@ -99,6 +101,7 @@ export default function ClaimShow({ claim, linkedDistribution, attachments, atta
         return item.distribution_item_id === claim.distribution_item_id;
     }) ?? [];
     const hasSpecificClaimedItem = claim.distribution_item_id !== null && claim.distribution_item_id !== undefined;
+    const claimedIssueQuantities = getClaimIssueQuantities(claim);
 
     useEffect(() => {
         statusForm.setData('status', nextStatusOptions[0]?.value ?? '');
@@ -164,6 +167,8 @@ export default function ClaimShow({ claim, linkedDistribution, attachments, atta
                         <Info label="Date Observed" value={formatDate(claim.claim_date)} />
                         <Info label="Issue Location" value={claim.claim_location} />
                         <Info label="Disputed Quantity" value={String(claim.quantity_disputed ?? 0)} />
+                        <Info label="Claimed Damaged Qty" value={formatQuantity(claimedIssueQuantities.damaged)} />
+                        <Info label="Claimed Missing Qty" value={formatQuantity(claimedIssueQuantities.missing)} />
                         <Info label="Resolution Type" value={claim.resolution_type ?? 'Pending review'} />
                         <Info label="Replacement Released" value={String(claim.replacement_quantity ?? 0)} />
                         <Info label="Available Replacement Stock" value={claim.replacement_available_stock === null || claim.replacement_available_stock === undefined ? '-' : String(claim.replacement_available_stock)} />
@@ -349,27 +354,32 @@ export default function ClaimShow({ claim, linkedDistribution, attachments, atta
                                         <th className="px-4 py-3 text-left font-semibold text-slate-700">Category</th>
                                         <th className="px-4 py-3 text-right font-semibold text-slate-700">Released Qty</th>
                                         <th className="px-4 py-3 text-right font-semibold text-slate-700">Received Qty</th>
-                                        <th className="px-4 py-3 text-right font-semibold text-slate-700">Damaged Qty</th>
-                                        <th className="px-4 py-3 text-right font-semibold text-slate-700">Missing Qty</th>
+                                        <th className="px-4 py-3 text-right font-semibold text-slate-700">Claimed Damaged Qty</th>
+                                        <th className="px-4 py-3 text-right font-semibold text-slate-700">Claimed Missing Qty</th>
                                         <th className="px-4 py-3 text-right font-semibold text-slate-700">Disputed Qty</th>
                                         <th className="px-4 py-3 text-left font-semibold text-slate-700">Unit</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {claimedItems.map((item) => (
-                                        <tr key={item.distribution_item_id} className="hover:bg-slate-50/60">
-                                            <td className="px-4 py-3 text-slate-700">{item.item_name}</td>
-                                            <td className="px-4 py-3 text-slate-600">{item.category_name || '-'}</td>
-                                            <td className="px-4 py-3 text-right font-semibold text-slate-700">{item.quantity_released.toFixed(2)}</td>
-                                            <td className="px-4 py-3 text-right font-semibold text-emerald-700">{(item.quantity_received ?? 0).toFixed(2)}</td>
-                                            <td className="px-4 py-3 text-right text-rose-600">{(item.quantity_damaged ?? 0).toFixed(2)}</td>
-                                            <td className="px-4 py-3 text-right text-amber-600">{(item.quantity_missing ?? 0).toFixed(2)}</td>
-                                            <td className="px-4 py-3 text-right font-semibold text-red-700">
-                                                {hasSpecificClaimedItem ? (claim.quantity_disputed ?? 0).toFixed(2) : '-'}
-                                            </td>
-                                            <td className="px-4 py-3 text-slate-700">{item.unit}</td>
-                                        </tr>
-                                    ))}
+                                    {claimedItems.map((item) => {
+                                        const rowClaimedDamaged = hasSpecificClaimedItem ? formatQuantity(claimedIssueQuantities.damaged) : '-';
+                                        const rowClaimedMissing = hasSpecificClaimedItem ? formatQuantity(claimedIssueQuantities.missing) : '-';
+
+                                        return (
+                                            <tr key={item.distribution_item_id} className="hover:bg-slate-50/60">
+                                                <td className="px-4 py-3 text-slate-700">{item.item_name}</td>
+                                                <td className="px-4 py-3 text-slate-600">{item.category_name || '-'}</td>
+                                                <td className="px-4 py-3 text-right font-semibold text-slate-700">{item.quantity_released.toFixed(2)}</td>
+                                                <td className="px-4 py-3 text-right font-semibold text-emerald-700">{(item.quantity_received ?? 0).toFixed(2)}</td>
+                                                <td className="px-4 py-3 text-right text-rose-600">{rowClaimedDamaged}</td>
+                                                <td className="px-4 py-3 text-right text-amber-600">{rowClaimedMissing}</td>
+                                                <td className="px-4 py-3 text-right font-semibold text-red-700">
+                                                    {hasSpecificClaimedItem ? formatQuantity(claim.quantity_disputed ?? 0) : '-'}
+                                                </td>
+                                                <td className="px-4 py-3 text-slate-700">{item.unit}</td>
+                                            </tr>
+                                        );
+                                    })}
                                     {claimedItems.length === 0 ? (
                                         <tr>
                                             <td colSpan={8} className="px-4 py-8 text-center text-sm text-slate-500">
@@ -423,6 +433,7 @@ function displayClaimType(type: string): string {
         DAMAGED_ITEM: 'Damaged Item',
         QUANTITY_MISMATCH: 'Quantity Mismatch',
         WRONG_ITEM_RECEIVED: 'Wrong Item Received',
+        MISSING_AND_DAMAGED: 'Missing and Damaged',
         SHORTAGE: 'Shortage',
     };
 
@@ -440,6 +451,30 @@ function displayClaimStatus(status: string): string {
     };
 
     return map[status] ?? humanizeEnum(status);
+}
+
+function getClaimIssueQuantities(claim: Props['claim']): { damaged: number; missing: number } {
+    const damaged = claim.quantity_damaged ?? 0;
+    const missing = claim.quantity_missing ?? 0;
+
+    if (damaged > 0 || missing > 0) {
+        return { damaged, missing };
+    }
+
+    const disputedQuantity = claim.quantity_disputed ?? 0;
+    if (claim.claim_type === 'DAMAGED_ITEM') {
+        return { damaged: disputedQuantity, missing: 0 };
+    }
+
+    if (['MISSING_ITEM', 'SHORTAGE'].includes(claim.claim_type)) {
+        return { damaged: 0, missing: disputedQuantity };
+    }
+
+    return { damaged: 0, missing: 0 };
+}
+
+function formatQuantity(value: number): string {
+    return value.toFixed(2);
 }
 
 function getNextStatusOptions(status: string): Array<{ value: string; label: string }> {
@@ -481,4 +516,3 @@ function getResolutionTypeOptions(status: string): Array<{ value: string; label:
 
     return [];
 }
-

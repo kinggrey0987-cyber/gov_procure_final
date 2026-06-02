@@ -588,6 +588,67 @@ class InventoryDistributionFoundationTest extends TestCase
             ->assertSessionHasErrors('office_id');
     }
 
+    public function test_claim_creation_totals_issue_quantities_and_rejects_above_released_item_balance(): void
+    {
+        $record = $this->createReleasedDistributionRecordForOffice($this->officeA, 90112);
+        $distributionItem = $record->items()->firstOrFail();
+        $distributionItem->forceFill(['quantity_released' => 20])->save();
+
+        $this->actingAs($this->officeUserA)
+            ->post(route('office.claims.store'), [
+                'distribution_record_id' => $record->distribution_record_id,
+                'distribution_item_id' => $distributionItem->distribution_item_id,
+                'office_id' => $this->officeA->id,
+                'claim_type' => 'MISSING_ITEM',
+                'claim_date' => now()->toDateString(),
+                'claim_location' => 'Office A Storage',
+                'quantity_missing' => 20,
+                'quantity_damaged' => 1,
+                'remarks' => 'Invalid mixed claim above released quantity.',
+            ])
+            ->assertSessionHasErrors('quantity_disputed');
+
+        $this->actingAs($this->officeUserA)
+            ->post(route('office.claims.store'), [
+                'distribution_record_id' => $record->distribution_record_id,
+                'distribution_item_id' => $distributionItem->distribution_item_id,
+                'office_id' => $this->officeA->id,
+                'claim_type' => 'MISSING_ITEM',
+                'claim_date' => now()->toDateString(),
+                'claim_location' => 'Office A Storage',
+                'quantity_missing' => 19,
+                'quantity_damaged' => 1,
+                'quantity_disputed' => 20,
+                'remarks' => 'Valid mixed claim totaling the released quantity.',
+            ])
+            ->assertRedirect();
+
+        $claim = Claim::query()->where('distribution_item_id', $distributionItem->distribution_item_id)->firstOrFail();
+
+        $this->assertSame('MISSING_AND_DAMAGED', (string) $claim->claim_type);
+        $this->assertSame('20.00', (string) $claim->quantity_disputed);
+        $this->assertSame('1.00', (string) $claim->quantity_damaged);
+        $this->assertSame('19.00', (string) $claim->quantity_missing);
+
+        $this->actingAs($this->officeUserA)
+            ->post(route('office.claims.store'), [
+                'distribution_record_id' => $record->distribution_record_id,
+                'distribution_item_id' => $distributionItem->distribution_item_id,
+                'office_id' => $this->officeA->id,
+                'claim_type' => 'DAMAGED_ITEM',
+                'claim_date' => now()->toDateString(),
+                'claim_location' => 'Office A Storage',
+                'quantity_disputed' => 1,
+                'remarks' => 'Attempt to claim another damaged unit.',
+            ])
+            ->assertSessionHasErrors('quantity_disputed');
+
+        $this->assertSame(
+            1,
+            Claim::query()->where('distribution_item_id', $distributionItem->distribution_item_id)->count()
+        );
+    }
+
     public function test_claim_replacement_resolution_cannot_exceed_available_stock(): void
     {
         $record = $this->createReleasedDistributionRecordForOffice($this->officeA, 90110);
