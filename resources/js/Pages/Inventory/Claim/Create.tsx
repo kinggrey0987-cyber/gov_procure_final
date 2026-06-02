@@ -36,7 +36,6 @@ type IssueLine = {
     distribution_item_id: string;
     claim_type: string;
     quantity: string;
-    notes: string;
 };
 
 const claimTypeOptions = [
@@ -139,14 +138,15 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                 onChange={(e) => {
                                     const selectedRecordId = Number(e.target.value);
                                     const selected = distributionRecords.find((record) => record.distribution_record_id === selectedRecordId);
+                                    const firstItem = selected?.items?.[0] ?? null;
                                     form.setData('distribution_record_id', selectedRecordId);
-                                    form.setData('distribution_item_id', '');
+                                    form.setData('distribution_item_id', firstItem?.distribution_item_id ?? '');
                                     form.setData('office_id', selected?.office_id ?? 0);
                                     form.setData('claim_date', todayDate());
-                                    form.setData('quantity_disputed', '');
-                                    form.setData('quantity_damaged', '');
-                                    form.setData('quantity_missing', '');
-                                    setIssueLines(buildInitialIssueLines(null));
+                                    form.setData('quantity_disputed', String(Math.trunc((firstItem?.quantity_missing ?? 0) + (firstItem?.quantity_damaged ?? 0))));
+                                    form.setData('quantity_damaged', String(Math.trunc(firstItem?.quantity_damaged ?? 0)));
+                                    form.setData('quantity_missing', String(Math.trunc(firstItem?.quantity_missing ?? 0)));
+                                    setIssueLines(buildInitialIssueLines(firstItem));
                                 }}
                             >
                                 <option value="">Select Distribution Record</option>
@@ -168,36 +168,6 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                 <p><span className="font-semibold text-slate-800">Distribution Status:</span> {selectedRecord.status}</p>
                             </div>
                         ) : null}
-
-                        <div>
-                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Affected Released Item</label>
-                            <select
-                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                                value={form.data.distribution_item_id}
-                                onChange={(e) => {
-                                    const distributionItemId = e.target.value;
-                                    const nextItem = selectedRecord?.items?.find((item) => item.distribution_item_id === Number(distributionItemId));
-                                    form.setData('distribution_item_id', distributionItemId);
-                                    form.setData('quantity_disputed', String(Math.trunc((nextItem?.quantity_missing ?? 0) + (nextItem?.quantity_damaged ?? 0))));
-                                    form.setData('quantity_damaged', String(Math.trunc(nextItem?.quantity_damaged ?? 0)));
-                                    form.setData('quantity_missing', String(Math.trunc(nextItem?.quantity_missing ?? 0)));
-                                    setIssueLines(buildInitialIssueLines(nextItem ?? null));
-                                }}
-                            >
-                                <option value="">Select affected released item</option>
-                                {(selectedRecord?.items ?? []).map((item) => (
-                                    <option key={item.distribution_item_id} value={item.distribution_item_id}>
-                                        {item.item_name} - released {item.quantity_released} {item.unit}
-                                    </option>
-                                ))}
-                            </select>
-                            {form.errors.distribution_item_id ? <p className="mt-1 text-xs text-rose-600">{form.errors.distribution_item_id}</p> : null}
-                            {selectedItem ? (
-                                <p className="mt-2 text-xs text-slate-500">
-                                    Received: {formatQuantity(selectedItem.quantity_received)} {selectedItem.unit} · Damaged: {formatQuantity(selectedItem.quantity_damaged)} · Missing: {formatQuantity(selectedItem.quantity_missing)}
-                                </p>
-                            ) : null}
-                        </div>
 
                         <div className="grid gap-3 sm:grid-cols-2">
                             <div>
@@ -242,7 +212,7 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                     const lineMaxQuantity = Math.trunc(lineItem?.quantity_released ?? 0);
 
                                     return (
-                                    <div key={line.id} className="grid gap-2 rounded-lg border border-amber-200 bg-white p-3 sm:grid-cols-[1.2fr_1.1fr_0.7fr_0.9fr_auto]">
+                                    <div key={line.id} className="grid gap-2 rounded-lg border border-amber-200 bg-white p-3 sm:grid-cols-[1.35fr_1.1fr_0.65fr_auto]">
                                         <select
                                             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                                             value={line.distribution_item_id}
@@ -287,12 +257,6 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                                 updateIssueLine(setIssueLines, line.id, { quantity: cappedQuantity });
                                             }}
                                         />
-                                        <input
-                                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                                            placeholder="Notes"
-                                            value={line.notes}
-                                            onChange={(e) => updateIssueLine(setIssueLines, line.id, { notes: e.target.value })}
-                                        />
                                         <button
                                             type="button"
                                             className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-50"
@@ -311,6 +275,7 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                 {derivedClaimType ? ` · Claim type: ${displayClaimType(derivedClaimType)}` : ''}
                             </p>
                             {form.errors.claim_type ? <p className="mt-1 text-xs text-rose-600 sm:col-span-3">{form.errors.claim_type}</p> : null}
+                            {form.errors.distribution_item_id ? <p className="mt-1 text-xs text-rose-600 sm:col-span-3">{form.errors.distribution_item_id}</p> : null}
                             {form.errors.quantity_disputed ? <p className="mt-1 text-xs text-rose-600 sm:col-span-3">{form.errors.quantity_disputed}</p> : null}
                             {form.errors.quantity_damaged ? <p className="mt-1 text-xs text-rose-600">{form.errors.quantity_damaged}</p> : null}
                             {form.errors.quantity_missing ? <p className="mt-1 text-xs text-rose-600">{form.errors.quantity_missing}</p> : null}
@@ -370,7 +335,6 @@ function createIssueLine(claimType: string, quantity = '', distributionItemId: n
         distribution_item_id: String(distributionItemId),
         claim_type: claimType,
         quantity,
-        notes: '',
     };
 }
 
