@@ -8,6 +8,8 @@ use App\Models\PurchaseRequest;
 use App\Models\Delivery;
 use App\Models\SupplyRequest;
 use App\Models\SupplyRequestItem;
+use App\Models\User;
+use App\Services\Analytics\AlertService;
 use App\Services\Procurement\PurchaseRequestService;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\RedirectResponse;
@@ -19,8 +21,10 @@ use Inertia\Response;
 
 class RequestWorkflowController
 {
-    public function __construct(private readonly PurchaseRequestService $purchaseRequestService)
-    {
+    public function __construct(
+        private readonly PurchaseRequestService $purchaseRequestService,
+        private readonly AlertService $alertService,
+    ) {
     }
 
     public function officeSupplyRequests(Request $request): Response
@@ -307,6 +311,10 @@ class RequestWorkflowController
     public function procurementRequests(Request $request): Response
     {
         abort_unless($request->user()?->can('inventory.view-any'), 403);
+        $actor = $request->user();
+        if ($actor instanceof User) {
+            $this->alertService->syncLowStockInventoryAlerts($actor);
+        }
 
         $focusInventoryId = (int) $request->query('focus_inventory_id', 0);
 

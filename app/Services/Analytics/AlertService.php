@@ -4,10 +4,13 @@ namespace App\Services\Analytics;
 
 use App\Models\Alert;
 use App\Models\ApprovalHistory;
+use App\Models\Inventory;
+use App\Models\Office;
 use App\Models\StatusHistory;
 use App\Models\User;
 use App\Services\AuditLogService;
 use App\Services\NotificationService;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -46,6 +49,56 @@ class AlertService
 
             return $alert;
         });
+    }
+
+    /**
+     * @return Collection<int, Alert>
+     */
+    public function syncLowStockInventoryAlerts(User $actor): Collection
+    {
+        $created = collect();
+        $gsoOfficeId = Office::query()
+            ->whereRaw('UPPER(code) = ?', ['GSO'])
+            ->value('id');
+
+        $inventories = Inventory::query()
+            ->with('item:item_id,item_name')
+            ->where('low_stock_threshold', '>', 0)
+            ->whereColumn('available_stock', '<', 'low_stock_threshold')
+            ->get();
+
+        foreach ($inventories as $inventory) {
+            $inventoryId = (int) $inventory->inventory_id;
+            $alreadyOpen = Alert::query()
+                ->where('alert_type', 'LOW_STOCK')
+                ->whereIn('status', ['OPEN', 'IN_REVIEW'])
+                ->where('alert_message', 'like', '%inventory #'.$inventoryId.'%')
+                ->exists();
+
+            if ($alreadyOpen) {
+                continue;
+            }
+
+            $available = (float) $inventory->available_stock;
+            $threshold = (float) $inventory->low_stock_threshold;
+            $severity = $available <= 0 || $available <= ($threshold * 0.25) ? 'HIGH' : 'MEDIUM';
+            $itemName = (string) ($inventory->item?->item_name ?? 'Unassigned inventory item');
+
+            $created->push($this->create($actor, [
+                'alert_type' => 'LOW_STOCK',
+                'severity' => $severity,
+                'office_id' => $gsoOfficeId ?: $actor->office_id,
+                'alert_message' => sprintf(
+                    '%s is below GSO reorder threshold (available %.2f vs threshold %.2f; inventory #%d).',
+                    $itemName,
+                    $available,
+                    $threshold,
+                    $inventoryId,
+                ),
+            ]));
+        }
+
+        return $created;
     }
 
     public function updateStatus(Alert $alert, User $actor, string $newStatus, ?string $remarks = null): Alert

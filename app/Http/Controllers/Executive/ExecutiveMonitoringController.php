@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\Executive;
 
+use App\Services\Analytics\AlertService;
 use App\Services\Analytics\ExecutiveMonitoringService;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
@@ -11,8 +13,10 @@ use Inertia\Response;
 
 class ExecutiveMonitoringController
 {
-    public function __construct(private readonly ExecutiveMonitoringService $monitoringService)
-    {
+    public function __construct(
+        private readonly ExecutiveMonitoringService $monitoringService,
+        private readonly AlertService $alertService,
+    ) {
     }
 
     public function summary(): Response
@@ -23,6 +27,10 @@ class ExecutiveMonitoringController
     public function dashboard(): Response
     {
         $this->authorizeView();
+        $actor = Auth::user();
+        if ($actor instanceof User) {
+            $this->alertService->syncLowStockInventoryAlerts($actor);
+        }
 
         return Inertia::render('Executive/Dashboard/Index', $this->monitoringService->dashboard());
     }
@@ -51,6 +59,10 @@ class ExecutiveMonitoringController
     public function anomaliesMonitoring(Request $request): Response
     {
         $this->authorizeView();
+        $actor = $request->user();
+        if ($actor instanceof User) {
+            $this->alertService->syncLowStockInventoryAlerts($actor);
+        }
 
         $filters = $request->validate([
             'office_id' => ['nullable', 'integer', 'exists:offices,id'],
