@@ -53,8 +53,10 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
         purpose: '',
         priority_level: 'MEDIUM',
         review_notes: '',
+        submit_after_save: false,
         items: [emptyItem()],
     });
+    const submitAfterSaveRef = useRef(false);
     const fetchedItemsForPpmpRef = useRef<string | null>(initialOptions.length > 0 && selectedPpmpId ? String(selectedPpmpId) : null);
 
     const hasPpmp = form.data.ppmp_id !== '';
@@ -87,7 +89,12 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
             return;
         }
 
-        form.post(route('office.supply-requests.store'));
+        form.transform((data) => ({ ...data, submit_after_save: submitAfterSaveRef.current }));
+        form.post(route('office.supply-requests.store'), {
+            onFinish: () => {
+                submitAfterSaveRef.current = false;
+            },
+        });
     };
 
     const addItem = () => {
@@ -529,7 +536,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                         </div>
                     ) : null}
 
-                    <div className="flex justify-end gap-2">
+                    <div className="flex flex-wrap justify-end gap-2">
                         <Link
                             href={route('office.supply-requests.index')}
                             className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
@@ -538,10 +545,23 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                         </Link>
                         <button
                             type="submit"
+                            onClick={() => {
+                                submitAfterSaveRef.current = false;
+                            }}
+                            disabled={form.processing || !hasPpmp || duplicateLineCount > 0 || !isFormComplete}
+                            className="rounded-lg border border-red-300 bg-white px-5 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60"
+                        >
+                            Save Request
+                        </button>
+                        <button
+                            type="submit"
+                            onClick={() => {
+                                submitAfterSaveRef.current = true;
+                            }}
                             disabled={form.processing || !hasPpmp || duplicateLineCount > 0 || !isFormComplete}
                             className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
                         >
-                            Save Request
+                            Submit Request
                         </button>
                     </div>
                     {!hasPpmp ? (

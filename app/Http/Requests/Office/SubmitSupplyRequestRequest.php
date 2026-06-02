@@ -21,6 +21,7 @@ class SubmitSupplyRequestRequest extends FormRequest
     {
         return [
             'review_notes' => ['nullable', 'string', 'max:2000'],
+            'redirect_to' => ['nullable', 'in:index,show'],
         ];
     }
 }

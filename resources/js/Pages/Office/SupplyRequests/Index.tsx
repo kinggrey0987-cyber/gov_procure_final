@@ -37,6 +37,7 @@ export default function SupplyRequestsIndex({ supplyRequests, filters, filter_op
     const [month, setMonth] = useState(filters?.month ?? '');
     const [search, setSearch] = useState(filters?.search ?? '');
     const [draftToDelete, setDraftToDelete] = useState<RequestRow | null>(null);
+    const [submittingDraftId, setSubmittingDraftId] = useState<number | null>(null);
     const debouncedSearch = useDebouncedValue(search, 450);
     const hasMountedRef = useRef(false);
 
@@ -80,6 +81,22 @@ export default function SupplyRequestsIndex({ supplyRequests, filters, filter_op
             preserveScroll: true,
             onFinish: () => setDraftToDelete(null),
         });
+    };
+
+    const submitDraft = (row: RequestRow) => {
+        if ((row.raw_status ?? row.status) !== 'DRAFT') {
+            return;
+        }
+
+        router.post(
+            route('office.supply-requests.submit', row.supply_request_id),
+            { redirect_to: 'index' },
+            {
+                preserveScroll: true,
+                onStart: () => setSubmittingDraftId(row.supply_request_id),
+                onFinish: () => setSubmittingDraftId(null),
+            },
+        );
     };
 
     return (
@@ -210,6 +227,16 @@ export default function SupplyRequestsIndex({ supplyRequests, filters, filter_op
                                                 >
                                                     View Details
                                                 </Link>
+                                                    {(row.raw_status ?? row.status) === 'DRAFT' && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => submitDraft(row)}
+                                                            disabled={submittingDraftId === row.supply_request_id}
+                                                            className="inline-flex items-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                                                        >
+                                                            {submittingDraftId === row.supply_request_id ? 'Submitting...' : 'Submit'}
+                                                        </button>
+                                                    )}
                                                     {(row.raw_status ?? row.status) === 'DRAFT' && (
                                                         <button
                                                             type="button"

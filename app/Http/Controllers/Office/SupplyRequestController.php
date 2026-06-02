@@ -189,6 +189,15 @@ class SupplyRequestController extends Controller
             $this->service->addItem($supplyRequest, $request->user(), $item);
         }
 
+        if ($request->boolean('submit_after_save')) {
+            abort_unless($request->user()?->can('office.supply-request.submit', $supplyRequest), 403);
+
+            $submittedRequest = $this->service->submit($supplyRequest, $request->user(), $payload['review_notes'] ?? null);
+
+            return redirect()->route('office.supply-requests.show', $supplyRequest->supply_request_id)
+                ->with('success', $this->submitSuccessMessage($submittedRequest));
+        }
+
         return redirect()->route('office.supply-requests.show', $supplyRequest->supply_request_id)
             ->with('success', 'Supply request created successfully.');
     }
@@ -641,21 +650,30 @@ class SupplyRequestController extends Controller
     public function submit(SubmitSupplyRequestRequest $request, SupplyRequest $supplyRequest): RedirectResponse
     {
         $submittedRequest = $this->service->submit($supplyRequest, $request->user(), $request->input('review_notes'));
+
+        if ($request->input('redirect_to') === 'index') {
+            return redirect()->back()
+                ->with('success', $this->submitSuccessMessage($submittedRequest));
+        }
+
+        return redirect()->route('office.supply-requests.show', $supplyRequest->supply_request_id)
+            ->with('success', $this->submitSuccessMessage($submittedRequest));
+    }
+
+    private function submitSuccessMessage(SupplyRequest $submittedRequest): string
+    {
         $overRequestCount = (int) ($submittedRequest->getAttribute('ppmp_over_request_count') ?? 0);
         $scheduleMismatchCount = (int) ($submittedRequest->getAttribute('ppmp_schedule_mismatch_count') ?? 0);
 
-        $successMessage = 'Supply request submitted successfully.';
-
         if ($overRequestCount > 0 || $scheduleMismatchCount > 0) {
-            $successMessage = sprintf(
+            return sprintf(
                 'Supply request submitted successfully. %d PPMP over-allocation line(s) and %d out-of-schedule line(s) were flagged for executive review.',
                 $overRequestCount,
                 $scheduleMismatchCount,
             );
         }
 
-        return redirect()->route('office.supply-requests.show', $supplyRequest->supply_request_id)
-            ->with('success', $successMessage);
+        return 'Supply request submitted successfully.';
     }
 
     public function destroy(Request $request, SupplyRequest $supplyRequest): RedirectResponse

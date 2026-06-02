@@ -34,6 +34,7 @@ class StoreSupplyRequestRequest extends FormRequest
             'purpose' => ['required', 'string'],
             'priority_level' => ['required', 'string', 'max:30'],
             'review_notes' => ['nullable', 'string', 'max:2000'],
+            'submit_after_save' => ['sometimes', 'boolean'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.item_id' => ['nullable', 'integer'],
             'items.*.ppmp_item_id' => [

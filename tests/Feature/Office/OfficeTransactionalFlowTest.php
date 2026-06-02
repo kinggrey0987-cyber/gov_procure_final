@@ -1739,6 +1739,75 @@ class OfficeTransactionalFlowTest extends TestCase
         $this->assertGreaterThan((float) $anomaly->expected_value, (float) $anomaly->detected_value);
     }
 
+    public function test_supply_request_can_be_submitted_directly_after_create(): void
+    {
+        $office = $this->createOffice();
+        $officeUser = $this->createUser(UserRole::OFFICE_USER, $office);
+        [$ppmp, $ppmpItem, $item] = $this->createApprovedPpmpItemContext($office, $officeUser, 20);
+
+        $response = $this->actingAs($officeUser)->post(route('office.supply-requests.store'), [
+            'ppmp_id' => $ppmp->ppmp_id,
+            'needed_by_date' => now()->addDays(3)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Direct submit from create page',
+            'priority_level' => 'MEDIUM',
+            'review_notes' => 'Submit immediately',
+            'submit_after_save' => true,
+            'items' => [[
+                'item_id' => $item->item_id,
+                'ppmp_item_id' => $ppmpItem->ppmp_item_id,
+                'item_name_snapshot' => $item->item_name,
+                'quantity_requested' => 5,
+            ]],
+        ]);
+
+        $supplyRequest = SupplyRequest::query()->firstOrFail();
+
+        $response->assertRedirect(route('office.supply-requests.show', $supplyRequest->supply_request_id));
+        $response->assertSessionHas('success', 'Supply request submitted successfully.');
+        $this->assertSame('SUBMITTED', $supplyRequest->refresh()->status);
+
+        $this->assertDatabaseHas('status_history', [
+            'reference_type' => SupplyRequest::class,
+            'reference_id' => $supplyRequest->supply_request_id,
+            'new_status' => 'SUBMITTED',
+        ]);
+    }
+
+    public function test_draft_supply_request_can_be_submitted_from_tracking_list(): void
+    {
+        $office = $this->createOffice();
+        $officeUser = $this->createUser(UserRole::OFFICE_USER, $office);
+        [$ppmp, $ppmpItem, $item] = $this->createApprovedPpmpItemContext($office, $officeUser, 20);
+
+        $this->actingAs($officeUser)->post(route('office.supply-requests.store'), [
+            'ppmp_id' => $ppmp->ppmp_id,
+            'needed_by_date' => now()->addDays(3)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Submit from tracking list',
+            'priority_level' => 'MEDIUM',
+            'items' => [[
+                'item_id' => $item->item_id,
+                'ppmp_item_id' => $ppmpItem->ppmp_item_id,
+                'item_name_snapshot' => $item->item_name,
+                'quantity_requested' => 5,
+            ]],
+        ])->assertRedirect();
+
+        $supplyRequest = SupplyRequest::query()->firstOrFail();
+
+        $response = $this
+            ->actingAs($officeUser)
+            ->from(route('office.supply-requests.index', ['status' => 'DRAFT']))
+            ->post(route('office.supply-requests.submit', $supplyRequest->supply_request_id), [
+                'redirect_to' => 'index',
+            ]);
+
+        $response->assertRedirect(route('office.supply-requests.index', ['status' => 'DRAFT']));
+        $response->assertSessionHas('success', 'Supply request submitted successfully.');
+        $this->assertSame('SUBMITTED', $supplyRequest->refresh()->status);
+    }
+
     private function createOffice(): Office
     {
         return Office::query()->create([
