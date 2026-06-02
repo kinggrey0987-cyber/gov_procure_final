@@ -3,6 +3,7 @@
 namespace App\Services\Office;
 
 use App\Models\ApprovalHistory;
+use App\Enums\UserRole;
 use App\Enums\FundSource;
 use App\Models\Ppmp;
 use App\Models\PpmpItem;
@@ -104,6 +105,15 @@ class PpmpService
                 title: 'PPMP Submitted',
                 message: 'Your PPMP was submitted successfully.',
                 notificationType: 'OFFICE_PPMP_SUBMITTED',
+                referenceType: Ppmp::class,
+                referenceId: (int) $ppmp->ppmp_id,
+            );
+
+            $this->notificationService->notifyRole(
+                role: UserRole::EXECUTIVE_OFFICER,
+                title: 'PPMP Pending Executive Approval',
+                message: sprintf('PPMP #%d has been submitted for executive review.', (int) $ppmp->ppmp_id),
+                notificationType: 'EXEC_PPMP_PENDING_APPROVAL',
                 referenceType: Ppmp::class,
                 referenceId: (int) $ppmp->ppmp_id,
             );

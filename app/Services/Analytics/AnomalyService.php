@@ -2,6 +2,7 @@
 
 namespace App\Services\Analytics;
 
+use App\Enums\UserRole;
 use App\Models\Anomaly;
 use App\Models\ApprovalHistory;
 use App\Models\StatusHistory;
@@ -158,6 +159,15 @@ class AnomalyService
                 'remarks' => 'System-detected anomaly created.',
                 'changed_at' => now(),
             ]);
+
+            $this->notificationService->notifyRole(
+                role: UserRole::EXECUTIVE_OFFICER,
+                title: 'New Anomaly Detected',
+                message: sprintf('Anomaly %s was detected and needs executive review.', $anomalyType),
+                notificationType: 'EXEC_ANOMALY_DETECTED',
+                referenceType: Anomaly::class,
+                referenceId: (int) $anomaly->anomaly_id,
+            );
 
             return $anomaly;
         });

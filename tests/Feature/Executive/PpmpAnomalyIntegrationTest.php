@@ -156,6 +156,19 @@ class PpmpAnomalyIntegrationTest extends TestCase
             'status' => 'OPEN',
         ]);
 
+        $anomaly = Anomaly::query()
+            ->where('anomaly_type', 'PPMP_OVER_REQUEST')
+            ->where('office_id', $this->office->id)
+            ->firstOrFail();
+
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $this->executive->id,
+            'notification_type' => 'EXEC_ANOMALY_DETECTED',
+            'reference_type' => Anomaly::class,
+            'reference_id' => $anomaly->anomaly_id,
+            'is_read' => false,
+        ]);
+
         $this->actingAs($this->executive)
             ->get(route('executive.anomalies-monitoring'))
             ->assertOk()

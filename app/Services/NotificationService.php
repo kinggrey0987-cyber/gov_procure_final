@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\UserRole;
 use App\Models\Notification as GovernanceNotification;
 use App\Models\User;
 use Illuminate\Support\Collection;
@@ -55,5 +56,32 @@ class NotificationService
                 $referenceId
             );
         });
+    }
+
+    /**
+     * @return Collection<int, GovernanceNotification>
+     */
+    public function notifyRole(
+        UserRole|string $role,
+        string $title,
+        string $message,
+        string $notificationType,
+        ?string $referenceType = null,
+        ?int $referenceId = null
+    ): Collection {
+        $roleCode = $role instanceof UserRole ? $role->value : $role;
+
+        $users = User::query()
+            ->whereHas('role', fn ($query) => $query->where('code', $roleCode))
+            ->get();
+
+        return $this->notifyUsers(
+            users: $users,
+            title: $title,
+            message: $message,
+            notificationType: $notificationType,
+            referenceType: $referenceType,
+            referenceId: $referenceId,
+        );
     }
 }

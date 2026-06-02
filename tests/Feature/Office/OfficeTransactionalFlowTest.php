@@ -38,6 +38,7 @@ class OfficeTransactionalFlowTest extends TestCase
     {
         $office = $this->createOffice();
         $officeUser = $this->createUser(UserRole::OFFICE_USER, $office);
+        $executive = $this->createUser(UserRole::EXECUTIVE_OFFICER, $office);
 
         $create = $this->actingAs($officeUser)->post(route('office.ppmp.store'), [
             'fiscal_year' => 2026,
@@ -80,6 +81,14 @@ class OfficeTransactionalFlowTest extends TestCase
 
         $this->assertContains('DRAFT', $history);
         $this->assertContains('SUBMITTED', $history);
+
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $executive->id,
+            'notification_type' => 'EXEC_PPMP_PENDING_APPROVAL',
+            'reference_type' => Ppmp::class,
+            'reference_id' => $ppmp->ppmp_id,
+            'is_read' => false,
+        ]);
     }
 
     public function test_ppmp_edit_page_loads_existing_item_fields_for_editing_context(): void
