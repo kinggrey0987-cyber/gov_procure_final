@@ -48,8 +48,6 @@ type IssueLine = {
 const claimTypeOptions = [
     { value: 'MISSING_ITEM', label: 'Missing Item' },
     { value: 'DAMAGED_ITEM', label: 'Damaged Item' },
-    { value: 'QUANTITY_MISMATCH', label: 'Quantity Mismatch' },
-    { value: 'WRONG_ITEM', label: 'Wrong Item Received' },
 ];
 
 const todayDate = (): string => {
@@ -130,7 +128,7 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
 
                     <div className="mb-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                         <p className="text-sm text-slate-600">Claims are filed against supply requests your office has already confirmed received.</p>
-                        <p className="mt-2 text-xs text-slate-500">Typical claim types: missing items, damaged items, quantity mismatch, or wrong item received.</p>
+                        <p className="mt-2 text-xs text-slate-500">Claim types are limited to missing items and damaged items.</p>
                         {parentClaim ? (
                             <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
                                 Follow-up claim for {parentClaim.claim_code}. Resolving this follow-up will also resolve the original claim.
@@ -391,22 +389,14 @@ function getClaimTypeFromIssueLines(issueLines: IssueLine[]): string {
         return 'MISSING_AND_DAMAGED';
     }
 
-    if (activeTypes.size > 1) {
-        return 'MULTIPLE_ISSUES';
-    }
-
     const [firstType] = Array.from(activeTypes);
 
-    return firstType || 'QUANTITY_MISMATCH';
+    return firstType || '';
 }
 
 function displayClaimType(type: string): string {
     if (type === 'MISSING_AND_DAMAGED') {
         return 'Missing and Damaged';
-    }
-
-    if (type === 'MULTIPLE_ISSUES') {
-        return 'Multiple Issues';
     }
 
     if (type === 'DAMAGED_ITEM') {

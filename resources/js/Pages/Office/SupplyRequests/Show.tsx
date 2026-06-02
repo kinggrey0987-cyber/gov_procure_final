@@ -441,8 +441,6 @@ export default function SupplyRequestShow({
                                 >
                                     <option value="MISSING_ITEM">Missing Item</option>
                                     <option value="DAMAGED_ITEM">Damaged Item</option>
-                                    <option value="WRONG_ITEM">Wrong Item</option>
-                                    <option value="OTHER">Other</option>
                                 </select>
                             </div>
 
@@ -583,4 +581,3 @@ function StatusBadge({ status }: { status: string }) {
 
     return <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${style}`}>{status.replaceAll('_', ' ')}</span>;
 }
-

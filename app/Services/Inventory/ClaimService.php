@@ -69,6 +69,12 @@ class ClaimService
         }
 
         $submittedClaimType = (string) ($payload['claim_type'] ?? '');
+        if (! in_array($submittedClaimType, ['MISSING_ITEM', 'DAMAGED_ITEM', 'MISSING_AND_DAMAGED'], true)) {
+            throw ValidationException::withMessages([
+                'claim_type' => 'Claim type must be Missing Item or Damaged Item.',
+            ]);
+        }
+
         $submittedDisputedQuantity = max((float) ($payload['quantity_disputed'] ?? 0), 0);
         $damagedQuantity = max((float) ($payload['quantity_damaged'] ?? 0), 0);
         $missingQuantity = max((float) ($payload['quantity_missing'] ?? 0), 0);
@@ -79,7 +85,7 @@ class ClaimService
 
             if ($submittedClaimType === 'DAMAGED_ITEM' && $damagedQuantity <= 0 && $missingQuantity <= 0) {
                 $damagedQuantity = $disputedQuantity;
-            } elseif (in_array($submittedClaimType, ['MISSING_ITEM', 'SHORTAGE'], true) && $damagedQuantity <= 0 && $missingQuantity <= 0) {
+            } elseif ($submittedClaimType === 'MISSING_ITEM' && $damagedQuantity <= 0 && $missingQuantity <= 0) {
                 $missingQuantity = $disputedQuantity;
             }
         }
@@ -423,10 +429,6 @@ class ClaimService
 
     private function resolveClaimType(string $submittedType, float $damagedQuantity, float $missingQuantity): string
     {
-        if (in_array($submittedType, ['MULTIPLE_ISSUES', 'WRONG_ITEM', 'QUANTITY_MISMATCH'], true)) {
-            return $submittedType;
-        }
-
         if ($damagedQuantity > 0 && $missingQuantity > 0) {
             return 'MISSING_AND_DAMAGED';
         }

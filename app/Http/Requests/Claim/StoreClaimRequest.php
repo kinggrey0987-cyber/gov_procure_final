@@ -4,6 +4,7 @@ namespace App\Http\Requests\Claim;
 
 use App\Models\DistributionRecord;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreClaimRequest extends FormRequest
 {
@@ -29,7 +30,7 @@ class StoreClaimRequest extends FormRequest
             'parent_claim_id' => ['nullable', 'integer', 'exists:claims,claims_id'],
             'source_type' => ['nullable', 'string', 'max:60'],
             'office_id' => ['required', 'integer', 'exists:offices,id'],
-            'claim_type' => ['required', 'string', 'max:80'],
+            'claim_type' => ['required', 'string', Rule::in(['MISSING_ITEM', 'DAMAGED_ITEM', 'MISSING_AND_DAMAGED'])],
             'claim_date' => ['required', 'date', 'after_or_equal:'.$earliestClaimDate, 'before_or_equal:today'],
             'claim_location' => ['required', 'string', 'max:150'],
             'quantity_disputed' => ['nullable', 'integer', 'min:0'],
@@ -49,6 +50,7 @@ class StoreClaimRequest extends FormRequest
         return [
             'claim_date.after_or_equal' => 'Date observed cannot be before the supply release date.',
             'claim_date.before_or_equal' => 'Date observed cannot be in the future.',
+            'claim_type.in' => 'Claim type must be Missing Item or Damaged Item.',
         ];
     }
 }

@@ -702,6 +702,28 @@ class InventoryDistributionFoundationTest extends TestCase
         $this->assertSame(0, Claim::query()->where('distribution_item_id', $distributionItem->distribution_item_id)->count());
     }
 
+    public function test_claim_creation_rejects_obsolete_issue_types(): void
+    {
+        $record = $this->createReleasedDistributionRecordForOffice($this->officeA, 90114);
+        $record->forceFill(['status' => 'RECEIVED'])->save();
+        $distributionItem = $record->items()->firstOrFail();
+
+        $this->actingAs($this->officeUserA)
+            ->post(route('office.claims.store'), [
+                'distribution_record_id' => $record->distribution_record_id,
+                'distribution_item_id' => $distributionItem->distribution_item_id,
+                'office_id' => $this->officeA->id,
+                'claim_type' => 'QUANTITY_MISMATCH',
+                'claim_date' => now()->toDateString(),
+                'claim_location' => 'Office A Storage',
+                'quantity_disputed' => 1,
+                'remarks' => 'Obsolete issue type should not be accepted.',
+            ])
+            ->assertSessionHasErrors('claim_type');
+
+        $this->assertSame(0, Claim::query()->where('distribution_item_id', $distributionItem->distribution_item_id)->count());
+    }
+
     public function test_claim_replacement_resolution_cannot_exceed_available_stock(): void
     {
         $record = $this->createReleasedDistributionRecordForOffice($this->officeA, 90110);

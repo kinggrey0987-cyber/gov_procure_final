@@ -310,42 +310,6 @@ export default function ClaimShow({ claim, parentClaim, followUpClaims = [], lin
                             <Info label="Release Date" value={formatDate(linkedDistribution.release_date)} />
                             <Info label="Record ID" value={String(linkedDistribution.distribution_record_id)} />
                         </div>
-
-                        <div className="mt-4 overflow-hidden rounded-lg border border-slate-200">
-                            <table className="min-w-full divide-y divide-slate-200 text-sm">
-                                <thead className="bg-slate-50">
-                                    <tr>
-                                        <th className="px-4 py-2 text-left font-semibold text-slate-700">Item</th>
-                                        <th className="px-4 py-2 text-left font-semibold text-slate-700">Category</th>
-                                        <th className="px-4 py-2 text-right font-semibold text-slate-700">Released Qty</th>
-                                        <th className="px-4 py-2 text-right font-semibold text-slate-700">Received Qty</th>
-                                        <th className="px-4 py-2 text-right font-semibold text-slate-700">Damaged Qty</th>
-                                        <th className="px-4 py-2 text-right font-semibold text-slate-700">Missing Qty</th>
-                                        <th className="px-4 py-2 text-left font-semibold text-slate-700">Unit</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {linkedDistribution.items.map((item) => (
-                                        <tr key={item.distribution_item_id} className="hover:bg-slate-50/60">
-                                            <td className="px-4 py-2 text-slate-700">{item.item_name}</td>
-                                            <td className="px-4 py-2 text-slate-600">{item.category_name || '-'}</td>
-                                            <td className="px-4 py-2 text-right font-semibold text-slate-700">{formatQuantity(item.quantity_released)}</td>
-                                            <td className="px-4 py-2 text-right font-semibold text-emerald-700">{formatQuantity(item.quantity_received ?? 0)}</td>
-                                            <td className="px-4 py-2 text-right text-rose-600">{formatQuantity(item.quantity_damaged ?? 0)}</td>
-                                            <td className="px-4 py-2 text-right text-amber-600">{formatQuantity(item.quantity_missing ?? 0)}</td>
-                                            <td className="px-4 py-2 text-slate-700">{item.unit}</td>
-                                        </tr>
-                                    ))}
-                                    {linkedDistribution.items.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={7} className="px-4 py-6 text-center text-sm text-slate-500">
-                                                No released item lines available for this distribution record.
-                                            </td>
-                                        </tr>
-                                    ) : null}
-                                </tbody>
-                            </table>
-                        </div>
                     </div>
                 ) : null}
 
