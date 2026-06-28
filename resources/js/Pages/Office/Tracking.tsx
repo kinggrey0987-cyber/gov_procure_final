@@ -1,3 +1,4 @@
+import DashboardAlertBanner, { type DashboardAlert } from '@/Components/DashboardAlertBanner';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
@@ -33,9 +34,10 @@ type Props = {
         is_read: boolean;
         created_at?: string | null;
     }>;
+    dashboardAlerts: DashboardAlert[];
 };
 
-export default function OfficeTracking({ summary, recentRequests, notificationPreview }: Props) {
+export default function OfficeTracking({ summary, recentRequests, notificationPreview, dashboardAlerts }: Props) {
     const [requestSearch, setRequestSearch] = useState('');
     const [requestStatus, setRequestStatus] = useState('ALL');
 
@@ -78,6 +80,8 @@ export default function OfficeTracking({ summary, recentRequests, notificationPr
             <Head title="Office Dashboard" />
 
             <div className="space-y-6 py-4">
+                <DashboardAlertBanner alerts={dashboardAlerts} />
+
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <MetricCard label="Total Requests" value={summary.total_requests} tone="slate" />
                     <MetricCard label="Pending Requests" value={summary.pending_requests} tone="amber" />

@@ -665,6 +665,42 @@ class RequestWorkflowController
             ->with('success', 'Supply request queued for procurement processing.');
     }
 
+    public function queueConsolidatedProcurement(Request $request): RedirectResponse
+    {
+        abort_unless($request->user()?->can('inventory.view-any'), 403);
+
+        $validated = $request->validate([
+            'office_id' => ['required', 'integer', 'exists:offices,id'],
+            'supply_request_ids' => ['required', 'array', 'min:1'],
+            'supply_request_ids.*' => ['required', 'integer', 'exists:supply_requests,supply_request_id'],
+        ]);
+
+        try {
+            $purchaseRequest = $this->purchaseRequestService->queueConsolidatedFromOffice(
+                actor: $request->user(),
+                officeId: (int) $validated['office_id'],
+                supplyRequestIds: array_map('intval', $validated['supply_request_ids']),
+            );
+        } catch (ValidationException $exception) {
+            $message = collect($exception->errors())
+                ->flatten()
+                ->first() ?: 'Consolidated purchase request could not be created.';
+
+            return redirect()
+                ->route('inventory.office-supply-requests.index', $request->query())
+                ->withErrors($exception->errors())
+                ->with('error', $message);
+        }
+
+        return redirect()
+            ->route('inventory.office-supply-requests.index', $request->query())
+            ->with('success', sprintf(
+                'Consolidated purchase request PR-%06d created for %d supply request(s).',
+                (int) $purchaseRequest->purchase_request_id,
+                count($validated['supply_request_ids']),
+            ));
+    }
+
     public function initiateLowStockProcurement(Request $request, Inventory $inventory): RedirectResponse
     {
         abort_unless($request->user()?->can('inventory.view-any'), 403);

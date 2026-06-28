@@ -1017,4 +1017,167 @@ class PurchaseRequestService
             officeId: (int) $purchaseRequest->office_id,
         );
     }
+
+    /**
+     * Create a single consolidated purchase request from multiple supply requests of the same office.
+     *
+     * This method aggregates all eligible (SUBMITTED, shortage) supply requests for an office
+     * into one PR, merging item quantities by item_id to avoid duplicate line items.
+     *
+     * @param  int[]  $supplyRequestIds
+     */
+    public function queueConsolidatedFromOffice(User $actor, int $officeId, array $supplyRequestIds): PurchaseRequest
+    {
+        $this->assertGsoActor($actor);
+
+        $office = Office::query()->findOrFail($officeId);
+        if ((string) ($office->code ?? '') === 'GSO') {
+            throw ValidationException::withMessages([
+                'office_id' => 'GSO-origin supply requests cannot be consolidated for procurement routing.',
+            ]);
+        }
+
+        $supplyRequests = SupplyRequest::query()
+            ->with(['items.item.inventory'])
+            ->where('office_id', $officeId)
+            ->whereIn('supply_request_id', $supplyRequestIds)
+            ->get();
+
+        if ($supplyRequests->isEmpty()) {
+            throw ValidationException::withMessages([
+                'supply_request_ids' => 'No supply requests found for the selected office.',
+            ]);
+        }
+
+        // Validate all supply requests are SUBMITTED and have shortages
+        $eligible = $supplyRequests->filter(function (SupplyRequest $request): bool {
+            if ((string) $request->status !== 'SUBMITTED') {
+                return false;
+            }
+
+            // Check that there's no existing active PR
+            $hasActivePr = PurchaseRequest::query()
+                ->where('supply_request_id', $request->supply_request_id)
+                ->whereIn('status', ['OPEN', 'PROCESSING'])
+                ->exists();
+
+            return ! $hasActivePr;
+        });
+
+        if ($eligible->isEmpty()) {
+            throw ValidationException::withMessages([
+                'supply_request_ids' => 'No eligible supply requests found. Requests must be SUBMITTED and not already queued for procurement.',
+            ]);
+        }
+
+        // Merge items by item_id, summing quantities
+        $mergedItems = [];
+        foreach ($eligible as $supplyRequest) {
+            foreach ($supplyRequest->items as $item) {
+                $itemId = (int) $item->item_id;
+                $requested = (float) $item->quantity_requested;
+
+                if (isset($mergedItems[$itemId])) {
+                    $mergedItems[$itemId]['quantity_requested'] += $requested;
+                } else {
+                    $mergedItems[$itemId] = [
+                        'item_id' => $itemId,
+                        'quantity_requested' => $requested,
+                        'item_name_snapshot' => (string) ($item->item?->item_name ?? $item->item_name_snapshot ?? 'Unknown Item'),
+                    ];
+                }
+            }
+        }
+
+        if (count($mergedItems) === 0) {
+            throw ValidationException::withMessages([
+                'supply_request_ids' => 'No items found across the selected supply requests.',
+            ]);
+        }
+
+        // Use the first eligible supply request as the "primary" link for the consolidated PR
+        $primarySupplyRequest = $eligible->first();
+
+        return DB::transaction(function () use ($actor, $office, $eligible, $mergedItems, $primarySupplyRequest): PurchaseRequest {
+            $sourceRequestCodes = $eligible->pluck('request_code')->implode(', ');
+
+            $purchaseRequest = PurchaseRequest::query()->create([
+                'supply_request_id' => (int) $primarySupplyRequest->supply_request_id,
+                'office_id' => (int) $office->id,
+                'requested_by' => (int) $actor->id,
+                'status' => 'OPEN',
+                'remarks' => sprintf(
+                    'Consolidated PR for %s from %d supply request(s): %s.',
+                    (string) $office->name,
+                    $eligible->count(),
+                    $sourceRequestCodes,
+                ),
+            ]);
+
+            $itemRows = [];
+            foreach ($mergedItems as $merged) {
+                $itemRows[] = [
+                    'purchase_request_id' => (int) $purchaseRequest->purchase_request_id,
+                    'item_id' => (int) $merged['item_id'],
+                    'quantity_requested' => round((float) $merged['quantity_requested'], 2),
+                    'remarks' => 'Consolidated from office supply requests.',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }
+
+            PurchaseRequestItem::query()->insert($itemRows);
+
+            // Update all source supply requests
+            foreach ($eligible as $supplyRequest) {
+                // Also create individual PR links for non-primary supply requests
+                if ((int) $supplyRequest->supply_request_id !== (int) $primarySupplyRequest->supply_request_id) {
+                    PurchaseRequest::query()->create([
+                        'supply_request_id' => (int) $supplyRequest->supply_request_id,
+                        'office_id' => (int) $office->id,
+                        'requested_by' => (int) $actor->id,
+                        'status' => 'OPEN',
+                        'remarks' => sprintf(
+                            'Linked to consolidated PR-%06d for %s.',
+                            (int) $purchaseRequest->purchase_request_id,
+                            (string) $office->name,
+                        ),
+                    ]);
+                }
+
+                $this->syncSupplyRequestStatus(
+                    PurchaseRequest::query()
+                        ->where('supply_request_id', $supplyRequest->supply_request_id)
+                        ->latest('purchase_request_id')
+                        ->first() ?? $purchaseRequest,
+                    $actor,
+                    'FOR_PROCUREMENT',
+                    sprintf('Supply request consolidated into PR-%06d for office %s.', (int) $purchaseRequest->purchase_request_id, (string) $office->name),
+                );
+            }
+
+            $this->recordStatus($purchaseRequest, null, 'OPEN', $actor, sprintf(
+                'Consolidated purchase request created from %d supply request(s) for %s.',
+                $eligible->count(),
+                (string) $office->name,
+            ));
+            $this->recordAudit($actor, 'CONSOLIDATED_QUEUE', $purchaseRequest);
+
+            $this->notificationService->notifyRole(
+                role: UserRole::PROCUREMENT_OFFICER,
+                title: 'Consolidated Purchase Request Queued',
+                message: sprintf(
+                    'GSO consolidated %d supply request(s) from %s into PR-%06d for Procurement Unit review.',
+                    $eligible->count(),
+                    (string) $office->name,
+                    (int) $purchaseRequest->purchase_request_id,
+                ),
+                notificationType: 'PROCUREMENT_PURCHASE_REQUEST_QUEUED',
+                referenceType: PurchaseRequest::class,
+                referenceId: (int) $purchaseRequest->purchase_request_id,
+            );
+
+            return $purchaseRequest->fresh(['items', 'office', 'requester', 'supplyRequest']) ?? $purchaseRequest;
+        });
+    }
 }

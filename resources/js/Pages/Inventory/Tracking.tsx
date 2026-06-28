@@ -1,3 +1,4 @@
+import DashboardAlertBanner, { type DashboardAlert } from '@/Components/DashboardAlertBanner';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link } from '@inertiajs/react';
 import type { ReactNode } from 'react';
@@ -15,9 +16,10 @@ type Props = {
         pending_delivery_count: number;
         open_claim_count: number;
     };
+    dashboardAlerts: DashboardAlert[];
 };
 
-export default function InventoryTracking({ summary }: Props) {
+export default function InventoryTracking({ summary, dashboardAlerts }: Props) {
     const quickActions = [
         { href: route('inventory.deliveries.index'), label: 'Monitor Deliveries', description: 'Review incoming supplies and delivery status.' },
         { href: route('inventory.distribution-records.create'), label: 'Release Supplies', description: 'Create a distribution record for office requests.' },
@@ -37,6 +39,8 @@ export default function InventoryTracking({ summary }: Props) {
             <Head title="Inventory Dashboard" />
 
             <div className="space-y-6 py-8">
+                <DashboardAlertBanner alerts={dashboardAlerts} />
+
                 <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                         <div>

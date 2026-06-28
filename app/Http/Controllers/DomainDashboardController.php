@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Alert;
 use App\Models\AuditLog;
 use App\Models\Ppmp;
 use App\Models\Claim;
@@ -187,6 +188,7 @@ class DomainDashboardController extends Controller
             'recentRequests' => $recentRequests,
             'releasedSuppliesPreview' => $releasedSuppliesPreview,
             'notificationPreview' => $notificationPreview,
+            'dashboardAlerts' => $this->fetchDashboardAlerts(officeId: $officeId),
         ]);
 
         $this->logIfSlow('office', $startedAt, (int) ($user?->id ?? 0));
@@ -242,6 +244,7 @@ class DomainDashboardController extends Controller
                 'total_amount' => (float) $order->total_amount,
                 'created_at' => optional($order->created_at)?->toIso8601String(),
             ])->values(),
+            'dashboardAlerts' => $this->fetchDashboardAlerts(alertTypes: ['ANOMALY_DETECTED', 'PRICE_DEVIATION']),
         ]);
 
         $this->logIfSlow('procurement', $startedAt, (int) (auth()->user()?->id ?? 0));
@@ -270,6 +273,7 @@ class DomainDashboardController extends Controller
                     ->whereIn('status', DashboardStatusGroups::claimActiveStatuses())
                     ->count(),
             ],
+            'dashboardAlerts' => $this->fetchDashboardAlerts(alertTypes: ['UNCLAIMED_SUPPLY', 'LOW_STOCK', 'DELIVERY_DISCREPANCY', 'ANOMALY_DETECTED']),
         ]);
 
         $this->logIfSlow('inventory', $startedAt, (int) (auth()->user()?->id ?? 0));
@@ -291,6 +295,41 @@ class DomainDashboardController extends Controller
             'title' => 'Public Transparency Portal',
             'description' => 'Approved and published disclosures only.',
         ]);
+    }
+
+    /**
+     * Fetch active dashboard alerts, optionally scoped to an office or specific alert types.
+     *
+     * @param  int|null  $officeId
+     * @param  string[]  $alertTypes
+     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     */
+    private function fetchDashboardAlerts(?int $officeId = null, array $alertTypes = []): \Illuminate\Support\Collection
+    {
+        $query = Alert::query()
+            ->whereIn('status', ['ACTIVE', 'PENDING'])
+            ->with('office:id,name')
+            ->latest('detected_at')
+            ->limit(10);
+
+        if ($officeId !== null) {
+            $query->forOffice($officeId);
+        }
+
+        if (count($alertTypes) > 0) {
+            $query->whereIn('alert_type', $alertTypes);
+        }
+
+        return $query->get()->map(fn (Alert $alert): array => [
+            'alerts_id' => (int) $alert->alerts_id,
+            'alert_type' => (string) $alert->alert_type,
+            'severity' => (string) $alert->severity,
+            'alert_message' => (string) $alert->alert_message,
+            'detected_at' => optional($alert->detected_at)?->toIso8601String(),
+            'office_name' => (string) ($alert->office?->name ?? ''),
+            'supply_request_id' => $alert->supply_request_id ? (int) $alert->supply_request_id : null,
+            'purchase_order_id' => $alert->purchase_order_id ? (int) $alert->purchase_order_id : null,
+        ])->values();
     }
 
     private function logIfSlow(string $dashboard, float $startedAt, int $userId): void

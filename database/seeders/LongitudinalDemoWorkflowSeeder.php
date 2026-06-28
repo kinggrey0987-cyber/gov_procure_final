@@ -106,8 +106,8 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                     approver: $execUser,
                     fiscalYear: 2025,
                     plannedItems: [
-                        ['item_name' => 'Rubbing Alcohol', 'quantity' => 30, 'unit_cost' => 24],
-                        ['item_name' => 'Detergent Powder', 'quantity' => 25, 'unit_cost' => 36],
+                        ['item_name' => 'Rubbing Alcohol', 'quantity' => 10, 'unit_cost' => 400],
+                        ['item_name' => 'Detergent Powder', 'quantity' => 15, 'unit_cost' => 120],
                     ],
                     desiredStatus: 'RETURNED_FOR_REVISION',
                     remarks: 'Returned PPMP example retained for executive planning review demonstration.',
@@ -119,7 +119,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                     approver: $execUser,
                     fiscalYear: 2027,
                     plannedItems: [
-                        ['item_name' => 'Logbook', 'quantity' => 24, 'unit_cost' => 120],
+                        ['item_name' => 'Logbook', 'quantity' => 10, 'unit_cost' => 150],
                         ['item_name' => 'Mouse', 'quantity' => 10, 'unit_cost' => 330],
                     ],
                     desiredStatus: 'SUBMITTED',
@@ -133,9 +133,9 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                         approver: $execUser,
                         fiscalYear: 2026,
                         plannedItems: [
-                            ['item_name' => 'Bond Paper', 'quantity' => 120, 'unit_cost' => 18],
-                            ['item_name' => 'Ballpen', 'quantity' => 180, 'unit_cost' => 6],
-                            ['item_name' => 'Folder', 'quantity' => 60, 'unit_cost' => 12],
+                            ['item_name' => 'Bond Paper', 'quantity' => 20, 'unit_cost' => 950],
+                            ['item_name' => 'Ballpen', 'quantity' => 10, 'unit_cost' => 300],
+                            ['item_name' => 'Folder', 'quantity' => 5, 'unit_cost' => 1200],
                         ],
                         desiredStatus: 'APPROVED',
                         remarks: 'Late-2025 planning for Q1 office stationery and filing support.',
@@ -146,9 +146,9 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                         approver: $execUser,
                         fiscalYear: 2026,
                         plannedItems: [
-                            ['item_name' => 'Rubbing Alcohol', 'quantity' => 80, 'unit_cost' => 25],
-                            ['item_name' => 'Detergent Powder', 'quantity' => 70, 'unit_cost' => 38],
-                            ['item_name' => 'Safety Gloves', 'quantity' => 40, 'unit_cost' => 45],
+                            ['item_name' => 'Rubbing Alcohol', 'quantity' => 20, 'unit_cost' => 400],
+                            ['item_name' => 'Detergent Powder', 'quantity' => 30, 'unit_cost' => 120],
+                            ['item_name' => 'Safety Gloves', 'quantity' => 20, 'unit_cost' => 45],
                         ],
                         desiredStatus: 'APPROVED',
                         remarks: 'MSWDO revised PPMP approved for FY 2026 execution scenarios.',
@@ -159,9 +159,9 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                         approver: $execUser,
                         fiscalYear: 2026,
                         plannedItems: [
-                            ['item_name' => 'Printer Ink', 'quantity' => 24, 'unit_cost' => 850],
+                            ['item_name' => 'Printer Ink', 'quantity' => 10, 'unit_cost' => 850],
                             ['item_name' => 'Mouse', 'quantity' => 30, 'unit_cost' => 325],
-                            ['item_name' => 'Logbook', 'quantity' => 20, 'unit_cost' => 120],
+                            ['item_name' => 'Logbook', 'quantity' => 10, 'unit_cost' => 150],
                         ],
                         desiredStatus: 'APPROVED',
                         remarks: 'Engineering operating stock plan for first half of 2026.',
@@ -184,7 +184,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                         priorityLevel: 'NORMAL',
                         neededByDate: '2026-01-18',
                         lines: [
-                            ['item_name' => 'Bond Paper', 'quantity' => 24],
+                            ['item_name' => 'Bond Paper', 'quantity' => 4],
                         ],
                     );
 
@@ -197,7 +197,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                         priorityLevel: 'NORMAL',
                         neededByDate: '2026-01-22',
                         lines: [
-                            ['item_name' => 'Folder', 'quantity' => 18],
+                            ['item_name' => 'Folder', 'quantity' => 2],
                         ],
                     );
 
@@ -210,7 +210,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                         priorityLevel: 'HIGH',
                         neededByDate: '2026-01-20',
                         lines: [
-                            ['item_name' => 'Rubbing Alcohol', 'quantity' => 10],
+                            ['item_name' => 'Rubbing Alcohol', 'quantity' => 2],
                         ],
                     );
 
@@ -223,7 +223,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                         priorityLevel: 'NORMAL',
                         neededByDate: '2026-01-21',
                         lines: [
-                            ['item_name' => 'Printer Ink', 'quantity' => 4],
+                            ['item_name' => 'Printer Ink', 'quantity' => 2],
                         ],
                     );
             });
@@ -288,7 +288,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                         priorityLevel: 'NORMAL',
                         neededByDate: '2026-02-26',
                         lines: [
-                            ['item_name' => 'Bond Paper', 'quantity' => 32],
+                            ['item_name' => 'Bond Paper', 'quantity' => 6],
                         ],
                     );
 
@@ -301,7 +301,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                         priorityLevel: 'HIGH',
                         neededByDate: '2026-02-24',
                         lines: [
-                            ['item_name' => 'Detergent Powder', 'quantity' => 16],
+                            ['item_name' => 'Detergent Powder', 'quantity' => 3],
                         ],
                     );
 
@@ -368,8 +368,8 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                         priorityLevel: 'NORMAL',
                         neededByDate: '2026-03-27',
                         lines: [
-                            ['item_name' => 'Bond Paper', 'quantity' => 22],
-                            ['item_name' => 'Folder', 'quantity' => 10],
+                            ['item_name' => 'Bond Paper', 'quantity' => 4],
+                            ['item_name' => 'Folder', 'quantity' => 1],
                         ],
                     );
 
@@ -382,8 +382,8 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                         priorityLevel: 'HIGH',
                         neededByDate: '2026-03-26',
                         lines: [
-                            ['item_name' => 'Rubbing Alcohol', 'quantity' => 12],
-                            ['item_name' => 'Detergent Powder', 'quantity' => 10],
+                            ['item_name' => 'Rubbing Alcohol', 'quantity' => 2],
+                            ['item_name' => 'Detergent Powder', 'quantity' => 2],
                         ],
                     );
 
@@ -396,7 +396,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                         priorityLevel: 'NORMAL',
                         neededByDate: '2026-03-28',
                         lines: [
-                            ['item_name' => 'Printer Ink', 'quantity' => 5],
+                            ['item_name' => 'Printer Ink', 'quantity' => 2],
                         ],
                     );
             });
@@ -475,7 +475,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                         priorityLevel: 'HIGH',
                         neededByDate: '2026-04-18',
                         lines: [
-                            ['item_name' => 'Bond Paper', 'quantity' => 70],
+                            ['item_name' => 'Bond Paper', 'quantity' => 14],
                         ],
                     );
 
@@ -488,7 +488,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                         priorityLevel: 'HIGH',
                         neededByDate: '2026-04-19',
                         lines: [
-                            ['item_name' => 'Bond Paper', 'quantity' => 18],
+                            ['item_name' => 'Bond Paper', 'quantity' => 4],
                         ],
                     );
 
@@ -501,7 +501,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                         priorityLevel: 'NORMAL',
                         neededByDate: '2026-04-18',
                         lines: [
-                            ['item_name' => 'Printer Ink', 'quantity' => 8],
+                            ['item_name' => 'Printer Ink', 'quantity' => 3],
                         ],
                     );
 
@@ -549,7 +549,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                         priorityLevel: 'HIGH',
                         neededByDate: '2026-04-28',
                         lines: [
-                            ['item_name' => 'Bond Paper', 'quantity' => 24],
+                            ['item_name' => 'Bond Paper', 'quantity' => 4],
                         ],
                     );
 
@@ -562,7 +562,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                         priorityLevel: 'NORMAL',
                         neededByDate: '2026-04-29',
                         lines: [
-                            ['item_name' => 'Bond Paper', 'quantity' => 16],
+                            ['item_name' => 'Bond Paper', 'quantity' => 3],
                         ],
                     );
 
@@ -575,7 +575,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                         priorityLevel: 'HIGH',
                         neededByDate: '2026-04-29',
                         lines: [
-                            ['item_name' => 'Bond Paper', 'quantity' => 140],
+                            ['item_name' => 'Bond Paper', 'quantity' => 28],
                         ],
                     );
 
@@ -588,7 +588,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                         priorityLevel: 'NORMAL',
                         neededByDate: '2026-04-26',
                         lines: [
-                            ['item_name' => 'Ballpen', 'quantity' => 12],
+                            ['item_name' => 'Ballpen', 'quantity' => 1],
                         ],
                     );
 
@@ -601,7 +601,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                         priorityLevel: 'HIGH',
                         neededByDate: '2026-04-27',
                         lines: [
-                            ['item_name' => 'Detergent Powder', 'quantity' => 20],
+                            ['item_name' => 'Detergent Powder', 'quantity' => 4],
                         ],
                     );
 
@@ -614,7 +614,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                         priorityLevel: 'NORMAL',
                         neededByDate: '2026-04-27',
                         lines: [
-                            ['item_name' => 'Printer Ink', 'quantity' => 6],
+                            ['item_name' => 'Printer Ink', 'quantity' => 2],
                         ],
                     );
             });
@@ -719,7 +719,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                 delivery: $marchDelivery,
                 officeUser: $mpdoUser,
                 gsoUser: $gsoUser,
-                claimType: 'SHORTAGE',
+                claimType: 'MISSING_ITEM',
                 claimLocation: 'Planning office receiving desk',
                 createRemarks: 'Selective claim: March distribution discrepancy reported by MPDO.',
                 resolveRemarks: 'Resolved after office count confirmation in post-release review.',
@@ -729,7 +729,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                 delivery: $aprilDelivery,
                 officeUser: $engUser,
                 gsoUser: $gsoUser,
-                claimType: 'QUANTITY_MISMATCH',
+                claimType: 'MISSING_ITEM',
                 claimLocation: 'Engineering receiving station',
                 createRemarks: 'Selective claim: April engineering release mismatch for traceability.',
                 resolveRemarks: 'Resolved after engineering confirmed final released count.',
@@ -739,7 +739,7 @@ class LongitudinalDemoWorkflowSeeder extends Seeder
                 delivery: $burstDelivery,
                 officeUser: $mpdoUser,
                 gsoUser: $gsoUser,
-                claimType: 'SHORTAGE',
+                claimType: 'MISSING_ITEM',
                 claimLocation: 'MPDO stock room',
                 createRemarks: 'Selective claim: April paper surge release shortage review.',
                 resolveRemarks: null,

@@ -601,6 +601,9 @@ Route::middleware(['auth', 'twofactor', 'must-change-password'])->group(function
                 Route::post('/{supply_request}/queue', [RequestWorkflowController::class, 'queueProcurement'])
                     ->middleware('can:inventory.view-any')
                     ->name('queue');
+                Route::post('/consolidated-queue', [RequestWorkflowController::class, 'queueConsolidatedProcurement'])
+                    ->middleware('can:inventory.view-any')
+                    ->name('consolidated-queue');
             });
 
             Route::prefix('procurement-requests')->name('procurement-requests.')->group(function () {

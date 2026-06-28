@@ -1,3 +1,4 @@
+import DashboardAlertBanner, { type DashboardAlert } from '@/Components/DashboardAlertBanner';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
@@ -27,12 +28,13 @@ type Props = {
         total_amount: number;
         created_at?: string | null;
     }>;
+    dashboardAlerts: DashboardAlert[];
 };
 
 const REQUEST_STATUS_FILTERS = ['ALL', 'OPEN', 'PROCESSING', 'COMPLETED', 'RETURNED_FOR_REVISION', 'REJECTED'];
 const ORDER_STATUS_FILTERS = ['ALL', 'DRAFT', 'PLACED', 'COMPLETED'];
 
-export default function ProcurementTracking({ summary, recentPurchaseRequests, recentPurchaseOrders }: Props) {
+export default function ProcurementTracking({ summary, recentPurchaseRequests, recentPurchaseOrders, dashboardAlerts }: Props) {
     const [requestSearch, setRequestSearch] = useState('');
     const [requestStatus, setRequestStatus] = useState('ALL');
     const [orderSearch, setOrderSearch] = useState('');
@@ -99,6 +101,8 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
             <Head title="Procurement Dashboard" />
 
             <div className="space-y-6 py-8">
+                <DashboardAlertBanner alerts={dashboardAlerts} />
+
                 <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <SummaryCard label="Pending Requests" value={summary.pending_requests} tone="amber" helper="Awaiting Procurement Unit review" />
                     <SummaryCard label="Processing Requests" value={summary.processing_requests} tone="blue" helper="Currently under procurement action" />

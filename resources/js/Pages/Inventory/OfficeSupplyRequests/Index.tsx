@@ -66,6 +66,8 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
     const debouncedQ = useDebouncedValue(q, 450);
     const [queueingRequestId, setQueueingRequestId] = useState<number | null>(null);
     const [processingRequestId, setProcessingRequestId] = useState<number | null>(null);
+    const [selectedRequestIds, setSelectedRequestIds] = useState<Set<number>>(new Set());
+    const [isConsolidating, setIsConsolidating] = useState(false);
     const hasMountedRef = useRef(false);
 
     useEffect(() => {
@@ -119,6 +121,53 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
             preserveScroll: true,
             onFinish: () => setProcessingRequestId(null),
         });
+    };
+
+    // Eligible requests for consolidation: shortage + submitted + no existing PR
+    const consolidatableRequests = requests.data.filter(
+        (r) => r.stock_assessment === 'SHORTAGE_REQUIRES_PROCUREMENT' && r.status === 'SUBMITTED' && !r.has_purchase_request,
+    );
+
+    const toggleSelect = (id: number) => {
+        setSelectedRequestIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) {
+                next.delete(id);
+            } else {
+                next.add(id);
+            }
+            return next;
+        });
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedRequestIds.size >= consolidatableRequests.length) {
+            setSelectedRequestIds(new Set());
+        } else {
+            setSelectedRequestIds(new Set(consolidatableRequests.map((r) => r.supply_request_id)));
+        }
+    };
+
+    const currentOfficeId = filters.office_id ?? null;
+    const canConsolidate = currentOfficeId !== null && selectedRequestIds.size >= 1;
+
+    const submitConsolidatedPr = () => {
+        if (!canConsolidate) return;
+        setIsConsolidating(true);
+        router.post(
+            route('inventory.office-supply-requests.consolidated-queue'),
+            {
+                office_id: currentOfficeId,
+                supply_request_ids: Array.from(selectedRequestIds),
+            },
+            {
+                preserveScroll: true,
+                onFinish: () => {
+                    setIsConsolidating(false);
+                    setSelectedRequestIds(new Set());
+                },
+            },
+        );
     };
 
     return (
@@ -192,10 +241,45 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                     </p>
                 </div>
 
+                {currentOfficeId !== null && consolidatableRequests.length > 0 ? (
+                    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-5 py-3 shadow-sm">
+                        <div className="flex-1">
+                            <p className="text-sm font-semibold text-indigo-800">
+                                📦 Consolidated PR
+                            </p>
+                            <p className="mt-0.5 text-xs text-indigo-700">
+                                Select shortage requests below to create one consolidated purchase request for this office.
+                                {selectedRequestIds.size > 0 ? (
+                                    <span className="ml-1 font-bold">{selectedRequestIds.size} request(s) selected.</span>
+                                ) : null}
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            disabled={!canConsolidate || isConsolidating}
+                            onClick={submitConsolidatedPr}
+                            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            {isConsolidating ? 'Creating...' : `Create Consolidated PR (${selectedRequestIds.size})`}
+                        </button>
+                    </div>
+                ) : null}
+
                 <div className="responsive-table-wrap rounded-xl border border-slate-200 bg-white shadow-sm">
                     <table className="min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-slate-50">
                             <tr>
+                                {currentOfficeId !== null && consolidatableRequests.length > 0 ? (
+                                    <th className="px-3 py-3 text-center">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedRequestIds.size >= consolidatableRequests.length && consolidatableRequests.length > 0}
+                                            onChange={toggleSelectAll}
+                                            className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                            title="Select all eligible requests"
+                                        />
+                                    </th>
+                                ) : null}
                                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Request</th>
                                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Office</th>
                                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Needed By</th>
@@ -210,6 +294,20 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
 
                                 return (
                                 <tr key={request.supply_request_id} className="hover:bg-slate-50/60">
+                                    {currentOfficeId !== null && consolidatableRequests.length > 0 ? (
+                                        <td className="px-3 py-3 text-center">
+                                            {consolidatableRequests.some((r) => r.supply_request_id === request.supply_request_id) ? (
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedRequestIds.has(request.supply_request_id)}
+                                                    onChange={() => toggleSelect(request.supply_request_id)}
+                                                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                                />
+                                            ) : (
+                                                <span className="text-xs text-slate-300">—</span>
+                                            )}
+                                        </td>
+                                    ) : null}
                                     <td className="px-4 py-3">
                                         <p className="font-mono text-xs text-slate-700">{request.request_code}</p>
                                         <p className="mt-1 text-xs text-slate-500">
@@ -286,7 +384,7 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                             })}
                             {requests.data.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-500">
+                                    <td colSpan={currentOfficeId !== null && consolidatableRequests.length > 0 ? 7 : 6} className="px-4 py-8 text-center text-sm text-slate-500">
                                         No office supply requests available for review.
                                     </td>
                                 </tr>
