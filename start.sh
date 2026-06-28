@@ -18,8 +18,8 @@ php-fpm -D
 if [ "${FORCE_DEMO_RESEED_ON_START:-false}" = "true" ]; then
   (
     sleep 10
-    echo "[seed] starting workflow-only demo reset..."
-    php artisan demo:reset-workflow
+    echo "[seed] starting workflow-only demo reset (with item updates)..."
+    php artisan data:reset-transactions --no-interaction
     echo "[seed] workflow-only demo reset finished."
   ) >> /proc/1/fd/1 2>> /proc/1/fd/2 &
 elif [ "${RUN_DEMO_SEED:-false}" = "true" ]; then
