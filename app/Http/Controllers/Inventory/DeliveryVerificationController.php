@@ -84,11 +84,24 @@ class DeliveryVerificationController
     {
         abort_unless(auth()->user()->can('delivery-verification.create', $delivery), 403);
 
-        $this->verificationService->create(
+        $verified = $this->verificationService->create(
             delivery: $delivery,
             actor: auth()->user(),
             payload: $request->validated(),
         );
+
+        // Store evidence file if uploaded (required for REJECTED verifications)
+        if ($request->hasFile('evidence_file')) {
+            app(\App\Services\Documents\DocumentService::class)->upload(
+                auth()->user(),
+                'deliveries',
+                (int) $delivery->delivery_id,
+                [
+                    'title' => 'Delivery Verification Evidence — '.$delivery->delivery_code,
+                    'file' => $request->file('evidence_file'),
+                ],
+            );
+        }
 
         return Redirect::route('inventory.deliveries.show', $delivery->delivery_id)
             ->with('success', 'Delivery verified successfully.');

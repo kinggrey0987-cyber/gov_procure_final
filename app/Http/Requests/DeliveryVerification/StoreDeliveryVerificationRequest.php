@@ -25,6 +25,13 @@ class StoreDeliveryVerificationRequest extends FormRequest
             'verification_status' => ['required', 'string', 'in:APPROVED,REJECTED'],
             'discrepancy_notes' => ['nullable', 'string', 'max:1000'],
             'remarks' => ['nullable', 'string', 'max:500'],
+            'evidence_file' => [
+                'required_if:verification_status,REJECTED',
+                'nullable',
+                'file',
+                'max:10240',
+                'mimes:pdf,doc,docx,xls,xlsx,png,jpg,jpeg',
+            ],
         ];
     }
 
@@ -53,6 +60,7 @@ class StoreDeliveryVerificationRequest extends FormRequest
             'verification_date.before_or_equal' => 'Verification date cannot be in the future.',
             'verification_status.required' => 'Verification status is required.',
             'verification_status.in' => 'Verification status must be APPROVED or REJECTED.',
+            'evidence_file.required_if' => 'Evidence (photo or document) is required when rejecting a delivery due to discrepancies. Upload a file showing the issue.',
         ];
     }
 }

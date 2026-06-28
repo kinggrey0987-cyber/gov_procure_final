@@ -177,3 +177,14 @@ Artisan::command('procurement:sync-completed-statuses', function () {
 
     return self::SUCCESS;
 })->purpose('Sync stale PR/PO/SR statuses to final values when supply requests were already fully received.');
+
+/*
+|--------------------------------------------------------------------------
+| Unclaimed Supply Check (Rev 5)
+|--------------------------------------------------------------------------
+| Runs daily to detect distributions that have been RELEASED for more than
+| 2 days without the office confirming receipt. Creates UNCLAIMED_SUPPLY
+| alerts and sends office notifications.
+|
+| Manual usage: php artisan supply:check-unclaimed --days=2
+*/

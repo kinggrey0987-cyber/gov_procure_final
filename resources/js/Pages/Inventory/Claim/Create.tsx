@@ -314,18 +314,28 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                             {form.errors.remarks ? <p className="mt-1 text-xs text-rose-600">{form.errors.remarks}</p> : null}
                         </div>
 
+                        {derivedClaimType ? (
+                            <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3">
+                                <p className="text-sm font-semibold text-rose-800">⚠ Evidence Required</p>
+                                <p className="mt-1 text-xs text-rose-700">
+                                    Photo or document evidence is <strong>required</strong> for {displayClaimType(derivedClaimType)} claims. Please attach a file showing the issue (e.g., photo of damaged item, count discrepancy record).
+                                </p>
+                            </div>
+                        ) : null}
+
                         <div className="grid gap-3 sm:grid-cols-2">
                             <div>
-                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Attachment Title (Optional)</label>
+                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Attachment Title {derivedClaimType ? <span className="normal-case text-rose-600">(Required)</span> : '(Optional)'}</label>
                                 <input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Photo evidence or issue report" value={form.data.attachment_title} onChange={(e) => form.setData('attachment_title', e.target.value)} />
                             </div>
                             <div>
-                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Attachment File (Optional)</label>
+                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Attachment File {derivedClaimType ? <span className="normal-case text-rose-600">(Required)</span> : '(Optional)'}</label>
                                 <input
                                     type="file"
-                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                    className={`w-full rounded-lg border px-3 py-2 text-sm ${derivedClaimType && !form.data.attachment_file ? 'border-rose-300 bg-rose-50/50' : 'border-slate-300'}`}
                                     onChange={(e) => form.setData('attachment_file', e.target.files?.[0] ?? null)}
                                 />
+                                {form.errors.attachment_file ? <p className="mt-1 text-xs text-rose-600">{form.errors.attachment_file}</p> : null}
                             </div>
                         </div>
 

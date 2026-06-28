@@ -41,6 +41,7 @@ type VerificationForm = {
     verification_status: '' | 'APPROVED' | 'REJECTED';
     discrepancy_notes: string;
     remarks: string;
+    evidence_file: File | null;
 };
 
 type Props = {
@@ -62,11 +63,15 @@ export default function DeliveryVerificationCreate({ delivery }: Props) {
         verification_status: delivery.verification_summary?.recommended_status ?? '',
         discrepancy_notes: '',
         remarks: '',
+        evidence_file: null,
     });
+
+    const isRejected = data.verification_status === 'REJECTED';
+    const hasDiscrepancy = delivery.verification_summary?.has_discrepancy ?? false;
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
-        post(route('inventory.delivery-verifications.store', delivery.delivery_id));
+        post(route('inventory.delivery-verifications.store', delivery.delivery_id), { forceFormData: true });
     };
 
     return (
@@ -181,6 +186,29 @@ export default function DeliveryVerificationCreate({ delivery }: Props) {
                                 onChange={(e) => setData('remarks', e.target.value)}
                                 className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none"
                             />
+                        </FormField>
+
+                        {(isRejected || hasDiscrepancy) ? (
+                            <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3">
+                                <p className="text-sm font-semibold text-rose-800">⚠ Evidence Required for Discrepancy</p>
+                                <p className="mt-1 text-xs text-rose-700">
+                                    When rejecting a delivery due to discrepancies (damaged or missing items), you <strong>must</strong> attach evidence (photo of damaged goods, count sheet, etc.) before submitting the verification.
+                                </p>
+                            </div>
+                        ) : null}
+
+                        <FormField label={`Evidence File ${isRejected ? '' : '(Optional)'}`} required={isRejected} error={errors.evidence_file}>
+                            <input
+                                type="file"
+                                className={`w-full rounded-lg border px-4 py-2.5 text-sm ${isRejected && !data.evidence_file ? 'border-rose-300 bg-rose-50/50' : 'border-slate-300'}`}
+                                onChange={(e) => setData('evidence_file', e.target.files?.[0] ?? null)}
+                                accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                            />
+                            <p className="mt-1 text-xs text-slate-500">
+                                {isRejected
+                                    ? 'Required: Upload photo or document evidence showing the delivery discrepancy.'
+                                    : 'Optional: Attach supporting evidence if applicable.'}
+                            </p>
                         </FormField>
 
                         <div className="flex flex-wrap gap-3">
