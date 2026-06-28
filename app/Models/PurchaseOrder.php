@@ -25,10 +25,12 @@ class PurchaseOrder extends Model
         'supply_request_id',
         'supplier_id',
         'created_by',
+        'approved_by',
         'po_number',
         'procurement_method',
         'status',
         'expected_delivery_date',
+        'date_approved',
         'total_amount',
         'terms_notes',
         'remarks',
@@ -39,7 +41,9 @@ class PurchaseOrder extends Model
         'supply_request_id' => 'integer',
         'supplier_id' => 'integer',
         'created_by' => 'integer',
+        'approved_by' => 'integer',
         'expected_delivery_date' => 'date',
+        'date_approved' => 'date',
         'total_amount' => 'decimal:2',
     ];
 
@@ -61,6 +65,11 @@ class PurchaseOrder extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
     }
 
     public function items(): HasMany

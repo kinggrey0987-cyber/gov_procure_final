@@ -38,7 +38,12 @@ class StoreClaimRequest extends FormRequest
             'quantity_missing' => ['nullable', 'integer', 'min:0'],
             'remarks' => ['nullable', 'string'],
             'attachment_title' => ['nullable', 'string', 'max:200'],
-            'attachment_file' => ['nullable', 'file', 'max:10240', 'mimes:pdf,doc,docx,xls,xlsx,csv,png,jpg,jpeg'],
+            'attachment_file' => [
+                'required_if:claim_type,DAMAGED_ITEM,MISSING_ITEM,MISSING_AND_DAMAGED',
+                'file',
+                'max:10240',
+                'mimes:pdf,doc,docx,xls,xlsx,csv,png,jpg,jpeg',
+            ],
         ];
     }
 
@@ -51,6 +56,7 @@ class StoreClaimRequest extends FormRequest
             'claim_date.after_or_equal' => 'Date observed cannot be before the supply release date.',
             'claim_date.before_or_equal' => 'Date observed cannot be in the future.',
             'claim_type.in' => 'Claim type must be Missing Item or Damaged Item.',
+            'attachment_file.required_if' => 'Evidence (photo or document) is required for damaged or missing item claims. Please attach a file showing the issue.',
         ];
     }
 }

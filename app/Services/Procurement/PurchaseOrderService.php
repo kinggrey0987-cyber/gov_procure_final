@@ -130,6 +130,8 @@ class PurchaseOrderService
 
             $purchaseOrder->forceFill([
                 'status' => 'PLACED',
+                'approved_by' => (int) $actor->id,
+                'date_approved' => now()->toDateString(),
                 'remarks' => $remarks ?? $purchaseOrder->remarks,
             ])->save();
 

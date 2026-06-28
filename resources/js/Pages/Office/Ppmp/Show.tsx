@@ -20,8 +20,11 @@ type Props = {
         fund_source: string;
         status: string;
         date_prepared: string;
+        date_approved?: string | null;
         remarks: string | null;
         items: PpmpItem[];
+        approver?: { id: number; name: string } | null;
+        preparer?: { id: number; name: string } | null;
     };
     canEdit: boolean;
     canSubmit: boolean;
@@ -95,6 +98,23 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Fund Source</p>
                         <p className="mt-1 text-sm text-slate-700">{getFundSourceLabel(ppmp.fund_source) || '-'}</p>
                     </div>
+
+                    {ppmp.approver ? (
+                        <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Approved By</p>
+                            <p className="mt-1 text-sm font-semibold text-emerald-900">{ppmp.approver.name}</p>
+                            {ppmp.date_approved ? (
+                                <p className="mt-0.5 text-xs text-emerald-700">Date approved: {formatDate(ppmp.date_approved)}</p>
+                            ) : null}
+                        </div>
+                    ) : null}
+
+                    {ppmp.preparer ? (
+                        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Prepared By</p>
+                            <p className="mt-1 text-sm text-slate-700">{ppmp.preparer.name}</p>
+                        </div>
+                    ) : null}
 
                     <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Remarks</p>

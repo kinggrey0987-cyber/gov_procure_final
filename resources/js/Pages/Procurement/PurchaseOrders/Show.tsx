@@ -26,6 +26,13 @@ type PurchaseOrder = {
             name?: string | null;
         } | null;
     } | null;
+    creator?: {
+        name?: string | null;
+    } | null;
+    approver?: {
+        name?: string | null;
+    } | null;
+    date_approved?: string | null;
     items?: Array<{
         purchase_order_item_id: number;
         item_name_snapshot?: string | null;
@@ -109,6 +116,24 @@ export default function PurchaseOrdersShow({ purchaseOrder, statusHistory, appro
                         <p className="mt-4 text-sm text-slate-600">
                             <span className="font-semibold text-slate-700">Remarks:</span> {purchaseOrder.remarks ?? 'No remarks provided.'}
                         </p>
+
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                            {purchaseOrder.creator?.name ? (
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                    <dt className="text-xs uppercase tracking-wide text-slate-500">Created By</dt>
+                                    <dd className="mt-1 font-medium text-slate-800">{purchaseOrder.creator.name}</dd>
+                                </div>
+                            ) : null}
+                            {purchaseOrder.approver?.name ? (
+                                <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2">
+                                    <dt className="text-xs uppercase tracking-wide text-emerald-700">Approved / Placed By</dt>
+                                    <dd className="mt-1 font-semibold text-emerald-900">{purchaseOrder.approver.name}</dd>
+                                    {purchaseOrder.date_approved ? (
+                                        <dd className="mt-0.5 text-xs text-emerald-700">Date: {formatDate(purchaseOrder.date_approved)}</dd>
+                                    ) : null}
+                                </div>
+                            ) : null}
+                        </div>
                     </section>
 
                     <section className="responsive-table-wrap rounded-xl border border-slate-200 bg-white shadow-sm">

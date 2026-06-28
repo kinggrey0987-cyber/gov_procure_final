@@ -105,7 +105,7 @@ export default function DistributionIndex({ records, filters, filter_options }: 
                 <div className="flex items-center justify-between">
                     <h2 className="text-xl font-semibold leading-tight text-gray-800">Distribution Records</h2>
                     <Link href={route('inventory.distribution-records.create')} className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
-                        Open Supply Distribution
+                        New Distribution
                     </Link>
                 </div>
             }

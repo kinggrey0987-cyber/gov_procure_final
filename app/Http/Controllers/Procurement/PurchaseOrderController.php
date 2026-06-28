@@ -171,6 +171,7 @@ class PurchaseOrderController extends Controller
                 'items.item.category',
                 'supplier',
                 'creator',
+                'approver',
                 'purchaseRequest.office',
                 'supplyRequest.requester',
             ]),
