@@ -62,7 +62,7 @@ class UpdateSupplyRequestItemRequest extends FormRequest
                 return;
             }
 
-            $supplyRequestItem = $this->route('supply_request_item');
+            $supplyRequestItem = $this->route('supplyRequestItem');
             $currentSupplyRequestItemId = $supplyRequestItem ? (int) $supplyRequestItem->supply_request_item_id : 0;
 
             $alreadyIncluded = $supplyRequest->items()

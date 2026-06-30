@@ -23,7 +23,7 @@ class StorePpmpRequest extends FormRequest
             'date_prepared' => ['required', 'date'],
             'fund_source' => ['required', 'string', Rule::in(FundSource::values())],
             'remarks' => ['nullable', 'string', 'max:2000'],
-            'items' => ['required', 'array', 'min:1'],
+            'items' => ['nullable', 'array'],
             'items.*.item_id' => ['required_with:items', 'integer', 'exists:items,item_id'],
             'items.*.item_category_id' => ['required_with:items', 'integer', 'exists:item_categories,item_category_id'],
             'items.*.quantity' => ['required_with:items', 'numeric', 'gt:0'],

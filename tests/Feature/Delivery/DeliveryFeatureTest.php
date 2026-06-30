@@ -22,6 +22,7 @@ use App\Services\Delivery\DeliveryItemService;
 use App\Services\Delivery\DeliveryService;
 use App\Services\Delivery\DeliveryVerificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Tests\TestCase;
 
 class DeliveryFeatureTest extends TestCase
@@ -326,6 +327,7 @@ class DeliveryFeatureTest extends TestCase
             'verification_date' => now()->toDateString(),
             'verification_status' => 'REJECTED',
             'discrepancy_notes' => 'One damaged and one missing item for BAC/procurement follow-up.',
+            'evidence_file' => UploadedFile::fake()->image('evidence.png'),
         ])->assertRedirect();
 
         $this->assertDatabaseHas('deliveries', [

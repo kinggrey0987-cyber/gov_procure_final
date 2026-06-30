@@ -493,7 +493,13 @@ class ProcurementFoundationHardeningTest extends TestCase
             ])
             ->assertRedirect();
 
-        return Supplier::query()->latest('supplier_id')->firstOrFail();
+        $supplier = Supplier::query()->latest('supplier_id')->firstOrFail();
+
+        if ($status === 'INACTIVE') {
+            $supplier->update(['status' => 'INACTIVE']);
+        }
+
+        return $supplier;
     }
 
     private function createOffice(): Office

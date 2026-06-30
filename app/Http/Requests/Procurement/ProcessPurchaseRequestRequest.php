@@ -11,6 +11,10 @@ class ProcessPurchaseRequestRequest extends FormRequest
     {
         $purchaseRequest = $this->route('purchase_request');
 
+        if ($this->input('action') === 'process' && (string) $purchaseRequest->status !== 'OPEN') {
+            return false;
+        }
+
         return (bool) $this->user()?->can('procurement.purchase-request.process', $purchaseRequest);
     }
 
