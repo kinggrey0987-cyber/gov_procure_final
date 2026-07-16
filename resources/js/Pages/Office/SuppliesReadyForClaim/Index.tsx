@@ -101,7 +101,7 @@ export default function SuppliesReadyForClaimIndex({ records }: Props) {
                                                         href={route('office.distribution-records.show', record.distribution_record_id)}
                                                         className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
                                                     >
-                                                        Open Distribution
+                                                        View
                                                     </Link>
                                                     {record.status.toUpperCase() === 'RECEIVED' ? (
                                                         <Link

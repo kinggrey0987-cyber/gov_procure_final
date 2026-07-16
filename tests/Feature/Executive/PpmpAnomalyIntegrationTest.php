@@ -181,6 +181,7 @@ class PpmpAnomalyIntegrationTest extends TestCase
 
     public function test_early_depletion_submission_is_visible_to_exec_without_manual_detection_run(): void
     {
+        \Illuminate\Support\Carbon::setTestNow('2026-03-15');
         $context = $this->createApprovedPpmpRequestContext(9706, 100);
 
         foreach ([20, 30] as $quantity) {
