@@ -51,6 +51,8 @@ class AppServiceProvider extends ServiceProvider
             }
             if (! empty($config['sharedFolderId'] ?? null)) {
                 $options['sharedFolderId'] = $config['sharedFolderId'];
+            } elseif (! empty($config['folderId'] ?? null)) {
+                $options['sharedFolderId'] = $config['folderId'];
             }
 
             $client = new \Google\Client();
@@ -58,11 +60,14 @@ class AppServiceProvider extends ServiceProvider
             $client->setClientSecret((string) ($config['clientSecret'] ?? ''));
             $refreshToken = (string) ($config['refreshToken'] ?? '');
             if (! empty($refreshToken)) {
-                $client->fetchAccessTokenWithRefreshToken($refreshToken);
+                $token = $client->fetchAccessTokenWithRefreshToken($refreshToken);
+                if (isset($token['access_token'])) {
+                    $client->setAccessToken($token);
+                }
             }
 
             $service = new \Google\Service\Drive($client);
-            $adapter = new \Masbug\Flysystem\GoogleDriveAdapter($service, (string) ($config['folderId'] ?? 'root'), $options);
+            $adapter = new \Masbug\Flysystem\GoogleDriveAdapter($service, '/', $options);
             $driver = new \League\Flysystem\Filesystem($adapter);
 
             return new \Illuminate\Filesystem\FilesystemAdapter($driver, $adapter, $config);
