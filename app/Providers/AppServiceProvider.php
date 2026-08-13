@@ -56,7 +56,10 @@ class AppServiceProvider extends ServiceProvider
             $client = new \Google\Client();
             $client->setClientId((string) ($config['clientId'] ?? ''));
             $client->setClientSecret((string) ($config['clientSecret'] ?? ''));
-            $client->refreshToken((string) ($config['refreshToken'] ?? ''));
+            $refreshToken = (string) ($config['refreshToken'] ?? '');
+            if (! empty($refreshToken)) {
+                $client->fetchAccessTokenWithRefreshToken($refreshToken);
+            }
 
             $service = new \Google\Service\Drive($client);
             $adapter = new \Masbug\Flysystem\GoogleDriveAdapter($service, (string) ($config['folderId'] ?? 'root'), $options);
