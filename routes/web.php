@@ -814,7 +814,7 @@ require __DIR__.'/auth.php';
 Route::get('/system-migrate', function () {
     $expectedKey = env('DEPLOY_SECRET_KEY', 'deploy-secret-2026');
     if (request('key') !== $expectedKey) {
-        abort(403, 'Unauthorized. Please provide a valid ?key parameter.');
+        return response("<pre style='background:#1e1e1e;color:#ff6b6b;padding:20px;font-size:14px;border-radius:8px;'><strong>403 Unauthorized</strong>\n\nPlease provide the secret key in the URL parameter.\nExample: /system-migrate?key=deploy-secret-2026&action=clear-cache</pre>", 403);
     }
 
     $action = request('action', 'status');
@@ -848,9 +848,7 @@ Route::get('/system-migrate', function () {
     }
 
     return response("<pre style='background:#1e1e1e;color:#4af626;padding:20px;font-size:14px;border-radius:8px;'><strong>Action: {$action}</strong>\n\n{$output}</pre>");
-})->withoutMiddleware([
-    \Illuminate\Session\Middleware\StartSession::class,
-    \Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class,
-]);
+});
+
 
 
