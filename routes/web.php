@@ -810,3 +810,47 @@ Route::prefix('public')
     });
 
 require __DIR__.'/auth.php';
+
+Route::get('/system-migrate', function () {
+    $expectedKey = env('DEPLOY_SECRET_KEY', 'deploy-secret-2026');
+    if (request('key') !== $expectedKey) {
+        abort(403, 'Unauthorized. Please provide a valid ?key parameter.');
+    }
+
+    $action = request('action', 'status');
+    $output = '';
+
+    try {
+        switch ($action) {
+            case 'migrate':
+                \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+                $output = \Illuminate\Support\Facades\Artisan::output();
+                break;
+            case 'seed':
+                \Illuminate\Support\Facades\Artisan::call('db:seed', ['--force' => true]);
+                $output = \Illuminate\Support\Facades\Artisan::output();
+                break;
+            case 'storage-link':
+                \Illuminate\Support\Facades\Artisan::call('storage:link');
+                $output = \Illuminate\Support\Facades\Artisan::output();
+                break;
+            case 'clear-cache':
+                \Illuminate\Support\Facades\Artisan::call('optimize:clear');
+                $output = \Illuminate\Support\Facades\Artisan::output();
+                break;
+            default:
+                \Illuminate\Support\Facades\Artisan::call('migrate:status');
+                $output = \Illuminate\Support\Facades\Artisan::output();
+                break;
+        }
+    } catch (\Throwable $e) {
+        $output = 'Error: '.$e->getMessage();
+    }
+
+    return response("<pre style='background:#1e1e1e;color:#4af626;padding:20px;font-size:14px;border-radius:8px;'><strong>Action: {$action}</strong>\n\n{$output}</pre>");
+})->withoutMiddleware([
+    \Illuminate\Session\Middleware\StartSession::class,
+    \Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class,
+]);
+
+

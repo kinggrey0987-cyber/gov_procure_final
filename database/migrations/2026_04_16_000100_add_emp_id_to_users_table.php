@@ -23,11 +23,16 @@ return new class extends Migration
             });
         }
 
-        // Add partial unique index (PostgreSQL: UNIQUE WHERE emp_id IS NOT NULL)
-        // This allows multiple NULL values while enforcing uniqueness on non-NULL values
-        DB::statement(
-            'CREATE UNIQUE INDEX idx_users_emp_id_not_null ON users(emp_id) WHERE emp_id IS NOT NULL'
-        );
+        // Add unique index compatible with current database driver
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement(
+                'CREATE UNIQUE INDEX idx_users_emp_id_not_null ON users(emp_id) WHERE emp_id IS NOT NULL'
+            );
+        } else {
+            Schema::table('users', function (Blueprint $table) {
+                $table->unique('emp_id', 'idx_users_emp_id_not_null');
+            });
+        }
     }
 
     /**

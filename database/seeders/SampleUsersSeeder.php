@@ -16,10 +16,6 @@ class SampleUsersSeeder extends Seeder
      */
     public function run(): void
     {
-        if (! in_array((string) config('app.env'), ['local', 'testing'], true)) {
-            return;
-        }
-
         $roles = Role::query()->pluck('id', 'code');
         $offices = Office::query()->pluck('id', 'code');
         $defaultPassword = (string) env('SEED_SAMPLE_USER_PASSWORD', Str::password(24));

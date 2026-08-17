@@ -4,7 +4,9 @@
     "type": "module",
     "scripts": {
         "build": "tsc && vite build",
-        "dev": "vite"
+        "dev": "vite",
+        "pack": "powershell -ExecutionPolicy Bypass -File ./package_update.ps1",
+        "package": "powershell -ExecutionPolicy Bypass -File ./package_update.ps1"
     },
     "devDependencies": {
         "@headlessui/react": "^2.0.0",

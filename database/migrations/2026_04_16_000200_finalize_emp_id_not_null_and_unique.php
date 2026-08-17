@@ -24,17 +24,33 @@ return new class extends Migration
 
         if ($driver === 'sqlite') {
             DB::statement("UPDATE users SET emp_id = 'LEGACY-' || id WHERE emp_id IS NULL OR TRIM(emp_id) = ''");
-        } else {
+        } elseif ($driver === 'pgsql') {
             DB::statement("UPDATE users SET emp_id = CONCAT('LEGACY-', id) WHERE emp_id IS NULL OR BTRIM(emp_id) = ''");
+        } else {
+            DB::statement("UPDATE users SET emp_id = CONCAT('LEGACY-', id) WHERE emp_id IS NULL OR TRIM(emp_id) = ''");
         }
 
         // Drop the Phase 1 partial unique index (no longer needed post-NOT NULL)
-        DB::statement('DROP INDEX IF EXISTS idx_users_emp_id_not_null');
+        try {
+            if ($driver === 'pgsql') {
+                DB::statement('DROP INDEX IF EXISTS idx_users_emp_id_not_null');
+            } else {
+                Schema::table('users', function (Blueprint $table) {
+                    $table->dropUnique('idx_users_emp_id_not_null');
+                });
+            }
+        } catch (\Throwable $e) {
+            // Ignore index drop if already absent
+        }
 
         // Alter column to NOT NULL and add unique constraint
         Schema::table('users', function (Blueprint $table) {
             $table->string('emp_id')->nullable(false)->change();
-            $table->unique('emp_id');
+            try {
+                $table->unique('emp_id');
+            } catch (\Throwable $e) {
+                // Ignore if unique index already exists
+            }
         });
     }
 
