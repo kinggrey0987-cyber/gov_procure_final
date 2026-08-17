@@ -415,11 +415,27 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                                 required
                                             >
                                                 <option value="">{hasPpmp ? 'Select PPMP item' : 'Select PPMP first'}</option>
-                                                {itemOptions.map((entry) => (
-                                                    <option key={entry.ppmp_item_id} value={entry.ppmp_item_id}>
-                                                        {entry.item_name} {entry.procurement_schedule ? `- ${entry.procurement_schedule}` : ''} (remaining: {entry.remaining_quantity})
-                                                    </option>
-                                                ))}
+                                                {itemOptions.map((entry) => {
+                                                    const isExhausted = Number(entry.remaining_quantity) <= 0;
+                                                    const isOutSchedule = Boolean(entry.is_schedule_mismatch);
+                                                    
+                                                    let statusTag = `(Remaining: ${entry.remaining_quantity} ${entry.default_unit || 'units'})`;
+                                                    if (isExhausted) {
+                                                        statusTag = `⚠️ [Allocation Exhausted (0 left) — Supplemental Requisition]`;
+                                                    } else if (isOutSchedule) {
+                                                        statusTag = `⏰ [Schedule: ${entry.procurement_schedule || 'Later Quarter'} — Early Requisition] (Remaining: ${entry.remaining_quantity})`;
+                                                    }
+
+                                                    return (
+                                                        <option
+                                                            key={entry.ppmp_item_id}
+                                                            value={entry.ppmp_item_id}
+                                                            className={isExhausted ? 'text-amber-800 bg-amber-50 font-medium' : ''}
+                                                        >
+                                                            {entry.item_name} {entry.procurement_schedule ? `[${entry.procurement_schedule}]` : ''} {statusTag}
+                                                        </option>
+                                                    );
+                                                })}
                                             </select>
                                             {form.errors[`items.${index}.ppmp_item_id`] ? <p className="mt-1 text-xs text-rose-600">{form.errors[`items.${index}.ppmp_item_id`]}</p> : null}
                                         </Field>
