@@ -84,10 +84,10 @@ export default function InventoryTracking({ summary, dashboardAlerts }: Props) {
                         <p className="text-sm text-slate-600">Track delivery receipts, item verification, and office release records from one flow.</p>
                         <div className="mt-4 flex flex-wrap gap-2">
                             <Link href={route('inventory.deliveries.index')} className="rounded-lg bg-red-700 px-3 py-2 text-xs font-semibold text-white hover:bg-red-800">
-                                Open Deliveries
+                                View Deliveries
                             </Link>
                             <Link href={route('inventory.distribution-records.index')} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700">
-                                Open Distribution
+                                View Distribution
                             </Link>
                         </div>
                     </Panel>
