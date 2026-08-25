@@ -546,6 +546,24 @@ class TwoFactorAuthenticationTest extends TestCase
         $this->assertSame(1, $activeChallenges);
     }
 
+    public function test_direct_login_when_two_factor_is_disabled_via_config(): void
+    {
+        Mail::fake();
+        config(['auth.two_factor.enabled' => false]);
+
+        $user = $this->createUser(UserRole::OFFICE_USER, 'office.direct@gsc.local');
+
+        $response = $this->post('/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $response->assertRedirect(route('dashboard', absolute: false));
+        $this->assertAuthenticatedAs($user);
+        $this->assertDatabaseCount('two_factor_challenges', 0);
+        Mail::assertNothingSent();
+    }
+
     private function createUser(UserRole $role, string $email): User
     {
         $office = Office::query()->firstOrCreate([

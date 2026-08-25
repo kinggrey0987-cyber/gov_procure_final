@@ -115,6 +115,7 @@ return [
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
     'two_factor' => [
+        'enabled' => env('TWO_FACTOR_ENABLED', true),
         'code_expiration_minutes' => env('TWO_FACTOR_CODE_EXPIRATION_MINUTES', 10),
         'max_attempts' => env('TWO_FACTOR_MAX_ATTEMPTS', 5),
         'testing_bypass' => env('TWO_FACTOR_TESTING_BYPASS', true),

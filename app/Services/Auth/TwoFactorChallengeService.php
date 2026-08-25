@@ -21,6 +21,10 @@ class TwoFactorChallengeService
 
     public function requiresTwoFactor(User $user): bool
     {
+        if (! (bool) config('auth.two_factor.enabled', true)) {
+            return false;
+        }
+
         return in_array($user->roleCode(), [
             UserRole::ADMIN->value,
             UserRole::OFFICE_USER->value,
