@@ -45,8 +45,8 @@ export default function PurchaseOrdersCreate({ eligiblePurchaseRequests, supplie
     const firstPurchaseRequest = eligiblePurchaseRequests[0];
 
     const form = useForm({
-        purchase_request_id: firstPurchaseRequest?.purchase_request_id ?? 0,
-        supplier_id: suppliers[0]?.supplier_id ?? 0,
+        purchase_request_id: eligiblePurchaseRequests.length === 1 ? (firstPurchaseRequest?.purchase_request_id ?? 0) : 0,
+        supplier_id: 0,
         procurement_method: DEFAULT_PROCUREMENT_METHOD,
         expected_delivery_date: '',
         terms_notes: '',
@@ -121,20 +121,22 @@ export default function PurchaseOrdersCreate({ eligiblePurchaseRequests, supplie
                         <select
                             value={form.data.purchase_request_id}
                             onChange={(event) => form.setData('purchase_request_id', Number(event.target.value))}
-                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                             disabled={!hasEligiblePurchaseRequests}
                             required
                         >
+                            <option value={0}>-- Select Purchase Request Source --</option>
                             {hasEligiblePurchaseRequests ? (
                                 eligiblePurchaseRequests.map((row) => (
                                     <option key={row.purchase_request_id} value={row.purchase_request_id}>
                                         PR #{row.purchase_request_id} | {row.supply_request?.request_code || `SR #${row.supply_request?.supply_request_id ?? '-'}`} | {row.office?.code || row.office?.name || 'Unknown Office'}
                                     </option>
                                 ))
-                            ) : (
-                                <option value={0}>No eligible purchase requests available</option>
-                            )}
+                            ) : null}
                         </select>
+                        {form.errors.purchase_request_id ? (
+                            <p className="mt-1 text-xs font-semibold text-rose-600">{form.errors.purchase_request_id}</p>
+                        ) : null}
                         </label>
 
                         <label className="block">
@@ -142,20 +144,22 @@ export default function PurchaseOrdersCreate({ eligiblePurchaseRequests, supplie
                         <select
                             value={form.data.supplier_id}
                             onChange={(event) => form.setData('supplier_id', Number(event.target.value))}
-                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                             disabled={!hasSuppliers}
                             required
                         >
+                            <option value={0}>-- Select a Supplier --</option>
                             {hasSuppliers ? (
                                 suppliers.map((row) => (
                                     <option key={row.supplier_id} value={row.supplier_id}>
                                         {row.supplier_name}
                                     </option>
                                 ))
-                            ) : (
-                                <option value={0}>No active suppliers available</option>
-                            )}
+                            ) : null}
                         </select>
+                        {form.errors.supplier_id ? (
+                            <p className="mt-1 text-xs font-semibold text-rose-600">{form.errors.supplier_id}</p>
+                        ) : null}
                         </label>
 
                         <label className="block">

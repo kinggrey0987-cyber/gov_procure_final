@@ -25,4 +25,16 @@ class StorePurchaseOrderRequest extends FormRequest
             'remarks' => ['nullable', 'string'],
         ];
     }
+
+    public function messages(): array
+    {
+        return [
+            'purchase_request_id.required' => 'Please select an approved purchase request source.',
+            'purchase_request_id.exists' => 'The selected purchase request is invalid or already assigned.',
+            'purchase_request_id.min' => 'Please select an approved purchase request source.',
+            'supplier_id.required' => 'Please select a supplier for this purchase order.',
+            'supplier_id.exists' => 'Please select an active and valid supplier from the list.',
+            'supplier_id.min' => 'Please select a supplier for this purchase order.',
+        ];
+    }
 }
