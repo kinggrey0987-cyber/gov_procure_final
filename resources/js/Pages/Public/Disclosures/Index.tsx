@@ -1,5 +1,6 @@
 import PaginationNav from '@/Components/PaginationNav';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
+import { useState } from 'react';
 
 type DisclosureRow = {
     disclosure_id: number;
@@ -16,11 +17,49 @@ type Props = {
         links: Array<{ url: string | null; label: string; active: boolean }>;
         current_page?: number;
     };
+    filters?: {
+        year?: string;
+        type?: string;
+        search?: string;
+    };
+    availableYears?: string[];
+    availableTypes?: string[];
 };
 
-export default function PublicDisclosureIndex({ disclosures }: Props) {
+export default function PublicDisclosureIndex({ disclosures, filters = {}, availableYears = ['2026'], availableTypes = [] }: Props) {
     const rows = disclosures.data ?? [];
     const currentPage = disclosures.current_page || undefined;
+
+    const [search, setSearch] = useState(filters.search || '');
+    const [selectedYear, setSelectedYear] = useState(filters.year || '');
+    const [selectedType, setSelectedType] = useState(filters.type || '');
+
+    const handleFilterChange = (newYear: string, newType: string, newSearch: string) => {
+        router.get(
+            route('public.disclosures.index'),
+            {
+                year: newYear || undefined,
+                type: newType || undefined,
+                search: newSearch || undefined,
+            },
+            {
+                preserveState: true,
+                replace: true,
+            }
+        );
+    };
+
+    const handleSearchSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        handleFilterChange(selectedYear, selectedType, search);
+    };
+
+    const handleReset = () => {
+        setSearch('');
+        setSelectedYear('');
+        setSelectedType('');
+        router.get(route('public.disclosures.index'), {}, { preserveState: true, replace: true });
+    };
 
     return (
         <>
@@ -51,6 +90,100 @@ export default function PublicDisclosureIndex({ disclosures }: Props) {
                                     <p className="mt-1 text-sm font-medium text-slate-600">public disclosure packages</p>
                                 </div>
                             </div>
+                        </div>
+
+                        {/* Search and Filters Bar */}
+                        <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
+                            <form onSubmit={handleSearchSubmit} className="grid gap-3 sm:grid-cols-12 sm:items-center">
+                                <div className="sm:col-span-4">
+                                    <label htmlFor="search" className="block text-xs font-semibold uppercase tracking-wider text-slate-600">
+                                        Search Disclosures
+                                    </label>
+                                    <div className="relative mt-1">
+                                        <input
+                                            id="search"
+                                            type="text"
+                                            placeholder="Search by title or keyword..."
+                                            value={search}
+                                            onChange={(e) => setSearch(e.target.value)}
+                                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-red-600 focus:outline-none focus:ring-1 focus:ring-red-600"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="sm:col-span-3">
+                                    <label htmlFor="year-filter" className="block text-xs font-semibold uppercase tracking-wider text-slate-600">
+                                        Fiscal Year
+                                    </label>
+                                    <select
+                                        id="year-filter"
+                                        value={selectedYear}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setSelectedYear(val);
+                                            handleFilterChange(val, selectedType, search);
+                                        }}
+                                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 focus:border-red-600 focus:outline-none focus:ring-1 focus:ring-red-600"
+                                    >
+                                        <option value="">All Fiscal Years</option>
+                                        {availableYears.map((yr) => (
+                                            <option key={yr} value={yr}>
+                                                Year {yr}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="sm:col-span-3">
+                                    <label htmlFor="type-filter" className="block text-xs font-semibold uppercase tracking-wider text-slate-600">
+                                        Category / Type
+                                    </label>
+                                    <select
+                                        id="type-filter"
+                                        value={selectedType}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setSelectedType(val);
+                                            handleFilterChange(selectedYear, val, search);
+                                        }}
+                                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 focus:border-red-600 focus:outline-none focus:ring-1 focus:ring-red-600"
+                                    >
+                                        <option value="">All Categories / Types</option>
+                                        {availableTypes.length > 0 ? (
+                                            availableTypes.map((t) => (
+                                                <option key={t} value={t}>
+                                                    {formatTypeLabel(t)}
+                                                </option>
+                                            ))
+                                        ) : (
+                                            <>
+                                                <option value="PROCUREMENT">Procurement Package</option>
+                                                <option value="PPMP">PPMP Package</option>
+                                                <option value="PURCHASE_ORDER">Purchase Order Package</option>
+                                                <option value="DISTRIBUTION">Distribution Package</option>
+                                            </>
+                                        )}
+                                    </select>
+                                </div>
+
+                                <div className="flex items-end gap-2 sm:col-span-2 sm:mt-5">
+                                    <button
+                                        type="submit"
+                                        className="flex-1 rounded-lg bg-red-700 px-3 py-2 text-center text-xs font-bold text-white shadow-sm transition-colors hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-red-600"
+                                    >
+                                        Search
+                                    </button>
+                                    {(selectedYear || selectedType || search) && (
+                                        <button
+                                            type="button"
+                                            onClick={handleReset}
+                                            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-100"
+                                        >
+                                            Reset
+                                        </button>
+                                    )}
+                                </div>
+                            </form>
                         </div>
 
                         <div className="mt-5 grid gap-3 md:grid-cols-3">

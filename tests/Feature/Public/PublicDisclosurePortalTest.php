@@ -79,6 +79,65 @@ class PublicDisclosurePortalTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_public_disclosures_can_be_filtered_by_year_type_and_search(): void
+    {
+        PublicDisclosure::query()->create([
+            'title' => '2026 Office Supplies Procurement Package',
+            'type' => 'PROCUREMENT',
+            'reference_type' => null,
+            'reference_id' => null,
+            'description' => 'Office supplies package for 2026',
+            'published_by' => $this->executiveUser->id,
+            'published_at' => '2026-03-15 10:00:00',
+            'file_path' => '/files/2026-supplies.pdf',
+            'status' => 'PUBLISHED',
+        ]);
+
+        PublicDisclosure::query()->create([
+            'title' => '2025 IT Equipment Procurement Package',
+            'type' => 'PPMP',
+            'reference_type' => null,
+            'reference_id' => null,
+            'description' => 'IT equipment package for 2025',
+            'published_by' => $this->executiveUser->id,
+            'published_at' => '2025-06-20 14:00:00',
+            'file_path' => '/files/2025-it.pdf',
+            'status' => 'PUBLISHED',
+        ]);
+
+        // Filter by Year 2026
+        $this->actingAs($this->publicUser)
+            ->get(route('public.disclosures.index', ['year' => '2026']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Public/Disclosures/Index')
+                ->has('disclosures.data', 1)
+                ->where('disclosures.data.0.title', '2026 Office Supplies Procurement Package')
+                ->where('filters.year', '2026')
+            );
+
+        // Filter by Type PPMP
+        $this->actingAs($this->publicUser)
+            ->get(route('public.disclosures.index', ['type' => 'PPMP']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Public/Disclosures/Index')
+                ->has('disclosures.data', 1)
+                ->where('disclosures.data.0.title', '2025 IT Equipment Procurement Package')
+                ->where('filters.type', 'PPMP')
+            );
+
+        // Filter by Search Keyword
+        $this->actingAs($this->publicUser)
+            ->get(route('public.disclosures.index', ['search' => 'Supplies']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Public/Disclosures/Index')
+                ->has('disclosures.data', 1)
+                ->where('disclosures.data.0.title', '2026 Office Supplies Procurement Package')
+            );
+    }
+
     public function test_welcome_page_uses_published_public_data_only(): void
     {
         $published = PublicDisclosure::query()->create([

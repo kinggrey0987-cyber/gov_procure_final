@@ -27,13 +27,60 @@ class PublicDisclosurePortalController
         return (string) config('filesystems.public_disk', 'public');
     }
 
-    public function index(): Response
+    public function index(\Illuminate\Http\Request $request): Response
     {
-        $disclosures = PublicDisclosure::query()
+        $query = PublicDisclosure::query()
             ->with('sources')
+            ->published();
+
+        $selectedYear = $request->filled('year') ? (string) $request->input('year') : '';
+        if ($selectedYear !== '') {
+            $query->where(function ($q) use ($selectedYear) {
+                $q->whereYear('published_at', (int) $selectedYear)
+                    ->orWhereBetween('published_at', ["{$selectedYear}-01-01 00:00:00", "{$selectedYear}-12-31 23:59:59"]);
+            });
+        }
+
+        $selectedType = $request->filled('type') ? (string) $request->input('type') : '';
+        if ($selectedType !== '') {
+            $query->where('type', $selectedType);
+        }
+
+        $search = $request->filled('search') ? trim((string) $request->input('search')) : '';
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%");
+            });
+        }
+
+        $disclosures = $query->orderByDesc('published_at')
+            ->paginate(20)
+            ->withQueryString();
+
+        $availableYears = PublicDisclosure::query()
             ->published()
-            ->orderByDesc('published_at')
-            ->paginate(20);
+            ->whereNotNull('published_at')
+            ->pluck('published_at')
+            ->map(fn ($dt) => $dt instanceof \Illuminate\Support\Carbon ? $dt->format('Y') : (\Carbon\Carbon::tryParse($dt)?->format('Y') ?? null))
+            ->filter()
+            ->unique()
+            ->sortDesc()
+            ->values()
+            ->all();
+
+        if (empty($availableYears)) {
+            $availableYears = [(string) now()->year];
+        }
+
+        $availableTypes = PublicDisclosure::query()
+            ->published()
+            ->whereNotNull('type')
+            ->distinct()
+            ->pluck('type')
+            ->filter()
+            ->values()
+            ->all();
 
         return Inertia::render('Public/Disclosures/Index', [
             'disclosures' => $disclosures->through(fn (PublicDisclosure $disclosure): array => [
@@ -46,6 +93,13 @@ class PublicDisclosurePortalController
                     ?? 'Disclosure package',
                 'linked_records_count' => $disclosure->sources->count(),
             ]),
+            'filters' => [
+                'year' => $selectedYear,
+                'type' => $selectedType,
+                'search' => $search,
+            ],
+            'availableYears' => $availableYears,
+            'availableTypes' => $availableTypes,
         ]);
     }
 
