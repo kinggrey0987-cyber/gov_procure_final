@@ -48,6 +48,7 @@ type Props = {
 export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, approvalHistory }: Props) {
     const submitForm = useForm({ remarks: ppmp.remarks ?? '' });
     const [confirmingDelete, setConfirmingDelete] = useState(false);
+    const [confirmingSubmit, setConfirmingSubmit] = useState(false);
 
     const totalBudget = ppmp.items.reduce((total, item) => total + item.quantity * item.unit_cost, 0);
     const isDraft = ppmp.status.toUpperCase() === 'DRAFT';
@@ -177,8 +178,12 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
                             </button>
                         ) : null}
                         {canSubmit ? (
-                            <button onClick={() => submitForm.post(route('office.ppmp.submit', ppmp.ppmp_id))} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white">
-                                Submit PPMP
+                            <button
+                                type="button"
+                                onClick={() => setConfirmingSubmit(true)}
+                                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2"
+                            >
+                                Submit PPMP for Approval
                             </button>
                         ) : null}
                     </div>
@@ -186,6 +191,55 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
 
             </div>
 
+            {/* Submit Confirmation Modal */}
+            <Modal show={confirmingSubmit} maxWidth="md" onClose={() => setConfirmingSubmit(false)}>
+                <div className="p-6">
+                    <h2 className="text-lg font-semibold text-slate-900">Submit PPMP for Executive Approval?</h2>
+                    <p className="mt-2 text-sm text-slate-600">
+                        Are you sure you want to submit <strong className="font-semibold text-slate-800">{ppmpCode}</strong> for executive review?
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                        Once submitted, editing will be locked while the Municipal Mayor / Executive Office conducts the annual budget authorization review.
+                    </p>
+
+                    <div className="mt-4">
+                        <label className="block text-xs font-semibold uppercase tracking-wide text-slate-700">
+                            Submission Remarks (Optional)
+                        </label>
+                        <textarea
+                            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-red-600 focus:outline-none focus:ring-1 focus:ring-red-600"
+                            rows={3}
+                            placeholder="e.g. Submitted for FY 2026 Annual Budget appropriation..."
+                            value={submitForm.data.remarks}
+                            onChange={(e) => submitForm.setData('remarks', e.target.value)}
+                        />
+                    </div>
+
+                    <div className="mt-6 flex justify-end gap-3">
+                        <button
+                            type="button"
+                            onClick={() => setConfirmingSubmit(false)}
+                            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            disabled={submitForm.processing}
+                            onClick={() => {
+                                submitForm.post(route('office.ppmp.submit', ppmp.ppmp_id), {
+                                    onSuccess: () => setConfirmingSubmit(false),
+                                });
+                            }}
+                            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700 disabled:opacity-60"
+                        >
+                            {submitForm.processing ? 'Submitting...' : 'Confirm Submission'}
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Delete Draft Modal */}
             <Modal show={confirmingDelete} maxWidth="md" onClose={() => setConfirmingDelete(false)}>
                 <div className="p-6">
                     <h2 className="text-lg font-semibold text-slate-900">Delete draft PPMP?</h2>
