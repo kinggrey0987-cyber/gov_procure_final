@@ -92,7 +92,7 @@ export default function Login({
 
     return (
         <div className="min-h-screen bg-gradient-to-b from-red-700 via-red-700 to-red-800">
-            <Head title="Log in" />
+            <Head title="Login" />
 
             <header className="border-b border-white/15 bg-red-700/80 backdrop-blur-sm">
                 <div className="mx-auto flex w-full max-w-6xl items-center px-4 py-4 sm:px-6 lg:px-8">
