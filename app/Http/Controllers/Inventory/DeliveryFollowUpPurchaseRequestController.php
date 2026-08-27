@@ -18,13 +18,24 @@ class DeliveryFollowUpPurchaseRequestController
     {
         abort_unless($request->user()->can('delivery.follow-up-pr.create', $delivery), 403);
 
-        $purchaseRequest = $this->purchaseRequestService->createFromPartialDelivery(
-            delivery: $delivery,
-            actor: $request->user(),
-            remarks: $request->validated('remarks'),
-        );
+        try {
+            $purchaseRequest = $this->purchaseRequestService->createFromPartialDelivery(
+                delivery: $delivery,
+                actor: $request->user(),
+                remarks: $request->validated('remarks'),
+            );
 
-        return Redirect::route('inventory.deliveries.show', $delivery->delivery_id)
-            ->with('success', sprintf('Follow-up purchase request PR-%06d created from delivery discrepancy and queued for Procurement Unit review.', (int) $purchaseRequest->purchase_request_id));
+            return Redirect::route('inventory.deliveries.show', $delivery->delivery_id)
+                ->with('success', sprintf('Follow-up purchase request PR-%06d created from delivery discrepancy and queued for Procurement Unit review.', (int) $purchaseRequest->purchase_request_id));
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $firstError = collect($e->errors())->flatten()->first() ?? 'Unable to create follow-up purchase request.';
+
+            return Redirect::route('inventory.deliveries.show', $delivery->delivery_id)
+                ->withErrors($e->errors())
+                ->with('error', $firstError);
+        } catch (\Throwable $e) {
+            return Redirect::route('inventory.deliveries.show', $delivery->delivery_id)
+                ->with('error', 'Error creating follow-up purchase request: '.$e->getMessage());
+        }
     }
 }

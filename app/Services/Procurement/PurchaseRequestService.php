@@ -508,7 +508,7 @@ class PurchaseRequestService
             ]);
         }
 
-        $delivery->loadMissing(['items.purchaseOrderItem.item.category', 'items.purchaseOrderItem.supplyRequestItem', 'purchaseOrder.supplyRequest', 'verifications']);
+        $delivery->loadMissing(['items.purchaseOrderItem.item.category', 'items.purchaseOrderItem.supplyRequestItem', 'purchaseOrder.supplyRequest', 'purchaseOrder.purchaseRequest.supplyRequest', 'verifications']);
 
         $existing = PurchaseRequest::query()
             ->where('source_delivery_id', (int) $delivery->delivery_id)
@@ -525,12 +525,8 @@ class PurchaseRequestService
             ]);
         }
 
-        $sourceSupplyRequest = $delivery->purchaseOrder?->supplyRequest;
-        if (! $sourceSupplyRequest instanceof SupplyRequest) {
-            throw ValidationException::withMessages([
-                'delivery_id' => 'The source supply request could not be resolved for this delivery.',
-            ]);
-        }
+        $sourceSupplyRequest = $delivery->purchaseOrder?->supplyRequest
+            ?? $delivery->purchaseOrder?->purchaseRequest?->supplyRequest;
 
         $discrepancyItems = $delivery->items
             ->filter(function ($item): bool {
@@ -547,8 +543,13 @@ class PurchaseRequestService
             ]);
         }
 
-        $officeId = (int) $sourceSupplyRequest->office_id;
-        $ppmpId = (int) ($sourceSupplyRequest->ppmp_id ?? 0);
+        $officeId = (int) (
+            $sourceSupplyRequest?->office_id
+            ?? $delivery->purchaseOrder?->purchaseRequest?->office_id
+            ?? $actor->office_id
+            ?? 1
+        );
+        $ppmpId = (int) ($sourceSupplyRequest?->ppmp_id ?? 0);
 
         $followUpRemarks = trim((string) $remarks);
         $verificationNotes = $delivery->verifications->last()?->discrepancy_notes;
@@ -566,13 +567,13 @@ class PurchaseRequestService
                 'ppmp_id' => $ppmpId > 0 ? $ppmpId : null,
                 'request_date' => now()->toDateString(),
                 'needed_by_date' => now()->addDays(7)->toDateString(),
-                'request_category' => (string) ($sourceSupplyRequest->request_category ?? 'GENERAL'),
+                'request_category' => (string) ($sourceSupplyRequest?->request_category ?? 'GENERAL'),
                 'purpose' => sprintf(
                     'Follow-up procurement for partially received delivery %s linked to PO %s.',
                     (string) $delivery->delivery_code,
                     (string) ($delivery->purchaseOrder?->po_number ?? 'N/A')
                 ),
-                'priority_level' => (string) ($sourceSupplyRequest->priority_level ?? 'HIGH'),
+                'priority_level' => (string) ($sourceSupplyRequest?->priority_level ?? 'HIGH'),
                 'status' => 'SUBMITTED',
                 'review_notes' => sprintf(
                     'Generated from discrepancy follow-up of delivery %s. %s',
@@ -603,19 +604,38 @@ class PurchaseRequestService
                 }
 
                 $purchaseOrderItem = $deliveryItem->purchaseOrderItem;
-                $sourceSupplyRequestItem = $purchaseOrderItem?->supplyRequestItem;
-                $catalogItem = $purchaseOrderItem?->item;
-                $quantityRequested = round((float) $deliveryItem->missing_quantity + (float) $deliveryItem->damaged_quantity, 2);
-
-                if ($quantityRequested <= 0 || ! $purchaseOrderItem || ! $sourceSupplyRequestItem) {
+                if (! $purchaseOrderItem) {
                     continue;
                 }
+
+                $catalogItem = $purchaseOrderItem->item;
+                $quantityRequested = round((float) $deliveryItem->missing_quantity + (float) $deliveryItem->damaged_quantity, 2);
+
+                if ($quantityRequested <= 0) {
+                    continue;
+                }
+
+                $sourceSupplyRequestItem = $purchaseOrderItem->supplyRequestItem;
+                $ppmpItemId = $sourceSupplyRequestItem?->ppmp_item_id;
+
+                if (! $ppmpItemId && $ppmpId > 0) {
+                    $ppmpItemId = PpmpItem::query()
+                        ->where('ppmp_id', $ppmpId)
+                        ->where('item_id', $purchaseOrderItem->item_id)
+                        ->value('ppmp_item_id');
+                }
+
+                $itemName = (string) (
+                    $catalogItem?->item_name
+                    ?? $purchaseOrderItem->item_name_snapshot
+                    ?? 'Unassigned Item'
+                );
 
                 SupplyRequestItem::query()->create([
                     'supply_request_id' => (int) $supplyRequest->supply_request_id,
                     'item_id' => (int) $purchaseOrderItem->item_id,
-                    'ppmp_item_id' => (int) $sourceSupplyRequestItem->ppmp_item_id,
-                    'item_name_snapshot' => (string) ($catalogItem?->item_name ?? $purchaseOrderItem->item_name_snapshot ?? 'Unassigned Item'),
+                    'ppmp_item_id' => $ppmpItemId ? (int) $ppmpItemId : null,
+                    'item_name_snapshot' => $itemName,
                     'quantity_requested' => $quantityRequested,
                 ]);
 
@@ -883,25 +903,30 @@ class PurchaseRequestService
         });
     }
 
-        private function buildRequestCode(int $officeId): string
-        {
-            $office = Office::query()->findOrFail($officeId);
+    private function buildRequestCode(int $officeId): string
+    {
+        $office = Office::query()->find($officeId);
+        $officeCode = $office ? (string) $office->code : 'GEN';
 
-            $countThisMonth = SupplyRequest::query()
-                ->where('office_id', $officeId)
-                ->whereYear('created_at', now()->year)
-                ->whereMonth('created_at', now()->month)
-                ->count();
+        $countThisMonth = SupplyRequest::query()
+            ->where('office_id', $officeId)
+            ->whereYear('created_at', now()->year)
+            ->whereMonth('created_at', now()->month)
+            ->count();
 
-            $nextSequence = $countThisMonth + 1;
-
-            return sprintf(
+        $nextSequence = $countThisMonth + 1;
+        do {
+            $code = sprintf(
                 'SR-%s-%s-%02d',
-                (string) $office->code,
+                $officeCode,
                 now()->format('Ym'),
                 $nextSequence
             );
-        }
+            $nextSequence++;
+        } while (SupplyRequest::query()->where('request_code', $code)->exists());
+
+        return $code;
+    }
 
     private function assertProcurementActor(User $actor): void
     {
