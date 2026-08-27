@@ -838,6 +838,10 @@ Route::get('/system-migrate', function () {
                 \Illuminate\Support\Facades\Artisan::call('optimize:clear');
                 $output = \Illuminate\Support\Facades\Artisan::output();
                 break;
+            case 'refresh-disclosures':
+                \Illuminate\Support\Facades\Artisan::call('disclosures:refresh-packages');
+                $output = \Illuminate\Support\Facades\Artisan::output();
+                break;
             default:
                 \Illuminate\Support\Facades\Artisan::call('migrate:status');
                 $output = \Illuminate\Support\Facades\Artisan::output();

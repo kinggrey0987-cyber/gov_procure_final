@@ -177,6 +177,9 @@ class PublicDisclosurePackageService
 
         $content = $this->buildSnapshotPdf($disclosure);
         $fileBaseName = sprintf('disclosure-%d-official-package', (int) $disclosure->disclosure_id);
+        $path = sprintf('documents/public_disclosures/%d/%s.pdf', (int) $disclosure->disclosure_id, $fileBaseName);
+
+        $this->storePdfSafely($path, $content);
 
         $existing = Document::query()
             ->where('related_module', 'public_disclosures')
@@ -186,11 +189,12 @@ class PublicDisclosurePackageService
 
         if ($existing instanceof Document) {
             $previousPath = (string) $existing->file_path;
-            $path = sprintf('documents/public_disclosures/%d/%s.pdf', (int) $disclosure->disclosure_id, $fileBaseName);
-
-            Storage::disk($this->publicDisk())->put($path, $content);
             if ($previousPath !== '' && $previousPath !== $path) {
-                Storage::disk($this->publicDisk())->delete($previousPath);
+                try {
+                    Storage::disk($this->publicDisk())->delete($previousPath);
+                } catch (\Throwable) {
+                    // Ignore deletion error on previous path
+                }
             }
 
             $existing->forceFill([
@@ -205,19 +209,37 @@ class PublicDisclosurePackageService
             return $existing->fresh() ?? $existing;
         }
 
-        $document = $this->documentService->createGeneratedAttachment(
-            actor: $actor,
-            relatedModule: 'public_disclosures',
-            relatedReferenceId: (int) $disclosure->disclosure_id,
-            title: 'Official Disclosure Package',
-            fileName: $fileBaseName,
-            content: $content,
-            mimeExtension: 'pdf',
-        );
-
-        $document->forceFill(['document_kind' => 'OFFICIAL_DISCLOSURE_PACKAGE'])->save();
+        $document = Document::query()->create([
+            'uploaded_by' => (int) $actor->id,
+            'title' => 'Official Disclosure Package',
+            'file_name' => $fileBaseName.'.pdf',
+            'document_kind' => 'OFFICIAL_DISCLOSURE_PACKAGE',
+            'file_path' => $path,
+            'related_module' => 'public_disclosures',
+            'related_reference_id' => (int) $disclosure->disclosure_id,
+            'uploaded_at' => now(),
+        ]);
 
         return $document->fresh() ?? $document;
+    }
+
+    private function storePdfSafely(string $path, string $content): void
+    {
+        $primaryDisk = $this->publicDisk();
+        try {
+            Storage::disk($primaryDisk)->put($path, $content);
+            return;
+        } catch (\Throwable) {
+            if ($primaryDisk !== 'public') {
+                try {
+                    Storage::disk('public')->put($path, $content);
+                    return;
+                } catch (\Throwable) {
+                    // Fallback to local
+                }
+            }
+            Storage::disk('local')->put($path, $content);
+        }
     }
 
     /**
