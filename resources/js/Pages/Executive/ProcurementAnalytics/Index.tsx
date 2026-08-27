@@ -1,9 +1,11 @@
 import { DonutChart, ExecutiveChartCard, HorizontalBarChart, TrendGroupedBarChart } from '@/Components/Executive/Charts';
+import { GovDocumentPage, GovDocumentMetadata } from '@/Components/Executive/GovDocumentLayout';
 import MonthFilterSelect from '@/Components/MonthFilterSelect';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PaginationNav from '@/Components/PaginationNav';
 import { downloadSectionAsPdfById } from '@/lib/printSection';
-import { Head, Link, router } from '@inertiajs/react';
+import { PageProps } from '@/types';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
 
 type OfficeOption = { id: number; name: string };
@@ -219,18 +221,38 @@ export default function ProcurementAnalyticsIndex({
         downloadCsv(lines, 'procurement-insights.csv');
     };
 
+    const { auth } = usePage<PageProps>().props;
     const exportSectionId = 'procurement-insights-export-section';
     const procurementRecords = recent.procurement_records ?? recent.purchase_orders;
     const exportProcurementRecords = recent.procurement_records_export ?? procurementRecords.data;
+    const procurementExportPages = useMemo(() => chunkRows(exportProcurementRecords, 12), [exportProcurementRecords]);
+    const totalPdfPages = 1 + (procurementExportPages.length > 0 ? procurementExportPages.length : 1);
+
+    const baseMetadata: GovDocumentMetadata = {
+        title: 'EXECUTIVE PROCUREMENT ANALYTICS & SPENDING REPORT',
+        formCode: 'FDP Form - Procurement Spend & Trend Analysis',
+        trackingCode: `EBM-PROC-SPEND-${form.year || new Date().getFullYear()}`,
+        fiscalYear: form.year || new Date().getFullYear(),
+        period: form.year ? `Fiscal Year ${form.year}${form.month ? ` - Month ${form.month}` : ''}` : `Fiscal Year ${new Date().getFullYear()}`,
+        moduleScope: 'Purchase Request vs Purchase Order Analytics & Office Spend',
+        preparedByName: auth?.user?.name || 'Executive Officer',
+        preparedByRole: auth?.user?.role_code || 'Executive Officer',
+        preparedAt: new Date().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }),
+        approverName: 'HON. JOVILYN D. MAGALONA',
+        approverRole: 'Municipal Mayor / Local Chief Executive',
+    };
 
     const exportPdf = async () => {
         await downloadSectionAsPdfById(exportSectionId, {
-            title: 'Procurement Insights',
-            fileName: 'procurement-insights.pdf',
+            title: 'Procurement Insights Report',
+            fileName: 'procurement-insights-report.pdf',
             marginMm: 6,
-            paperWidthPx: 900,
+            paperWidthPx: 820,
+            orientation: 'portrait',
             excludeSelectors: ['.print-hide', 'nav', 'aside', '[role="navigation"]'],
             revealSelectors: ['.pdf-export-content'],
+            pageBreakSelectors: ['.pdf-page'],
+            includeDefaultHeading: false,
         });
     };
 
@@ -419,91 +441,125 @@ export default function ProcurementAnalyticsIndex({
                     )}
                 </section>
 
-                <div id={exportSectionId} className="pdf-export-content hidden space-y-5 text-slate-900">
-                    <section className="rounded-xl border border-red-100 bg-white p-4">
-                        <h2 className="text-2xl font-semibold text-slate-900">Procurement Insights Graphs</h2>
-                        <p className="mt-1 text-sm text-slate-600">Graphs only, followed by all filtered procurement records.</p>
-                    </section>
+                <div id={exportSectionId} className="pdf-export-content hidden space-y-6 text-slate-900">
+                    {/* Page 1: Analytics & Spend Summary */}
+                    <GovDocumentPage
+                        metadata={baseMetadata}
+                        pageNumber={1}
+                        totalPages={totalPdfPages}
+                        showLetterhead={true}
+                        showSignatories={totalPdfPages === 1}
+                        showAttestation={totalPdfPages === 1}
+                    >
+                        <div className="rounded-lg border border-slate-300 bg-slate-50/50 p-4">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-2 mb-3">
+                                Procurement Activity & Expenditure Totals
+                            </h3>
+                            <div className="grid grid-cols-3 gap-3">
+                                <div className="rounded-md border border-slate-300 bg-white p-3 text-center">
+                                    <p className="text-[10px] font-bold uppercase text-slate-600">Total Purchase Requests</p>
+                                    <p className="mt-1 text-2xl font-extrabold text-slate-900">{totals.purchase_request_count}</p>
+                                </div>
+                                <div className="rounded-md border border-slate-300 bg-white p-3 text-center">
+                                    <p className="text-[10px] font-bold uppercase text-slate-600">Total Purchase Orders</p>
+                                    <p className="mt-1 text-2xl font-extrabold text-slate-900">{totals.purchase_order_count}</p>
+                                </div>
+                                <div className="rounded-md border border-slate-300 bg-white p-3 text-center">
+                                    <p className="text-[10px] font-bold uppercase text-slate-600">Total Committed Spend</p>
+                                    <p className="mt-1 text-xl font-extrabold text-red-800">{formatCurrency(totals.purchase_order_total_amount)}</p>
+                                </div>
+                            </div>
+                        </div>
 
-                    <div className="grid grid-cols-2 gap-4 [&_.truncate]:whitespace-normal [&_.truncate]:overflow-visible [&_.truncate]:text-clip [&_[class*='h-52']]:h-40 [&_[class*='h-56']]:h-40 [&_[class*='space-y-3.5']]:space-y-5">
-                        <div className="col-span-2">
-                            <ExecutiveChartCard title="PR vs PO Trend" subtitle="Monthly movement" tone="critical">
+                        <div className="grid grid-cols-2 gap-4">
+                            <section className="rounded-lg border border-slate-300 bg-white p-3.5">
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2.5">
+                                    PR vs PO Monthly Volume Trend
+                                </h3>
                                 <TrendGroupedBarChart
                                     data={monthlyMerged}
                                     firstLabel="Purchase Requests"
                                     secondLabel="Purchase Orders"
                                     emptyText="No data in current filter scope"
                                 />
-                            </ExecutiveChartCard>
-                        </div>
+                            </section>
 
-                        <div className="col-span-2">
-                            <ExecutiveChartCard title="Top Procurement Concentration" subtitle="Office spending ranking" tone="neutral">
+                            <section className="rounded-lg border border-slate-300 bg-white p-3.5">
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2.5">
+                                    Office Procurement Spending Ranking
+                                </h3>
                                 <HorizontalBarChart
                                     data={officeValueBreakdown}
                                     valueFormatter={formatCurrency}
                                     emptyText="No data in current filter scope"
                                 />
-                            </ExecutiveChartCard>
+                            </section>
                         </div>
+                    </GovDocumentPage>
 
-                        <div>
-                            <ExecutiveChartCard title="PR Status Mix" subtitle="Request lifecycle" tone="default">
-                                <DonutChart
-                                    data={statusMixPr}
-                                    centerLabel="PR"
-                                    emptyText="No data in current filter scope"
-                                />
-                            </ExecutiveChartCard>
-                        </div>
+                    {/* Continuation Pages: Detailed Procurement Records */}
+                    {procurementExportPages.length === 0 ? (
+                        <GovDocumentPage
+                            metadata={{
+                                ...baseMetadata,
+                                title: 'PROCUREMENT TRANSACTION SCHEDULE',
+                                moduleScope: 'Itemized Purchase Requests & Purchase Orders',
+                            }}
+                            pageNumber={2}
+                            totalPages={2}
+                            showLetterhead={true}
+                            showSignatories={true}
+                            showAttestation={true}
+                        >
+                            <p className="py-8 text-center text-sm text-slate-500">No procurement records found within the selected filter criteria.</p>
+                        </GovDocumentPage>
+                    ) : (
+                        procurementExportPages.map((rows, pageIndex) => {
+                            const pageNumber = 2 + pageIndex;
+                            const isLast = pageNumber === totalPdfPages;
 
-                        <div>
-                            <ExecutiveChartCard title="PO Status Mix" subtitle="Order progression" tone="default">
-                                <DonutChart
-                                    data={statusMixPo}
-                                    centerLabel="PO"
-                                    emptyText="No data in current filter scope"
-                                />
-                            </ExecutiveChartCard>
-                        </div>
-                    </div>
-
-                    <div className="h-[420px]" aria-hidden="true" />
-
-                    <section className="overflow-hidden rounded-xl border border-red-100 bg-white">
-                        <div className="border-b border-slate-200 px-4 py-3">
-                            <h3 className="text-xl font-semibold text-slate-800">All Filtered Procurement Records</h3>
-                            <p className="mt-1 text-sm text-slate-600">Includes all purchase requests and purchase orders in the current filter scope, not only the visible page.</p>
-                        </div>
-                        {exportProcurementRecords.length === 0 ? (
-                            <p className="px-6 py-8 text-sm text-slate-500">No data in current filter scope</p>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full table-fixed divide-y divide-slate-200 text-xs">
-                                    <thead className="bg-slate-50">
-                                        <tr>
-                                            <th className="w-[14%] px-3 py-2 text-left">Record</th>
-                                            <th className="w-[10%] px-3 py-2 text-left">Type</th>
-                                            <th className="w-[36%] px-3 py-2 text-left">Office</th>
-                                            <th className="w-[20%] px-3 py-2 text-left">Status</th>
-                                            <th className="w-[20%] px-3 py-2 text-left">Amount</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {exportProcurementRecords.map((row) => (
-                                            <tr key={`${row.type}-${row.record_id}`}>
-                                                <td className="px-3 py-2 align-top">{row.reference}</td>
-                                                <td className="px-3 py-2 align-top uppercase">{row.type}</td>
-                                                <td className="px-3 py-2 align-top leading-snug">{row.office_name ?? 'N/A'}</td>
-                                                <td className="px-3 py-2 align-top">{row.status}</td>
-                                                <td className="px-3 py-2 align-top">{row.amount == null ? '—' : formatCurrency(row.amount)}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </section>
+                            return (
+                                <GovDocumentPage
+                                    key={`procurement-export-page-${pageIndex + 1}`}
+                                    metadata={{
+                                        ...baseMetadata,
+                                        title: 'PROCUREMENT TRANSACTION SCHEDULE',
+                                        moduleScope: 'Itemized Purchase Requests & Purchase Orders',
+                                    }}
+                                    pageNumber={pageNumber}
+                                    totalPages={totalPdfPages}
+                                    showLetterhead={true}
+                                    showSignatories={isLast}
+                                    showAttestation={isLast}
+                                >
+                                    <div className="overflow-x-auto rounded-md border border-slate-300">
+                                        <table className="min-w-full table-fixed divide-y divide-slate-300 text-[11px]">
+                                            <thead className="bg-slate-100 text-slate-800 font-bold uppercase">
+                                                <tr>
+                                                    <th className="w-[18%] px-3 py-2 text-left border-r border-slate-300">Tracking Reference</th>
+                                                    <th className="w-[10%] px-3 py-2 text-center border-r border-slate-300">Type</th>
+                                                    <th className="w-[32%] px-3 py-2 text-left border-r border-slate-300">Procuring Office</th>
+                                                    <th className="w-[20%] px-3 py-2 text-center border-r border-slate-300">Status</th>
+                                                    <th className="w-[20%] px-3 py-2 text-right">Amount (PHP)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-200 bg-white">
+                                                {rows.map((row) => (
+                                                    <tr key={`${row.type}-${row.record_id}`}>
+                                                        <td className="px-3 py-2 align-top font-bold text-slate-900 border-r border-slate-200">{row.reference}</td>
+                                                        <td className="px-3 py-2 align-top text-center font-semibold text-slate-700 uppercase border-r border-slate-200">{row.type}</td>
+                                                        <td className="px-3 py-2 align-top text-slate-800 border-r border-slate-200">{row.office_name ?? 'N/A'}</td>
+                                                        <td className="px-3 py-2 align-top text-center text-slate-700 border-r border-slate-200">{row.status}</td>
+                                                        <td className="px-3 py-2 align-top text-right font-semibold text-slate-900">{row.amount == null ? '—' : formatCurrency(row.amount)}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </GovDocumentPage>
+                            );
+                        })
+                    )}
                 </div>
             </div>
         </AuthenticatedLayout>
@@ -610,4 +666,12 @@ function serializeProcurementFilters(filters: {
         record_type: filters.record_type ?? 'all',
         records_page: String(filters.records_page ?? ''),
     });
+}
+
+function chunkRows<T>(rows: T[], pageSize: number): T[][] {
+    const pages: T[][] = [];
+    for (let index = 0; index < rows.length; index += pageSize) {
+        pages.push(rows.slice(index, index + pageSize));
+    }
+    return pages;
 }

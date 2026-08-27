@@ -13,6 +13,7 @@ type ExportSectionPdfOptions = {
     excludeSelectors?: string[];
     revealSelectors?: string[];
     pageBreakSelectors?: string[];
+    includeDefaultHeading?: boolean;
 };
 
 export function printSectionById(sectionId: string, options: PrintSectionOptions = {}): void {
@@ -103,12 +104,14 @@ export async function downloadSectionAsPdfById(sectionId: string, options: Expor
     const excludeSelectors = options.excludeSelectors ?? ['.print-hide'];
     const revealSelectors = options.revealSelectors ?? [];
     const pageBreakSelectors = options.pageBreakSelectors ?? [];
+    const includeDefaultHeading = options.includeDefaultHeading ?? (pageBreakSelectors.length === 0);
 
     const captureRoot = createPdfCaptureRoot(source, {
         title,
         paperWidthPx,
         excludeSelectors,
         revealSelectors,
+        includeDefaultHeading,
     });
 
     try {
@@ -179,14 +182,23 @@ async function renderPdfCanvas(
     });
 }
 
-function createPdfCaptureRoot(source: HTMLElement, options: { title: string; paperWidthPx: number; excludeSelectors: string[]; revealSelectors: string[] }): HTMLDivElement {
+function createPdfCaptureRoot(
+    source: HTMLElement,
+    options: {
+        title: string;
+        paperWidthPx: number;
+        excludeSelectors: string[];
+        revealSelectors: string[];
+        includeDefaultHeading?: boolean;
+    },
+): HTMLDivElement {
     const root = document.createElement('div');
     root.setAttribute('data-pdf-capture-root', 'true');
     root.style.position = 'fixed';
     root.style.left = '-100000px';
     root.style.top = '0';
     root.style.width = `${options.paperWidthPx}px`;
-    root.style.padding = '20px';
+    root.style.padding = '0';
     root.style.background = '#ffffff';
     root.style.boxSizing = 'border-box';
     root.style.zIndex = '-1';
@@ -214,13 +226,6 @@ function createPdfCaptureRoot(source: HTMLElement, options: { title: string; pap
         });
     });
 
-    const heading = document.createElement('div');
-    heading.style.marginBottom = '12px';
-    heading.innerHTML = `
-        <h1 style="margin: 0; font-size: 20px; font-weight: 700; color: #0f172a;">${escapeHtml(options.title)}</h1>
-        <p style="margin: 4px 0 0; font-size: 12px; color: #64748b;">Generated ${new Date().toLocaleString()}</p>
-    `;
-
     const style = document.createElement('style');
     style.textContent = `
         [data-pdf-capture-root], [data-pdf-capture-root] * { box-sizing: border-box; }
@@ -238,10 +243,25 @@ function createPdfCaptureRoot(source: HTMLElement, options: { title: string; pap
             overflow-wrap: anywhere;
             word-break: break-word;
         }
+        [data-pdf-capture-root] .pdf-page {
+            box-shadow: none !important;
+            margin: 0 !important;
+        }
     `;
 
     root.appendChild(style);
-    root.appendChild(heading);
+
+    if (options.includeDefaultHeading) {
+        const heading = document.createElement('div');
+        heading.style.padding = '16px';
+        heading.style.marginBottom = '12px';
+        heading.innerHTML = `
+            <h1 style="margin: 0; font-size: 20px; font-weight: 700; color: #0f172a;">${escapeHtml(options.title)}</h1>
+            <p style="margin: 4px 0 0; font-size: 12px; color: #64748b;">Generated ${new Date().toLocaleString()}</p>
+        `;
+        root.appendChild(heading);
+    }
+
     root.appendChild(clonedSection);
     document.body.appendChild(root);
 

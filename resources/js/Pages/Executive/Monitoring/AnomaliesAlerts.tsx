@@ -1,8 +1,10 @@
 import { ExecutiveChartCard, HorizontalBarChart, TrendGroupedBarChart } from '@/Components/Executive/Charts';
+import { GovDocumentPage, GovDocumentMetadata } from '@/Components/Executive/GovDocumentLayout';
 import MonthFilterSelect from '@/Components/MonthFilterSelect';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { downloadSectionAsPdfById } from '@/lib/printSection';
-import { Head, Link, router } from '@inertiajs/react';
+import { PageProps } from '@/types';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
 
 type OptionOffice = { id: number; name: string };
@@ -199,16 +201,38 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
         downloadCsv(rows, 'risk-and-alerts.csv');
     };
 
+    const { auth } = usePage<PageProps>().props;
     const exportSectionId = 'risk-alerts-export-section';
+
+    const anomalyExportPages = useMemo(() => chunkRows(recent.anomalies, 10), [recent.anomalies]);
+    const alertExportPages = useMemo(() => chunkRows(recent.alerts, 10), [recent.alerts]);
+    const totalPdfPages = 1 + (anomalyExportPages.length > 0 ? anomalyExportPages.length : 1) + (alertExportPages.length > 0 ? alertExportPages.length : 1);
+
+    const baseMetadata: GovDocumentMetadata = {
+        title: 'EXECUTIVE RISK SIGNALS & PROCUREMENT ANOMALIES REPORT',
+        formCode: 'FDP Form - Risk Management & Anomaly Detection',
+        trackingCode: `EBM-RISK-${form.year || new Date().getFullYear()}`,
+        fiscalYear: form.year || new Date().getFullYear(),
+        period: form.year ? `Fiscal Year ${form.year}${form.month ? ` - Month ${form.month}` : ''}` : `Fiscal Year ${new Date().getFullYear()}`,
+        moduleScope: 'Automated Anomaly Detection & High-Severity Alerts Monitoring',
+        preparedByName: auth?.user?.name || 'Executive Officer',
+        preparedByRole: auth?.user?.role_code || 'Executive Officer',
+        preparedAt: new Date().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }),
+        approverName: 'HON. JOVILYN D. MAGALONA',
+        approverRole: 'Municipal Mayor / Local Chief Executive',
+    };
 
     const exportPdf = async () => {
         await downloadSectionAsPdfById(exportSectionId, {
-            title: 'Risk & Alerts',
-            fileName: 'risk-and-alerts.pdf',
+            title: 'Risk and Alerts Report',
+            fileName: 'risk-and-alerts-report.pdf',
             marginMm: 6,
-            paperWidthPx: 900,
+            paperWidthPx: 820,
+            orientation: 'portrait',
             excludeSelectors: ['.print-hide', 'nav', 'aside', '[role="navigation"]'],
             revealSelectors: ['.pdf-export-content'],
+            pageBreakSelectors: ['.pdf-page'],
+            includeDefaultHeading: false,
         });
     };
 
@@ -438,23 +462,47 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                     </section>
                 </div>
 
-                <div id={exportSectionId} className="pdf-export-content hidden space-y-5 text-slate-900">
-                    <section className="rounded-xl border border-red-100 bg-white p-4">
-                        <h2 className="text-2xl font-semibold text-slate-900">Risk & Alerts Graphs</h2>
-                        <p className="mt-1 text-sm text-slate-600">Graphs only, followed by all filtered anomaly and alert records.</p>
-                    </section>
+                <div id={exportSectionId} className="pdf-export-content hidden space-y-6 text-slate-900">
+                    {/* Page 1: Risk & Alerts Summary Overview */}
+                    <GovDocumentPage
+                        metadata={baseMetadata}
+                        pageNumber={1}
+                        totalPages={totalPdfPages}
+                        showLetterhead={true}
+                        showSignatories={totalPdfPages === 1}
+                        showAttestation={totalPdfPages === 1}
+                    >
+                        <div className="rounded-lg border border-slate-300 bg-slate-50/50 p-4">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-2 mb-3">
+                                Procurement Integrity & Risk Metrics
+                            </h3>
+                            <div className="grid grid-cols-4 gap-3">
+                                <div className="rounded-md border border-slate-300 bg-white p-3 text-center">
+                                    <p className="text-[10px] font-bold uppercase text-slate-600">Total Anomalies</p>
+                                    <p className="mt-1 text-2xl font-extrabold text-slate-900">{totals.anomaly_count}</p>
+                                </div>
+                                <div className="rounded-md border border-slate-300 bg-white p-3 text-center">
+                                    <p className="text-[10px] font-bold uppercase text-slate-600">Total Alerts</p>
+                                    <p className="mt-1 text-2xl font-extrabold text-slate-900">{totals.alert_count}</p>
+                                </div>
+                                <div className="rounded-md border border-rose-300 bg-rose-50/70 p-3 text-center">
+                                    <p className="text-[10px] font-bold uppercase text-rose-900">Critical Anomalies</p>
+                                    <p className="mt-1 text-2xl font-extrabold text-rose-800">{totals.high_severity_anomaly_count}</p>
+                                </div>
+                                <div className="rounded-md border border-amber-300 bg-amber-50/70 p-3 text-center">
+                                    <p className="text-[10px] font-bold uppercase text-amber-900">Critical Alerts</p>
+                                    <p className="mt-1 text-2xl font-extrabold text-amber-800">{totals.high_severity_alert_count}</p>
+                                </div>
+                            </div>
+                        </div>
 
-                    <div className="grid grid-cols-2 gap-4 [&_.truncate]:whitespace-normal [&_.truncate]:overflow-visible [&_.truncate]:text-clip [&_[class*='h-52']]:h-40 [&_[class*='h-56']]:h-40 [&_[class*='space-y-3.5']]:space-y-5">
-                        <div className="col-span-2">
-                            <ExecutiveChartCard title="Incident Trend" subtitle="Anomaly and alert movement" tone="critical">
+                        <div className="grid grid-cols-2 gap-4">
+                            <section className="rounded-lg border border-slate-300 bg-white p-3.5">
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2.5">
+                                    Incident Monthly Movement Trend
+                                </h3>
                                 {trendData.length === 0 ? (
                                     <CompactEmpty text="No incident trend data in current filter scope." />
-                                ) : trendData.length === 1 ? (
-                                    <div className="grid gap-3 md:grid-cols-3">
-                                        <MiniStat label="Month" value={trendData[0].label} />
-                                        <MiniStat label="Anomalies" value={trendData[0].first} />
-                                        <MiniStat label="Alerts" value={trendData[0].second} />
-                                    </div>
                                 ) : (
                                     <TrendGroupedBarChart
                                         data={trendData}
@@ -463,108 +511,144 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                                         emptyText="No data in current filter scope"
                                     />
                                 )}
-                            </ExecutiveChartCard>
-                        </div>
+                            </section>
 
-                        <div className="col-span-2">
-                            <ExecutiveChartCard title="Office Risk Ranking" subtitle="Total incidents by office" tone="neutral">
+                            <section className="rounded-lg border border-slate-300 bg-white p-3.5">
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2.5">
+                                    Office Risk Concentration
+                                </h3>
                                 <HorizontalBarChart data={officeRisk} emptyText="No data in current filter scope" />
-                            </ExecutiveChartCard>
+                            </section>
                         </div>
+                    </GovDocumentPage>
 
-                        <div>
-                            <ExecutiveChartCard title="Top Anomaly Categories" subtitle="Most frequent anomaly types" tone="warning">
-                                <HorizontalBarChart data={anomalyTypeMix} emptyText="No data in current filter scope" />
-                            </ExecutiveChartCard>
-                        </div>
+                    {/* Continuation Pages: Anomaly Records */}
+                    {anomalyExportPages.length === 0 ? (
+                        <GovDocumentPage
+                            metadata={{
+                                ...baseMetadata,
+                                title: 'ITEMIZED ANOMALY INCIDENT SCHEDULE',
+                                moduleScope: 'Detected Algorithmic Anomalies & Irregularities',
+                            }}
+                            pageNumber={2}
+                            totalPages={totalPdfPages}
+                            showLetterhead={true}
+                            showSignatories={alertExportPages.length === 0}
+                            showAttestation={alertExportPages.length === 0}
+                        >
+                            <p className="py-8 text-center text-sm text-slate-500">No anomaly incidents recorded for the selected filter scope.</p>
+                        </GovDocumentPage>
+                    ) : (
+                        anomalyExportPages.map((rows, pageIndex) => {
+                            const pageNumber = 2 + pageIndex;
+                            const isLast = pageNumber === totalPdfPages;
 
-                        <div>
-                            <ExecutiveChartCard title="Severity and Status Snapshot" subtitle="Compact comparison" tone="default">
-                                <div className="grid gap-4">
-                                    <div>
-                                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">Severity</p>
-                                        <HorizontalBarChart data={severityMix} emptyText="No data in current filter scope" />
+                            return (
+                                <GovDocumentPage
+                                    key={`risk-anomalies-export-${pageIndex + 1}`}
+                                    metadata={{
+                                        ...baseMetadata,
+                                        title: 'ITEMIZED ANOMALY INCIDENT SCHEDULE',
+                                        moduleScope: 'Detected Algorithmic Anomalies & Irregularities',
+                                    }}
+                                    pageNumber={pageNumber}
+                                    totalPages={totalPdfPages}
+                                    showLetterhead={true}
+                                    showSignatories={isLast}
+                                    showAttestation={isLast}
+                                >
+                                    <div className="overflow-x-auto rounded-md border border-slate-300">
+                                        <table className="min-w-full table-fixed divide-y divide-slate-300 text-[11px]">
+                                            <thead className="bg-slate-100 text-slate-800 font-bold uppercase">
+                                                <tr>
+                                                    <th className="w-[30%] px-3 py-2 text-left border-r border-slate-300">Anomaly Classification</th>
+                                                    <th className="w-[14%] px-3 py-2 text-center border-r border-slate-300">Severity</th>
+                                                    <th className="w-[24%] px-3 py-2 text-left border-r border-slate-300">Office / Unit</th>
+                                                    <th className="w-[18%] px-3 py-2 text-left border-r border-slate-300">Date Detected</th>
+                                                    <th className="w-[14%] px-3 py-2 text-center">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-200 bg-white">
+                                                {rows.map((row) => (
+                                                    <tr key={row.anomaly_id}>
+                                                        <td className="px-3 py-2 align-top font-bold text-slate-900 border-r border-slate-200">{formatAnomalyType(row.anomaly_type)}</td>
+                                                        <td className="px-3 py-2 align-top text-center border-r border-slate-200">{formatStatus(row.severity)}</td>
+                                                        <td className="px-3 py-2 align-top text-slate-700 border-r border-slate-200">{row.office?.name ?? 'N/A'}</td>
+                                                        <td className="px-3 py-2 align-top text-slate-600 border-r border-slate-200">{formatDate(row.detected_at)}</td>
+                                                        <td className="px-3 py-2 align-top text-center text-slate-700">{formatStatus(row.status)}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
                                     </div>
-                                    <div>
-                                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">Status</p>
-                                        <HorizontalBarChart data={statusMix} emptyText="No data in current filter scope" />
+                                </GovDocumentPage>
+                            );
+                        })
+                    )}
+
+                    {/* Continuation Pages: Alert Records */}
+                    {alertExportPages.length === 0 ? (
+                        <GovDocumentPage
+                            metadata={{
+                                ...baseMetadata,
+                                title: 'ITEMIZED SYSTEM ALERT LOG',
+                                moduleScope: 'Procurement Workflow & Threshold Alerts',
+                            }}
+                            pageNumber={totalPdfPages}
+                            totalPages={totalPdfPages}
+                            showLetterhead={true}
+                            showSignatories={true}
+                            showAttestation={true}
+                        >
+                            <p className="py-8 text-center text-sm text-slate-500">No system alerts recorded for the selected filter scope.</p>
+                        </GovDocumentPage>
+                    ) : (
+                        alertExportPages.map((rows, pageIndex) => {
+                            const pageNumber = 2 + (anomalyExportPages.length > 0 ? anomalyExportPages.length : 1) + pageIndex;
+                            const isLast = pageNumber === totalPdfPages;
+
+                            return (
+                                <GovDocumentPage
+                                    key={`risk-alerts-export-${pageIndex + 1}`}
+                                    metadata={{
+                                        ...baseMetadata,
+                                        title: 'ITEMIZED SYSTEM ALERT LOG',
+                                        moduleScope: 'Procurement Workflow & Threshold Alerts',
+                                    }}
+                                    pageNumber={pageNumber}
+                                    totalPages={totalPdfPages}
+                                    showLetterhead={true}
+                                    showSignatories={isLast}
+                                    showAttestation={isLast}
+                                >
+                                    <div className="overflow-x-auto rounded-md border border-slate-300">
+                                        <table className="min-w-full table-fixed divide-y divide-slate-300 text-[11px]">
+                                            <thead className="bg-slate-100 text-slate-800 font-bold uppercase">
+                                                <tr>
+                                                    <th className="w-[30%] px-3 py-2 text-left border-r border-slate-300">Alert Classification</th>
+                                                    <th className="w-[14%] px-3 py-2 text-center border-r border-slate-300">Severity</th>
+                                                    <th className="w-[24%] px-3 py-2 text-left border-r border-slate-300">Office / Unit</th>
+                                                    <th className="w-[18%] px-3 py-2 text-left border-r border-slate-300">Date Detected</th>
+                                                    <th className="w-[14%] px-3 py-2 text-center">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-200 bg-white">
+                                                {rows.map((row) => (
+                                                    <tr key={row.alerts_id}>
+                                                        <td className="px-3 py-2 align-top font-bold text-slate-900 border-r border-slate-200">{formatAlertType(row.alert_type)}</td>
+                                                        <td className="px-3 py-2 align-top text-center border-r border-slate-200">{formatStatus(row.severity)}</td>
+                                                        <td className="px-3 py-2 align-top text-slate-700 border-r border-slate-200">{row.office?.name ?? 'N/A'}</td>
+                                                        <td className="px-3 py-2 align-top text-slate-600 border-r border-slate-200">{formatDate(row.detected_at)}</td>
+                                                        <td className="px-3 py-2 align-top text-center text-slate-700">{formatStatus(row.status)}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
                                     </div>
-                                </div>
-                            </ExecutiveChartCard>
-                        </div>
-                    </div>
-
-                    <div className="h-[420px]" aria-hidden="true" />
-
-                    <section className="overflow-hidden rounded-xl border border-red-100 bg-white">
-                        <div className="border-b border-slate-200 px-4 py-3">
-                            <h3 className="text-xl font-semibold text-slate-800">All Filtered Anomaly Records</h3>
-                            <p className="mt-1 text-sm text-slate-600">Includes all anomaly records in the current filter scope.</p>
-                        </div>
-                        {recent.anomalies.length === 0 ? (
-                            <p className="px-6 py-8 text-sm text-slate-500">No anomalies found for the selected filters.</p>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full table-fixed divide-y divide-slate-200 text-xs">
-                                    <thead className="bg-slate-50">
-                                        <tr>
-                                            <th className="w-[28%] px-3 py-2 text-left">Type</th>
-                                            <th className="w-[14%] px-3 py-2 text-left">Severity</th>
-                                            <th className="w-[28%] px-3 py-2 text-left">Office</th>
-                                            <th className="w-[18%] px-3 py-2 text-left">Detected</th>
-                                            <th className="w-[12%] px-3 py-2 text-left">Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {recent.anomalies.map((row) => (
-                                            <tr key={row.anomaly_id}>
-                                                <td className="px-3 py-2 align-top leading-snug">{formatAnomalyType(row.anomaly_type)}</td>
-                                                <td className="px-3 py-2 align-top">{formatStatus(row.severity)}</td>
-                                                <td className="px-3 py-2 align-top leading-snug">{row.office?.name ?? 'N/A'}</td>
-                                                <td className="px-3 py-2 align-top">{formatDate(row.detected_at)}</td>
-                                                <td className="px-3 py-2 align-top">{formatStatus(row.status)}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </section>
-
-                    <section className="overflow-hidden rounded-xl border border-red-100 bg-white">
-                        <div className="border-b border-slate-200 px-4 py-3">
-                            <h3 className="text-xl font-semibold text-slate-800">All Filtered Alert Records</h3>
-                            <p className="mt-1 text-sm text-slate-600">Includes all alert records in the current filter scope.</p>
-                        </div>
-                        {recent.alerts.length === 0 ? (
-                            <p className="px-6 py-8 text-sm text-slate-500">No alerts found for the selected filters.</p>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full table-fixed divide-y divide-slate-200 text-xs">
-                                    <thead className="bg-slate-50">
-                                        <tr>
-                                            <th className="w-[28%] px-3 py-2 text-left">Alert Type</th>
-                                            <th className="w-[14%] px-3 py-2 text-left">Severity</th>
-                                            <th className="w-[28%] px-3 py-2 text-left">Office</th>
-                                            <th className="w-[18%] px-3 py-2 text-left">Detected</th>
-                                            <th className="w-[12%] px-3 py-2 text-left">Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {recent.alerts.map((row) => (
-                                            <tr key={row.alerts_id}>
-                                                <td className="px-3 py-2 align-top leading-snug">{formatAlertType(row.alert_type)}</td>
-                                                <td className="px-3 py-2 align-top">{formatStatus(row.severity)}</td>
-                                                <td className="px-3 py-2 align-top leading-snug">{row.office?.name ?? 'N/A'}</td>
-                                                <td className="px-3 py-2 align-top">{formatDate(row.detected_at)}</td>
-                                                <td className="px-3 py-2 align-top">{formatStatus(row.status)}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </section>
+                                </GovDocumentPage>
+                            );
+                        })
+                    )}
                 </div>
             </div>
         </AuthenticatedLayout>
@@ -956,4 +1040,12 @@ function serializeRiskFilters(filters: {
         year: filters.year ?? '',
         month: filters.month ?? '',
     });
+}
+
+function chunkRows<T>(rows: T[], pageSize: number): T[][] {
+    const pages: T[][] = [];
+    for (let index = 0; index < rows.length; index += pageSize) {
+        pages.push(rows.slice(index, index + pageSize));
+    }
+    return pages;
 }

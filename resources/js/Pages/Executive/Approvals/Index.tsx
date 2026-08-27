@@ -1,11 +1,13 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { DonutChart, ExecutiveChartCard, HorizontalBarChart } from '@/Components/Executive/Charts';
+import { GovDocumentPage, GovDocumentMetadata } from '@/Components/Executive/GovDocumentLayout';
 import MonthFilterSelect from '@/Components/MonthFilterSelect';
 import PaginationNav from '@/Components/PaginationNav';
 import PpmpDecisionModal from '@/Components/PpmpDecisionModal';
 import useSmartRefresh from '@/hooks/useSmartRefresh';
 import { downloadSectionAsPdfById } from '@/lib/printSection';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { PageProps } from '@/types';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
 
 type DecisionStatus = 'APPROVED' | 'REJECTED' | 'RETURNED_FOR_REVISION';
@@ -163,8 +165,6 @@ export default function ExecutiveApprovalsIndex({ records, recordsExport, summar
         { label: 'Rejected', value: summary.rejected },
     ];
 
-    const recordsExportPages = useMemo(() => chunkRows(recordsExport, 12), [recordsExport]);
-
     const exportCsv = () => {
         const lines = [
             ['metric', 'value'],
@@ -191,16 +191,35 @@ export default function ExecutiveApprovalsIndex({ records, recordsExport, summar
         downloadFile(csv, 'executive-approvals.csv', 'text/csv;charset=utf-8;');
     };
 
+    const { auth } = usePage<PageProps>().props;
+    const recordsExportPages = useMemo(() => chunkRows(recordsExport, 10), [recordsExport]);
+    const totalPdfPages = 1 + recordsExportPages.length;
+
+    const baseMetadata: GovDocumentMetadata = {
+        title: 'PROJECT PROCUREMENT MANAGEMENT PLAN (PPMP) EXECUTIVE APPROVAL REPORT',
+        formCode: 'FDP Form - PPMP Approval & Utilization',
+        trackingCode: `EBM-PPMP-${form.year || new Date().getFullYear()}`,
+        fiscalYear: form.year || new Date().getFullYear(),
+        period: form.year ? `Fiscal Year ${form.year}` : `Fiscal Year ${new Date().getFullYear()}`,
+        moduleScope: 'Executive PPMP Signoff & Annual Procurement Plan Queue',
+        preparedByName: auth?.user?.name || 'Executive Officer',
+        preparedByRole: auth?.user?.role_code || 'Executive Officer',
+        preparedAt: new Date().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }),
+        approverName: 'HON. JOVILYN D. MAGALONA',
+        approverRole: 'Municipal Mayor / Local Chief Executive',
+    };
+
     const exportPdf = async () => {
         await downloadSectionAsPdfById(exportSectionId, {
-            title: 'Executive Approvals',
-            fileName: 'executive-approvals.pdf',
-            marginMm: 5,
-            paperWidthPx: 760,
+            title: 'Executive Approvals Report',
+            fileName: 'executive-ppmp-approvals.pdf',
+            marginMm: 6,
+            paperWidthPx: 820,
             orientation: 'portrait',
             excludeSelectors: ['.print-hide', 'nav', 'aside', '[role="navigation"]'],
             revealSelectors: ['.pdf-export-content'],
             pageBreakSelectors: ['.pdf-page'],
+            includeDefaultHeading: false,
         });
     };
 
@@ -391,77 +410,114 @@ export default function ExecutiveApprovalsIndex({ records, recordsExport, summar
                     {records.data.length > 0 ? <PaginationNav links={records.links} preserveState={false} /> : null}
                 </section>
 
-                <div id={exportSectionId} className="pdf-export-content hidden space-y-4 text-slate-900">
-                    <section className="pdf-page rounded-xl border border-red-100 bg-white p-4">
-                        <h2 className="text-xl font-semibold text-slate-900">Executive Approvals Summary</h2>
-                        <p className="mt-1 text-xs text-slate-600">Summary first, then full approval records on following pages.</p>
-
-                        <div className="mt-3 grid gap-3 sm:grid-cols-4">
-                            <SummaryCard label="Pending PPMP Approvals" value={summary.pending_ppmp_approvals} tone="amber" />
-                            <SummaryCard label="Returned for Revision" value={summary.returned_for_revision} tone="blue" />
-                            <SummaryCard label="Recently Approved" value={summary.recently_approved} tone="emerald" />
-                            <SummaryCard label="Rejected" value={summary.rejected} tone="rose" />
-                        </div>
-
-                        <div className="mt-3 grid grid-cols-2 gap-3 [&_.truncate]:whitespace-normal [&_.truncate]:overflow-visible [&_.truncate]:text-clip [&_[class*='space-y-3.5']]:space-y-4">
-                            <section className="rounded-xl border border-red-100 bg-white p-3">
-                                <h3 className="text-sm font-semibold text-slate-900">Approval Status Mix</h3>
-                                <p className="mt-1 text-xs text-slate-600">Current decision state.</p>
-                                <div className="mt-4">
-                                    <DonutChart data={statusMix} centerLabel="Queue" emptyText="No approval status metrics are available." />
+                <div id={exportSectionId} className="pdf-export-content hidden space-y-6 text-slate-900">
+                    {/* Page 1: Summary, Decision Mix & Office Queue */}
+                    <GovDocumentPage
+                        metadata={baseMetadata}
+                        pageNumber={1}
+                        totalPages={totalPdfPages}
+                        showLetterhead={true}
+                        showSignatories={totalPdfPages === 1}
+                        showAttestation={totalPdfPages === 1}
+                    >
+                        <div className="rounded-lg border border-slate-300 bg-slate-50/50 p-4">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-2 mb-3">
+                                Executive PPMP Approval Queue Status
+                            </h3>
+                            <div className="grid grid-cols-4 gap-3">
+                                <div className="rounded-md border border-amber-300 bg-amber-50/70 p-3 text-center">
+                                    <p className="text-[10px] font-bold uppercase text-amber-900">Pending Review</p>
+                                    <p className="mt-1 text-2xl font-extrabold text-amber-800">{summary.pending_ppmp_approvals}</p>
                                 </div>
-                            </section>
-                            <section className="rounded-xl border border-red-100 bg-white p-3">
-                                <h3 className="text-sm font-semibold text-slate-900">Office Queue Distribution</h3>
-                                <p className="mt-1 text-xs text-slate-600">Workflow records by office.</p>
-                                <div className="mt-4">
-                                    <HorizontalBarChart
-                                        data={office_breakdown.map((row) => ({ label: row.office_name, value: row.total }))}
-                                        emptyText="No office-level queue data is available."
-                                    />
+                                <div className="rounded-md border border-blue-300 bg-blue-50/70 p-3 text-center">
+                                    <p className="text-[10px] font-bold uppercase text-blue-900">Returned Revision</p>
+                                    <p className="mt-1 text-2xl font-extrabold text-blue-800">{summary.returned_for_revision}</p>
                                 </div>
-                            </section>
-                        </div>
-                    </section>
-
-                    {recordsExportPages.map((rows, pageIndex) => (
-                        <section key={`executive-approvals-export-${pageIndex + 1}`} className="pdf-page overflow-hidden rounded-xl border border-red-100 bg-white">
-                            <ExportPageHeader
-                                title="Executive Approval Records"
-                                subtitle={pageIndex === 0 ? 'All approval records in the current filter scope.' : `Continuation page ${pageIndex + 2}.`}
-                            />
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full table-fixed divide-y divide-slate-200 text-[11px]">
-                                    <thead className="bg-slate-50">
-                                        <tr>
-                                            <th className="w-[12%] px-2 py-2 text-left">PPMP</th>
-                                            <th className="w-[20%] px-2 py-2 text-left">Office</th>
-                                            <th className="w-[16%] px-2 py-2 text-left">Preparer</th>
-                                            <th className="w-[8%] px-2 py-2 text-left">Year</th>
-                                            <th className="w-[14%] px-2 py-2 text-left">Status</th>
-                                            <th className="w-[12%] px-2 py-2 text-left">Prepared</th>
-                                            <th className="w-[10%] px-2 py-2 text-left">Items</th>
-                                            <th className="w-[18%] px-2 py-2 text-left">Budget</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {rows.map((row) => (
-                                            <tr key={`approval-${row.ppmp_id}`}>
-                                                <td className="px-2 py-1.5 align-top leading-snug">PPMP-{row.ppmp_id}</td>
-                                                <td className="px-2 py-1.5 align-top leading-snug">{row.office?.name ?? 'Unassigned Office'}</td>
-                                                <td className="px-2 py-1.5 align-top leading-snug">{row.preparer?.name ?? 'Unknown'}</td>
-                                                <td className="px-2 py-1.5 align-top leading-snug">{row.fiscal_year}</td>
-                                                <td className="px-2 py-1.5 align-top leading-snug">{displayPpmpStatus(row.status)}</td>
-                                                <td className="px-2 py-1.5 align-top leading-snug">{row.date_prepared ?? '-'}</td>
-                                                <td className="px-2 py-1.5 align-top leading-snug">{row.items_count}</td>
-                                                <td className="px-2 py-1.5 align-top leading-snug">{formatCurrency(row.total_estimated_budget)}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                <div className="rounded-md border border-emerald-300 bg-emerald-50/70 p-3 text-center">
+                                    <p className="text-[10px] font-bold uppercase text-emerald-900">Approved</p>
+                                    <p className="mt-1 text-2xl font-extrabold text-emerald-800">{summary.recently_approved}</p>
+                                </div>
+                                <div className="rounded-md border border-rose-300 bg-rose-50/70 p-3 text-center">
+                                    <p className="text-[10px] font-bold uppercase text-rose-900">Rejected</p>
+                                    <p className="mt-1 text-2xl font-extrabold text-rose-800">{summary.rejected}</p>
+                                </div>
                             </div>
-                        </section>
-                    ))}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <section className="rounded-lg border border-slate-300 bg-white p-3.5">
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2.5">
+                                    Approval Decision State Mix
+                                </h3>
+                                <DonutChart data={statusMix} centerLabel="Queue" emptyText="No approval status metrics are available." />
+                            </section>
+
+                            <section className="rounded-lg border border-slate-300 bg-white p-3.5">
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2.5">
+                                    Office Queue Concentration
+                                </h3>
+                                <HorizontalBarChart
+                                    data={office_breakdown.map((row) => ({ label: row.office_name, value: row.total }))}
+                                    emptyText="No office-level queue data is available."
+                                />
+                            </section>
+                        </div>
+                    </GovDocumentPage>
+
+                    {/* Continuation Pages: Detailed PPMP Records */}
+                    {recordsExportPages.map((rows, pageIndex) => {
+                        const pageNumber = 2 + pageIndex;
+                        const isLast = pageNumber === totalPdfPages;
+
+                        return (
+                            <GovDocumentPage
+                                key={`executive-approvals-export-${pageIndex + 1}`}
+                                metadata={{
+                                    ...baseMetadata,
+                                    title: 'PROJECT PROCUREMENT MANAGEMENT PLAN (PPMP) RECORD SCHEDULE',
+                                    moduleScope: 'Itemized PPMP Records & Budget Allocations',
+                                }}
+                                pageNumber={pageNumber}
+                                totalPages={totalPdfPages}
+                                showLetterhead={true}
+                                showSignatories={isLast}
+                                showAttestation={isLast}
+                            >
+                                <div className="overflow-x-auto rounded-md border border-slate-300">
+                                    <table className="min-w-full table-fixed divide-y divide-slate-300 text-[11px]">
+                                        <thead className="bg-slate-100 text-slate-800 font-bold uppercase">
+                                            <tr>
+                                                <th className="w-[12%] px-2.5 py-2 text-left border-r border-slate-300">PPMP No.</th>
+                                                <th className="w-[20%] px-2.5 py-2 text-left border-r border-slate-300">Office / Department</th>
+                                                <th className="w-[16%] px-2.5 py-2 text-left border-r border-slate-300">Preparer</th>
+                                                <th className="w-[8%] px-2 py-2 text-center border-r border-slate-300">Year</th>
+                                                <th className="w-[14%] px-2.5 py-2 text-center border-r border-slate-300">Status</th>
+                                                <th className="w-[12%] px-2.5 py-2 text-left border-r border-slate-300">Prepared</th>
+                                                <th className="w-[6%] px-2 py-2 text-center border-r border-slate-300">Items</th>
+                                                <th className="w-[12%] px-2.5 py-2 text-right">Budget</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-200 bg-white">
+                                            {rows.map((row) => (
+                                                <tr key={`approval-${row.ppmp_id}`}>
+                                                    <td className="px-2.5 py-2 align-top font-bold text-slate-900 border-r border-slate-200">PPMP-{row.ppmp_id}</td>
+                                                    <td className="px-2.5 py-2 align-top text-slate-700 border-r border-slate-200">{row.office?.name ?? 'Unassigned'}</td>
+                                                    <td className="px-2.5 py-2 align-top text-slate-700 border-r border-slate-200">{row.preparer?.name ?? 'Unknown'}</td>
+                                                    <td className="px-2 py-2 align-top text-center border-r border-slate-200">{row.fiscal_year}</td>
+                                                    <td className="px-2.5 py-2 align-top text-center border-r border-slate-200">
+                                                        <span className={statusBadgeClass(row.status)}>{displayPpmpStatus(row.status)}</span>
+                                                    </td>
+                                                    <td className="px-2.5 py-2 align-top text-slate-600 border-r border-slate-200">{row.date_prepared ?? '-'}</td>
+                                                    <td className="px-2 py-2 align-top text-center border-r border-slate-200">{row.items_count}</td>
+                                                    <td className="px-2.5 py-2 align-top text-right font-semibold text-slate-900">{formatCurrency(row.total_estimated_budget)}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </GovDocumentPage>
+                        );
+                    })}
                 </div>
             </div>
 

@@ -1,8 +1,10 @@
 import { ExecutiveChartCard, HorizontalBarChart } from '@/Components/Executive/Charts';
+import { GovDocumentPage, GovDocumentMetadata } from '@/Components/Executive/GovDocumentLayout';
 import MonthFilterSelect from '@/Components/MonthFilterSelect';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { downloadSectionAsPdfById } from '@/lib/printSection';
-import { Head, Link, router } from '@inertiajs/react';
+import { PageProps } from '@/types';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
 
 type DisclosureRow = {
@@ -173,16 +175,34 @@ export default function TransparencyMonitoringIndex({
         window.URL.revokeObjectURL(url);
     };
 
+    const { auth } = usePage<PageProps>().props;
+    const totalPdfPages = 1 + (disclosureExportPages.length > 0 ? disclosureExportPages.length : 1);
+
+    const baseMetadata: GovDocumentMetadata = {
+        title: 'PUBLIC TRANSPARENCY & STATUTORY DISCLOSURE REPORT',
+        formCode: 'FDP Form - Public Disclosure Monitoring',
+        trackingCode: `EBM-TRANSP-${form.year || new Date().getFullYear()}`,
+        fiscalYear: form.year || new Date().getFullYear(),
+        period: form.year ? `Fiscal Year ${form.year}${form.month ? ` - Month ${form.month}` : ''}` : `Fiscal Year ${new Date().getFullYear()}`,
+        moduleScope: 'Full Disclosure Policy (FDP) Compliance & Portal Disclosures',
+        preparedByName: auth?.user?.name || 'Executive Officer',
+        preparedByRole: auth?.user?.role_code || 'Executive Officer',
+        preparedAt: new Date().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }),
+        approverName: 'HON. JOVILYN D. MAGALONA',
+        approverRole: 'Municipal Mayor / Local Chief Executive',
+    };
+
     const exportPdf = async () => {
         await downloadSectionAsPdfById(exportSectionId, {
-            title: 'Transparency & Disclosures',
-            fileName: 'transparency-and-disclosures.pdf',
-            marginMm: 5,
-            paperWidthPx: 760,
+            title: 'Transparency and Disclosures Report',
+            fileName: 'transparency-disclosures-report.pdf',
+            marginMm: 6,
+            paperWidthPx: 820,
             orientation: 'portrait',
             excludeSelectors: ['.print-hide', 'nav', 'aside', '[role="navigation"]'],
             revealSelectors: ['.pdf-export-content'],
             pageBreakSelectors: ['.pdf-page'],
+            includeDefaultHeading: false,
         });
     };
 
@@ -450,75 +470,116 @@ export default function TransparencyMonitoringIndex({
                     </section>
                 )}
 
-                <div id={exportSectionId} className="pdf-export-content hidden space-y-4 text-slate-900">
-                    <section className="pdf-page rounded-xl border border-red-100 bg-white p-4">
-                        <h2 className="text-xl font-semibold text-slate-900">Transparency & Disclosures Summary</h2>
-                        <p className="mt-1 text-xs text-slate-600">Summary charts first, then all filtered disclosure records.</p>
-
-                        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                            <Card label="Published" value={totals.published_count} />
-                            <Card label="Drafts" value={totals.draft_count} />
-                            <Card label="Pending / Review" value={pendingOrOtherCount} />
-                        </div>
-
-                        <div className="mt-3 grid grid-cols-2 gap-3 [&_.truncate]:whitespace-normal [&_.truncate]:overflow-visible [&_.truncate]:text-clip [&_[class*='space-y-3.5']]:space-y-4">
-                            <section className="rounded-xl border border-red-100 bg-white p-3">
-                                <h3 className="text-sm font-semibold text-slate-900">Publication Snapshot</h3>
-                                <p className="mt-1 text-xs text-slate-600">Disclosure state totals.</p>
-                                <div className="mt-4">
-                                    <HorizontalBarChart data={publicationStateSnapshot} emptyText="No data in current filter scope" />
+                <div id={exportSectionId} className="pdf-export-content hidden space-y-6 text-slate-900">
+                    {/* Page 1: Transparency Summary & Status Mix */}
+                    <GovDocumentPage
+                        metadata={baseMetadata}
+                        pageNumber={1}
+                        totalPages={totalPdfPages}
+                        showLetterhead={true}
+                        showSignatories={totalPdfPages === 1}
+                        showAttestation={totalPdfPages === 1}
+                    >
+                        <div className="rounded-lg border border-slate-300 bg-slate-50/50 p-4">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-2 mb-3">
+                                Statutory Transparency Disclosure Summary
+                            </h3>
+                            <div className="grid grid-cols-3 gap-3">
+                                <div className="rounded-md border border-emerald-300 bg-emerald-50/70 p-3 text-center">
+                                    <p className="text-[10px] font-bold uppercase text-emerald-900">Published Disclosures</p>
+                                    <p className="mt-1 text-2xl font-extrabold text-emerald-800">{totals.published_count}</p>
                                 </div>
-                            </section>
-
-                            <section className="rounded-xl border border-red-100 bg-white p-3">
-                                <h3 className="text-sm font-semibold text-slate-900">Type Distribution</h3>
-                                <p className="mt-1 text-xs text-slate-600">Most common disclosure types.</p>
-                                <div className="mt-4">
-                                    <HorizontalBarChart data={typeMix} emptyText="No data in current filter scope" />
+                                <div className="rounded-md border border-slate-300 bg-white p-3 text-center">
+                                    <p className="text-[10px] font-bold uppercase text-slate-600">Draft Disclosures</p>
+                                    <p className="mt-1 text-2xl font-extrabold text-slate-900">{totals.draft_count}</p>
                                 </div>
-                            </section>
-                        </div>
-                    </section>
-
-                    {disclosureExportPages.map((pageRows, pageIndex) => (
-                        <section key={`transparency-export-page-${pageIndex + 1}`} className="pdf-page overflow-hidden rounded-xl border border-red-100 bg-white">
-                            <div className="border-b border-slate-200 px-3 py-2.5">
-                                <h3 className="text-lg font-semibold text-slate-800">All Filtered Disclosure Records</h3>
-                                <p className="mt-1 text-xs text-slate-600">
-                                    {pageIndex === 0 ? 'Includes all disclosure records in the current filter scope.' : `Continuation page ${pageIndex + 2}.`}
-                                </p>
+                                <div className="rounded-md border border-amber-300 bg-amber-50/70 p-3 text-center">
+                                    <p className="text-[10px] font-bold uppercase text-amber-900">Pending Review</p>
+                                    <p className="mt-1 text-2xl font-extrabold text-amber-800">{pendingOrOtherCount}</p>
+                                </div>
                             </div>
+                        </div>
 
-                            {pageRows.length === 0 ? (
-                                <p className="px-6 py-8 text-sm text-slate-500">No data in current filter scope</p>
-                            ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="min-w-full table-fixed divide-y divide-slate-200 text-[11px]">
-                                        <thead className="bg-slate-50">
-                                            <tr>
-                                                <th className="w-[30%] px-2 py-2 text-left">Title</th>
-                                                <th className="w-[16%] px-2 py-2 text-left">Type</th>
-                                                <th className="w-[14%] px-2 py-2 text-left">Status</th>
-                                                <th className="w-[18%] px-2 py-2 text-left">Published</th>
-                                                <th className="w-[22%] px-2 py-2 text-left">Publisher</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100">
-                                            {pageRows.map((row) => (
-                                                <tr key={`${pageIndex}-${row.disclosure_id}`}>
-                                                    <td className="px-2 py-1.5 align-top leading-snug">{row.title}</td>
-                                                    <td className="px-2 py-1.5 align-top leading-snug">{formatLabel(row.type)}</td>
-                                                    <td className="px-2 py-1.5 align-top leading-snug">{formatLabel(row.status)}</td>
-                                                    <td className="px-2 py-1.5 align-top leading-snug">{formatDate(row.published_at)}</td>
-                                                    <td className="px-2 py-1.5 align-top leading-snug">{row.publisher?.name ?? 'N/A'}</td>
+                        <div className="grid grid-cols-2 gap-4">
+                            <section className="rounded-lg border border-slate-300 bg-white p-3.5">
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2.5">
+                                    Publication State Distribution
+                                </h3>
+                                <HorizontalBarChart data={publicationStateSnapshot} emptyText="No data in current filter scope" />
+                            </section>
+
+                            <section className="rounded-lg border border-slate-300 bg-white p-3.5">
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2.5">
+                                    Statutory Disclosure Types
+                                </h3>
+                                <HorizontalBarChart data={typeMix} emptyText="No data in current filter scope" />
+                            </section>
+                        </div>
+                    </GovDocumentPage>
+
+                    {/* Continuation Pages: Disclosure Record Tables */}
+                    {disclosureExportPages.length === 0 ? (
+                        <GovDocumentPage
+                            metadata={{
+                                ...baseMetadata,
+                                title: 'PUBLIC DISCLOSURE PUBLICATION SCHEDULE',
+                                moduleScope: 'Itemized Public Transparency Disclosures',
+                            }}
+                            pageNumber={2}
+                            totalPages={2}
+                            showLetterhead={true}
+                            showSignatories={true}
+                            showAttestation={true}
+                        >
+                            <p className="py-8 text-center text-sm text-slate-500">No disclosure records recorded for the selected filter scope.</p>
+                        </GovDocumentPage>
+                    ) : (
+                        disclosureExportPages.map((pageRows, pageIndex) => {
+                            const pageNumber = 2 + pageIndex;
+                            const isLast = pageNumber === totalPdfPages;
+
+                            return (
+                                <GovDocumentPage
+                                    key={`transparency-export-page-${pageIndex + 1}`}
+                                    metadata={{
+                                        ...baseMetadata,
+                                        title: 'PUBLIC DISCLOSURE PUBLICATION SCHEDULE',
+                                        moduleScope: 'Itemized Public Transparency Disclosures',
+                                    }}
+                                    pageNumber={pageNumber}
+                                    totalPages={totalPdfPages}
+                                    showLetterhead={true}
+                                    showSignatories={isLast}
+                                    showAttestation={isLast}
+                                >
+                                    <div className="overflow-x-auto rounded-md border border-slate-300">
+                                        <table className="min-w-full table-fixed divide-y divide-slate-300 text-[11px]">
+                                            <thead className="bg-slate-100 text-slate-800 font-bold uppercase">
+                                                <tr>
+                                                    <th className="w-[34%] px-3 py-2 text-left border-r border-slate-300">Disclosure Title</th>
+                                                    <th className="w-[18%] px-3 py-2 text-left border-r border-slate-300">Category / Type</th>
+                                                    <th className="w-[14%] px-3 py-2 text-center border-r border-slate-300">Status</th>
+                                                    <th className="w-[16%] px-3 py-2 text-left border-r border-slate-300">Published Date</th>
+                                                    <th className="w-[18%] px-3 py-2 text-left">Publishing Office</th>
                                                 </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </section>
-                    ))}
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-200 bg-white">
+                                                {pageRows.map((row) => (
+                                                    <tr key={`${pageIndex}-${row.disclosure_id}`}>
+                                                        <td className="px-3 py-2 align-top font-bold text-slate-900 border-r border-slate-200">{row.title}</td>
+                                                        <td className="px-3 py-2 align-top text-slate-700 border-r border-slate-200">{formatLabel(row.type)}</td>
+                                                        <td className="px-3 py-2 align-top text-center border-r border-slate-200">{StatusBadge(row.status)}</td>
+                                                        <td className="px-3 py-2 align-top text-slate-600 border-r border-slate-200">{formatDate(row.published_at)}</td>
+                                                        <td className="px-3 py-2 align-top text-slate-700">{row.publisher?.name ?? 'Executive Office'}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </GovDocumentPage>
+                            );
+                        })
+                    )}
                 </div>
             </div>
         </AuthenticatedLayout>

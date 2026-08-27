@@ -1,8 +1,10 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { HorizontalBarChart } from '@/Components/Executive/Charts';
+import { GovDocumentPage, GovDocumentMetadata } from '@/Components/Executive/GovDocumentLayout';
 import PaginationNav from '@/Components/PaginationNav';
 import { downloadSectionAsPdfById } from '@/lib/printSection';
-import { Head, router } from '@inertiajs/react';
+import { PageProps } from '@/types';
+import { Head, router, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
 
 type Props = {
@@ -164,16 +166,34 @@ export default function BusinessAudit({ auditLogs, auditLogsExport, filters, ana
         window.URL.revokeObjectURL(url);
     };
 
+    const { auth } = usePage<PageProps>().props;
+    const totalPdfPages = 1 + (auditLogsExportPages.length > 0 ? auditLogsExportPages.length : 1);
+
+    const baseMetadata: GovDocumentMetadata = {
+        title: 'OFFICIAL GOVERNANCE & BUSINESS AUDIT TRAIL REPORT',
+        formCode: 'FDP Form - Executive Governance & Audit Trail',
+        trackingCode: `EBM-AUDIT-${new Date().getFullYear()}`,
+        fiscalYear: new Date().getFullYear(),
+        period: form.from_date || form.to_date ? `${form.from_date || 'Start'} to ${form.to_date || 'Present'}` : `Calendar Year ${new Date().getFullYear()}`,
+        moduleScope: 'Executive Business Event Logging & Governance Trail',
+        preparedByName: auth?.user?.name || 'Executive Officer',
+        preparedByRole: auth?.user?.role_code || 'Executive Officer',
+        preparedAt: new Date().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }),
+        approverName: 'HON. JOVILYN D. MAGALONA',
+        approverRole: 'Municipal Mayor / Local Chief Executive',
+    };
+
     const exportPdf = async () => {
         await downloadSectionAsPdfById(exportSectionId, {
-            title: 'Governance Logs',
-            fileName: 'governance-logs.pdf',
-            marginMm: 5,
-            paperWidthPx: 760,
+            title: 'Governance Logs Report',
+            fileName: 'governance-logs-report.pdf',
+            marginMm: 6,
+            paperWidthPx: 820,
             orientation: 'portrait',
             excludeSelectors: ['.print-hide', 'nav', 'aside', '[role="navigation"]'],
             revealSelectors: ['.pdf-export-content'],
             pageBreakSelectors: ['.pdf-page'],
+            includeDefaultHeading: false,
         });
     };
 
@@ -336,76 +356,114 @@ export default function BusinessAudit({ auditLogs, auditLogsExport, filters, ana
                     </div>
                 </section>
 
-                <div id={exportSectionId} className="pdf-export-content hidden space-y-4 text-slate-900">
-                    <section className="pdf-page rounded-xl border border-red-100 bg-white p-4">
-                        <h2 className="text-xl font-semibold text-slate-900">Governance Logs Summary</h2>
-                        <p className="mt-1 text-xs text-slate-600">Summary charts followed by all filtered governance activity records.</p>
-                        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                            <KpiCard label="Events in Scope" value={totalEvents} />
-                            <KpiCard label="Modules Involved" value={activeModules} />
-                            <KpiCard label="Action Types" value={activeActions} />
-                        </div>
-
-                        <div className="mt-3 grid grid-cols-2 gap-3 [&_.truncate]:whitespace-normal [&_.truncate]:overflow-visible [&_.truncate]:text-clip [&_[class*='space-y-3.5']]:space-y-4">
-                            <section className="rounded-xl border border-red-100 bg-white p-3">
-                                <h3 className="text-sm font-semibold text-slate-900">Module Summary</h3>
-                                <p className="mt-1 text-xs text-slate-600">Most active governance modules in current filters.</p>
-                                <div className="mt-4">
-                                    <HorizontalBarChart data={moduleSummary} emptyText="No data in current filter scope" />
+                <div id={exportSectionId} className="pdf-export-content hidden space-y-6 text-slate-900">
+                    {/* Page 1: Governance Overview & Module/Action Breakdown */}
+                    <GovDocumentPage
+                        metadata={baseMetadata}
+                        pageNumber={1}
+                        totalPages={totalPdfPages}
+                        showLetterhead={true}
+                        showSignatories={totalPdfPages === 1}
+                        showAttestation={totalPdfPages === 1}
+                    >
+                        <div className="rounded-lg border border-slate-300 bg-slate-50/50 p-4">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-2 mb-3">
+                                Executive Governance Event Summary
+                            </h3>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="rounded-md border border-slate-300 bg-white p-3 text-center">
+                                    <p className="text-[10px] font-bold uppercase text-slate-600">Total Filtered Events</p>
+                                    <p className="mt-1 text-2xl font-extrabold text-slate-900">{totalEvents}</p>
                                 </div>
-                            </section>
-
-                            <section className="rounded-xl border border-red-100 bg-white p-3">
-                                <h3 className="text-sm font-semibold text-slate-900">Action Summary</h3>
-                                <p className="mt-1 text-xs text-slate-600">Most common governance actions in current filters.</p>
-                                <div className="mt-4">
-                                    <HorizontalBarChart data={actionSummary} emptyText="No data in current filter scope" />
+                                <div className="rounded-md border border-slate-300 bg-white p-3 text-center">
+                                    <p className="text-[10px] font-bold uppercase text-slate-600">Distinct Modules Active</p>
+                                    <p className="mt-1 text-2xl font-extrabold text-slate-900">{activeModules}</p>
                                 </div>
-                            </section>
-                        </div>
-                    </section>
-
-                    {auditLogsExportPages.map((pageRows, pageIndex) => (
-                        <section key={`governance-export-page-${pageIndex + 1}`} className="pdf-page overflow-hidden rounded-xl border border-red-100 bg-white">
-                            <div className="border-b border-slate-200 px-3 py-2.5">
-                                <h3 className="text-lg font-semibold text-slate-800">All Filtered Governance Activity Records</h3>
-                                <p className="mt-1 text-xs text-slate-600">
-                                    {pageIndex === 0 ? 'Includes all governance records in the current filter scope.' : `Continuation page ${pageIndex + 2}.`}
-                                </p>
                             </div>
+                        </div>
 
-                            {pageRows.length === 0 ? (
-                                <p className="px-6 py-8 text-sm text-slate-500">No data in current filter scope</p>
-                            ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="min-w-full table-fixed divide-y divide-slate-200 text-[11px]">
-                                        <thead className="bg-slate-50">
-                                            <tr>
-                                                <th className="w-[18%] px-2 py-2 text-left">Timestamp</th>
-                                                <th className="w-[16%] px-2 py-2 text-left">User</th>
-                                                <th className="w-[20%] px-2 py-2 text-left">Module</th>
-                                                <th className="w-[14%] px-2 py-2 text-left">Action</th>
-                                                <th className="w-[15%] px-2 py-2 text-left">Reference</th>
-                                                <th className="w-[17%] px-2 py-2 text-left">Office</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100">
-                                            {pageRows.map((log) => (
-                                                <tr key={`${pageIndex}-${log.id}`}>
-                                                    <td className="px-2 py-1.5 align-top leading-snug">{new Date(log.created_at).toLocaleString()}</td>
-                                                    <td className="px-2 py-1.5 align-top leading-snug">{log.user?.name ?? 'System'}</td>
-                                                    <td className="px-2 py-1.5 align-top leading-snug">{formatModuleLabel(log.module_name)}</td>
-                                                    <td className="px-2 py-1.5 align-top leading-snug">{formatActionLabel(log.action_type)}</td>
-                                                    <td className="px-2 py-1.5 align-top leading-snug">{formatReferenceLabel(log.reference_type)} #{log.reference_id}</td>
-                                                    <td className="px-2 py-1.5 align-top leading-snug">{log.office?.name ?? 'N/A'}</td>
+                        <div className="grid grid-cols-2 gap-4">
+                            <section className="rounded-lg border border-slate-300 bg-white p-3.5">
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2.5">
+                                    Activity by Functional Module
+                                </h3>
+                                <HorizontalBarChart data={moduleSummary} emptyText="No data in current filter scope" />
+                            </section>
+
+                            <section className="rounded-lg border border-slate-300 bg-white p-3.5">
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2.5">
+                                    Activity by Governance Action
+                                </h3>
+                                <HorizontalBarChart data={actionSummary} emptyText="No data in current filter scope" />
+                            </section>
+                        </div>
+                    </GovDocumentPage>
+
+                    {/* Continuation Pages: Itemized Audit Trail Tables */}
+                    {auditLogsExportPages.length === 0 ? (
+                        <GovDocumentPage
+                            metadata={{
+                                ...baseMetadata,
+                                title: 'ITEMIZED GOVERNANCE EVENT LOG',
+                                moduleScope: 'Itemized Business Event Audit Trail',
+                            }}
+                            pageNumber={2}
+                            totalPages={2}
+                            showLetterhead={true}
+                            showSignatories={true}
+                            showAttestation={true}
+                        >
+                            <p className="py-8 text-center text-sm text-slate-500">No governance logs recorded for the selected filter scope.</p>
+                        </GovDocumentPage>
+                    ) : (
+                        auditLogsExportPages.map((pageRows, pageIndex) => {
+                            const pageNumber = 2 + pageIndex;
+                            const isLast = pageNumber === totalPdfPages;
+
+                            return (
+                                <GovDocumentPage
+                                    key={`governance-export-page-${pageIndex + 1}`}
+                                    metadata={{
+                                        ...baseMetadata,
+                                        title: 'ITEMIZED GOVERNANCE EVENT LOG',
+                                        moduleScope: 'Itemized Business Event Audit Trail',
+                                    }}
+                                    pageNumber={pageNumber}
+                                    totalPages={totalPdfPages}
+                                    showLetterhead={true}
+                                    showSignatories={isLast}
+                                    showAttestation={isLast}
+                                >
+                                    <div className="overflow-x-auto rounded-md border border-slate-300">
+                                        <table className="min-w-full table-fixed divide-y divide-slate-300 text-[11px]">
+                                            <thead className="bg-slate-100 text-slate-800 font-bold uppercase">
+                                                <tr>
+                                                    <th className="w-[18%] px-3 py-2 text-left border-r border-slate-300">Timestamp</th>
+                                                    <th className="w-[16%] px-3 py-2 text-left border-r border-slate-300">User / Actor</th>
+                                                    <th className="w-[22%] px-3 py-2 text-left border-r border-slate-300">Module</th>
+                                                    <th className="w-[16%] px-3 py-2 text-left border-r border-slate-300">Action</th>
+                                                    <th className="w-[14%] px-3 py-2 text-left border-r border-slate-300">Reference</th>
+                                                    <th className="w-[14%] px-3 py-2 text-left">Office</th>
                                                 </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </section>
-                    ))}
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-200 bg-white">
+                                                {pageRows.map((log) => (
+                                                    <tr key={`${pageIndex}-${log.id}`}>
+                                                        <td className="px-3 py-2 align-top text-slate-600 border-r border-slate-200">{new Date(log.created_at).toLocaleString()}</td>
+                                                        <td className="px-3 py-2 align-top font-bold text-slate-900 border-r border-slate-200">{log.user?.name ?? 'System'}</td>
+                                                        <td className="px-3 py-2 align-top text-slate-700 border-r border-slate-200">{formatModuleLabel(log.module_name)}</td>
+                                                        <td className="px-3 py-2 align-top text-slate-700 border-r border-slate-200">{formatActionLabel(log.action_type)}</td>
+                                                        <td className="px-3 py-2 align-top text-slate-700 border-r border-slate-200">{formatReferenceLabel(log.reference_type)} #{log.reference_id}</td>
+                                                        <td className="px-3 py-2 align-top text-slate-700">{log.office?.name ?? 'N/A'}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </GovDocumentPage>
+                            );
+                        })
+                    )}
                 </div>
             </div>
         </AuthenticatedLayout>
