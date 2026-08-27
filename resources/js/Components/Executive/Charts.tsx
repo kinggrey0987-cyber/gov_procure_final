@@ -141,18 +141,41 @@ export function HorizontalBarChart({
     const max = Math.max(...data.map((item) => item.value), 1);
 
     return (
-        <div className="space-y-3.5">
-            {data.map((item) => {
-                const width = `${Math.max((item.value / max) * 100, item.value > 0 ? 7 : 0)}%`;
+        <div style={{ display: 'block', width: '100%', paddingTop: '4px', paddingBottom: '4px' }}>
+            {data.map((item, index) => {
+                const width = `${Math.max((item.value / max) * 100, item.value > 0 ? 6 : 0)}%`;
 
                 return (
-                    <div key={item.label} className="space-y-1">
-                        <div className="flex items-center justify-between text-sm">
-                            <span className="truncate pr-3 font-medium text-slate-700" title={item.label}>{item.label}</span>
-                            <span className="font-semibold text-slate-900">{valueFormatter ? valueFormatter(item.value) : item.value}</span>
-                        </div>
-                        <div className="h-2.5 rounded-full bg-slate-200/70">
-                            <div className="h-2.5 rounded-full bg-gradient-to-r from-red-700 to-red-500" style={{ width }} />
+                    <div
+                        key={item.label}
+                        style={{
+                            display: 'block',
+                            width: '100%',
+                            marginBottom: index < data.length - 1 ? '12px' : '4px',
+                        }}
+                    >
+                        <table style={{ width: '100%', borderCollapse: 'collapse', border: 'none', marginBottom: '5px' }}>
+                            <tbody>
+                                <tr>
+                                    <td style={{ padding: 0, border: 'none', textAlign: 'left', fontSize: '11px', fontWeight: 600, color: '#1e293b', whiteSpace: 'normal', lineHeight: '14px' }}>
+                                        {item.label}
+                                    </td>
+                                    <td style={{ padding: 0, border: 'none', textAlign: 'right', fontSize: '11px', fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap', width: '45px', lineHeight: '14px' }}>
+                                        {valueFormatter ? valueFormatter(item.value) : item.value}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div style={{ display: 'block', height: '8px', width: '100%', backgroundColor: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+                            <div
+                                style={{
+                                    display: 'block',
+                                    height: '8px',
+                                    width,
+                                    backgroundColor: '#dc2626',
+                                    borderRadius: '4px',
+                                }}
+                            />
                         </div>
                     </div>
                 );

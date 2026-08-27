@@ -132,10 +132,11 @@ export default function BusinessAudit({ auditLogs, auditLogsExport, filters, ana
     const activeActions = actionSummary.length;
     const auditLogsExportPages = useMemo(() => {
         const pageSize = 14;
+        const targetLogs = auditLogsExport.slice(0, 28);
         const pages: typeof auditLogsExport[] = [];
 
-        for (let index = 0; index < auditLogsExport.length; index += pageSize) {
-            pages.push(auditLogsExport.slice(index, index + pageSize));
+        for (let index = 0; index < targetLogs.length; index += pageSize) {
+            pages.push(targetLogs.slice(index, index + pageSize));
         }
 
         return pages;
@@ -176,11 +177,9 @@ export default function BusinessAudit({ auditLogs, auditLogsExport, filters, ana
         fiscalYear: new Date().getFullYear(),
         period: form.from_date || form.to_date ? `${form.from_date || 'Start'} to ${form.to_date || 'Present'}` : `Calendar Year ${new Date().getFullYear()}`,
         moduleScope: 'Executive Business Event Logging & Governance Trail',
-        preparedByName: auth?.user?.name || 'Executive Officer',
-        preparedByRole: auth?.user?.role_code || 'Executive Officer',
+        preparedByName: auth?.user?.name || 'Mayor Jeron',
+        preparedByRole: auth?.user?.role_code || 'Municipal Mayor / Local Chief Executive',
         preparedAt: new Date().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }),
-        approverName: 'HON. JOVILYN D. MAGALONA',
-        approverRole: 'Municipal Mayor / Local Chief Executive',
     };
 
     const [isExportingPdf, setIsExportingPdf] = useState(false);

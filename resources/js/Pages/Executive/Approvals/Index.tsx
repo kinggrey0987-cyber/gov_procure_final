@@ -192,8 +192,8 @@ export default function ExecutiveApprovalsIndex({ records, recordsExport, summar
     };
 
     const { auth } = usePage<PageProps>().props;
-    const recordsExportPages = useMemo(() => chunkRows(recordsExport, 10), [recordsExport]);
-    const totalPdfPages = 1 + recordsExportPages.length;
+    const recordsExportPages = useMemo(() => chunkRows(recordsExport.slice(0, 36), 12), [recordsExport]);
+    const totalPdfPages = 1 + (recordsExportPages.length > 0 ? recordsExportPages.length : 1);
 
     const baseMetadata: GovDocumentMetadata = {
         title: 'PROJECT PROCUREMENT MANAGEMENT PLAN (PPMP) EXECUTIVE APPROVAL REPORT',
@@ -202,11 +202,9 @@ export default function ExecutiveApprovalsIndex({ records, recordsExport, summar
         fiscalYear: form.year || new Date().getFullYear(),
         period: form.year ? `Fiscal Year ${form.year}` : `Fiscal Year ${new Date().getFullYear()}`,
         moduleScope: 'Executive PPMP Signoff & Annual Procurement Plan Queue',
-        preparedByName: auth?.user?.name || 'Executive Officer',
-        preparedByRole: auth?.user?.role_code || 'Executive Officer',
+        preparedByName: auth?.user?.name || 'Mayor Jeron',
+        preparedByRole: auth?.user?.role_code || 'Municipal Mayor / Local Chief Executive',
         preparedAt: new Date().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }),
-        approverName: 'HON. JOVILYN D. MAGALONA',
-        approverRole: 'Municipal Mayor / Local Chief Executive',
     };
 
     const [isExportingPdf, setIsExportingPdf] = useState(false);
@@ -502,29 +500,29 @@ export default function ExecutiveApprovalsIndex({ records, recordsExport, summar
                                     <table className="min-w-full table-fixed divide-y divide-slate-300 text-[11px]">
                                         <thead className="bg-slate-100 text-slate-800 font-bold uppercase">
                                             <tr>
-                                                <th className="w-[12%] px-2.5 py-2 text-left border-r border-slate-300">PPMP No.</th>
-                                                <th className="w-[20%] px-2.5 py-2 text-left border-r border-slate-300">Office / Department</th>
-                                                <th className="w-[16%] px-2.5 py-2 text-left border-r border-slate-300">Preparer</th>
-                                                <th className="w-[8%] px-2 py-2 text-center border-r border-slate-300">Year</th>
-                                                <th className="w-[14%] px-2.5 py-2 text-center border-r border-slate-300">Status</th>
-                                                <th className="w-[12%] px-2.5 py-2 text-left border-r border-slate-300">Prepared</th>
-                                                <th className="w-[6%] px-2 py-2 text-center border-r border-slate-300">Items</th>
-                                                <th className="w-[12%] px-2.5 py-2 text-right">Budget</th>
+                                                <th className="w-[12%] px-2.5 py-2.5 text-left border-r border-slate-300 whitespace-nowrap">PPMP No.</th>
+                                                <th className="w-[23%] px-2.5 py-2.5 text-left border-r border-slate-300">Office / Department</th>
+                                                <th className="w-[14%] px-2.5 py-2.5 text-left border-r border-slate-300">Preparer</th>
+                                                <th className="w-[7%] px-2 py-2.5 text-center border-r border-slate-300 whitespace-nowrap">Year</th>
+                                                <th className="w-[14%] px-2.5 py-2.5 text-center border-r border-slate-300 whitespace-nowrap">Status</th>
+                                                <th className="w-[11%] px-2.5 py-2.5 text-left border-r border-slate-300 whitespace-nowrap">Prepared</th>
+                                                <th className="w-[7%] px-2 py-2.5 text-center border-r border-slate-300 whitespace-nowrap">Items</th>
+                                                <th className="w-[12%] px-2.5 py-2.5 text-right whitespace-nowrap">Budget (PHP)</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-200 bg-white">
                                             {rows.map((row) => (
                                                 <tr key={`approval-${row.ppmp_id}`}>
-                                                    <td className="px-2.5 py-2 align-top font-bold text-slate-900 border-r border-slate-200">PPMP-{row.ppmp_id}</td>
-                                                    <td className="px-2.5 py-2 align-top text-slate-700 border-r border-slate-200">{row.office?.name ?? 'Unassigned'}</td>
-                                                    <td className="px-2.5 py-2 align-top text-slate-700 border-r border-slate-200">{row.preparer?.name ?? 'Unknown'}</td>
-                                                    <td className="px-2 py-2 align-top text-center border-r border-slate-200">{row.fiscal_year}</td>
-                                                    <td className="px-2.5 py-2 align-top text-center border-r border-slate-200">
+                                                    <td className="px-2.5 py-2.5 align-middle font-bold text-slate-900 border-r border-slate-200 whitespace-nowrap">PPMP-{row.ppmp_id}</td>
+                                                    <td className="px-2.5 py-2.5 align-middle text-slate-700 border-r border-slate-200 leading-snug">{row.office?.name ?? 'Unassigned'}</td>
+                                                    <td className="px-2.5 py-2.5 align-middle text-slate-700 border-r border-slate-200">{row.preparer?.name ?? 'Unknown'}</td>
+                                                    <td className="px-2 py-2.5 align-middle text-center border-r border-slate-200">{row.fiscal_year}</td>
+                                                    <td className="px-2.5 py-2.5 align-middle text-center border-r border-slate-200">
                                                         <span className={statusBadgeClass(row.status)}>{displayPpmpStatus(row.status)}</span>
                                                     </td>
-                                                    <td className="px-2.5 py-2 align-top text-slate-600 border-r border-slate-200">{row.date_prepared ?? '-'}</td>
-                                                    <td className="px-2 py-2 align-top text-center border-r border-slate-200">{row.items_count}</td>
-                                                    <td className="px-2.5 py-2 align-top text-right font-semibold text-slate-900">{formatCurrency(row.total_estimated_budget)}</td>
+                                                    <td className="px-2.5 py-2.5 align-middle text-slate-600 border-r border-slate-200 whitespace-nowrap">{row.date_prepared ?? '-'}</td>
+                                                    <td className="px-2 py-2.5 align-middle text-center border-r border-slate-200 font-semibold">{row.items_count}</td>
+                                                    <td className="px-2.5 py-2.5 align-middle text-right font-bold text-slate-900 whitespace-nowrap">{formatCurrency(row.total_estimated_budget)}</td>
                                                 </tr>
                                             ))}
                                         </tbody>

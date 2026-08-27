@@ -90,10 +90,11 @@ export default function TransparencyMonitoringIndex({
     const recentActivityRows = recent_disclosures.slice((recentActivityPage - 1) * recentActivityPerPage, recentActivityPage * recentActivityPerPage);
     const disclosureExportPages = useMemo(() => {
         const pageSize = 14;
+        const targetDisclosures = disclosures_export.slice(0, 28);
         const pages: typeof disclosures_export[] = [];
 
-        for (let index = 0; index < disclosures_export.length; index += pageSize) {
-            pages.push(disclosures_export.slice(index, index + pageSize));
+        for (let index = 0; index < targetDisclosures.length; index += pageSize) {
+            pages.push(targetDisclosures.slice(index, index + pageSize));
         }
 
         return pages;
@@ -185,11 +186,9 @@ export default function TransparencyMonitoringIndex({
         fiscalYear: form.year || new Date().getFullYear(),
         period: form.year ? `Fiscal Year ${form.year}${form.month ? ` - Month ${form.month}` : ''}` : `Fiscal Year ${new Date().getFullYear()}`,
         moduleScope: 'Full Disclosure Policy (FDP) Compliance & Portal Disclosures',
-        preparedByName: auth?.user?.name || 'Executive Officer',
-        preparedByRole: auth?.user?.role_code || 'Executive Officer',
+        preparedByName: auth?.user?.name || 'Mayor Jeron',
+        preparedByRole: auth?.user?.role_code || 'Municipal Mayor / Local Chief Executive',
         preparedAt: new Date().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }),
-        approverName: 'HON. JOVILYN D. MAGALONA',
-        approverRole: 'Municipal Mayor / Local Chief Executive',
     };
 
     const [isExportingPdf, setIsExportingPdf] = useState(false);

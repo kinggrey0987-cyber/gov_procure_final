@@ -204,8 +204,8 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
     const { auth } = usePage<PageProps>().props;
     const exportSectionId = 'risk-alerts-export-section';
 
-    const anomalyExportPages = useMemo(() => chunkRows(recent.anomalies, 10), [recent.anomalies]);
-    const alertExportPages = useMemo(() => chunkRows(recent.alerts, 10), [recent.alerts]);
+    const anomalyExportPages = useMemo(() => chunkRows(recent.anomalies.slice(0, 24), 12), [recent.anomalies]);
+    const alertExportPages = useMemo(() => chunkRows(recent.alerts.slice(0, 24), 12), [recent.alerts]);
     const totalPdfPages = 1 + (anomalyExportPages.length > 0 ? anomalyExportPages.length : 1) + (alertExportPages.length > 0 ? alertExportPages.length : 1);
 
     const baseMetadata: GovDocumentMetadata = {
@@ -215,11 +215,9 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
         fiscalYear: form.year || new Date().getFullYear(),
         period: form.year ? `Fiscal Year ${form.year}${form.month ? ` - Month ${form.month}` : ''}` : `Fiscal Year ${new Date().getFullYear()}`,
         moduleScope: 'Automated Anomaly Detection & High-Severity Alerts Monitoring',
-        preparedByName: auth?.user?.name || 'Executive Officer',
-        preparedByRole: auth?.user?.role_code || 'Executive Officer',
+        preparedByName: auth?.user?.name || 'Mayor Jeron',
+        preparedByRole: auth?.user?.role_code || 'Municipal Mayor / Local Chief Executive',
         preparedAt: new Date().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }),
-        approverName: 'HON. JOVILYN D. MAGALONA',
-        approverRole: 'Municipal Mayor / Local Chief Executive',
     };
 
     const [isExportingPdf, setIsExportingPdf] = useState(false);

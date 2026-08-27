@@ -1,5 +1,4 @@
-import React, { ReactNode } from 'react';
-import RepublicSeal from './RepublicSeal';
+import { ReactNode } from 'react';
 
 export type GovDocumentMetadata = {
     title: string;
@@ -38,19 +37,24 @@ export function GovLetterhead({
                 </div>
 
                 {/* Center Heading */}
-                <div className="flex-1 text-center">
-                    <p className="text-[11px] font-medium uppercase tracking-wider text-slate-700">Republic of the Philippines</p>
-                    <p className="text-[11px] font-medium uppercase tracking-wider text-slate-700">Province of Negros Occidental</p>
-                    <h2 className="text-base font-extrabold uppercase tracking-wide text-slate-950 sm:text-lg">
+                <div className="flex-1 text-center px-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-700 leading-tight">Republic of the Philippines</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-700 leading-tight">Province of Negros Occidental</p>
+                    <h2 className="text-base font-extrabold uppercase tracking-wide text-slate-950 sm:text-lg leading-tight mt-0.5">
                         Municipality of Enrique B. Magalona
                     </h2>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-red-800">{officeName}</p>
-                    <p className="mt-0.5 text-[10px] text-slate-500">{subtitle}</p>
+                    <p className="text-xs font-bold uppercase tracking-wider text-red-800 leading-tight mt-0.5">{officeName}</p>
+                    <p className="mt-1 text-[10px] text-slate-500 leading-tight">{subtitle}</p>
                 </div>
 
-                {/* Right Seal: Republic of the Philippines Seal */}
+                {/* Right Seal: Municipality of E.B. Magalona Seal */}
                 <div className="flex flex-shrink-0 items-center justify-center">
-                    <RepublicSeal className="h-16 w-16 shadow-sm" />
+                    <img
+                        src="/logo.jpg"
+                        alt="Municipality of Enrique B. Magalona Seal"
+                        className="h-16 w-16 rounded-full border border-slate-300 bg-white object-contain shadow-sm"
+                        crossOrigin="anonymous"
+                    />
                 </div>
             </div>
 
@@ -77,7 +81,10 @@ export function GovDocumentHeader({ metadata, isContinuation = false, pageNumber
     });
 
     const formatRole = (role?: string) => {
-        if (!role) return 'Executive Staff';
+        if (!role) return 'Municipal Mayor';
+        if (role.toLowerCase().includes('exec') || role.toLowerCase().includes('mayor')) {
+            return 'Municipal Mayor';
+        }
         return role.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
     };
 
@@ -137,9 +144,9 @@ export function GovDocumentHeader({ metadata, isContinuation = false, pageNumber
                     <div className="px-3 py-1.5">
                         <span className="font-semibold text-slate-600">PREPARED BY:</span>{' '}
                         <span className="font-bold text-slate-900">
-                            {metadata.preparedByName || 'System Executive'}
+                            {metadata.preparedByName || 'Mayor Jeron'}
                         </span>
-                        <span className="text-slate-600"> ({formatRole(metadata.preparedByRole)})</span>
+                        <span className="text-slate-600 font-medium"> ({formatRole(metadata.preparedByRole)})</span>
                     </div>
                 </div>
 
@@ -170,12 +177,9 @@ export type GovSignatoriesProps = {
 };
 
 export function GovSignatories({
-    preparedByName = 'System Executive',
-    preparedByRole = 'Executive Staff',
+    preparedByName = 'Mayor Jeron',
+    preparedByRole = 'Municipal Mayor / Local Chief Executive',
     preparedAt,
-    approverName = 'HON. JOVILYN D. MAGALONA',
-    approverRole = 'Municipal Mayor',
-    approverOffice = 'Office of the Municipal Mayor',
 }: GovSignatoriesProps) {
     const formattedDate = preparedAt || new Date().toLocaleDateString('en-PH', {
         year: 'numeric',
@@ -184,44 +188,29 @@ export function GovSignatories({
     });
 
     const formatRole = (role?: string) => {
-        if (!role) return 'Executive Staff';
+        if (!role) return 'Municipal Mayor / Local Chief Executive';
+        if (role.toLowerCase().includes('exec') || role.toLowerCase().includes('mayor')) {
+            return 'Municipal Mayor / Local Chief Executive';
+        }
         return role.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
     };
 
     return (
-        <div className="mt-6 pt-4 border-t border-slate-300">
-            <div className="grid grid-cols-2 gap-8 sm:gap-16">
-                {/* Prepared By (Logged-in user who generated the report) */}
-                <div className="flex flex-col items-center text-center">
-                    <p className="self-start text-xs font-semibold uppercase tracking-wider text-slate-700 mb-8">
-                        Prepared By:
+        <div className="mt-6 pt-4 border-t border-slate-300 flex justify-end">
+            <div className="flex flex-col items-center text-center min-w-[280px] max-w-[340px]">
+                <p className="self-start text-xs font-bold uppercase tracking-wider text-slate-800 mb-8">
+                    Prepared & Certified By:
+                </p>
+                <div className="w-full border-b-2 border-slate-900 pb-1">
+                    <p className="text-sm font-extrabold uppercase tracking-wide text-slate-950">
+                        {preparedByName}
                     </p>
-                    <div className="w-full max-w-[260px] border-b-2 border-slate-800 pb-1">
-                        <p className="text-sm font-extrabold uppercase tracking-wide text-slate-950">
-                            {preparedByName}
-                        </p>
-                    </div>
-                    <p className="mt-1 text-xs font-medium text-slate-700">
-                        {formatRole(preparedByRole)}
-                    </p>
-                    <p className="text-[10px] text-slate-500">Date: {formattedDate}</p>
                 </div>
-
-                {/* Approved / Noted By (Local Chief Executive) */}
-                <div className="flex flex-col items-center text-center">
-                    <p className="self-start text-xs font-semibold uppercase tracking-wider text-slate-700 mb-8">
-                        Approved / Noted By:
-                    </p>
-                    <div className="w-full max-w-[260px] border-b-2 border-slate-800 pb-1">
-                        <p className="text-sm font-extrabold uppercase tracking-wide text-slate-950">
-                            {approverName}
-                        </p>
-                    </div>
-                    <p className="mt-1 text-xs font-semibold text-slate-900">
-                        {approverRole}
-                    </p>
-                    <p className="text-[10px] text-slate-600">{approverOffice}</p>
-                </div>
+                <p className="mt-1 text-xs font-bold text-slate-900">
+                    {formatRole(preparedByRole)}
+                </p>
+                <p className="text-[11px] font-medium text-slate-600">Office of the Municipal Mayor</p>
+                <p className="mt-0.5 text-[10px] text-slate-500">Date: {formattedDate}</p>
             </div>
         </div>
     );
@@ -280,7 +269,7 @@ export function GovDocumentPage({
     const isContinuation = pageNumber > 1;
 
     return (
-        <section className={`pdf-page overflow-hidden rounded-xl border border-slate-300 bg-white p-6 shadow-sm sm:p-8 space-y-4 text-slate-900 ${className}`}>
+        <section className={`pdf-page overflow-hidden rounded-xl border border-slate-300 bg-white p-6 shadow-sm space-y-3 text-slate-900 ${className}`}>
             {/* Letterhead */}
             {showLetterhead && <GovLetterhead />}
 

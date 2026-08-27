@@ -98,8 +98,8 @@ export async function downloadSectionAsPdfById(sectionId: string, options: Expor
 
     const title = options.title ?? document.title ?? 'report';
     const fileName = options.fileName ?? `${slugify(title)}.pdf`;
-    const scale = options.scale ?? 2;
-    const marginMm = options.marginMm ?? 6;
+    const scale = options.scale ?? 1.5;
+    const marginMm = options.marginMm ?? 8;
     const paperWidthPx = options.paperWidthPx ?? 820;
     const forcedOrientation = options.orientation;
     const excludeSelectors = options.excludeSelectors ?? ['.print-hide'];
@@ -125,7 +125,12 @@ export async function downloadSectionAsPdfById(sectionId: string, options: Expor
 
         const validPageNodes = pageNodes.length > 0 ? pageNodes : [captureRoot];
 
-        const firstCanvas = await renderPdfCanvas(html2canvas, validPageNodes[0], scale, paperWidthPx);
+        // Render canvases in parallel for maximum speed
+        const canvases = await Promise.all(
+            validPageNodes.map((node) => renderPdfCanvas(html2canvas, node, scale, paperWidthPx))
+        );
+
+        const firstCanvas = canvases[0];
         const orientation = forcedOrientation ?? (firstCanvas.width > firstCanvas.height ? 'landscape' : 'portrait');
         const pdf = new jsPDF({
             orientation,
@@ -138,31 +143,33 @@ export async function downloadSectionAsPdfById(sectionId: string, options: Expor
         const pageHeight = pdf.internal.pageSize.getHeight();
         const usablePageHeight = pageHeight - marginMm * 2;
         const contentWidth = pageWidth - marginMm * 2;
-        let isFirstPage = true;
 
-        for (const node of validPageNodes) {
-            const canvas = node === validPageNodes[0]
-                ? firstCanvas
-                : await renderPdfCanvas(html2canvas, node, scale, paperWidthPx);
-            const contentHeight = (canvas.height * contentWidth) / canvas.width;
-            const image = canvas.toDataURL('image/png');
-
-            if (!isFirstPage) {
+        canvases.forEach((canvas, index) => {
+            if (index > 0) {
                 pdf.addPage();
             }
 
-            pdf.addImage(image, 'PNG', marginMm, marginMm, contentWidth, contentHeight, undefined, 'FAST');
+            const image = canvas.toDataURL('image/jpeg', 0.95);
+            const rawContentHeight = (canvas.height * contentWidth) / canvas.width;
 
-            let renderedHeight = usablePageHeight;
-            while (renderedHeight < contentHeight) {
-                pdf.addPage();
-                const offsetY = marginMm - renderedHeight;
-                pdf.addImage(image, 'PNG', marginMm, offsetY, contentWidth, contentHeight, undefined, 'FAST');
-                renderedHeight += usablePageHeight;
+            // If using structured pages or within 12% tolerance, fit onto exactly one single page
+            if (pageBreakSelectors.length > 0 || rawContentHeight <= usablePageHeight * 1.12) {
+                const finalHeight = Math.min(rawContentHeight, usablePageHeight);
+                const finalWidth = (canvas.width * finalHeight) / canvas.height;
+                const offsetX = marginMm + Math.max(0, (contentWidth - finalWidth) / 2);
+                pdf.addImage(image, 'JPEG', offsetX, marginMm, finalWidth, finalHeight, undefined, 'FAST');
+            } else {
+                // Continuous document multi-page slicing
+                pdf.addImage(image, 'JPEG', marginMm, marginMm, contentWidth, rawContentHeight, undefined, 'FAST');
+                let renderedHeight = usablePageHeight;
+                while (renderedHeight + 10 < rawContentHeight) {
+                    pdf.addPage();
+                    const offsetY = marginMm - renderedHeight;
+                    pdf.addImage(image, 'JPEG', marginMm, offsetY, contentWidth, rawContentHeight, undefined, 'FAST');
+                    renderedHeight += usablePageHeight;
+                }
             }
-
-            isFirstPage = false;
-        }
+        });
 
         pdf.save(fileName);
     } catch (error) {

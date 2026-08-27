@@ -260,10 +260,10 @@ export default function ExecutiveDashboardIndex({
 
     const anomalyPreviewRows = useMemo(() => filteredAnomalyGroups.slice(0, 5), [filteredAnomalyGroups]);
     const alertPreviewRows = useMemo(() => filteredAlerts.slice(0, 5), [filteredAlerts]);
-    const anomalyExportPages = useMemo(() => chunkRows(recent_anomalies_export, 10), [recent_anomalies_export]);
-    const alertExportPages = useMemo(() => chunkRows(recent_alerts_export, 10), [recent_alerts_export]);
-    const disclosureExportPages = useMemo(() => chunkRows(recent_disclosures_export, 10), [recent_disclosures_export]);
-    const businessLogExportPages = useMemo(() => chunkRows(recent_business_logs_export, 10), [recent_business_logs_export]);
+    const anomalyExportPages = useMemo(() => chunkRows(recent_anomalies_export.slice(0, 24), 12), [recent_anomalies_export]);
+    const alertExportPages = useMemo(() => chunkRows(recent_alerts_export.slice(0, 24), 12), [recent_alerts_export]);
+    const disclosureExportPages = useMemo(() => chunkRows(recent_disclosures_export.slice(0, 12), 12), [recent_disclosures_export]);
+    const businessLogExportPages = useMemo(() => chunkRows(recent_business_logs_export.slice(0, 12), 12), [recent_business_logs_export]);
 
     const totalPdfPages = 1 + anomalyExportPages.length + alertExportPages.length + disclosureExportPages.length + businessLogExportPages.length;
 
@@ -277,8 +277,6 @@ export default function ExecutiveDashboardIndex({
         preparedByName,
         preparedByRole,
         preparedAt,
-        approverName: 'HON. JOVILYN D. MAGALONA',
-        approverRole: 'Municipal Mayor / Local Chief Executive',
     };
 
     const exportCsv = () => {

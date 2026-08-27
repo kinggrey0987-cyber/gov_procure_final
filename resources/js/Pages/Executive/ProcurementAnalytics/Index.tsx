@@ -224,8 +224,8 @@ export default function ProcurementAnalyticsIndex({
     const { auth } = usePage<PageProps>().props;
     const exportSectionId = 'procurement-insights-export-section';
     const procurementRecords = recent.procurement_records ?? recent.purchase_orders;
-    const exportProcurementRecords = recent.procurement_records_export ?? procurementRecords.data;
-    const procurementExportPages = useMemo(() => chunkRows(exportProcurementRecords, 12), [exportProcurementRecords]);
+    const exportProcurementRecords: ProcurementRecordRow[] = recent.procurement_records_export ?? (procurementRecords.data as unknown as ProcurementRecordRow[]);
+    const procurementExportPages = useMemo(() => chunkRows(exportProcurementRecords.slice(0, 36), 12), [exportProcurementRecords]);
     const totalPdfPages = 1 + (procurementExportPages.length > 0 ? procurementExportPages.length : 1);
 
     const baseMetadata: GovDocumentMetadata = {
@@ -235,11 +235,9 @@ export default function ProcurementAnalyticsIndex({
         fiscalYear: form.year || new Date().getFullYear(),
         period: form.year ? `Fiscal Year ${form.year}${form.month ? ` - Month ${form.month}` : ''}` : `Fiscal Year ${new Date().getFullYear()}`,
         moduleScope: 'Purchase Request vs Purchase Order Analytics & Office Spend',
-        preparedByName: auth?.user?.name || 'Executive Officer',
-        preparedByRole: auth?.user?.role_code || 'Executive Officer',
+        preparedByName: auth?.user?.name || 'Mayor Jeron',
+        preparedByRole: auth?.user?.role_code || 'Municipal Mayor / Local Chief Executive',
         preparedAt: new Date().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }),
-        approverName: 'HON. JOVILYN D. MAGALONA',
-        approverRole: 'Municipal Mayor / Local Chief Executive',
     };
 
     const [isExportingPdf, setIsExportingPdf] = useState(false);
