@@ -542,10 +542,25 @@ class PublicDisclosurePackageService
     }
 
     /**
+     * @param  array<string, mixed>  $sources
      * @return array<string, mixed>
      */
     private function sourceRow(Model $record, string $role, int $sortOrder): array
     {
+        if ($record instanceof PurchaseOrder) {
+            $record->loadMissing(['items.item', 'supplier']);
+        } elseif ($record instanceof PurchaseRequest) {
+            $record->loadMissing(['items.item', 'office']);
+        } elseif ($record instanceof Ppmp) {
+            $record->loadMissing(['items.item', 'office']);
+        } elseif ($record instanceof SupplyRequest) {
+            $record->loadMissing(['items.item', 'office']);
+        } elseif ($record instanceof Delivery) {
+            $record->loadMissing(['items.purchaseOrderItem.item']);
+        } elseif ($record instanceof DistributionRecord) {
+            $record->loadMissing(['items.item', 'office']);
+        }
+
         return [
             'source_type' => $record::class,
             'source_id' => (int) $record->getKey(),
@@ -600,7 +615,7 @@ class PublicDisclosurePackageService
                 'item_count' => $record->items->count(),
                 'items' => $record->items->map(fn ($item): array => [
                     'item' => $this->itemName($item),
-                    'quantity' => $this->decimal($item->quantity_ordered),
+                    'quantity' => $this->formatQuantityWithUnit($item, $item->quantity_ordered),
                     'cost' => $this->money($item->total_price),
                 ])->values()->all(),
             ];
@@ -614,7 +629,7 @@ class PublicDisclosurePackageService
                 'item_count' => $record->items->count(),
                 'items' => $record->items->map(fn ($item): array => [
                     'item' => $this->itemName($item),
-                    'quantity' => $this->decimal($item->quantity_requested),
+                    'quantity' => $this->formatQuantityWithUnit($item, $item->quantity_requested),
                 ])->values()->all(),
             ];
         }
@@ -629,7 +644,7 @@ class PublicDisclosurePackageService
                 'item_count' => $record->items->count(),
                 'items' => $record->items->map(fn ($item): array => [
                     'item' => $this->itemName($item),
-                    'quantity' => $this->decimal($item->quantity),
+                    'quantity' => $this->formatQuantityWithUnit($item, $item->quantity),
                     'cost' => $this->money($item->estimated_budget),
                 ])->values()->all(),
             ];
@@ -644,7 +659,7 @@ class PublicDisclosurePackageService
                 'item_count' => $record->items->count(),
                 'items' => $record->items->map(fn ($item): array => [
                     'item' => $this->itemName($item),
-                    'quantity' => $this->decimal($item->quantity_requested),
+                    'quantity' => $this->formatQuantityWithUnit($item, $item->quantity_requested),
                 ])->values()->all(),
             ];
         }
@@ -657,7 +672,7 @@ class PublicDisclosurePackageService
                 'item_count' => $record->items->count(),
                 'items' => $record->items->map(fn ($item): array => [
                     'item' => $this->itemName($item->purchaseOrderItem ?? $item),
-                    'quantity' => $this->decimal($item->expected_quantity),
+                    'quantity' => $this->formatQuantityWithUnit($item->purchaseOrderItem ?? $item, $item->expected_quantity),
                 ])->values()->all(),
             ];
         }
@@ -671,12 +686,48 @@ class PublicDisclosurePackageService
                 'item_count' => $record->items->count(),
                 'items' => $record->items->map(fn ($item): array => [
                     'item' => $this->itemName($item),
-                    'quantity' => $this->decimal($item->quantity_released),
+                    'quantity' => $this->formatQuantityWithUnit($item, $item->quantity_released),
                 ])->values()->all(),
             ];
         }
 
         return [];
+    }
+
+    private function itemUnit(Model $item): string
+    {
+        $directUnit = $item->getAttribute('unit');
+        if (is_string($directUnit) && trim($directUnit) !== '') {
+            return trim($directUnit);
+        }
+
+        $relatedItem = $item->getRelationValue('item');
+        if ($relatedItem instanceof Model) {
+            $defaultUnit = $relatedItem->getAttribute('default_unit');
+            if (is_string($defaultUnit) && trim($defaultUnit) !== '') {
+                return trim($defaultUnit);
+            }
+        }
+
+        $poItem = $item->getRelationValue('purchaseOrderItem');
+        if ($poItem instanceof Model) {
+            return $this->itemUnit($poItem);
+        }
+
+        return '';
+    }
+
+    private function formatQuantityWithUnit(Model $item, mixed $quantity): string
+    {
+        $qtyNum = (float) ($quantity ?? 0);
+        $qtyStr = (floor($qtyNum) == $qtyNum) ? number_format($qtyNum, 0) : number_format($qtyNum, 2);
+        $unit = $this->itemUnit($item);
+
+        if ($unit !== '') {
+            return sprintf('%s %s', $qtyStr, $unit);
+        }
+
+        return $qtyStr;
     }
 
     /**

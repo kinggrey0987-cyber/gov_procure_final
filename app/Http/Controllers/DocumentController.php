@@ -80,7 +80,7 @@ class DocumentController extends Controller
         return back()->with('success', 'Attachment deleted successfully.');
     }
 
-    public function downloadPublicDisclosureDocument(PublicDisclosure $public_disclosure, Document $document): StreamedResponse
+    public function downloadPublicDisclosureDocument(PublicDisclosure $public_disclosure, Document $document): \Symfony\Component\HttpFoundation\Response
     {
         abort_unless($this->belongsToPublicDisclosure($document, $public_disclosure), 404);
 
@@ -88,59 +88,45 @@ class DocumentController extends Controller
             && (bool) $public_disclosure->published_at;
         abort_unless($isPublished, 404);
 
-        $path = $this->resolveExistingPublicDiskPath((string) $document->file_path, [
-            sprintf(
-                'documents/public_disclosures/%d/%s',
-                (int) $public_disclosure->disclosure_id,
-                (string) $document->file_name,
-            ),
-            sprintf(
-                'public_disclosures/%s',
-                (string) $document->file_name,
-            ),
+        // 1. Try to stream existing file across disks
+        $streamResponse = $this->tryStreamDocumentFile((string) $document->file_path, (string) $document->file_name, [
+            sprintf('documents/public_disclosures/%d/%s', (int) $public_disclosure->disclosure_id, (string) $document->file_name),
+            sprintf('public_disclosures/%s', (string) $document->file_name),
         ]);
-        if ($path === null) {
-            $path = sprintf(
-                'documents/public_disclosures/%d/rebuilt-%d.txt',
-                (int) $public_disclosure->disclosure_id,
-                (int) $document->document_id,
-            );
 
-            Storage::disk($this->publicDisk())->put(
-                $path,
-                implode(PHP_EOL, [
-                    'GovSupply Connect Public Disclosure Attachment (Rebuilt)',
-                    sprintf('Disclosure ID: %d', (int) $public_disclosure->disclosure_id),
-                    sprintf('Document ID: %d', (int) $document->document_id),
-                    sprintf('Title: %s', (string) $document->title),
-                    sprintf('Original File Name: %s', (string) $document->file_name),
-                    'Generated because original attachment file was unavailable in storage.',
-                ]).PHP_EOL,
-            );
-
-            $document->forceFill([
-                'file_path' => $path,
-                'file_name' => basename($path),
-            ])->save();
-
-            $this->auditLogService->log(
-                actor: request()->user(),
-                moduleName: 'Public.DisclosureAttachmentDownload',
-                actionType: 'REBUILD_MISSING_PUBLIC_ATTACHMENT_FILE',
-                referenceType: Document::class,
-                referenceId: (int) $document->document_id,
-                details: [
-                    'disclosure_id' => (int) $public_disclosure->disclosure_id,
-                    'document_id' => (int) $document->document_id,
-                    'rebuilt_file_path' => $path,
-                    'request_context' => request()->user() ? 'authenticated' : 'public',
-                    'rebuilt_at' => now()->toIso8601String(),
-                ],
-                logDomain: 'BUSINESS',
-            );
+        if ($streamResponse instanceof \Symfony\Component\HttpFoundation\Response) {
+            return $streamResponse;
         }
 
-        return $this->streamDiskDownload($path, (string) $document->file_name);
+        // 2. If it's the official package, dynamically re-generate the PDF!
+        if ($document->document_kind === 'OFFICIAL_DISCLOSURE_PACKAGE') {
+            try {
+                $packageService = app(\App\Services\Executive\PublicDisclosurePackageService::class);
+                $pdfContent = $packageService->buildSnapshotPdf($public_disclosure);
+
+                return response($pdfContent, 200, [
+                    'Content-Type' => 'application/pdf',
+                    'Content-Disposition' => sprintf('attachment; filename="%s"', (string) ($document->file_name ?: 'official-disclosure-package.pdf')),
+                ]);
+            } catch (\Throwable) {
+                // Fall through to fallback text
+            }
+        }
+
+        // 3. Fallback: text reconstruction
+        $fallbackText = implode(PHP_EOL, [
+            'GovSupply Connect Public Disclosure Attachment',
+            sprintf('Disclosure ID: %d', (int) $public_disclosure->disclosure_id),
+            sprintf('Document ID: %d', (int) $document->document_id),
+            sprintf('Title: %s', (string) $document->title),
+            sprintf('Original File Name: %s', (string) $document->file_name),
+            'Generated from system database metadata.',
+        ]).PHP_EOL;
+
+        return response($fallbackText, 200, [
+            'Content-Type' => 'text/plain',
+            'Content-Disposition' => sprintf('attachment; filename="%s"', (string) ($document->file_name ?: 'document.txt')),
+        ]);
     }
 
     private function normalizePublicDiskPath(string $path): string
@@ -151,7 +137,7 @@ class DocumentController extends Controller
     /**
      * @param  array<int, string>  $extraCandidates
      */
-    private function resolveExistingPublicDiskPath(string $rawPath, array $extraCandidates = []): ?string
+    private function tryStreamDocumentFile(string $rawPath, string $downloadName, array $extraCandidates = []): ?\Symfony\Component\HttpFoundation\Response
     {
         $normalized = $this->normalizePublicDiskPath($rawPath);
         $candidates = [];
@@ -175,31 +161,45 @@ class DocumentController extends Controller
             }
         }
 
-        foreach (array_values(array_unique($candidates)) as $candidate) {
-            if ($candidate !== '' && Storage::disk($this->publicDisk())->exists($candidate)) {
-                return $candidate;
+        $candidates = array_values(array_unique(array_filter($candidates)));
+        $disks = array_unique([$this->publicDisk(), 'public', 'local']);
+
+        foreach ($disks as $diskName) {
+            try {
+                $disk = Storage::disk($diskName);
+                foreach ($candidates as $candidate) {
+                    if ($disk->exists($candidate)) {
+                        $stream = $disk->readStream($candidate);
+                        if (is_resource($stream)) {
+                            $mime = str_ends_with(strtolower($downloadName), '.pdf') ? 'application/pdf' : 'application/octet-stream';
+                            return response()->streamDownload(
+                                static function () use ($stream): void {
+                                    fpassthru($stream);
+                                    if (is_resource($stream)) {
+                                        fclose($stream);
+                                    }
+                                },
+                                $downloadName,
+                                ['Content-Type' => $mime]
+                            );
+                        }
+                    }
+                }
+            } catch (\Throwable) {
+                // Ignore cloud disk failure and try next available storage disk
+                continue;
+            }
+        }
+
+        // Direct local filesystem check
+        foreach ($candidates as $candidate) {
+            $localPath = storage_path('app/public/' . $candidate);
+            if (file_exists($localPath) && is_readable($localPath)) {
+                return response()->download($localPath, $downloadName);
             }
         }
 
         return null;
-    }
-
-    private function streamDiskDownload(string $path, string $downloadName): StreamedResponse
-    {
-        $disk = Storage::disk($this->publicDisk());
-        $stream = $disk->readStream($path);
-
-        abort_unless(is_resource($stream), 404);
-
-        return response()->streamDownload(
-            static function () use ($stream): void {
-                fpassthru($stream);
-                if (is_resource($stream)) {
-                    fclose($stream);
-                }
-            },
-            $downloadName,
-        );
     }
 
     private function belongsToPublicDisclosure(Document $document, PublicDisclosure $publicDisclosure): bool

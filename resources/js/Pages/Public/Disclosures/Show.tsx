@@ -1,4 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
+import ProcurementTraceabilityMatrix from '@/Components/Executive/ProcurementTraceabilityMatrix';
 
 type Props = {
     disclosure: {
@@ -115,33 +116,11 @@ export default function PublicDisclosureShow({ disclosure, attachments, sources,
                     </section>
 
                     <section className="rounded-2xl border border-red-200 bg-white p-6 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-                        <h2 className="text-lg font-semibold text-slate-900">Procurement Traceability</h2>
-                        <p className="mt-1 text-sm text-slate-600">Source records included in this public disclosure package.</p>
-
-                        {sources.length === 0 ? (
-                            <div className="mt-4 rounded-xl border border-dashed border-red-200 bg-red-50/50 px-4 py-5 text-sm text-slate-600">
-                                No source traceability records are available for this package.
-                            </div>
-                        ) : (
-                            <ol className="mt-4 space-y-3">
-                                {sources.map((source, index) => (
-                                    <li key={source.id} className="rounded-xl border border-red-100 bg-red-50/40 px-4 py-3">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-red-700 text-xs font-bold text-white">{index + 1}</span>
-                                            <span className="rounded-full border border-red-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-red-700">{formatRoleLabel(source.source_role)}</span>
-                                            <p className="text-sm font-semibold text-slate-900">{source.source_label}</p>
-                                        </div>
-                                        {source.snapshot && Object.keys(source.snapshot).length > 0 ? (
-                                            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                                                {Object.entries(source.snapshot).map(([key, value]) => (
-                                                    <DetailCell key={`${source.id}-${key}`} label={formatTypeLabel(key)} value={formatSnapshotValue(key, value)} />
-                                                ))}
-                                            </div>
-                                        ) : null}
-                                    </li>
-                                ))}
-                            </ol>
-                        )}
+                        <ProcurementTraceabilityMatrix
+                            sources={sources}
+                            title="Procurement Traceability & Sourced Documents"
+                            description="Statutory source records, budget breakdowns, and itemized deliverables included in this public disclosure package."
+                        />
                     </section>
 
                     <section className="rounded-2xl border border-red-200 bg-white p-6 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">

@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import AttachmentsPanel from '@/Components/AttachmentsPanel';
+import ProcurementTraceabilityMatrix from '@/Components/Executive/ProcurementTraceabilityMatrix';
 import { Head, Link, useForm } from '@inertiajs/react';
 
 type ProcurementDocument = {
@@ -131,20 +132,11 @@ export default function DisclosureShow({ disclosure, attachments, availableProcu
                     </div>
 
                     <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                        <h3 className="text-lg font-semibold text-slate-900">Disclosure Package Sources</h3>
-                        <p className="mt-1 text-sm text-slate-600">Records that will be frozen into the official public disclosure package.</p>
-                        {sources.length === 0 ? (
-                            <p className="mt-4 rounded-xl border border-dashed border-slate-200 px-4 py-4 text-sm text-slate-600">No source traceability records found.</p>
-                        ) : (
-                            <div className="mt-4 grid gap-3 md:grid-cols-2">
-                                {sources.map((source) => (
-                                    <div key={source.id} className="rounded-xl border border-red-100 bg-red-50/50 px-4 py-3">
-                                        <p className="text-xs font-semibold uppercase tracking-wide text-red-700">{source.source_role.replaceAll('_', ' ')}</p>
-                                        <p className="mt-1 text-sm font-semibold text-slate-900">{source.source_label}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                        <ProcurementTraceabilityMatrix
+                            sources={sources}
+                            title="Disclosure Package Sources & Traceability"
+                            description="Source records, allocated funds, and line-item deliverables frozen into this official disclosure package."
+                        />
                     </section>
 
                     {disclosure.status === 'DRAFT' && (
