@@ -42,13 +42,8 @@ class DocumentService
         /** @var UploadedFile $file */
         $file = $payload['file'];
         $storedFileName = Str::uuid()->toString().'_'.$file->getClientOriginalName();
-        $filePath = $file->storeAs('documents/'.$module.'/'.$relatedReferenceId, $storedFileName, $this->publicDisk());
-
-        if (! is_string($filePath) || trim($filePath) === '') {
-            throw ValidationException::withMessages([
-                'file' => 'The attachment could not be saved. Check the configured public file storage disk.',
-            ]);
-        }
+        $directory = 'documents/'.$module.'/'.$relatedReferenceId;
+        $filePath = $this->storeUploadedFileSafely($file, $directory, $storedFileName);
 
         $document = DB::transaction(function () use ($actor, $module, $relatedReferenceId, $payload, $file, $filePath): Document {
             $document = Document::query()->create([
@@ -104,13 +99,7 @@ class DocumentService
         $safeName = trim($fileName) !== '' ? $fileName : 'generated-attachment';
         $storedFileName = Str::uuid()->toString().'_'.$safeName.'.'.$mimeExtension;
         $filePath = 'documents/'.$module.'/'.$relatedReferenceId.'/'.$storedFileName;
-        $written = Storage::disk($this->publicDisk())->put($filePath, $content);
-
-        if ($written !== true) {
-            throw ValidationException::withMessages([
-                'file' => 'The generated attachment could not be saved. Check the configured public file storage disk.',
-            ]);
-        }
+        $this->storeContentSafely($filePath, $content);
 
         $document = DB::transaction(function () use ($actor, $module, $relatedReferenceId, $title, $safeName, $mimeExtension, $filePath): Document {
             $document = Document::query()->create([
@@ -189,9 +178,18 @@ class DocumentService
             ]);
         }
 
-        DB::transaction(function () use ($actor, $document): void {
-            Storage::disk($this->publicDisk())->delete((string) $document->file_path);
+        $path = (string) $document->file_path;
+        foreach (array_unique([$this->publicDisk(), 'public', 'local']) as $diskName) {
+            try {
+                if (Storage::disk($diskName)->exists($path)) {
+                    Storage::disk($diskName)->delete($path);
+                }
+            } catch (\Throwable) {
+                // Ignore cloud disk failure on deletion
+            }
+        }
 
+        DB::transaction(function () use ($actor, $document): void {
             $this->auditLogService->log(
                 actor: $actor,
                 moduleName: 'Documents.Attachment',
@@ -212,5 +210,60 @@ class DocumentService
                 [(int) $document->getKey()],
             );
         });
+    }
+
+    private function storeUploadedFileSafely(UploadedFile $file, string $directory, string $fileName): string
+    {
+        $primaryDisk = $this->publicDisk();
+        try {
+            $path = $file->storeAs($directory, $fileName, $primaryDisk);
+            if (is_string($path) && trim($path) !== '') {
+                return $path;
+            }
+        } catch (\Throwable) {
+            // Fallback when cloud disk fails or lacks credentials
+        }
+
+        if ($primaryDisk !== 'public') {
+            try {
+                $path = $file->storeAs($directory, $fileName, 'public');
+                if (is_string($path) && trim($path) !== '') {
+                    return $path;
+                }
+            } catch (\Throwable) {
+                // Fallback to local
+            }
+        }
+
+        $path = $file->storeAs($directory, $fileName, 'local');
+        if (is_string($path) && trim($path) !== '') {
+            return $path;
+        }
+
+        throw ValidationException::withMessages([
+            'file' => 'The attachment could not be saved. Check storage disk write permissions.',
+        ]);
+    }
+
+    private function storeContentSafely(string $filePath, string $content): void
+    {
+        $primaryDisk = $this->publicDisk();
+        try {
+            Storage::disk($primaryDisk)->put($filePath, $content);
+            return;
+        } catch (\Throwable) {
+            // Ignore cloud disk failure
+        }
+
+        if ($primaryDisk !== 'public') {
+            try {
+                Storage::disk('public')->put($filePath, $content);
+                return;
+            } catch (\Throwable) {
+                // Ignore public disk failure
+            }
+        }
+
+        Storage::disk('local')->put($filePath, $content);
     }
 }

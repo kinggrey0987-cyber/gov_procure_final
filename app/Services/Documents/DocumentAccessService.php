@@ -134,6 +134,12 @@ class DocumentAccessService
             return $actor->can('public-disclosure.manage');
         }
 
+        if ($module === 'deliveries') {
+            return $actor->can('delivery.update', $parent)
+                || $actor->can('delivery-verification.create', $parent)
+                || $actor->isGsoOfficer();
+        }
+
         $definition = $this->moduleDefinition($module);
 
         return $actor->can($definition['manage_ability'], $parent);
