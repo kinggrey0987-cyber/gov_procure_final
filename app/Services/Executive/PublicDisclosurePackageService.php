@@ -362,11 +362,23 @@ class PublicDisclosurePackageService
     {
         $disclosure->loadMissing('sources');
 
+        $logoBase64 = '';
+        $logoPath = public_path('logo.jpg');
+        if (file_exists($logoPath)) {
+            $logoBase64 = 'data:image/jpeg;base64,'.base64_encode((string) file_get_contents($logoPath));
+        } elseif (file_exists(base_path('logo.jpg'))) {
+            $logoBase64 = 'data:image/jpeg;base64,'.base64_encode((string) file_get_contents(base_path('logo.jpg')));
+        }
+
         return Pdf::loadView('reports.public-disclosure-package', [
             'disclosure' => $disclosure,
             'typeLabel' => $this->label((string) $disclosure->type),
             'statusLabel' => $this->label((string) $disclosure->status),
             'generatedAt' => now(),
+            'logoBase64' => $logoBase64,
+            'trackingCode' => sprintf('EBM-FDP-DISC-%s', str_pad((string) $disclosure->disclosure_id, 4, '0', STR_PAD_LEFT)),
+            'mayorName' => 'Mayor Jeron',
+            'mayorRole' => 'Municipal Mayor / Local Chief Executive',
             'sources' => $disclosure->sources
                 ->sortBy('sort_order')
                 ->map(fn (PublicDisclosureSource $source): array => [
