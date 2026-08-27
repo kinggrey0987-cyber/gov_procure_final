@@ -761,7 +761,7 @@ export default function ExecutiveDashboardIndex({
                                                     <td className="px-3 py-2 align-top text-center border-r border-slate-200">{formatStatusLabel(row.severity)}</td>
                                                     <td className="px-3 py-2 align-top text-center border-r border-slate-200">{formatStatusLabel(row.status)}</td>
                                                     <td className="px-3 py-2 align-top text-slate-700 border-r border-slate-200">{row.office?.name ?? 'N/A'}</td>
-                                                    <td className="px-3 py-2 align-top text-slate-600">{row.detected_at ?? 'N/A'}</td>
+                                                    <td className="px-3 py-2 align-top text-slate-600 whitespace-nowrap">{formatDateTime(row.detected_at)}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -797,8 +797,8 @@ export default function ExecutiveDashboardIndex({
                                                 <th className="w-[30%] px-3 py-2 text-left border-r border-slate-300">Alert Type</th>
                                                 <th className="w-[14%] px-3 py-2 text-center border-r border-slate-300">Severity</th>
                                                 <th className="w-[14%] px-3 py-2 text-center border-r border-slate-300">Status</th>
-                                                <th className="w-[24%] px-3 py-2 text-left border-r border-slate-300">Office</th>
-                                                <th className="w-[18%] px-3 py-2 text-left">Detected At</th>
+                                                <th className="w-[22%] px-3 py-2 text-left border-r border-slate-300">Office</th>
+                                                <th className="w-[20%] px-3 py-2 text-left">Detected At</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-200 bg-white">
@@ -808,7 +808,7 @@ export default function ExecutiveDashboardIndex({
                                                     <td className="px-3 py-2 align-top text-center border-r border-slate-200">{formatStatusLabel(row.severity)}</td>
                                                     <td className="px-3 py-2 align-top text-center border-r border-slate-200">{formatStatusLabel(row.status)}</td>
                                                     <td className="px-3 py-2 align-top text-slate-700 border-r border-slate-200">{row.office?.name ?? 'N/A'}</td>
-                                                    <td className="px-3 py-2 align-top text-slate-600">{row.detected_at ?? 'N/A'}</td>
+                                                    <td className="px-3 py-2 align-top text-slate-600 whitespace-nowrap">{formatDateTime(row.detected_at)}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -841,11 +841,11 @@ export default function ExecutiveDashboardIndex({
                                     <table className="min-w-full table-fixed divide-y divide-slate-300 text-[11px]">
                                         <thead className="bg-slate-100 text-slate-800 font-bold uppercase">
                                             <tr>
-                                                <th className="w-[36%] px-3 py-2 text-left border-r border-slate-300">Title</th>
+                                                <th className="w-[34%] px-3 py-2 text-left border-r border-slate-300">Title</th>
                                                 <th className="w-[18%] px-3 py-2 text-left border-r border-slate-300">Type</th>
                                                 <th className="w-[14%] px-3 py-2 text-center border-r border-slate-300">Status</th>
-                                                <th className="w-[16%] px-3 py-2 text-left border-r border-slate-300">Published</th>
-                                                <th className="w-[16%] px-3 py-2 text-left">Created</th>
+                                                <th className="w-[17%] px-3 py-2 text-left border-r border-slate-300">Published</th>
+                                                <th className="w-[17%] px-3 py-2 text-left">Created</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-200 bg-white">
@@ -854,8 +854,8 @@ export default function ExecutiveDashboardIndex({
                                                     <td className="px-3 py-2 align-top font-semibold text-slate-900 border-r border-slate-200">{row.title}</td>
                                                     <td className="px-3 py-2 align-top text-slate-700 border-r border-slate-200">{row.type}</td>
                                                     <td className="px-3 py-2 align-top text-center border-r border-slate-200">{row.status}</td>
-                                                    <td className="px-3 py-2 align-top text-slate-600 border-r border-slate-200">{row.published_at ?? 'N/A'}</td>
-                                                    <td className="px-3 py-2 align-top text-slate-600">{row.created_at ?? 'N/A'}</td>
+                                                    <td className="px-3 py-2 align-top text-slate-600 border-r border-slate-200 whitespace-nowrap">{formatDateTime(row.published_at)}</td>
+                                                    <td className="px-3 py-2 align-top text-slate-600 whitespace-nowrap">{formatDateTime(row.created_at)}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -888,8 +888,8 @@ export default function ExecutiveDashboardIndex({
                                     <table className="min-w-full table-fixed divide-y divide-slate-300 text-[11px]">
                                         <thead className="bg-slate-100 text-slate-800 font-bold uppercase">
                                             <tr>
-                                                <th className="w-[18%] px-3 py-2 text-left border-r border-slate-300">Timestamp</th>
-                                                <th className="w-[20%] px-3 py-2 text-left border-r border-slate-300">Module</th>
+                                                <th className="w-[20%] px-3 py-2 text-left border-r border-slate-300">Timestamp</th>
+                                                <th className="w-[18%] px-3 py-2 text-left border-r border-slate-300">Module</th>
                                                 <th className="w-[18%] px-3 py-2 text-left border-r border-slate-300">Action</th>
                                                 <th className="w-[22%] px-3 py-2 text-left border-r border-slate-300">User</th>
                                                 <th className="w-[22%] px-3 py-2 text-left">Office</th>
@@ -898,7 +898,7 @@ export default function ExecutiveDashboardIndex({
                                         <tbody className="divide-y divide-slate-200 bg-white">
                                             {rows.map((row) => (
                                                 <tr key={`log-${row.id}`}>
-                                                    <td className="px-3 py-2 align-top text-slate-600 border-r border-slate-200">{row.created_at}</td>
+                                                    <td className="px-3 py-2 align-top text-slate-600 border-r border-slate-200 whitespace-nowrap">{formatDateTime(row.created_at)}</td>
                                                     <td className="px-3 py-2 align-top font-semibold text-slate-900 border-r border-slate-200">{row.module_name}</td>
                                                     <td className="px-3 py-2 align-top text-slate-700 border-r border-slate-200">{row.action_type}</td>
                                                     <td className="px-3 py-2 align-top text-slate-800 border-r border-slate-200">{row.user?.name ?? 'System'}</td>
@@ -1168,6 +1168,20 @@ function downloadFile(content: string, fileName: string, mimeType: string): void
     anchor.click();
     anchor.remove();
     window.URL.revokeObjectURL(url);
+}
+
+function formatDateTime(value?: string | null): string {
+    if (!value) return 'N/A';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return date.toLocaleString('en-PH', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+    });
 }
 
 

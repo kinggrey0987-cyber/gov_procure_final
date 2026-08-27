@@ -520,7 +520,7 @@ export default function ExecutiveApprovalsIndex({ records, recordsExport, summar
                                                     <td className="px-2.5 py-2.5 align-middle text-center border-r border-slate-200">
                                                         <span className={statusBadgeClass(row.status)}>{displayPpmpStatus(row.status)}</span>
                                                     </td>
-                                                    <td className="px-2.5 py-2.5 align-middle text-slate-600 border-r border-slate-200 whitespace-nowrap">{row.date_prepared ?? '-'}</td>
+                                                    <td className="px-2.5 py-2.5 align-middle text-slate-600 border-r border-slate-200 whitespace-nowrap">{formatDate(row.date_prepared)}</td>
                                                     <td className="px-2 py-2.5 align-middle text-center border-r border-slate-200 font-semibold">{row.items_count}</td>
                                                     <td className="px-2.5 py-2.5 align-middle text-right font-bold text-slate-900 whitespace-nowrap">{formatCurrency(row.total_estimated_budget)}</td>
                                                 </tr>
@@ -633,10 +633,14 @@ function formatCurrency(value: number): string {
 }
 
 function formatDate(value?: string | null): string {
-    if (!value) return '-';
+    if (!value) return 'N/A';
     const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return '-';
-    return parsed.toLocaleDateString();
+    if (Number.isNaN(parsed.getTime())) return String(value);
+    return parsed.toLocaleDateString('en-PH', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+    });
 }
 
 

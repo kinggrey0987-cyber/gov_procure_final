@@ -347,7 +347,7 @@ export default function BusinessAudit({ auditLogs, auditLogsExport, filters, ana
                                 <tbody className="divide-y divide-slate-100">
                                     {auditLogs.data.map((log) => (
                                         <tr key={log.id} className="align-top">
-                                            <td className="px-4 py-3 text-slate-700">{new Date(log.created_at).toLocaleString()}</td>
+                                            <td className="px-4 py-3 text-slate-700 whitespace-nowrap">{formatDateTime(log.created_at)}</td>
                                             <td className="px-4 py-3 text-slate-800">{log.user?.name ?? 'System'}</td>
                                             <td className="px-4 py-3 text-slate-700">{formatModuleLabel(log.module_name)}</td>
                                             <td className="px-4 py-3">
@@ -461,7 +461,7 @@ export default function BusinessAudit({ auditLogs, auditLogsExport, filters, ana
                                             <tbody className="divide-y divide-slate-200 bg-white">
                                                 {pageRows.map((log) => (
                                                     <tr key={`${pageIndex}-${log.id}`}>
-                                                        <td className="px-3 py-2 align-top text-slate-600 border-r border-slate-200">{new Date(log.created_at).toLocaleString()}</td>
+                                                        <td className="px-3 py-2 align-top text-slate-600 border-r border-slate-200 whitespace-nowrap">{formatDateTime(log.created_at)}</td>
                                                         <td className="px-3 py-2 align-top font-bold text-slate-900 border-r border-slate-200">{log.user?.name ?? 'System'}</td>
                                                         <td className="px-3 py-2 align-top text-slate-700 border-r border-slate-200">{formatModuleLabel(log.module_name)}</td>
                                                         <td className="px-3 py-2 align-top text-slate-700 border-r border-slate-200">{formatActionLabel(log.action_type)}</td>
@@ -606,6 +606,20 @@ function formatReferenceLabel(value: string): string {
     };
 
     return aliases[value] ?? value.split('\\').pop()?.replaceAll('_', ' ') ?? 'Record';
+}
+
+function formatDateTime(value?: string | null): string {
+    if (!value) return 'N/A';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return date.toLocaleString('en-PH', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+    });
 }
 
 
