@@ -211,9 +211,9 @@ export default function PpmpCreate({ itemOptions }: Props) {
                                         <InputError message={form.errors[`items.${index}.procurement_schedule`]} className="mt-1" />
                                     </label>
                                     <label className="block">
-                                        <span className="mb-1 block text-sm font-medium text-slate-700">Item Remarks</span>
-                                        <input value={item.remarks} onChange={(event) => patchItem(index, { remarks: event.target.value })} placeholder="Required item specification for SR and PO" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required />
-                                        <span className="mt-1 block text-xs text-slate-500">This becomes the item specification shown on Supply Requests and auto-filled on Purchase Orders.</span>
+                                        <span className="mb-1 block text-sm font-medium text-slate-700">Item Specification / Brand Details</span>
+                                        <input value={item.remarks} onChange={(event) => patchItem(index, { remarks: event.target.value })} placeholder="e.g. Panda 0.7mm Black, A4 80gsm 500 sheets" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required />
+                                        <span className="mt-1 block text-xs text-slate-500">Essential technical specification auto-filled into Supply Requests and Purchase Orders.</span>
                                         <InputError message={form.errors[`items.${index}.remarks`]} className="mt-1" />
                                     </label>
                                 </div>

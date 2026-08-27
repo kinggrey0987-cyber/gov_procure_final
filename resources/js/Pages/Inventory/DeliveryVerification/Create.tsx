@@ -169,22 +169,16 @@ export default function DeliveryVerificationCreate({ delivery }: Props) {
                             </FormField>
                         </div>
 
-                        <FormField label="Discrepancy Notes" error={errors.discrepancy_notes}>
+                        <FormField label={isRejected ? 'Discrepancy Notes / Findings' : 'Inspection Notes (Optional)'} error={errors.discrepancy_notes || errors.remarks}>
                             <textarea
                                 rows={4}
                                 value={data.discrepancy_notes}
-                                onChange={(e) => setData('discrepancy_notes', e.target.value)}
+                                onChange={(e) => {
+                                    setData('discrepancy_notes', e.target.value);
+                                    setData('remarks', e.target.value);
+                                }}
                                 className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none"
-                                placeholder="Add discrepancy details if found."
-                            />
-                        </FormField>
-
-                        <FormField label="Remarks" error={errors.remarks}>
-                            <textarea
-                                rows={3}
-                                value={data.remarks}
-                                onChange={(e) => setData('remarks', e.target.value)}
-                                className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none"
+                                placeholder={isRejected ? 'Describe the discrepancies found (e.g. damaged packaging, missing units, broken seals)...' : 'Optional inspection notes regarding delivery condition...'}
                             />
                         </FormField>
 

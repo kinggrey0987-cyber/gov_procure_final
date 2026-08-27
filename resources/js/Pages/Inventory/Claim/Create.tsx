@@ -309,7 +309,7 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                         </div>
 
                         <div>
-                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Description / Remarks</label>
+                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Discrepancy Details & Findings</label>
                             <textarea className="min-h-[90px] w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Describe what was observed and what quantity/item was affected." value={form.data.remarks} onChange={(e) => form.setData('remarks', e.target.value)} />
                             {form.errors.remarks ? <p className="mt-1 text-xs text-rose-600">{form.errors.remarks}</p> : null}
                         </div>

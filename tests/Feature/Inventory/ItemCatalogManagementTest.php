@@ -28,6 +28,9 @@ class ItemCatalogManagementTest extends TestCase
 
         $this->withoutVite();
 
+        Item::query()->delete();
+        ItemCategory::query()->delete();
+
         $this->office = $this->createOffice('Main Office', 'MAIN_OFF');
         $this->gsoOfficer = $this->createUser(UserRole::GSO_OFFICER, $this->office);
         $this->officeUser = $this->createUser(UserRole::OFFICE_USER, $this->office);

@@ -250,19 +250,15 @@ export default function PurchaseOrdersEdit({ purchaseOrder, suppliers }: Props) 
                             />
                             {form.errors.expected_delivery_date ? <p className="mt-1 text-xs font-semibold text-rose-600">{form.errors.expected_delivery_date}</p> : null}
                         </label>
-                        <label className="grid gap-2">
-                            <span className="block text-sm font-medium text-slate-700">Terms Notes</span>
+                        <label className="grid gap-2 md:col-span-2">
+                            <span className="block text-sm font-medium text-slate-700">Terms, Conditions & Instructions</span>
                             <textarea
                                 value={form.data.terms_notes}
-                                onChange={(event) => form.setData('terms_notes', event.target.value)}
-                                className="h-24 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                            />
-                        </label>
-                        <label className="grid gap-2">
-                            <span className="block text-sm font-medium text-slate-700">Remarks</span>
-                            <textarea
-                                value={form.data.remarks}
-                                onChange={(event) => form.setData('remarks', event.target.value)}
+                                onChange={(event) => {
+                                    form.setData('terms_notes', event.target.value);
+                                    form.setData('remarks', event.target.value);
+                                }}
+                                placeholder="Payment terms, delivery location, or special supplier instructions..."
                                 className="h-24 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                             />
                         </label>
