@@ -60,9 +60,13 @@ class AppServiceProvider extends ServiceProvider
             $client->setClientSecret((string) ($config['clientSecret'] ?? ''));
             $refreshToken = (string) ($config['refreshToken'] ?? '');
             if (! empty($refreshToken)) {
-                $token = $client->fetchAccessTokenWithRefreshToken($refreshToken);
-                if (isset($token['access_token'])) {
-                    $client->setAccessToken($token);
+                try {
+                    $token = $client->fetchAccessTokenWithRefreshToken($refreshToken);
+                    if (isset($token['access_token'])) {
+                        $client->setAccessToken($token);
+                    }
+                } catch (\Throwable) {
+                    // Suppress token refresh exception so driver setup does not crash app bootstrap
                 }
             }
 

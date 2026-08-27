@@ -84,7 +84,7 @@ class PublicDisclosureController
             /** @var UploadedFile $mainFile */
             $mainFile = $request->file('main_file');
             $storedFileName = Str::uuid()->toString().'_'.$mainFile->getClientOriginalName();
-            $payload['file_path'] = $mainFile->storeAs('public_disclosures', $storedFileName, $this->publicDisk());
+            $payload['file_path'] = $this->storeUploadedFileSafely($mainFile, 'public_disclosures', $storedFileName);
         }
 
         $disclosure = $this->disclosureService->createFromPayload($user, $payload);
@@ -308,5 +308,31 @@ class PublicDisclosureController
         }
 
         return sprintf('%s #%d (not found)', class_basename($referenceType), $referenceId);
+    }
+
+    private function storeUploadedFileSafely(UploadedFile $file, string $directory, string $fileName): string
+    {
+        $primaryDisk = $this->publicDisk();
+        try {
+            $path = $file->storeAs($directory, $fileName, $primaryDisk);
+            if (is_string($path) && trim($path) !== '') {
+                return $path;
+            }
+        } catch (\Throwable) {
+            // Fallback when cloud disk fails
+        }
+
+        if ($primaryDisk !== 'public') {
+            try {
+                $path = $file->storeAs($directory, $fileName, 'public');
+                if (is_string($path) && trim($path) !== '') {
+                    return $path;
+                }
+            } catch (\Throwable) {
+                // Fallback to local
+            }
+        }
+
+        return $file->storeAs($directory, $fileName, 'local') ?: '';
     }
 }
