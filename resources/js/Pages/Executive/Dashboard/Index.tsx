@@ -335,18 +335,26 @@ export default function ExecutiveDashboardIndex({
         downloadFile(csv, 'executive-dashboard.csv', 'text/csv;charset=utf-8;');
     };
 
+    const [isExportingPdf, setIsExportingPdf] = useState(false);
+
     const exportPdf = async () => {
-        await downloadSectionAsPdfById(exportSectionId, {
-            title: 'Executive Dashboard Report',
-            fileName: 'executive-oversight-report.pdf',
-            marginMm: 6,
-            paperWidthPx: 820,
-            orientation: 'portrait',
-            excludeSelectors: ['.print-hide', 'nav', 'aside', '[role="navigation"]'],
-            revealSelectors: ['.pdf-export-content'],
-            pageBreakSelectors: ['.pdf-page'],
-            includeDefaultHeading: false,
-        });
+        if (isExportingPdf) return;
+        setIsExportingPdf(true);
+        try {
+            await downloadSectionAsPdfById(exportSectionId, {
+                title: 'Executive Dashboard Report',
+                fileName: 'executive-oversight-report.pdf',
+                marginMm: 6,
+                paperWidthPx: 820,
+                orientation: 'portrait',
+                excludeSelectors: ['.print-hide', 'nav', 'aside', '[role="navigation"]'],
+                revealSelectors: ['.pdf-export-content'],
+                pageBreakSelectors: ['.pdf-page'],
+                includeDefaultHeading: false,
+            });
+        } finally {
+            setIsExportingPdf(false);
+        }
     };
 
     return (
@@ -363,9 +371,10 @@ export default function ExecutiveDashboardIndex({
                         <button
                             type="button"
                             onClick={exportPdf}
-                            className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
+                            disabled={isExportingPdf}
+                            className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            Export PDF
+                            {isExportingPdf ? 'Generating PDF...' : 'Export PDF'}
                         </button>
                         <button
                             type="button"

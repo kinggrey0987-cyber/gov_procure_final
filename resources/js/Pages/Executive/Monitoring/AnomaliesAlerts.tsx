@@ -222,18 +222,26 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
         approverRole: 'Municipal Mayor / Local Chief Executive',
     };
 
+    const [isExportingPdf, setIsExportingPdf] = useState(false);
+
     const exportPdf = async () => {
-        await downloadSectionAsPdfById(exportSectionId, {
-            title: 'Risk and Alerts Report',
-            fileName: 'risk-and-alerts-report.pdf',
-            marginMm: 6,
-            paperWidthPx: 820,
-            orientation: 'portrait',
-            excludeSelectors: ['.print-hide', 'nav', 'aside', '[role="navigation"]'],
-            revealSelectors: ['.pdf-export-content'],
-            pageBreakSelectors: ['.pdf-page'],
-            includeDefaultHeading: false,
-        });
+        if (isExportingPdf) return;
+        setIsExportingPdf(true);
+        try {
+            await downloadSectionAsPdfById(exportSectionId, {
+                title: 'Risk and Alerts Report',
+                fileName: 'risk-and-alerts-report.pdf',
+                marginMm: 6,
+                paperWidthPx: 820,
+                orientation: 'portrait',
+                excludeSelectors: ['.print-hide', 'nav', 'aside', '[role="navigation"]'],
+                revealSelectors: ['.pdf-export-content'],
+                pageBreakSelectors: ['.pdf-page'],
+                includeDefaultHeading: false,
+            });
+        } finally {
+            setIsExportingPdf(false);
+        }
     };
 
     return (
@@ -247,8 +255,13 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                         <p className="text-sm text-slate-600">Executive risk signal tracking and impact evidence.</p>
                     </div>
                     <div className="print-hide flex items-center gap-2">
-                        <button type="button" onClick={exportPdf} className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
-                            Export PDF
+                        <button
+                            type="button"
+                            onClick={exportPdf}
+                            disabled={isExportingPdf}
+                            className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {isExportingPdf ? 'Generating PDF...' : 'Export PDF'}
                         </button>
                         <button type="button" onClick={exportCsv} className="rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white hover:bg-red-800">
                             Export CSV

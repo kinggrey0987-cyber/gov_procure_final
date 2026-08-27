@@ -92,14 +92,15 @@ export async function downloadSectionAsPdfById(sectionId: string, options: Expor
     const source = document.getElementById(sectionId);
 
     if (!source) {
+        console.error(`[downloadSectionAsPdfById] Section element #${sectionId} not found.`);
         return;
     }
 
     const title = options.title ?? document.title ?? 'report';
     const fileName = options.fileName ?? `${slugify(title)}.pdf`;
     const scale = options.scale ?? 2;
-    const marginMm = options.marginMm ?? 10;
-    const paperWidthPx = options.paperWidthPx ?? 1120;
+    const marginMm = options.marginMm ?? 6;
+    const paperWidthPx = options.paperWidthPx ?? 820;
     const forcedOrientation = options.orientation;
     const excludeSelectors = options.excludeSelectors ?? ['.print-hide'];
     const revealSelectors = options.revealSelectors ?? [];
@@ -122,7 +123,9 @@ export async function downloadSectionAsPdfById(sectionId: string, options: Expor
             ? pageBreakSelectors.flatMap((selector) => Array.from(captureRoot.querySelectorAll<HTMLElement>(selector)))
             : [captureRoot];
 
-        const firstCanvas = await renderPdfCanvas(html2canvas, pageNodes[0] ?? captureRoot, scale, paperWidthPx);
+        const validPageNodes = pageNodes.length > 0 ? pageNodes : [captureRoot];
+
+        const firstCanvas = await renderPdfCanvas(html2canvas, validPageNodes[0], scale, paperWidthPx);
         const orientation = forcedOrientation ?? (firstCanvas.width > firstCanvas.height ? 'landscape' : 'portrait');
         const pdf = new jsPDF({
             orientation,
@@ -137,8 +140,8 @@ export async function downloadSectionAsPdfById(sectionId: string, options: Expor
         const contentWidth = pageWidth - marginMm * 2;
         let isFirstPage = true;
 
-        for (const node of pageNodes) {
-            const canvas = node === pageNodes[0]
+        for (const node of validPageNodes) {
+            const canvas = node === validPageNodes[0]
                 ? firstCanvas
                 : await renderPdfCanvas(html2canvas, node, scale, paperWidthPx);
             const contentHeight = (canvas.height * contentWidth) / canvas.width;
@@ -162,6 +165,10 @@ export async function downloadSectionAsPdfById(sectionId: string, options: Expor
         }
 
         pdf.save(fileName);
+    } catch (error) {
+        console.error('[downloadSectionAsPdfById] Failed to render PDF canvas:', error);
+        // Fallback: print directly using the browser print system
+        printSectionById(sectionId, { title });
     } finally {
         captureRoot.remove();
     }
@@ -177,7 +184,9 @@ async function renderPdfCanvas(
         backgroundColor: '#ffffff',
         scale,
         useCORS: true,
+        allowTaint: true,
         windowWidth: paperWidthPx,
+        width: source.offsetWidth || paperWidthPx,
         logging: false,
     });
 }
@@ -195,13 +204,14 @@ function createPdfCaptureRoot(
     const root = document.createElement('div');
     root.setAttribute('data-pdf-capture-root', 'true');
     root.style.position = 'fixed';
-    root.style.left = '-100000px';
+    root.style.left = '0';
     root.style.top = '0';
     root.style.width = `${options.paperWidthPx}px`;
     root.style.padding = '0';
     root.style.background = '#ffffff';
     root.style.boxSizing = 'border-box';
-    root.style.zIndex = '-1';
+    root.style.zIndex = '-99999';
+    root.style.pointerEvents = 'none';
 
     const clonedSection = source.cloneNode(true) as HTMLElement;
     clonedSection.style.width = '100%';
@@ -226,6 +236,13 @@ function createPdfCaptureRoot(
         });
     });
 
+    clonedSection.querySelectorAll<HTMLElement>('.pdf-page').forEach((element) => {
+        element.classList.remove('hidden');
+        element.style.display = 'block';
+        element.style.visibility = 'visible';
+        element.style.opacity = '1';
+    });
+
     const style = document.createElement('style');
     style.textContent = `
         [data-pdf-capture-root], [data-pdf-capture-root] * { box-sizing: border-box; }
@@ -246,6 +263,9 @@ function createPdfCaptureRoot(
         [data-pdf-capture-root] .pdf-page {
             box-shadow: none !important;
             margin: 0 !important;
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
         }
     `;
 
@@ -271,22 +291,39 @@ function createPdfCaptureRoot(
 async function waitForRenderableAssets(root: HTMLElement): Promise<void> {
     if ('fonts' in document) {
         try {
-            await document.fonts.ready;
+            await Promise.race([
+                document.fonts.ready,
+                new Promise((resolve) => setTimeout(resolve, 800)),
+            ]);
         } catch {
             // no-op
         }
     }
 
     const images = Array.from(root.querySelectorAll('img'));
+    if (images.length === 0) {
+        return;
+    }
+
     await Promise.all(
         images.map((image) => {
-            if (image.complete) {
+            if (image.complete && image.naturalWidth > 0) {
                 return Promise.resolve();
             }
 
             return new Promise<void>((resolve) => {
-                image.addEventListener('load', () => resolve(), { once: true });
-                image.addEventListener('error', () => resolve(), { once: true });
+                const timer = setTimeout(resolve, 800);
+                const onDone = () => {
+                    clearTimeout(timer);
+                    resolve();
+                };
+
+                if (typeof image.decode === 'function') {
+                    image.decode().then(onDone).catch(onDone);
+                } else {
+                    image.onload = onDone;
+                    image.onerror = onDone;
+                }
             });
         }),
     );
