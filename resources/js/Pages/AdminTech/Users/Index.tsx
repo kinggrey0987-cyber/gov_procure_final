@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import ConfirmationModal from '@/Components/ConfirmationModal';
 import useDebouncedValue from '@/hooks/useDebouncedValue';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
@@ -7,8 +8,12 @@ type UserRow = {
     id: number;
     name: string;
     email: string;
+    emp_id: string | null;
+    is_active: boolean;
     role: { code: string; name: string } | null;
     office: { code: string; name: string } | null;
+    can_toggle_active: boolean;
+    toggle_active_reason: string | null;
     can_delete: boolean;
     delete_reason: string | null;
 };
@@ -33,9 +38,15 @@ type Props = {
     filters: {
         search: string | null;
         role_id: number | null;
+        status: string | null;
     };
     roles: Role[];
 };
+
+type ModalState = {
+    type: 'toggle' | 'delete';
+    user: UserRow;
+} | null;
 
 export default function UserIndex({ users, filters, roles }: Props) {
     const page = usePage().props as {
@@ -46,53 +57,80 @@ export default function UserIndex({ users, filters, roles }: Props) {
         };
         flash?: {
             success?: string;
+            error?: string;
         };
         errors?: {
             delete?: string;
+            toggle_active?: string;
         };
     };
 
     const [formData, setFormData] = useState({
         search: filters.search ?? '',
         role_id: filters.role_id ? String(filters.role_id) : '',
+        status: filters.status ?? '',
     });
     const debouncedSearch = useDebouncedValue(formData.search, 400);
 
+    const [modalState, setModalState] = useState<ModalState>(null);
+    const [isProcessing, setIsProcessing] = useState(false);
+
     const deleteError = page.errors?.delete;
+    const toggleError = page.errors?.toggle_active;
     const successMessage = page.flash?.success;
+    const flashErrorMessage = page.flash?.error;
 
-    const deleteUser = (userId: number, userName: string) => {
-        if (!window.confirm(`Delete user account for ${userName}? This action cannot be undone.`)) {
-            return;
-        }
+    const handleConfirmAction = () => {
+        if (!modalState) return;
 
-        router.delete(route('admin-tech.users.destroy', userId), {
-            preserveScroll: true,
-            onError: (errors) => {
-                if (errors.delete) {
-                    window.alert(errors.delete);
+        setIsProcessing(true);
+
+        if (modalState.type === 'toggle') {
+            router.patch(
+                route('admin-tech.users.toggle-status', modalState.user.id),
+                {},
+                {
+                    preserveScroll: true,
+                    onFinish: () => {
+                        setIsProcessing(false);
+                        setModalState(null);
+                    },
                 }
-            },
-        });
+            );
+        } else if (modalState.type === 'delete') {
+            router.delete(
+                route('admin-tech.users.destroy', modalState.user.id),
+                {
+                    preserveScroll: true,
+                    onFinish: () => {
+                        setIsProcessing(false);
+                        setModalState(null);
+                    },
+                }
+            );
+        }
     };
 
     const activeFilters = useMemo(() => ({
         search: debouncedSearch || undefined,
         role_id: formData.role_id || undefined,
-    }), [debouncedSearch, formData.role_id]);
+        status: formData.status || undefined,
+    }), [debouncedSearch, formData.role_id, formData.status]);
 
     const activeFiltersKey = useMemo(() => JSON.stringify(activeFilters), [activeFilters]);
     const currentFiltersKey = useMemo(() => JSON.stringify({
         search: filters.search || undefined,
         role_id: filters.role_id ? String(filters.role_id) : undefined,
-    }), [filters.role_id, filters.search]);
+        status: filters.status || undefined,
+    }), [filters.role_id, filters.search, filters.status]);
 
     useEffect(() => {
         setFormData({
             search: filters.search ?? '',
             role_id: filters.role_id ? String(filters.role_id) : '',
+            status: filters.status ?? '',
         });
-    }, [filters.role_id, filters.search]);
+    }, [filters.role_id, filters.search, filters.status]);
 
     useEffect(() => {
         if (activeFiltersKey === currentFiltersKey) {
@@ -107,7 +145,7 @@ export default function UserIndex({ users, filters, roles }: Props) {
     }, [activeFilters, activeFiltersKey, currentFiltersKey]);
 
     const handleClearFilters = () => {
-        setFormData({ search: '', role_id: '' });
+        setFormData({ search: '', role_id: '', status: '' });
         router.get(route('admin-tech.users.index'), {}, {
             preserveScroll: true,
         });
@@ -121,30 +159,36 @@ export default function UserIndex({ users, filters, roles }: Props) {
                 <header className="flex flex-col gap-4 border-b border-slate-200 px-4 py-5 sm:px-6 md:flex-row md:items-center md:justify-between">
                     <div>
                         <h3 className="text-2xl font-semibold text-slate-800 sm:text-3xl">User Management</h3>
-                        <p className="mt-1 text-sm text-slate-500 sm:text-lg">Manage internal system users and their technical access roles</p>
+                        <p className="mt-1 text-sm text-slate-500 sm:text-base">Manage internal system users, active access status, and technical roles</p>
                     </div>
                     <Link
                         href={route('admin-tech.users.create')}
-                        className="inline-flex h-10 w-full items-center justify-center rounded-xl border border-red-300 bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700 sm:w-auto"
+                        className="inline-flex h-10 w-full items-center justify-center rounded-xl border border-red-300 bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700 sm:w-auto shadow-sm transition"
                     >
                         Add User
                     </Link>
                 </header>
 
                 {successMessage && (
-                    <div className="border-b border-emerald-200 bg-emerald-50 px-6 py-3 text-sm font-medium text-emerald-700">
-                        {successMessage}
+                    <div className="flex items-center gap-2 border-b border-emerald-200 bg-emerald-50 px-6 py-3 text-sm font-medium text-emerald-700">
+                        <svg className="h-5 w-5 shrink-0 text-emerald-600" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
+                        </svg>
+                        <span>{successMessage}</span>
                     </div>
                 )}
 
-                {deleteError && (
-                    <div className="border-b border-rose-200 bg-rose-50 px-6 py-3 text-sm font-medium text-rose-700">
-                        {deleteError}
+                {(deleteError || toggleError || flashErrorMessage) && (
+                    <div className="flex items-center gap-2 border-b border-rose-200 bg-rose-50 px-6 py-3 text-sm font-medium text-rose-700">
+                        <svg className="h-5 w-5 shrink-0 text-rose-600" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                        </svg>
+                        <span>{deleteError || toggleError || flashErrorMessage}</span>
                     </div>
                 )}
 
                 <div className="border-b border-slate-200 bg-slate-50 px-4 py-4 sm:px-6">
-                    <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem_auto] md:items-end">
+                    <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem_11rem_auto] md:items-end">
                         <div>
                             <label htmlFor="search-input" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
                                 Search
@@ -154,7 +198,7 @@ export default function UserIndex({ users, filters, roles }: Props) {
                                 type="text"
                                 value={formData.search}
                                 onChange={(e) => setFormData(prev => ({ ...prev, search: e.target.value }))}
-                                placeholder="Search by name or email..."
+                                placeholder="Search by name, email, or EMP ID..."
                                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
                             />
                         </div>
@@ -176,11 +220,26 @@ export default function UserIndex({ users, filters, roles }: Props) {
                                 ))}
                             </select>
                         </div>
+                        <div>
+                            <label htmlFor="status-select" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                Status
+                            </label>
+                            <select
+                                id="status-select"
+                                value={formData.status}
+                                onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                            >
+                                <option value="">All Statuses</option>
+                                <option value="active">Active</option>
+                                <option value="inactive">Deactivated</option>
+                            </select>
+                        </div>
                         <div className="grid gap-2 sm:flex sm:items-end">
                             <button
                                 type="button"
                                 onClick={handleClearFilters}
-                                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 transition"
                             >
                                 Clear
                             </button>
@@ -189,10 +248,10 @@ export default function UserIndex({ users, filters, roles }: Props) {
                 </div>
 
                 <div className="overflow-x-auto">
-                    <table className="min-w-[760px] divide-y divide-slate-200 text-sm md:min-w-full">
+                    <table className="min-w-[860px] divide-y divide-slate-200 text-sm md:min-w-full">
                         <thead className="bg-slate-50">
                             <tr>
-                                <th className="px-5 py-3 text-left text-sm font-semibold text-slate-700">Name</th>
+                                <th className="px-5 py-3 text-left text-sm font-semibold text-slate-700">Name & ID</th>
                                 <th className="px-5 py-3 text-left text-sm font-semibold text-slate-700">Email</th>
                                 <th className="px-5 py-3 text-left text-sm font-semibold text-slate-700">Role</th>
                                 <th className="px-5 py-3 text-left text-sm font-semibold text-slate-700">Office</th>
@@ -204,13 +263,20 @@ export default function UserIndex({ users, filters, roles }: Props) {
                             {users.data.length === 0 && (
                                 <tr>
                                     <td colSpan={6} className="px-5 py-10 text-center text-slate-500">
-                                        No user records available.
+                                        No user records match your criteria.
                                     </td>
                                 </tr>
                             )}
                             {users.data.map((user) => (
-                                <tr key={user.id} className="hover:bg-slate-50/80">
-                                    <td className="px-5 py-4 text-base font-semibold text-slate-800">{user.name}</td>
+                                <tr key={user.id} className={`hover:bg-slate-50/80 transition ${!user.is_active ? 'bg-slate-50/40 opacity-80' : ''}`}>
+                                    <td className="px-5 py-4">
+                                        <div className="font-semibold text-slate-800">{user.name}</div>
+                                        {user.emp_id && (
+                                            <span className="mt-0.5 inline-block text-xs font-mono text-slate-500">
+                                                ID: {user.emp_id}
+                                            </span>
+                                        )}
+                                    </td>
                                     <td className="px-5 py-4 break-all text-slate-600">{user.email}</td>
                                     <td className="px-5 py-4">
                                         <span className="inline-flex rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
@@ -223,23 +289,54 @@ export default function UserIndex({ users, filters, roles }: Props) {
                                         </span>
                                     </td>
                                     <td className="px-5 py-4">
-                                        <span className={`inline-flex rounded-lg px-2.5 py-1 text-xs font-semibold ${user.role ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                                            {user.role ? 'Assigned' : 'Pending Role'}
-                                        </span>
+                                        {user.is_active ? (
+                                            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
+                                                Active
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-slate-500/20">
+                                                <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                                                Deactivated
+                                            </span>
+                                        )}
                                     </td>
                                     <td className="px-5 py-4">
                                         <div className="flex flex-wrap items-center gap-2">
                                             <Link
                                                 href={route('admin-tech.users.edit', user.id)}
-                                                className="inline-flex h-8 items-center rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                                className="inline-flex h-8 items-center rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
                                             >
                                                 Edit
                                             </Link>
+
+                                            {user.is_active ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setModalState({ type: 'toggle', user })}
+                                                    disabled={!user.can_toggle_active}
+                                                    className="inline-flex h-8 items-center rounded-lg border border-amber-300 bg-amber-50/50 px-3 text-xs font-semibold text-amber-700 hover:bg-amber-100/70 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-transparent disabled:text-slate-400 transition"
+                                                    title={user.can_toggle_active ? 'Deactivate this user account' : user.toggle_active_reason ?? 'Deactivation unavailable.'}
+                                                >
+                                                    Deactivate
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setModalState({ type: 'toggle', user })}
+                                                    disabled={!user.can_toggle_active}
+                                                    className="inline-flex h-8 items-center rounded-lg border border-emerald-300 bg-emerald-50/50 px-3 text-xs font-semibold text-emerald-700 hover:bg-emerald-100/70 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-transparent disabled:text-slate-400 transition"
+                                                    title={user.can_toggle_active ? 'Reactivate this user account' : user.toggle_active_reason ?? 'Reactivation unavailable.'}
+                                                >
+                                                    Activate
+                                                </button>
+                                            )}
+
                                             <button
                                                 type="button"
-                                                onClick={() => deleteUser(user.id, user.name)}
+                                                onClick={() => setModalState({ type: 'delete', user })}
                                                 disabled={!user.can_delete}
-                                                className="inline-flex h-8 items-center rounded-lg border border-rose-300 px-3 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                                                className="inline-flex h-8 items-center rounded-lg border border-rose-300 px-3 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 transition"
                                                 title={user.can_delete ? 'Delete this account' : user.delete_reason ?? 'Delete is currently unavailable.'}
                                             >
                                                 Delete
@@ -255,7 +352,7 @@ export default function UserIndex({ users, filters, roles }: Props) {
                 <div className="border-t border-slate-200 bg-slate-50 px-4 py-4 sm:px-6">
                     <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                         <p className="text-sm text-slate-600">
-                            Showing <span className="font-semibold">{users.from}</span> to <span className="font-semibold">{users.to}</span> of <span className="font-semibold">{users.total}</span> user(s)
+                            Showing <span className="font-semibold">{users.from ?? 0}</span> to <span className="font-semibold">{users.to ?? 0}</span> of <span className="font-semibold">{users.total}</span> user(s)
                         </p>
                         <p className="text-sm text-slate-600">
                             Page <span className="font-semibold">{users.current_page}</span> of <span className="font-semibold">{users.last_page}</span>
@@ -307,11 +404,58 @@ export default function UserIndex({ users, filters, roles }: Props) {
                     </div>
                 </div>
             </section>
+
+            {modalState && (
+                <ConfirmationModal
+                    show={Boolean(modalState)}
+                    onClose={() => !isProcessing && setModalState(null)}
+                    processing={isProcessing}
+                    variant={
+                        modalState.type === 'delete'
+                            ? 'danger'
+                            : modalState.user.is_active
+                            ? 'warning'
+                            : 'success'
+                    }
+                    title={
+                        modalState.type === 'delete'
+                            ? 'Delete User Account'
+                            : modalState.user.is_active
+                            ? 'Deactivate User Account'
+                            : 'Reactivate User Account'
+                    }
+                    confirmText={
+                        modalState.type === 'delete'
+                            ? 'Delete Permanently'
+                            : modalState.user.is_active
+                            ? 'Deactivate Account'
+                            : 'Reactivate Account'
+                    }
+                    message={
+                        modalState.type === 'delete' ? (
+                            <p>
+                                Are you sure you want to permanently delete the account for{' '}
+                                <strong className="text-slate-800">{modalState.user.name}</strong> ({modalState.user.email})?
+                                This action cannot be undone.
+                            </p>
+                        ) : modalState.user.is_active ? (
+                            <p>
+                                Are you sure you want to deactivate the account for{' '}
+                                <strong className="text-slate-800">{modalState.user.name}</strong> ({modalState.user.email})?
+                                This will immediately revoke login access, while preserving all historical audit logs,
+                                approvals, and procurement records.
+                            </p>
+                        ) : (
+                            <p>
+                                Are you sure you want to reactivate the account for{' '}
+                                <strong className="text-slate-800">{modalState.user.name}</strong> ({modalState.user.email})?
+                                The user will be able to log in and access the system with their assigned role.
+                            </p>
+                        )
+                    }
+                    onConfirm={handleConfirmAction}
+                />
+            )}
         </AuthenticatedLayout>
     );
 }
-
-
-
-
-

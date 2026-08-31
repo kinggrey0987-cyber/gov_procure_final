@@ -30,6 +30,7 @@ class UserManagementController extends Controller
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:100'],
             'role_id' => ['nullable', 'integer'],
+            'status' => ['nullable', 'in:active,inactive'],
             'page' => ['nullable', 'integer', 'min:1'],
         ]);
 
@@ -57,8 +58,18 @@ class UserManagementController extends Controller
             $query->where('role_id', $filters['role_id']);
         }
 
-        // Count admins for deletion checks
-        $adminCount = (clone $query)
+        // Apply status filter
+        if ($filters['status'] ?? null) {
+            $query->where('is_active', $filters['status'] === 'active');
+        }
+
+        // Count total and active admins for safety checks
+        $totalAdminCount = User::query()
+            ->whereHas('role', fn ($q) => $q->where('code', UserRole::ADMIN->value))
+            ->count();
+
+        $activeAdminCount = User::query()
+            ->where('is_active', true)
             ->whereHas('role', fn ($q) => $q->where('code', UserRole::ADMIN->value))
             ->count();
 
@@ -67,15 +78,31 @@ class UserManagementController extends Controller
             ->orderBy('name')
             ->paginate(perPage: 5, page: $filters['page'] ?? 1)
             ->withQueryString()
-            ->through(function (User $user) use ($actingUserId, $adminCount): array {
+            ->through(function (User $user) use ($actingUserId, $totalAdminCount, $activeAdminCount): array {
                 $isSelf = $actingUserId === $user->id;
-                $isLastAdmin = $user->role?->code === UserRole::ADMIN->value && $adminCount <= 1;
-                $canDelete = ! $isSelf && ! $isLastAdmin;
+                $isAdmin = $user->role?->code === UserRole::ADMIN->value;
+                $isLastActiveAdmin = $isAdmin && $user->is_active && $activeAdminCount <= 1;
+                $isLastAdmin = $isAdmin && $totalAdminCount <= 1;
+                $hasLinked = $this->hasLinkedRecords($user);
+
+                $canToggleActive = ! $isSelf && ! $isLastActiveAdmin;
+                $toggleActiveReason = $isSelf
+                    ? 'You cannot change the active status of your own account.'
+                    : ($isLastActiveAdmin ? 'The last remaining active administrator account cannot be deactivated.' : null);
+
+                $canDelete = ! $isSelf && ! $isLastAdmin && ! $hasLinked;
+                $deleteReason = $isSelf
+                    ? 'You cannot delete your own account.'
+                    : ($isLastAdmin
+                        ? 'The last remaining administrator account cannot be deleted.'
+                        : ($hasLinked ? 'This user has linked records and should be deactivated rather than deleted.' : null));
 
                 return [
                     'id' => $user->id,
                     'name' => $user->name,
                     'email' => $user->email,
+                    'emp_id' => $user->emp_id,
+                    'is_active' => (bool) $user->is_active,
                     'role' => $user->role ? [
                         'code' => $user->role->code,
                         'name' => $user->role->name,
@@ -84,10 +111,10 @@ class UserManagementController extends Controller
                         'code' => $user->office->code,
                         'name' => $user->office->name,
                     ] : null,
+                    'can_toggle_active' => $canToggleActive,
+                    'toggle_active_reason' => $toggleActiveReason,
                     'can_delete' => $canDelete,
-                    'delete_reason' => $isSelf
-                        ? 'You cannot delete your own account.'
-                        : ($isLastAdmin ? 'The last remaining admin account cannot be deleted.' : null),
+                    'delete_reason' => $deleteReason,
                 ];
             });
 
@@ -96,6 +123,7 @@ class UserManagementController extends Controller
             'filters' => [
                 'search' => $filters['search'] ?? null,
                 'role_id' => $filters['role_id'] ?? null,
+                'status' => $filters['status'] ?? null,
             ],
             'roles' => $this->manageableRoles(),
         ]);
@@ -120,6 +148,7 @@ class UserManagementController extends Controller
             'emp_id' => $validated['emp_id'],
             'password' => Hash::make($validated['password']),
             'must_change_password' => true,
+            'is_active' => true,
             'role_id' => $roleId,
             'office_id' => $this->resolveOfficeIdForRole(
                 roleId: $roleId,
@@ -144,6 +173,7 @@ class UserManagementController extends Controller
                 'role_id' => (int) $user->role_id,
                 'role_code' => (string) ($user->role?->code ?? ''),
                 'office_id' => $user->office_id ? (int) $user->office_id : null,
+                'is_active' => (bool) $user->is_active,
             ],
             'roles' => $this->manageableRoles(),
             'offices' => $this->activeOffices(),
@@ -171,6 +201,37 @@ class UserManagementController extends Controller
         return to_route('admin-tech.users.index')->with('success', 'User account updated successfully.');
     }
 
+    public function toggleStatus(Request $request, User $user): RedirectResponse
+    {
+        $this->ensureManageableUser($user);
+
+        if ($request->user()?->id === $user->id) {
+            return back()->withErrors([
+                'toggle_active' => 'You cannot change the active status of your own account.',
+            ]);
+        }
+
+        if ($user->is_active && $user->role?->code === UserRole::ADMIN->value) {
+            $activeAdminCount = User::query()
+                ->where('is_active', true)
+                ->whereHas('role', fn ($query) => $query->where('code', UserRole::ADMIN->value))
+                ->count();
+
+            if ($activeAdminCount <= 1) {
+                return back()->withErrors([
+                    'toggle_active' => 'The last remaining active administrator account cannot be deactivated.',
+                ]);
+            }
+        }
+
+        $newStatus = ! $user->is_active;
+        $user->update(['is_active' => $newStatus]);
+
+        $actionWord = $newStatus ? 'activated' : 'deactivated';
+
+        return to_route('admin-tech.users.index')->with('success', "User account for {$user->name} has been {$actionWord} successfully.");
+    }
+
     public function destroy(Request $request, User $user): RedirectResponse
     {
         $this->ensureManageableUser($user);
@@ -194,15 +255,46 @@ class UserManagementController extends Controller
             }
         }
 
+        if ($this->hasLinkedRecords($user)) {
+            return back()->withErrors([
+                'delete' => 'This user account has linked system records and cannot be deleted. Please deactivate it instead.',
+            ]);
+        }
+
         try {
             $user->delete();
         } catch (QueryException) {
             return back()->withErrors([
-                'delete' => 'This account cannot be deleted because it is linked to existing records.',
+                'delete' => 'This account cannot be deleted because it is linked to existing records. Please deactivate it instead.',
             ]);
         }
 
         return to_route('admin-tech.users.index')->with('success', 'User account deleted successfully.');
+    }
+
+    private function hasLinkedRecords(User $user): bool
+    {
+        return $user->auditLogs()->exists()
+            || $user->approvals()->exists()
+            || $user->statusChanges()->exists()
+            || $user->preparedPpmps()->exists()
+            || $user->approvedPpmps()->exists()
+            || $user->requestedSupplyRequests()->exists()
+            || $user->approvedSupplyRequests()->exists()
+            || $user->requestedPurchaseRequests()->exists()
+            || $user->createdPurchaseOrders()->exists()
+            || $user->receivedDeliveries()->exists()
+            || $user->verifiedDeliveries()->exists()
+            || $user->inventoryMovements()->exists()
+            || $user->preparedDistributionRecords()->exists()
+            || $user->receivedDistributionRecords()->exists()
+            || $user->receivedDistributionItems()->exists()
+            || $user->filedClaims()->exists()
+            || $user->reviewedAlerts()->exists()
+            || $user->publishedDisclosures()->exists()
+            || $user->uploadedDocuments()->exists()
+            || $user->generatedRecordArchives()->exists()
+            || $user->createdSystemBackups()->exists();
     }
 
     private function ensureManageableUser(User $user): void

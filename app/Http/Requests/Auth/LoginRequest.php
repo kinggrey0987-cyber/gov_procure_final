@@ -68,6 +68,15 @@ class LoginRequest extends FormRequest
             ]);
         }
 
+        $user = Auth::user();
+        if ($user instanceof User && ! $user->is_active) {
+            Auth::logout();
+
+            throw ValidationException::withMessages([
+                'email' => 'This account has been deactivated. Please contact your system administrator.',
+            ]);
+        }
+
         RateLimiter::clear($this->throttleKey());
         Cache::forget($this->lockoutLevelKey());
     }

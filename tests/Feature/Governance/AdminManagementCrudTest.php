@@ -684,5 +684,102 @@ class AdminManagementCrudTest extends TestCase
                     'office_id' => $this->office->id,
                 ]);
         }
-}
 
+    public function test_admin_can_deactivate_and_reactivate_internal_user(): void
+    {
+        $targetUser = $this->createUser(UserRole::OFFICE_USER, $this->office, 'toggle.active@gsc.local');
+        $this->assertTrue($targetUser->is_active);
+
+        // Deactivate user
+        $this->actingAs($this->admin)
+            ->patch(route('admin-tech.users.toggle-status', $targetUser->id))
+            ->assertRedirect(route('admin-tech.users.index'))
+            ->assertSessionHas('success');
+
+        $targetUser->refresh();
+        $this->assertFalse($targetUser->is_active);
+
+        // Reactivate user
+        $this->actingAs($this->admin)
+            ->patch(route('admin-tech.users.toggle-status', $targetUser->id))
+            ->assertRedirect(route('admin-tech.users.index'))
+            ->assertSessionHas('success');
+
+        $targetUser->refresh();
+        $this->assertTrue($targetUser->is_active);
+    }
+
+    public function test_admin_cannot_deactivate_their_own_account(): void
+    {
+        $this->actingAs($this->admin)
+            ->patch(route('admin-tech.users.toggle-status', $this->admin->id))
+            ->assertSessionHasErrors('toggle_active');
+
+        $this->admin->refresh();
+        $this->assertTrue($this->admin->is_active);
+    }
+
+    public function test_last_active_admin_cannot_be_deactivated(): void
+    {
+        $secondAdmin = $this->createUser(UserRole::ADMIN, $this->technicalOffice, 'admin2@gsc.local');
+        $this->assertTrue($secondAdmin->is_active);
+
+        // Deactivate second admin
+        $this->actingAs($this->admin)
+            ->patch(route('admin-tech.users.toggle-status', $secondAdmin->id))
+            ->assertRedirect(route('admin-tech.users.index'));
+
+        $secondAdmin->refresh();
+        $this->assertFalse($secondAdmin->is_active);
+
+        // Now attempting to deactivate the only remaining active admin ($this->admin) fails
+        $this->actingAs($secondAdmin)
+            ->patch(route('admin-tech.users.toggle-status', $this->admin->id))
+            ->assertSessionHasErrors('toggle_active');
+
+        $this->admin->refresh();
+        $this->assertTrue($this->admin->is_active);
+    }
+
+    public function test_deactivated_user_cannot_log_in_with_password(): void
+    {
+        $user = $this->createUser(UserRole::OFFICE_USER, $this->office, 'inactive.login@gsc.local');
+        $user->update([
+            'password' => \Illuminate\Support\Facades\Hash::make('SecretPass#12345'),
+            'is_active' => false,
+        ]);
+
+        $response = $this->post(route('login'), [
+            'email' => 'inactive.login@gsc.local',
+            'password' => 'SecretPass#12345',
+        ]);
+
+        $response->assertSessionHasErrors('email');
+        $this->assertGuest();
+    }
+
+    public function test_admin_user_status_filter_works(): void
+    {
+        $activeUser = $this->createUser(UserRole::OFFICE_USER, $this->office, 'active.filter@gsc.local');
+        $inactiveUser = $this->createUser(UserRole::OFFICE_USER, $this->office, 'inactive.filter@gsc.local');
+        $inactiveUser->update(['is_active' => false]);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin-tech.users.index', ['status' => 'active', 'search' => 'filter@gsc.local']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('AdminTech/Users/Index')
+                ->where('filters.status', 'active')
+                ->where('users.data.0.id', $activeUser->id)
+            );
+
+        $this->actingAs($this->admin)
+            ->get(route('admin-tech.users.index', ['status' => 'inactive', 'search' => 'filter@gsc.local']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('AdminTech/Users/Index')
+                ->where('filters.status', 'inactive')
+                ->where('users.data.0.id', $inactiveUser->id)
+            );
+    }
+}

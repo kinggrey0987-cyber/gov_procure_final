@@ -28,6 +28,7 @@ class User extends Authenticatable
         'emp_id',
         'password',
         'must_change_password',
+        'is_active',
         'role_id',
         'office_id',
         'google_id',
@@ -56,6 +57,7 @@ class User extends Authenticatable
             'role_id' => 'integer',
             'office_id' => 'integer',
             'must_change_password' => 'boolean',
+            'is_active' => 'boolean',
             'email_verified_at' => 'datetime',
             'google_linked_at' => 'datetime',
             'password' => 'hashed',
@@ -246,6 +248,11 @@ class User extends Authenticatable
     public function isPublicUser(): bool
     {
         return $this->hasRole(UserRole::PUBLIC);
+    }
+
+    public function isActive(): bool
+    {
+        return (bool) $this->is_active;
     }
 
     public function scopeForOffice(Builder $query, int $officeId): Builder

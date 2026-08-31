@@ -140,6 +140,10 @@ Route::middleware(['auth', 'twofactor', 'must-change-password'])->group(function
                 ->middleware('can:governance.manage-users')
                 ->name('users.update');
 
+            Route::patch('/users/{user}/toggle-status', [UserManagementController::class, 'toggleStatus'])
+                ->middleware('can:governance.manage-users')
+                ->name('users.toggle-status');
+
             Route::delete('/users/{user}', [UserManagementController::class, 'destroy'])
                 ->middleware('can:governance.manage-users')
                 ->name('users.destroy');

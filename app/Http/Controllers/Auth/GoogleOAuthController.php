@@ -125,6 +125,15 @@ class GoogleOAuthController extends Controller
                 ->with('error', 'Your account does not have access to this system.');
         }
 
+        if (! $user->is_active) {
+            Log::warning('auth.google.callback.deactivated_account', [
+                'user_id' => (int) $user->id,
+            ]);
+
+            return redirect()->route('login')
+                ->with('error', 'This account has been deactivated. Please contact your administrator.');
+        }
+
         $userRole = optional($user->role)->code;
         if ($userRole === 'PUBLIC') {
             Log::warning('auth.google.callback.public_denied', [
@@ -230,4 +239,3 @@ class GoogleOAuthController extends Controller
         ])->save();
     }
 }
-
