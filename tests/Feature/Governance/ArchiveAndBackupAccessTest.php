@@ -286,6 +286,44 @@ class ArchiveAndBackupAccessTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_exec_can_generate_annual_procurement_dossier_with_sha256_checksum(): void
+    {
+        Storage::fake('local');
+
+        $this->actingAs($this->executive)
+            ->post(route('executive.record-archives.store'), [
+                'archive_year' => 2026,
+                'archive_scope' => 'annual_procurement_dossier',
+                'notes' => 'Annual Year-End Closeout Dossier.',
+            ])
+            ->assertRedirect(route('executive.record-archives.index'));
+
+        $archive = RecordArchive::query()->latest('archive_id')->firstOrFail();
+
+        $this->assertNotNull($archive->sha256_checksum);
+        $this->assertSame(64, strlen($archive->sha256_checksum));
+        $this->assertGreaterThanOrEqual(0, $archive->record_count);
+        $this->assertIsArray($archive->manifest_summary);
+    }
+
+    public function test_admin_backup_generation_stores_sha256_checksum_and_table_metrics(): void
+    {
+        Storage::fake('local');
+
+        $this->actingAs($this->admin)
+            ->post(route('admin-tech.system-backups.store'), [
+                'backup_type' => 'database_backup',
+                'notes' => 'Technical database backup snapshot.',
+            ])
+            ->assertRedirect(route('admin-tech.system-backups.index'));
+
+        $backup = SystemBackup::query()->latest('backup_id')->firstOrFail();
+
+        $this->assertNotNull($backup->sha256_checksum);
+        $this->assertSame(64, strlen($backup->sha256_checksum));
+        $this->assertIsArray($backup->table_metrics);
+    }
+
     private function createUser(UserRole $role, Office $office, string $email): User
     {
         $roleModel = $this->ensureRole($role);

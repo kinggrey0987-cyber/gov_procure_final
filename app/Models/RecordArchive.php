@@ -22,6 +22,9 @@ class RecordArchive extends Model
         'file_name',
         'file_path',
         'file_size',
+        'sha256_checksum',
+        'record_count',
+        'manifest_summary',
         'generated_by',
         'generated_at',
         'notes',
@@ -30,6 +33,8 @@ class RecordArchive extends Model
     protected $casts = [
         'archive_year' => 'integer',
         'file_size' => 'integer',
+        'record_count' => 'integer',
+        'manifest_summary' => 'array',
         'generated_by' => 'integer',
         'generated_at' => 'datetime',
     ];

@@ -18,7 +18,7 @@ class StoreRecordArchiveRequest extends FormRequest
     {
         return [
             'archive_year' => ['required', 'integer', 'min:2000', 'max:'.((string) (now()->year + 1))],
-            'archive_scope' => ['required', 'string', 'in:governance_yearly'],
+            'archive_scope' => ['required', 'string', 'in:annual_procurement_dossier,coa_compliance_package,governance_audit_trail,financial_contracts,governance_yearly'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ];
     }

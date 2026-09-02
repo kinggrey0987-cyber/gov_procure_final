@@ -36,6 +36,9 @@ class RecordArchiveController extends Controller
             'archive_scope' => (string) $record->archive_scope,
             'file_name' => (string) $record->file_name,
             'file_size' => $record->file_size,
+            'sha256_checksum' => $record->sha256_checksum,
+            'record_count' => (int) ($record->record_count ?? 0),
+            'manifest_summary' => $record->manifest_summary,
             'generated_at' => optional($record->generated_at)?->toIso8601String(),
             'generated_by' => $record->generator ? [
                 'id' => (int) $record->generator->id,
@@ -46,10 +49,18 @@ class RecordArchiveController extends Controller
             'can_delete' => $request->user()?->can('executive.record-archive.delete', $record) ?? false,
         ]);
 
+        $telemetry = $this->recordArchiveService->getArchiveStorageStats();
+
         return Inertia::render('Executive/RecordArchives/Index', [
             'records' => $records,
-            'archiveScopes' => ['governance_yearly'],
-            'yearOptions' => range(now()->year, 2000),
+            'telemetry' => $telemetry,
+            'archiveScopes' => [
+                'annual_procurement_dossier',
+                'coa_compliance_package',
+                'governance_audit_trail',
+                'financial_contracts',
+            ],
+            'yearOptions' => [2026, 2025, 2024],
         ]);
     }
 

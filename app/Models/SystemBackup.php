@@ -21,6 +21,8 @@ class SystemBackup extends Model
         'file_name',
         'file_path',
         'file_size',
+        'sha256_checksum',
+        'table_metrics',
         'payload',
         'created_by',
         'created_at',
@@ -30,6 +32,7 @@ class SystemBackup extends Model
 
     protected $casts = [
         'file_size' => 'integer',
+        'table_metrics' => 'array',
         'payload' => 'array',
         'created_by' => 'integer',
         'created_at' => 'datetime',

@@ -34,6 +34,8 @@ class SystemBackupController extends Controller
             'backup_type' => (string) $record->backup_type,
             'file_name' => (string) $record->file_name,
             'file_size' => $record->file_size,
+            'sha256_checksum' => $record->sha256_checksum,
+            'table_metrics' => $record->table_metrics,
             'backup_status' => (string) $record->backup_status,
             'created_at' => optional($record->created_at)?->toIso8601String(),
             'created_by' => $record->creator ? [
@@ -49,8 +51,11 @@ class SystemBackupController extends Controller
             'can_delete' => $request->user()?->can('admin.system-backup.delete', $record) ?? false,
         ]);
 
+        $telemetry = $this->systemBackupService->getBackupStorageStats();
+
         return Inertia::render('AdminTech/SystemBackups/Index', [
             'records' => $records,
+            'telemetry' => $telemetry,
             'backupTypes' => ['database_backup', 'server_backup', 'storage_backup'],
             'backupStatuses' => ['completed', 'failed', 'pending'],
         ]);
