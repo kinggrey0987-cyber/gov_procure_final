@@ -430,35 +430,102 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
 
             // 6. Public Transparency Disclosures for the Fiscal Year
             $pubDate = Carbon::create($year, 12, 28);
-            PublicDisclosure::query()->updateOrCreate(
-                ['title' => sprintf('FY %d Annual Procurement Transparency Package', $year)],
-                [
-                    'type' => 'ANNUAL_PROCUREMENT_PLAN',
-                    'reference_type' => Ppmp::class,
-                    'reference_id' => 1,
-                    'description' => sprintf('Certified Annual Procurement & Physical Property Report for Fiscal Year %d in compliance with COA Circular & RA 9184.', $year),
-                    'status' => 'PUBLISHED',
-                    'published_by' => $execUser->id,
-                    'published_at' => $pubDate,
-                    'created_at' => $pubDate,
-                    'updated_at' => $pubDate,
-                ]
-            );
+            $yearPpmp = Ppmp::query()->where('fiscal_year', $year)->first();
+            $yearPo = PurchaseOrder::query()->whereYear('created_at', $year)->first();
+            $packageService = app(\App\Services\Executive\PublicDisclosurePackageService::class);
 
-            PublicDisclosure::query()->updateOrCreate(
-                ['title' => sprintf('FY %d Consolidated Purchase Order Award Summary', $year)],
-                [
-                    'type' => 'PROCUREMENT_PACKAGE',
-                    'reference_type' => PurchaseOrder::class,
-                    'reference_id' => 1,
-                    'description' => sprintf('Public transparency summary of all completed purchase orders and supplier disbursements for Fiscal Year %d.', $year),
-                    'status' => 'PUBLISHED',
-                    'published_by' => $execUser->id,
-                    'published_at' => $pubDate->copy()->subDays(5),
-                    'created_at' => $pubDate->copy()->subDays(5),
-                    'updated_at' => $pubDate->copy()->subDays(5),
-                ]
-            );
+            if ($yearPpmp instanceof Ppmp) {
+                $ppmpTitle = sprintf('FY %d Annual Procurement Transparency Package', $year);
+                $reportPath = $this->writeDisclosureMainFile(
+                    title: $ppmpTitle,
+                    type: 'ANNUAL_PROCUREMENT_PLAN',
+                    referenceType: Ppmp::class,
+                    referenceId: (int) $yearPpmp->ppmp_id,
+                );
+
+                $disclosurePpmp = PublicDisclosure::query()->updateOrCreate(
+                    ['title' => $ppmpTitle],
+                    [
+                        'type' => 'ANNUAL_PROCUREMENT_PLAN',
+                        'reference_type' => Ppmp::class,
+                        'reference_id' => (int) $yearPpmp->ppmp_id,
+                        'description' => sprintf('Certified Annual Procurement & Physical Property Report for Fiscal Year %d in compliance with COA Circular & RA 9184.', $year),
+                        'file_path' => $reportPath,
+                        'status' => 'PUBLISHED',
+                        'published_by' => $execUser->id,
+                        'published_at' => $pubDate,
+                        'created_at' => $pubDate,
+                        'updated_at' => $pubDate,
+                    ]
+                );
+
+                $this->syncDisclosureAttachments(
+                    disclosure: $disclosurePpmp,
+                    actor: $execUser,
+                    attachments: [
+                        [
+                            'title' => sprintf('FY %d PPMP Annual Procurement Plan Matrix', $year),
+                            'suffix' => sprintf('fy-%d-ppmp-matrix.csv', $year),
+                            'body' => "fiscal_year,office_id,total_budget,status\n{$year},{$yearPpmp->office_id},{$yearPpmp->total_estimated_budget},APPROVED\n",
+                        ],
+                        [
+                            'title' => sprintf('FY %d Executive Procurement Certification', $year),
+                            'suffix' => sprintf('fy-%d-executive-certification.txt', $year),
+                            'body' => "Republic of the Philippines\nMunicipality of GovProcure\n\nExecutive Certification of Compliance\nFiscal Year: {$year}\nSigned by Executive Officer\nStatus: APPROVED AND DISCLOSED\n",
+                        ],
+                    ],
+                );
+
+                try {
+                    $packageService->ensureOfficialPackageAttachment($disclosurePpmp, $execUser);
+                } catch (\Throwable $e) {
+                    $packageService->syncSources($disclosurePpmp);
+                }
+            }
+
+            if ($yearPo instanceof PurchaseOrder) {
+                $poTitle = sprintf('FY %d Consolidated Purchase Order Award Summary', $year);
+                $poReportPath = $this->writeDisclosureMainFile(
+                    title: $poTitle,
+                    type: 'PROCUREMENT_PACKAGE',
+                    referenceType: PurchaseOrder::class,
+                    referenceId: (int) $yearPo->purchase_order_id,
+                );
+
+                $disclosurePo = PublicDisclosure::query()->updateOrCreate(
+                    ['title' => $poTitle],
+                    [
+                        'type' => 'PROCUREMENT_PACKAGE',
+                        'reference_type' => PurchaseOrder::class,
+                        'reference_id' => (int) $yearPo->purchase_order_id,
+                        'description' => sprintf('Public transparency summary of all completed purchase orders and supplier disbursements for Fiscal Year %d.', $year),
+                        'file_path' => $poReportPath,
+                        'status' => 'PUBLISHED',
+                        'published_by' => $execUser->id,
+                        'published_at' => $pubDate->copy()->subDays(5),
+                        'created_at' => $pubDate->copy()->subDays(5),
+                        'updated_at' => $pubDate->copy()->subDays(5),
+                    ]
+                );
+
+                $this->syncDisclosureAttachments(
+                    disclosure: $disclosurePo,
+                    actor: $execUser,
+                    attachments: [
+                        [
+                            'title' => sprintf('FY %d Purchase Order Award Notice', $year),
+                            'suffix' => sprintf('fy-%d-po-award-notice.txt', $year),
+                            'body' => "Purchase Order Award Transparency Notice\nFiscal Year: {$year}\nPO Reference: {$yearPo->po_number}\nAmount: ₱".number_format((float) $yearPo->total_amount, 2)."\nStatus: COMPLETED\n",
+                        ],
+                    ],
+                );
+
+                try {
+                    $packageService->ensureOfficialPackageAttachment($disclosurePo, $execUser);
+                } catch (\Throwable $e) {
+                    $packageService->syncSources($disclosurePo);
+                }
+            }
 
             // 7. Resolved Historical Claim for realism
             $sampleDist = DistributionRecord::query()->whereYear('created_at', $year)->first();
@@ -488,5 +555,80 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
                 );
             }
         });
+    }
+
+    private function publicDisk(): string
+    {
+        return (string) config('filesystems.public_disk', 'public');
+    }
+
+    private function putSafely(string $path, string $content): void
+    {
+        $primaryDisk = $this->publicDisk();
+        try {
+            Storage::disk($primaryDisk)->put($path, $content);
+            return;
+        } catch (\Throwable) {
+            if ($primaryDisk !== 'public') {
+                try {
+                    Storage::disk('public')->put($path, $content);
+                    return;
+                } catch (\Throwable) {
+                    // Fallback
+                }
+            }
+            Storage::disk('local')->put($path, $content);
+        }
+    }
+
+    private function writeDisclosureMainFile(string $title, string $type, string $referenceType, int $referenceId): string
+    {
+        $slug = strtolower(str_replace(' ', '-', trim($title)));
+        $path = sprintf('reports/public_disclosures/%s.txt', $slug);
+
+        $this->putSafely(
+            $path,
+            implode("\n", [
+                'GovSupply Connect Public Disclosure Report',
+                'Title: '.$title,
+                'Type: '.$type,
+                'Reference Type: '.$referenceType,
+                'Reference ID: '.$referenceId,
+                'Generated At: '.Carbon::now()->toIso8601String(),
+            ])."\n"
+        );
+
+        return $path;
+    }
+
+    /**
+     * @param  array<int, array{title: string, suffix: string, body: string}>  $attachments
+     */
+    private function syncDisclosureAttachments(PublicDisclosure $disclosure, User $actor, array $attachments): void
+    {
+        foreach ($attachments as $attachment) {
+            $path = sprintf(
+                'documents/public_disclosures/%d/%s',
+                (int) $disclosure->disclosure_id,
+                (string) $attachment['suffix'],
+            );
+
+            $this->putSafely($path, (string) $attachment['body']);
+
+            Document::query()->updateOrCreate(
+                [
+                    'related_module' => 'public_disclosures',
+                    'related_reference_id' => (int) $disclosure->disclosure_id,
+                    'title' => (string) $attachment['title'],
+                ],
+                [
+                    'uploaded_by' => (int) $actor->id,
+                    'file_name' => basename($path),
+                    'document_kind' => 'PUBLIC_DISCLOSURE_ATTACHMENT',
+                    'file_path' => $path,
+                    'uploaded_at' => now(),
+                ]
+            );
+        }
     }
 }

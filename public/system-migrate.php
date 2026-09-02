@@ -57,6 +57,10 @@ try {
             ]);
             $output = \Illuminate\Support\Facades\Artisan::output();
             break;
+        case 'refresh-disclosures':
+            \Illuminate\Support\Facades\Artisan::call('disclosures:refresh-packages');
+            $output = \Illuminate\Support\Facades\Artisan::output();
+            break;
         case 'clear-cache':
             \Illuminate\Support\Facades\Artisan::call('optimize:clear');
             $output = \Illuminate\Support\Facades\Artisan::output();
@@ -88,6 +92,7 @@ echo "<p style='color:#aaa;'><strong>Other Actions:</strong></p>";
 echo "<ul style='color:#aaa;'>";
 echo "<li><a href='system-migrate.php?key=deploy-secret-2026&action=migrate' style='color:#4af626;'>Run Migrations (migrate)</a></li>";
 echo "<li><a href='system-migrate.php?key=deploy-secret-2026&action=seed-multiyear' style='color:#4af626;'>Seed 3-Year Historical Data (seed-multiyear)</a></li>";
+echo "<li><a href='system-migrate.php?key=deploy-secret-2026&action=refresh-disclosures' style='color:#4af626;'>Refresh All Disclosure Packages (refresh-disclosures)</a></li>";
 echo "<li><a href='system-migrate.php?key=deploy-secret-2026&action=clear-cache' style='color:#4af626;'>Clear All Caches (clear-cache)</a></li>";
 echo "<li><a href='system-migrate.php?key=deploy-secret-2026&action=status' style='color:#4af626;'>Check Migration Status (status)</a></li>";
 echo "</ul>";
