@@ -42,6 +42,13 @@ try {
             \Illuminate\Support\Facades\Artisan::call('db:seed', ['--force' => true]);
             $output = \Illuminate\Support\Facades\Artisan::output();
             break;
+        case 'seed-multiyear':
+            \Illuminate\Support\Facades\Artisan::call('db:seed', [
+                '--class' => 'Database\\Seeders\\MultiYearHistoricalProcurementSeeder',
+                '--force' => true,
+            ]);
+            $output = \Illuminate\Support\Facades\Artisan::output();
+            break;
         case 'seed-catalog':
         case 'seed-items':
             \Illuminate\Support\Facades\Artisan::call('db:seed', [
@@ -80,6 +87,7 @@ echo "<hr style='border-color:#333;margin:20px 0;'>";
 echo "<p style='color:#aaa;'><strong>Other Actions:</strong></p>";
 echo "<ul style='color:#aaa;'>";
 echo "<li><a href='system-migrate.php?key=deploy-secret-2026&action=migrate' style='color:#4af626;'>Run Migrations (migrate)</a></li>";
+echo "<li><a href='system-migrate.php?key=deploy-secret-2026&action=seed-multiyear' style='color:#4af626;'>Seed 3-Year Historical Data (seed-multiyear)</a></li>";
 echo "<li><a href='system-migrate.php?key=deploy-secret-2026&action=clear-cache' style='color:#4af626;'>Clear All Caches (clear-cache)</a></li>";
 echo "<li><a href='system-migrate.php?key=deploy-secret-2026&action=status' style='color:#4af626;'>Check Migration Status (status)</a></li>";
 echo "</ul>";

@@ -835,6 +835,13 @@ Route::get('/system-migrate', function () {
                 \Illuminate\Support\Facades\Artisan::call('db:seed', ['--force' => true]);
                 $output = \Illuminate\Support\Facades\Artisan::output();
                 break;
+            case 'seed-multiyear':
+                \Illuminate\Support\Facades\Artisan::call('db:seed', [
+                    '--class' => 'Database\\Seeders\\MultiYearHistoricalProcurementSeeder',
+                    '--force' => true,
+                ]);
+                $output = \Illuminate\Support\Facades\Artisan::output();
+                break;
             case 'seed-catalog':
             case 'seed-items':
                 \Illuminate\Support\Facades\Artisan::call('db:seed', [
@@ -864,7 +871,7 @@ Route::get('/system-migrate', function () {
         $output = 'Error: '.$e->getMessage();
     }
 
-    return response("<!DOCTYPE html><html><head><title>System Migration - {$action}</title></head><body style='background:#121212;color:#fff;font-family:monospace;padding:30px;'><div style='background:#1e1e1e;color:#4af626;padding:24px;font-size:14px;border-radius:8px;max-width:900px;margin:0 auto;border:1px solid #333;'><h2 style='margin-top:0;color:#4af626;'>Action: " . htmlspecialchars($action) . "</h2><pre style='white-space:pre-wrap;word-break:break-all;font-size:13px;line-height:1.6;'>" . htmlspecialchars($output) . "</pre><hr style='border-color:#333;margin:20px 0;'><p style='color:#aaa;'><strong>Other Actions:</strong></p><ul style='color:#aaa;'><li><a href='/system-migrate?key=deploy-secret-2026&action=migrate' style='color:#4af626;'>Run Migrations (migrate)</a></li><li><a href='/system-migrate?key=deploy-secret-2026&action=clear-cache' style='color:#4af626;'>Clear All Caches (clear-cache)</a></li><li><a href='/system-migrate?key=deploy-secret-2026&action=status' style='color:#4af626;'>Check Migration Status (status)</a></li></ul></div></body></html>")->header('Content-Type', 'text/html');
+    return response("<!DOCTYPE html><html><head><title>System Migration - {$action}</title></head><body style='background:#121212;color:#fff;font-family:monospace;padding:30px;'><div style='background:#1e1e1e;color:#4af626;padding:24px;font-size:14px;border-radius:8px;max-width:900px;margin:0 auto;border:1px solid #333;'><h2 style='margin-top:0;color:#4af626;'>Action: " . htmlspecialchars($action) . "</h2><pre style='white-space:pre-wrap;word-break:break-all;font-size:13px;line-height:1.6;'>" . htmlspecialchars($output) . "</pre><hr style='border-color:#333;margin:20px 0;'><p style='color:#aaa;'><strong>Other Actions:</strong></p><ul style='color:#aaa;'><li><a href='/system-migrate?key=deploy-secret-2026&action=migrate' style='color:#4af626;'>Run Migrations (migrate)</a></li><li><a href='/system-migrate?key=deploy-secret-2026&action=seed-multiyear' style='color:#4af626;'>Seed 3-Year Historical Data (seed-multiyear)</a></li><li><a href='/system-migrate?key=deploy-secret-2026&action=clear-cache' style='color:#4af626;'>Clear All Caches (clear-cache)</a></li><li><a href='/system-migrate?key=deploy-secret-2026&action=status' style='color:#4af626;'>Check Migration Status (status)</a></li></ul></div></body></html>")->header('Content-Type', 'text/html');
 });
 
 

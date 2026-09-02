@@ -29,6 +29,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             SampleUsersSeeder::class,
             LongitudinalDemoWorkflowSeeder::class,
+            MultiYearHistoricalProcurementSeeder::class,
             ExecutiveDisclosureDemoSeeder::class,
             GovernanceOpsDemoSeeder::class,
         ]);
