@@ -268,6 +268,7 @@ class RequestWorkflowController
                     'supply_request_item_id' => (int) $item->supply_request_item_id,
                     'item_name' => (string) ($item->item?->item_name ?? $item->item_name_snapshot ?? 'Unknown Item'),
                     'unit' => (string) ($item->item?->default_unit ?? 'UNIT'),
+                    'pieces_per_box' => (int) ($item->item?->pieces_per_box ?? 1),
                     'quantity_requested' => round($requested, 2),
                     'available_stock' => round($available, 2),
                     'shortage' => round($shortage, 2),

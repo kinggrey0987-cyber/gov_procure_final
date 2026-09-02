@@ -12,6 +12,7 @@ type ItemOption = {
     item_category_id: number;
     item_category_name: string;
     default_unit?: string | null;
+    pieces_per_box?: number | null;
 };
 
 type ExistingItem = {
@@ -23,7 +24,7 @@ type ExistingItem = {
     estimated_budget?: number;
     procurement_schedule: string;
     remarks?: string | null;
-    item?: { item_name?: string | null; default_unit?: string | null } | null;
+    item?: { item_name?: string | null; default_unit?: string | null; pieces_per_box?: number | null } | null;
 };
 
 type PpmpItemDraft = {
@@ -249,8 +250,14 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                         <div className="space-y-3">
                             {ppmp.items.map((item) => {
                                 const row = editingRows[item.ppmp_item_id];
-                                const estimatedBudget = Number(row.quantity || 0) * Number(row.unit_cost || 0);
-                                const unit = row.item?.default_unit || itemOptionById.get(String(row.item_id))?.default_unit || '-';
+                                const selectedOption = itemOptionById.get(String(row.item_id));
+                                const piecesPerBox = row.item?.pieces_per_box ?? selectedOption?.pieces_per_box ?? 1;
+                                const qtyNum = Number(row.quantity || 0);
+                                const unitCostNum = Number(row.unit_cost || 0);
+                                const totalPieces = qtyNum * piecesPerBox;
+                                const estimatedBudget = qtyNum * unitCostNum;
+                                const costPerPiece = piecesPerBox > 0 ? unitCostNum / piecesPerBox : unitCostNum;
+                                const unit = row.item?.default_unit || selectedOption?.default_unit || 'box';
                                 const isRowComplete = isPpmpItemComplete(row);
 
                                 return (
@@ -271,7 +278,7 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                                             </label>
 
                                             <label className="block">
-                                                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Quantity</span>
+                                                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Quantity ({unit})</span>
                                                 <input
                                                     type="number"
                                                     min="1"
@@ -280,21 +287,30 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                                                     onChange={(event) => setEditingRows({ ...editingRows, [item.ppmp_item_id]: { ...row, quantity: Number(event.target.value) } })}
                                                     required
                                                 />
-                                                <span className="mt-1 block text-xs text-slate-500">Quantity: {row.quantity || 0} {unit}</span>
+                                                <div className="mt-1 text-xs text-slate-600">
+                                                    <span>
+                                                        {qtyNum} {unit}
+                                                        {piecesPerBox > 1 ? (
+                                                            <span className="text-indigo-600 font-semibold ml-1">
+                                                                = {totalPieces.toLocaleString()} pcs
+                                                            </span>
+                                                        ) : null}
+                                                    </span>
+                                                </div>
                                             </label>
 
                                             <label className="block">
-                                                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Unit</span>
+                                                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Packaging Unit</span>
                                                 <input
                                                     type="text"
                                                     className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm"
-                                                    value={unit}
+                                                    value={unit + (piecesPerBox > 1 ? ` (${piecesPerBox} pcs/${unit})` : '')}
                                                     readOnly
                                                 />
                                             </label>
 
                                             <label className="block">
-                                                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Unit Cost</span>
+                                                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Unit Cost (₱/{unit})</span>
                                                 <input
                                                     type="number"
                                                     min="0.01"
@@ -304,14 +320,19 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                                                     onChange={(event) => setEditingRows({ ...editingRows, [item.ppmp_item_id]: { ...row, unit_cost: Number(event.target.value) } })}
                                                     required
                                                 />
+                                                {unitCostNum > 0 && piecesPerBox > 1 ? (
+                                                    <span className="mt-1 block text-xs text-emerald-700 font-medium">
+                                                        ≈ ₱{costPerPiece.toFixed(2)}/pc
+                                                    </span>
+                                                ) : null}
                                             </label>
 
                                             <label className="block">
                                                 <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Estimated Budget</span>
                                                 <input
                                                     type="text"
-                                                    className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm"
-                                                    value={estimatedBudget.toFixed(2)}
+                                                    className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800"
+                                                    value={`₱${estimatedBudget.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                                                     readOnly
                                                 />
                                             </label>
@@ -381,54 +402,90 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                         <h4 className="text-xl font-semibold text-slate-800">Add New Item</h4>
                         <p className="mt-1 text-sm text-slate-600">Add a planning line to this PPMP using the required fields. The same catalog item cannot be repeated for the same procurement quarter.</p>
                     </div>
-                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-                        <label className="block xl:col-span-2">
-                            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Item</span>
-                            <select className={`w-full rounded-lg border px-3 py-2 text-sm ${newItemDuplicateMessage ? 'border-amber-300 bg-amber-50' : 'border-slate-300'}`} value={newItem.data.item_id} onChange={(event) => onOptionChange(event.target.value)} required>
-                                <option value="">Select Item</option>
-                                {itemOptions.map((option) => (
-                                    <option key={option.item_id} value={option.item_id}>{option.item_name}</option>
-                                ))}
-                            </select>
-                            <InputError message={newItem.errors.item_id} className="mt-1" />
-                        </label>
+                    {(() => {
+                        const selectedNewOpt = itemOptionById.get(newItem.data.item_id);
+                        const newUnit = selectedNewOpt?.default_unit || 'box';
+                        const newPieces = selectedNewOpt?.pieces_per_box || 1;
+                        const newQtyNum = Number(newItem.data.quantity || 0);
+                        const newCostNum = Number(newItem.data.unit_cost || 0);
+                        const newTotalPieces = newQtyNum * newPieces;
+                        const newSubtotal = newQtyNum * newCostNum;
+                        const newCostPerPiece = newPieces > 0 ? newCostNum / newPieces : newCostNum;
 
-                        <label className="block">
-                            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Quantity</span>
-                            <input type="number" min="1" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={newItem.data.quantity} onChange={(event) => newItem.setData('quantity', event.target.value)} required />
-                            <span className="mt-1 block text-xs text-slate-500">Quantity: {newItem.data.quantity || 0} {selectedNewItemUnit}</span>
-                            <InputError message={newItem.errors.quantity} className="mt-1" />
-                        </label>
+                        return (
+                            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+                                <label className="block xl:col-span-2">
+                                    <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Item</span>
+                                    <select className={`w-full rounded-lg border px-3 py-2 text-sm ${newItemDuplicateMessage ? 'border-amber-300 bg-amber-50' : 'border-slate-300'}`} value={newItem.data.item_id} onChange={(event) => onOptionChange(event.target.value)} required>
+                                        <option value="">Select Item</option>
+                                        {itemOptions.map((option) => (
+                                            <option key={option.item_id} value={option.item_id}>
+                                                {option.item_name} {option.pieces_per_box && option.pieces_per_box > 1 ? `(${option.pieces_per_box} pcs/${option.default_unit || 'box'})` : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <InputError message={newItem.errors.item_id} className="mt-1" />
+                                </label>
 
-                        <label className="block">
-                            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Unit</span>
-                            <input type="text" className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm" value={selectedNewItemUnit} readOnly />
-                        </label>
+                                <label className="block">
+                                    <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Quantity ({newUnit})</span>
+                                    <input type="number" min="1" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={newItem.data.quantity} onChange={(event) => newItem.setData('quantity', event.target.value)} required />
+                                    <div className="mt-1 text-xs text-slate-600">
+                                        <span>
+                                            {newQtyNum} {newUnit}
+                                            {newPieces > 1 ? (
+                                                <span className="text-indigo-600 font-semibold ml-1">
+                                                    = {newTotalPieces.toLocaleString()} pcs
+                                                </span>
+                                            ) : null}
+                                        </span>
+                                    </div>
+                                    <InputError message={newItem.errors.quantity} className="mt-1" />
+                                </label>
 
-                        <label className="block">
-                            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Unit Cost</span>
-                            <input type="number" min="0.01" step="0.01" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={newItem.data.unit_cost} onChange={(event) => newItem.setData('unit_cost', event.target.value)} required />
-                            <InputError message={newItem.errors.unit_cost} className="mt-1" />
-                        </label>
+                                <label className="block">
+                                    <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Packaging Unit</span>
+                                    <input type="text" className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm" value={newUnit + (newPieces > 1 ? ` (${newPieces} pcs/${newUnit})` : '')} readOnly />
+                                </label>
 
-                        <label className="block">
-                            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Procurement Schedule</span>
-                            <select className={`w-full rounded-lg border px-3 py-2 text-sm ${newItemDuplicateMessage ? 'border-amber-300 bg-amber-50' : 'border-slate-300'}`} value={newItem.data.procurement_schedule} onChange={(event) => newItem.setData('procurement_schedule', event.target.value)} required>
-                                <option value="">Select Quarter</option>
-                                {QUARTER_OPTIONS.map((quarter) => (
-                                    <option key={quarter} value={quarter}>{quarter}</option>
-                                ))}
-                            </select>
-                            <InputError message={newItem.errors.procurement_schedule} className="mt-1" />
-                        </label>
+                                <label className="block">
+                                    <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Unit Cost (₱/{newUnit})</span>
+                                    <input type="number" min="0.01" step="0.01" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={newItem.data.unit_cost} onChange={(event) => newItem.setData('unit_cost', event.target.value)} required />
+                                    <div className="mt-1 flex flex-wrap items-center justify-between text-xs text-slate-600">
+                                        {newCostNum > 0 && newPieces > 1 ? (
+                                            <span className="text-emerald-700 font-medium">
+                                                ≈ ₱{newCostPerPiece.toFixed(2)}/pc
+                                            </span>
+                                        ) : <span />}
+                                        {newSubtotal > 0 ? (
+                                            <span className="font-semibold text-slate-800">
+                                                ₱{newSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </span>
+                                        ) : null}
+                                    </div>
+                                    <InputError message={newItem.errors.unit_cost} className="mt-1" />
+                                </label>
 
-                        <label className="block xl:col-span-2">
-                            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Item Specification</span>
-                            <input type="text" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={newItem.data.remarks} onChange={(event) => newItem.setData('remarks', event.target.value)} placeholder="Required item specification for SR and PO" required />
-                            <span className="mt-1 block text-xs text-slate-500">This becomes the item specification shown on Supply Requests and auto-filled on Purchase Orders.</span>
-                            <InputError message={newItem.errors.remarks} className="mt-1" />
-                        </label>
-                    </div>
+                                <label className="block">
+                                    <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Procurement Schedule</span>
+                                    <select className={`w-full rounded-lg border px-3 py-2 text-sm ${newItemDuplicateMessage ? 'border-amber-300 bg-amber-50' : 'border-slate-300'}`} value={newItem.data.procurement_schedule} onChange={(event) => newItem.setData('procurement_schedule', event.target.value)} required>
+                                        <option value="">Select Quarter</option>
+                                        {QUARTER_OPTIONS.map((quarter) => (
+                                            <option key={quarter} value={quarter}>{quarter}</option>
+                                        ))}
+                                    </select>
+                                    <InputError message={newItem.errors.procurement_schedule} className="mt-1" />
+                                </label>
+
+                                <label className="block xl:col-span-2">
+                                    <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Item Specification</span>
+                                    <input type="text" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={newItem.data.remarks} onChange={(event) => newItem.setData('remarks', event.target.value)} placeholder="Required item specification for SR and PO" required />
+                                    <span className="mt-1 block text-xs text-slate-500">This becomes the item specification shown on Supply Requests and auto-filled on Purchase Orders.</span>
+                                    <InputError message={newItem.errors.remarks} className="mt-1" />
+                                </label>
+                            </div>
+                        );
+                    })()}
 
                     <InputError message={newItem.errors.item_category_id} className="mt-1" />
 

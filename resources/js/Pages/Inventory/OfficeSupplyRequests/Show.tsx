@@ -22,6 +22,7 @@ type Props = {
             supply_request_item_id: number;
             item_name: string;
             unit: string;
+            pieces_per_box?: number | null;
             quantity_requested: number;
             available_stock: number;
             shortage: number;
@@ -93,14 +94,39 @@ export default function InventoryOfficeSupplyRequestShow({ request, backFilters 
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {request.items.map((item) => (
+                            {request.items.map((item) => {
+                                const piecesPerBox = item.pieces_per_box ?? 1;
+
+                                return (
                                 <tr key={item.supply_request_item_id}>
-                                    <td className="px-4 py-3 text-slate-700">{item.item_name}</td>
-                                    <td className="px-4 py-3 text-slate-700">{item.quantity_requested.toFixed(2)} {item.unit}</td>
-                                    <td className="px-4 py-3 text-slate-700">{item.available_stock.toFixed(2)}</td>
-                                    <td className="px-4 py-3 text-slate-700">{item.shortage.toFixed(2)}</td>
+                                    <td className="px-4 py-3 text-slate-700 font-medium">{item.item_name}</td>
+                                    <td className="px-4 py-3 text-slate-700 font-semibold">
+                                        <span>{item.quantity_requested.toFixed(2)} {item.unit}</span>
+                                        {piecesPerBox > 1 ? (
+                                            <span className="block text-xs font-semibold text-indigo-700">
+                                                ({(item.quantity_requested * piecesPerBox).toLocaleString()} pcs total @ {piecesPerBox} pcs/{item.unit})
+                                            </span>
+                                        ) : null}
+                                    </td>
+                                    <td className="px-4 py-3 text-slate-700">
+                                        <span>{item.available_stock.toFixed(2)} {item.unit}</span>
+                                        {piecesPerBox > 1 ? (
+                                            <span className="block text-xs text-slate-500">
+                                                ({(item.available_stock * piecesPerBox).toLocaleString()} pcs)
+                                            </span>
+                                        ) : null}
+                                    </td>
+                                    <td className="px-4 py-3 text-slate-700">
+                                        <span>{item.shortage.toFixed(2)} {item.unit}</span>
+                                        {piecesPerBox > 1 && item.shortage > 0 ? (
+                                            <span className="block text-xs text-rose-600 font-medium">
+                                                ({(item.shortage * piecesPerBox).toLocaleString()} pcs shortage)
+                                            </span>
+                                        ) : null}
+                                    </td>
                                 </tr>
-                            ))}
+                                );
+                            })}
                             {request.items.length === 0 ? (
                                 <tr>
                                     <td colSpan={4} className="px-4 py-8 text-center text-sm text-slate-500">

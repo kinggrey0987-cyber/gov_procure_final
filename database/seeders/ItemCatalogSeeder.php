@@ -57,6 +57,7 @@ class ItemCatalogSeeder extends Seeder
                 'category_name' => 'Office Supplies',
                 'description' => 'A4 white copy paper, 80 GSM (Box of 5 reams).',
                 'default_unit' => 'box',
+                'pieces_per_box' => 5,
                 'status' => 'active',
             ],
             [
@@ -64,6 +65,7 @@ class ItemCatalogSeeder extends Seeder
                 'category_name' => 'Office Supplies',
                 'description' => 'Black ink ballpoint pen (Box of 50 pcs).',
                 'default_unit' => 'box',
+                'pieces_per_box' => 50,
                 'status' => 'active',
             ],
             [
@@ -71,6 +73,7 @@ class ItemCatalogSeeder extends Seeder
                 'category_name' => 'Office Supplies',
                 'description' => 'Standard filing folder (Pack of 100 pcs).',
                 'default_unit' => 'pack',
+                'pieces_per_box' => 100,
                 'status' => 'active',
             ],
             [
@@ -78,6 +81,7 @@ class ItemCatalogSeeder extends Seeder
                 'category_name' => 'Office Supplies',
                 'description' => 'Bound logbook for attendance and office transactions.',
                 'default_unit' => 'book',
+                'pieces_per_box' => 1,
                 'status' => 'active',
             ],
             [
@@ -85,6 +89,7 @@ class ItemCatalogSeeder extends Seeder
                 'category_name' => 'Office Supplies',
                 'description' => 'Heavy-duty staple wire refill (Box of 10,000 pcs).',
                 'default_unit' => 'box',
+                'pieces_per_box' => 10000,
                 'status' => 'active',
             ],
             [
@@ -92,6 +97,7 @@ class ItemCatalogSeeder extends Seeder
                 'category_name' => 'IT Equipment',
                 'description' => 'Portable USB storage device (32GB).',
                 'default_unit' => 'piece',
+                'pieces_per_box' => 1,
                 'status' => 'active',
             ],
             [
@@ -99,6 +105,7 @@ class ItemCatalogSeeder extends Seeder
                 'category_name' => 'IT Equipment',
                 'description' => 'USB computer mouse.',
                 'default_unit' => 'piece',
+                'pieces_per_box' => 1,
                 'status' => 'active',
             ],
             [
@@ -106,6 +113,7 @@ class ItemCatalogSeeder extends Seeder
                 'category_name' => 'IT Equipment',
                 'description' => 'Compatible printer ink cartridge.',
                 'default_unit' => 'cartridge',
+                'pieces_per_box' => 1,
                 'status' => 'active',
             ],
             [
@@ -113,6 +121,7 @@ class ItemCatalogSeeder extends Seeder
                 'category_name' => 'IT Equipment',
                 'description' => 'Laser printer toner cartridge.',
                 'default_unit' => 'cartridge',
+                'pieces_per_box' => 1,
                 'status' => 'active',
             ],
             [
@@ -120,6 +129,7 @@ class ItemCatalogSeeder extends Seeder
                 'category_name' => 'Cleaning Supplies',
                 'description' => 'Isopropyl cleaning solution (Gallon).',
                 'default_unit' => 'gallon',
+                'pieces_per_box' => 1,
                 'status' => 'active',
             ],
             [
@@ -127,6 +137,7 @@ class ItemCatalogSeeder extends Seeder
                 'category_name' => 'Cleaning Supplies',
                 'description' => 'Laundry and surface detergent (Pack of 1kg).',
                 'default_unit' => 'pack',
+                'pieces_per_box' => 1,
                 'status' => 'active',
             ],
             [
@@ -134,6 +145,7 @@ class ItemCatalogSeeder extends Seeder
                 'category_name' => 'Cleaning Supplies',
                 'description' => 'Heavy-duty waste disposal bag (Roll of 50 pcs).',
                 'default_unit' => 'roll',
+                'pieces_per_box' => 50,
                 'status' => 'active',
             ],
             [
@@ -141,6 +153,7 @@ class ItemCatalogSeeder extends Seeder
                 'category_name' => 'Maintenance Supplies',
                 'description' => 'Utility safety gloves for handling materials.',
                 'default_unit' => 'pair',
+                'pieces_per_box' => 1,
                 'status' => 'active',
             ],
             [
@@ -148,6 +161,7 @@ class ItemCatalogSeeder extends Seeder
                 'category_name' => 'Maintenance Supplies',
                 'description' => 'Retractable utility cutter for packaging and office use.',
                 'default_unit' => 'piece',
+                'pieces_per_box' => 1,
                 'status' => 'active',
             ],
         ];
@@ -164,6 +178,7 @@ class ItemCatalogSeeder extends Seeder
                     'item_category_id' => $categoryId,
                     'description' => $item['description'],
                     'default_unit' => $item['default_unit'],
+                    'pieces_per_box' => $item['pieces_per_box'] ?? 1,
                     'status' => $item['status'],
                 ],
             );

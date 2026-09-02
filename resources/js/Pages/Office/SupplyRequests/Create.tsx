@@ -17,6 +17,7 @@ type Option = {
     item_id: number;
     item_name: string;
     default_unit?: string | null;
+    pieces_per_box?: number | null;
     planned_quantity: number;
     requested_quantity: number;
     remaining_quantity: number;
@@ -449,7 +450,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                             />
                                         </Field>
 
-                                        <Field label="Quantity">
+                                        <Field label={`Quantity (${option?.default_unit || 'Units'})`}>
                                             <input
                                                 type="number"
                                                 min="1"
@@ -458,13 +459,30 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                                                 required
                                             />
-                                            <span className="mt-1 block text-xs text-slate-500">Quantity: {item.quantity_requested || 0} {option?.default_unit || '-'}</span>
+                                            {(() => {
+                                                const reqQty = Number(item.quantity_requested || 0);
+                                                const piecesPerBox = option?.pieces_per_box || 1;
+                                                const reqPieces = reqQty * piecesPerBox;
+
+                                                return (
+                                                    <div className="mt-1 text-xs text-slate-600">
+                                                        <span>
+                                                            Requested: <strong className="text-slate-800">{reqQty} {option?.default_unit || 'units'}</strong>
+                                                            {piecesPerBox > 1 ? (
+                                                                <span className="text-indigo-600 font-semibold ml-1">
+                                                                    = {reqPieces.toLocaleString()} pcs ({reqQty} × {piecesPerBox} pcs/{option?.default_unit || 'box'})
+                                                                </span>
+                                                            ) : null}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })()}
                                             {form.errors[`items.${index}.quantity_requested`] ? <p className="mt-1 text-xs text-rose-600">{form.errors[`items.${index}.quantity_requested`]}</p> : null}
                                         </Field>
 
-                                        <Field label="Unit" hint="Auto-filled from the item catalog.">
+                                        <Field label="Packaging Unit" hint="Auto-filled from the item catalog.">
                                             <input
-                                                value={option?.default_unit || '-'}
+                                                value={option?.default_unit ? `${option.default_unit}${option.pieces_per_box && option.pieces_per_box > 1 ? ` (${option.pieces_per_box} pcs/${option.default_unit})` : ''}` : '-'}
                                                 readOnly
                                                 aria-readonly="true"
                                                 className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700"
@@ -473,15 +491,25 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
 
                                     </div>
 
-                                    {option ? (
-                                        <div className="mt-3 grid gap-2 text-xs text-slate-600 md:grid-cols-4">
-                                            <div>Planned: <strong>{option.planned_quantity} {option.default_unit || ''}</strong></div>
-                                            <div>Already requested: <strong>{option.requested_quantity} {option.default_unit || ''}</strong></div>
-                                            <div>Remaining: <strong>{option.remaining_quantity} {option.default_unit || ''}</strong></div>
-                                            <div>PPMP reference unit cost: <strong>{option.suggested_unit_cost}</strong></div>
-                                            <div>Schedule: <strong>{option.procurement_schedule || '-'}</strong></div>
-                                        </div>
-                                    ) : null}
+                                    {option ? (() => {
+                                        const piecesPerBox = option.pieces_per_box || 1;
+                                        const reqQty = Number(item.quantity_requested || 0);
+                                        const postReqBalance = option.remaining_quantity - reqQty;
+
+                                        return (
+                                            <div className="mt-3 grid gap-2 rounded-lg bg-slate-50 p-3 text-xs text-slate-600 md:grid-cols-4">
+                                                <div>Planned: <strong>{option.planned_quantity} {option.default_unit || ''}</strong> {piecesPerBox > 1 ? <span className="text-slate-500">({(option.planned_quantity * piecesPerBox).toLocaleString()} pcs)</span> : null}</div>
+                                                <div>Already Requested: <strong>{option.requested_quantity} {option.default_unit || ''}</strong> {piecesPerBox > 1 ? <span className="text-slate-500">({(option.requested_quantity * piecesPerBox).toLocaleString()} pcs)</span> : null}</div>
+                                                <div>Remaining: <strong className={option.remaining_quantity <= 0 ? 'text-amber-700 font-semibold' : 'text-emerald-700 font-semibold'}>{option.remaining_quantity} {option.default_unit || ''}</strong> {piecesPerBox > 1 ? <span className="text-slate-500">({(option.remaining_quantity * piecesPerBox).toLocaleString()} pcs)</span> : null}</div>
+                                                <div>Packaging Spec: <strong className="text-indigo-700">{piecesPerBox} pcs / {option.default_unit || 'box'}</strong></div>
+                                                {reqQty > 0 && piecesPerBox > 1 ? (
+                                                    <div className="md:col-span-4 mt-1 border-t border-slate-200 pt-1 text-slate-700">
+                                                        Balance after this request: <strong className={postReqBalance < 0 ? 'text-rose-600 font-bold' : 'text-slate-800'}>{postReqBalance} {option.default_unit || 'boxes'} ({(postReqBalance * piecesPerBox).toLocaleString()} pcs)</strong>
+                                                    </div>
+                                                ) : null}
+                                            </div>
+                                        );
+                                    })() : null}
 
                                     {isDuplicate ? (
                                         <div className="mt-2 rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-xs text-rose-900">

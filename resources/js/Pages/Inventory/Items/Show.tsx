@@ -6,6 +6,7 @@ type Item = {
     item_name: string;
     description?: string | null;
     default_unit?: string | null;
+    pieces_per_box?: number | null;
     status: string;
     category?: {
         item_category_id: number;
@@ -58,7 +59,7 @@ export default function ShowItem({ item, canManage }: Props) {
                     <dl className="grid gap-4 md:grid-cols-2">
                         <div>
                             <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Item Name</dt>
-                            <dd className="mt-1 text-sm text-slate-900">{item.item_name}</dd>
+                            <dd className="mt-1 text-sm font-medium text-slate-900">{item.item_name}</dd>
                         </div>
                         <div>
                             <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</dt>
@@ -69,8 +70,15 @@ export default function ShowItem({ item, canManage }: Props) {
                             <dd className="mt-1 text-sm text-slate-900">{item.category?.category_name || '-'}</dd>
                         </div>
                         <div>
-                            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Default Unit</dt>
-                            <dd className="mt-1 text-sm text-slate-900">{item.default_unit || '-'}</dd>
+                            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Packaging Unit</dt>
+                            <dd className="mt-1 text-sm text-slate-900">
+                                <span className="font-medium capitalize">{item.default_unit || '-'}</span>
+                                {item.pieces_per_box ? (
+                                    <span className="ml-2 inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">
+                                        {item.pieces_per_box} pcs / {item.default_unit || 'box'}
+                                    </span>
+                                ) : null}
+                            </dd>
                         </div>
                         <div className="md:col-span-2">
                             <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Description</dt>

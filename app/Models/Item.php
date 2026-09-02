@@ -23,7 +23,12 @@ class Item extends Model
         'item_name',
         'description',
         'default_unit',
+        'pieces_per_box',
         'status',
+    ];
+
+    protected $casts = [
+        'pieces_per_box' => 'integer',
     ];
 
     public function category(): BelongsTo

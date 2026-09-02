@@ -10,6 +10,7 @@ type ItemRow = {
     item_name: string;
     description?: string | null;
     default_unit?: string | null;
+    pieces_per_box?: number | null;
     status: string;
     category?: {
         item_category_id: number;
@@ -167,7 +168,14 @@ export default function ItemCatalogIndex({ items, categories, filters, canManage
                                 <tr key={item.item_id} className="hover:bg-slate-50/60">
                                     <td className="px-4 py-3 text-slate-800">{item.item_name}</td>
                                     <td className="px-4 py-3 text-slate-700">{item.category?.category_name || '-'}</td>
-                                    <td className="px-4 py-3 text-slate-700">{item.default_unit || '-'}</td>
+                                    <td className="px-4 py-3 text-slate-700">
+                                        <span className="capitalize">{item.default_unit || '-'}</span>
+                                        {item.pieces_per_box && item.pieces_per_box > 1 ? (
+                                            <span className="ml-1.5 text-xs text-slate-500">
+                                                ({item.pieces_per_box} pcs/{item.default_unit || 'box'})
+                                            </span>
+                                        ) : null}
+                                    </td>
                                     <td className="px-4 py-3">
                                         <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${item.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700'}`}>
                                             {item.status === 'active' ? 'Active' : 'Inactive'}

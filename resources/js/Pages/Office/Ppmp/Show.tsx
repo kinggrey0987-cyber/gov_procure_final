@@ -10,7 +10,7 @@ type PpmpItem = {
     unit_cost: number;
     procurement_schedule: string;
     remarks?: string | null;
-    item?: { item_name?: string | null; default_unit?: string | null } | null;
+    item?: { item_name?: string | null; default_unit?: string | null; pieces_per_box?: number | null } | null;
 };
 
 type Props = {
@@ -145,17 +145,36 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {ppmp.items.map((item) => (
+                                    {ppmp.items.map((item) => {
+                                        const piecesPerBox = item.item?.pieces_per_box ?? 1;
+                                        const totalPieces = item.quantity * piecesPerBox;
+
+                                        return (
                                         <tr key={item.ppmp_item_id}>
-                                            <td className="px-4 py-3 text-slate-700">{item.item?.item_name ?? `Item #${item.ppmp_item_id}`}</td>
-                                            <td className="px-4 py-3 text-slate-700">{formatQuantity(item.quantity, item.item?.default_unit)}</td>
-                                            <td className="px-4 py-3 text-slate-700">{formatMoney(item.unit_cost)}</td>
-                                            <td className="px-4 py-3 text-slate-700">{formatMoney(item.quantity * item.unit_cost)}</td>
+                                            <td className="px-4 py-3 text-slate-700 font-medium">{item.item?.item_name ?? `Item #${item.ppmp_item_id}`}</td>
+                                            <td className="px-4 py-3 text-slate-700">
+                                                <span>{formatQuantity(item.quantity, item.item?.default_unit)}</span>
+                                                {piecesPerBox > 1 ? (
+                                                    <span className="block text-xs font-semibold text-indigo-700">
+                                                        ({totalPieces.toLocaleString()} pcs total)
+                                                    </span>
+                                                ) : null}
+                                            </td>
+                                            <td className="px-4 py-3 text-slate-700">
+                                                {formatMoney(item.unit_cost)}
+                                                {piecesPerBox > 1 ? (
+                                                    <span className="block text-xs text-slate-500">
+                                                        ≈ ₱{(item.unit_cost / piecesPerBox).toFixed(2)}/pc
+                                                    </span>
+                                                ) : null}
+                                            </td>
+                                            <td className="px-4 py-3 font-semibold text-slate-800">{formatMoney(item.quantity * item.unit_cost)}</td>
                                             <td className="px-4 py-3 text-slate-700">{item.procurement_schedule}</td>
                                             <td className="px-4 py-3"><span className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-800">{getFundSourceLabel(ppmp.fund_source)}</span></td>
                                             <td className="px-4 py-3 text-slate-700">{item.remarks || '-'}</td>
                                         </tr>
-                                    ))}
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>

@@ -24,6 +24,7 @@ export default function CreateItem({ categories, units }: Props) {
         item_name: '',
         item_category_id: categories[0]?.item_category_id ? String(categories[0].item_category_id) : '',
         default_unit: units[0]?.name ?? '',
+        pieces_per_box: '1',
         description: '',
         status: 'active',
     });
@@ -70,7 +71,7 @@ export default function CreateItem({ categories, units }: Props) {
                         </div>
 
                         <div>
-                            <label className="mb-1 block text-sm font-medium text-slate-700">Default Unit</label>
+                            <label className="mb-1 block text-sm font-medium text-slate-700">Packaging / Default Unit</label>
                             <select
                                 value={data.default_unit}
                                 onChange={(event) => setData('default_unit', event.target.value)}
@@ -85,6 +86,21 @@ export default function CreateItem({ categories, units }: Props) {
                             </select>
                             <p className="mt-1 text-xs text-slate-500">Missing a unit? Add it first in Item Units.</p>
                             <InputError message={errors.default_unit} className="mt-1" />
+                        </div>
+
+                        <div>
+                            <label className="mb-1 block text-sm font-medium text-slate-700">Pieces / Items per Box or Package</label>
+                            <input
+                                type="number"
+                                min="1"
+                                value={data.pieces_per_box}
+                                onChange={(event) => setData('pieces_per_box', event.target.value)}
+                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                placeholder="e.g. 50 pcs/box, 100 pcs/pack, 1 pc/unit"
+                                required
+                            />
+                            <p className="mt-1 text-xs text-slate-500">Total individual pieces contained inside 1 unit/box (used for PPMP & requisition calculations).</p>
+                            <InputError message={errors.pieces_per_box} className="mt-1" />
                         </div>
 
                         <div>

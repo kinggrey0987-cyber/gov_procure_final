@@ -20,6 +20,7 @@ type Item = {
     item_category_id: number;
     description?: string | null;
     default_unit?: string | null;
+    pieces_per_box?: number | null;
     status: string;
 };
 
@@ -34,6 +35,7 @@ export default function EditItem({ item, categories, units }: Props) {
         item_name: item.item_name,
         item_category_id: String(item.item_category_id),
         default_unit: item.default_unit ?? '',
+        pieces_per_box: String(item.pieces_per_box ?? 1),
         description: item.description ?? '',
         status: item.status,
     });
@@ -80,7 +82,7 @@ export default function EditItem({ item, categories, units }: Props) {
                         </div>
 
                         <div>
-                            <label className="mb-1 block text-sm font-medium text-slate-700">Default Unit</label>
+                            <label className="mb-1 block text-sm font-medium text-slate-700">Packaging / Default Unit</label>
                             <select
                                 value={data.default_unit}
                                 onChange={(event) => setData('default_unit', event.target.value)}
@@ -95,6 +97,21 @@ export default function EditItem({ item, categories, units }: Props) {
                             </select>
                             <p className="mt-1 text-xs text-slate-500">Missing a unit? Add it first in Item Units.</p>
                             <InputError message={errors.default_unit} className="mt-1" />
+                        </div>
+
+                        <div>
+                            <label className="mb-1 block text-sm font-medium text-slate-700">Pieces / Items per Box or Package</label>
+                            <input
+                                type="number"
+                                min="1"
+                                value={data.pieces_per_box}
+                                onChange={(event) => setData('pieces_per_box', event.target.value)}
+                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                placeholder="e.g. 50 pcs/box, 100 pcs/pack, 1 pc/unit"
+                                required
+                            />
+                            <p className="mt-1 text-xs text-slate-500">Total individual pieces contained inside 1 unit/box (used for PPMP & requisition calculations).</p>
+                            <InputError message={errors.pieces_per_box} className="mt-1" />
                         </div>
 
                         <div>

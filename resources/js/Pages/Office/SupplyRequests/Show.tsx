@@ -28,6 +28,8 @@ type Props = {
             supply_request_item_id: number;
             ppmp_item_id: number;
             item_name_snapshot?: string | null;
+            default_unit?: string | null;
+            pieces_per_box?: number | null;
             quantity_requested: number;
             quantity_released?: number | null;
             quantity_received?: number | null;
@@ -307,19 +309,61 @@ export default function SupplyRequestShow({
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {supplyRequest.items.map((item) => (
+                                    {supplyRequest.items.map((item) => {
+                                        const piecesPerBox = item.pieces_per_box ?? 1;
+                                        const unit = item.default_unit || 'box';
+
+                                        return (
                                         <tr key={item.supply_request_item_id}>
-                                            <td className="px-4 py-3 text-slate-700">{item.item_name_snapshot ?? '-'}</td>
+                                            <td className="px-4 py-3 text-slate-700 font-medium">{item.item_name_snapshot ?? '-'}</td>
                                             <td className="px-4 py-3 text-slate-700">{item.item_specification || '-'}</td>
                                             <td className="px-4 py-3 text-slate-700">#{item.ppmp_item_id}</td>
-                                            <td className="px-4 py-3 text-right font-semibold text-slate-700">{formatNumber(item.quantity_requested)}</td>
-                                            <td className="px-4 py-3 text-right text-slate-700">{formatNumber(item.quantity_released)}</td>
-                                            <td className="px-4 py-3 text-right text-slate-700">{formatNumber(item.quantity_received)}</td>
-                                            <td className="px-4 py-3 text-right text-slate-700">{formatNumber(item.planned_quantity)}</td>
-                                            <td className="px-4 py-3 text-right text-slate-700">{formatNumber(item.already_requested_quantity)}</td>
-                                            <td className="px-4 py-3 text-right text-slate-700">{formatNumber(item.remaining_quantity)}</td>
+                                            <td className="px-4 py-3 text-right font-semibold text-slate-800">
+                                                <span>{formatNumber(item.quantity_requested)} {unit}</span>
+                                                {piecesPerBox > 1 ? (
+                                                    <span className="block text-xs font-semibold text-indigo-700">
+                                                        ({(item.quantity_requested * piecesPerBox).toLocaleString()} pcs)
+                                                    </span>
+                                                ) : null}
+                                            </td>
+                                            <td className="px-4 py-3 text-right text-slate-700">
+                                                <span>{formatNumber(item.quantity_released)} {unit}</span>
+                                                {piecesPerBox > 1 && (item.quantity_released ?? 0) > 0 ? (
+                                                    <span className="block text-xs text-slate-500">
+                                                        ({((item.quantity_released ?? 0) * piecesPerBox).toLocaleString()} pcs)
+                                                    </span>
+                                                ) : null}
+                                            </td>
+                                            <td className="px-4 py-3 text-right text-slate-700">
+                                                <span>{formatNumber(item.quantity_received)} {unit}</span>
+                                                {piecesPerBox > 1 && (item.quantity_received ?? 0) > 0 ? (
+                                                    <span className="block text-xs text-slate-500">
+                                                        ({((item.quantity_received ?? 0) * piecesPerBox).toLocaleString()} pcs)
+                                                    </span>
+                                                ) : null}
+                                            </td>
+                                            <td className="px-4 py-3 text-right text-slate-700">
+                                                <span>{formatNumber(item.planned_quantity)} {unit}</span>
+                                                {piecesPerBox > 1 && item.planned_quantity != null ? (
+                                                    <span className="block text-xs text-slate-500">
+                                                        ({(item.planned_quantity * piecesPerBox).toLocaleString()} pcs)
+                                                    </span>
+                                                ) : null}
+                                            </td>
+                                            <td className="px-4 py-3 text-right text-slate-700">
+                                                <span>{formatNumber(item.already_requested_quantity)} {unit}</span>
+                                            </td>
+                                            <td className="px-4 py-3 text-right text-slate-700 font-medium">
+                                                <span>{formatNumber(item.remaining_quantity)} {unit}</span>
+                                                {piecesPerBox > 1 && item.remaining_quantity != null ? (
+                                                    <span className="block text-xs text-slate-500">
+                                                        ({(item.remaining_quantity * piecesPerBox).toLocaleString()} pcs)
+                                                    </span>
+                                                ) : null}
+                                            </td>
                                         </tr>
-                                    ))}
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>

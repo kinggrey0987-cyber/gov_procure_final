@@ -327,6 +327,8 @@ class SupplyRequestController extends Controller
                     'quantity_requested' => (float) $item->quantity_requested,
                     'quantity_released' => (float) ($releasedByItemId->get($itemId) ?? 0.0),
                     'quantity_received' => (float) ($receivedByItemId->get($itemId) ?? 0.0),
+                    'default_unit' => isset($context['default_unit']) ? (string) $context['default_unit'] : (string) ($item->item?->default_unit ?? 'box'),
+                    'pieces_per_box' => isset($context['pieces_per_box']) ? (int) $context['pieces_per_box'] : (int) ($item->item?->pieces_per_box ?? 1),
                     'planned_quantity' => isset($context['planned_quantity']) ? (float) $context['planned_quantity'] : null,
                     'already_requested_quantity' => isset($context['requested_quantity']) ? (float) $context['requested_quantity'] : null,
                     'remaining_quantity' => isset($context['remaining_quantity']) ? (float) $context['remaining_quantity'] : null,
