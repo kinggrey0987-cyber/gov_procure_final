@@ -14,6 +14,9 @@ type Props = {
         low_stock_threshold: string;
         item?: {
             item_name?: string;
+            default_unit?: string;
+            pieces_per_box?: number;
+            sub_unit?: string;
             category?: {
                 category_name?: string;
             };
@@ -29,6 +32,14 @@ type Props = {
 
 export default function InventoryShow({ inventory, recentMovements }: Props) {
     const isLowStock = Number(inventory.available_stock) < Number(inventory.low_stock_threshold);
+    const piecesPerBox = inventory.item?.pieces_per_box ?? 1;
+    const unit = inventory.item?.default_unit || 'box';
+    const subUnit = inventory.item?.sub_unit || 'piece';
+    const available = Number(inventory.available_stock);
+    const onHand = Number(inventory.stock_on_hand);
+    const reserved = Number(inventory.reserved_quantity);
+    const released = Number(inventory.released_quantity);
+    const threshold = Number(inventory.low_stock_threshold);
 
     return (
         <AuthenticatedLayout
@@ -45,15 +56,43 @@ export default function InventoryShow({ inventory, recentMovements }: Props) {
 
             <div className="space-y-6 py-8">
                 <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <h3 className="text-lg font-semibold text-slate-900">{inventory.item?.item_name ?? `Item #${inventory.item_id}`}</h3>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h3 className="text-lg font-semibold text-slate-900">{inventory.item?.item_name ?? `Item #${inventory.item_id}`}</h3>
+                        {piecesPerBox > 1 ? (
+                            <span className="rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+                                Packaging Spec: 1 {unit} = {piecesPerBox} {subUnit}s
+                            </span>
+                        ) : null}
+                    </div>
                     <p className="mt-1 text-sm text-slate-500">Category: {inventory.item?.category?.category_name ?? 'Uncategorized'} • Inventory ID: {inventory.inventory_id}</p>
 
                     <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                        <Metric label="Available" value={inventory.available_stock} tone={isLowStock ? 'warning' : 'default'} />
-                        <Metric label="On Hand" value={inventory.stock_on_hand} />
-                        <Metric label="Reserved" value={inventory.reserved_quantity} />
-                        <Metric label="Released" value={inventory.released_quantity} />
-                        <Metric label="Low Stock Threshold" value={inventory.low_stock_threshold} />
+                        <Metric
+                            label="Available"
+                            value={`${available.toFixed(2)} ${unit}s`}
+                            subValue={piecesPerBox > 1 ? `(${(available * piecesPerBox).toLocaleString()} ${subUnit}s)` : undefined}
+                            tone={isLowStock ? 'warning' : 'default'}
+                        />
+                        <Metric
+                            label="On Hand"
+                            value={`${onHand.toFixed(2)} ${unit}s`}
+                            subValue={piecesPerBox > 1 ? `(${(onHand * piecesPerBox).toLocaleString()} ${subUnit}s)` : undefined}
+                        />
+                        <Metric
+                            label="Reserved"
+                            value={`${reserved.toFixed(2)} ${unit}s`}
+                            subValue={piecesPerBox > 1 ? `(${(reserved * piecesPerBox).toLocaleString()} ${subUnit}s)` : undefined}
+                        />
+                        <Metric
+                            label="Released"
+                            value={`${released.toFixed(2)} ${unit}s`}
+                            subValue={piecesPerBox > 1 ? `(${(released * piecesPerBox).toLocaleString()} ${subUnit}s)` : undefined}
+                        />
+                        <Metric
+                            label="Low Stock Threshold"
+                            value={`${threshold.toFixed(2)} ${unit}s`}
+                            subValue={piecesPerBox > 1 ? `(${(threshold * piecesPerBox).toLocaleString()} ${subUnit}s)` : undefined}
+                        />
                     </div>
 
                     <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700">
@@ -108,11 +147,12 @@ export default function InventoryShow({ inventory, recentMovements }: Props) {
     );
 }
 
-function Metric({ label, value, tone = 'default' }: { label: string; value: string; tone?: 'default' | 'warning' }) {
+function Metric({ label, value, subValue, tone = 'default' }: { label: string; value: string; subValue?: string; tone?: 'default' | 'warning' }) {
     return (
         <div className={`rounded-lg border px-3 py-2 ${tone === 'warning' ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-slate-200 bg-white text-slate-800'}`}>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
             <p className="mt-1 text-lg font-semibold">{value}</p>
+            {subValue ? <p className="mt-0.5 text-xs font-medium text-indigo-700">{subValue}</p> : null}
         </div>
     );
 }

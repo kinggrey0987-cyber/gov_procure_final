@@ -10,7 +10,7 @@ type PpmpItem = {
     unit_cost: number;
     procurement_schedule: string;
     remarks?: string | null;
-    item?: { item_name?: string | null; default_unit?: string | null; pieces_per_box?: number | null } | null;
+    item?: { item_name?: string | null; default_unit?: string | null; pieces_per_box?: number | null; sub_unit?: string | null } | null;
 };
 
 type Props = {
@@ -147,6 +147,7 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
                                 <tbody className="divide-y divide-slate-100">
                                     {ppmp.items.map((item) => {
                                         const piecesPerBox = item.item?.pieces_per_box ?? 1;
+                                        const subUnit = item.item?.sub_unit ?? 'piece';
                                         const totalPieces = item.quantity * piecesPerBox;
 
                                         return (
@@ -156,7 +157,7 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
                                                 <span>{formatQuantity(item.quantity, item.item?.default_unit)}</span>
                                                 {piecesPerBox > 1 ? (
                                                     <span className="block text-xs font-semibold text-indigo-700">
-                                                        ({totalPieces.toLocaleString()} pcs total)
+                                                        ({totalPieces.toLocaleString()} {subUnit}s total)
                                                     </span>
                                                 ) : null}
                                             </td>
@@ -164,7 +165,7 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
                                                 {formatMoney(item.unit_cost)}
                                                 {piecesPerBox > 1 ? (
                                                     <span className="block text-xs text-slate-500">
-                                                        ≈ ₱{(item.unit_cost / piecesPerBox).toFixed(2)}/pc
+                                                        ≈ ₱{(item.unit_cost / piecesPerBox).toFixed(2)}/{subUnit}
                                                     </span>
                                                 ) : null}
                                             </td>

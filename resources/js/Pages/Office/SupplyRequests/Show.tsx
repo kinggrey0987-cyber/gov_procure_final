@@ -30,6 +30,7 @@ type Props = {
             item_name_snapshot?: string | null;
             default_unit?: string | null;
             pieces_per_box?: number | null;
+            sub_unit?: string | null;
             quantity_requested: number;
             quantity_released?: number | null;
             quantity_received?: number | null;
@@ -38,7 +39,7 @@ type Props = {
             already_requested_quantity?: number | null;
             remaining_quantity?: number | null;
             over_requested_quantity?: number | null;
-            exceeds_ppmp_allocation: boolean;
+            exceeds_ppmp_allocation?: boolean;
         }>;
         processing_timeline: {
             mode: 'PROCUREMENT' | 'DIRECT_STOCK';
@@ -312,6 +313,7 @@ export default function SupplyRequestShow({
                                     {supplyRequest.items.map((item) => {
                                         const piecesPerBox = item.pieces_per_box ?? 1;
                                         const unit = item.default_unit || 'box';
+                                        const subUnit = item.sub_unit || 'piece';
 
                                         return (
                                         <tr key={item.supply_request_item_id}>
@@ -322,7 +324,7 @@ export default function SupplyRequestShow({
                                                 <span>{formatNumber(item.quantity_requested)} {unit}</span>
                                                 {piecesPerBox > 1 ? (
                                                     <span className="block text-xs font-semibold text-indigo-700">
-                                                        ({(item.quantity_requested * piecesPerBox).toLocaleString()} pcs)
+                                                        ({(item.quantity_requested * piecesPerBox).toLocaleString()} {subUnit}s)
                                                     </span>
                                                 ) : null}
                                             </td>
@@ -330,7 +332,7 @@ export default function SupplyRequestShow({
                                                 <span>{formatNumber(item.quantity_released)} {unit}</span>
                                                 {piecesPerBox > 1 && (item.quantity_released ?? 0) > 0 ? (
                                                     <span className="block text-xs text-slate-500">
-                                                        ({((item.quantity_released ?? 0) * piecesPerBox).toLocaleString()} pcs)
+                                                        ({((item.quantity_released ?? 0) * piecesPerBox).toLocaleString()} {subUnit}s)
                                                     </span>
                                                 ) : null}
                                             </td>
@@ -338,7 +340,7 @@ export default function SupplyRequestShow({
                                                 <span>{formatNumber(item.quantity_received)} {unit}</span>
                                                 {piecesPerBox > 1 && (item.quantity_received ?? 0) > 0 ? (
                                                     <span className="block text-xs text-slate-500">
-                                                        ({((item.quantity_received ?? 0) * piecesPerBox).toLocaleString()} pcs)
+                                                        ({((item.quantity_received ?? 0) * piecesPerBox).toLocaleString()} {subUnit}s)
                                                     </span>
                                                 ) : null}
                                             </td>
@@ -346,7 +348,7 @@ export default function SupplyRequestShow({
                                                 <span>{formatNumber(item.planned_quantity)} {unit}</span>
                                                 {piecesPerBox > 1 && item.planned_quantity != null ? (
                                                     <span className="block text-xs text-slate-500">
-                                                        ({(item.planned_quantity * piecesPerBox).toLocaleString()} pcs)
+                                                        ({(item.planned_quantity * piecesPerBox).toLocaleString()} {subUnit}s)
                                                     </span>
                                                 ) : null}
                                             </td>
@@ -357,7 +359,7 @@ export default function SupplyRequestShow({
                                                 <span>{formatNumber(item.remaining_quantity)} {unit}</span>
                                                 {piecesPerBox > 1 && item.remaining_quantity != null ? (
                                                     <span className="block text-xs text-slate-500">
-                                                        ({(item.remaining_quantity * piecesPerBox).toLocaleString()} pcs)
+                                                        ({(item.remaining_quantity * piecesPerBox).toLocaleString()} {subUnit}s)
                                                     </span>
                                                 ) : null}
                                             </td>

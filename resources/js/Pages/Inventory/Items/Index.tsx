@@ -11,6 +11,7 @@ type ItemRow = {
     description?: string | null;
     default_unit?: string | null;
     pieces_per_box?: number | null;
+    sub_unit?: string | null;
     status: string;
     category?: {
         item_category_id: number;
@@ -172,7 +173,7 @@ export default function ItemCatalogIndex({ items, categories, filters, canManage
                                         <span className="capitalize">{item.default_unit || '-'}</span>
                                         {item.pieces_per_box && item.pieces_per_box > 1 ? (
                                             <span className="ml-1.5 text-xs text-slate-500">
-                                                ({item.pieces_per_box} pcs/{item.default_unit || 'box'})
+                                                ({item.pieces_per_box} {item.sub_unit || 'piece'}s/{item.default_unit || 'box'})
                                             </span>
                                         ) : null}
                                     </td>

@@ -7,6 +7,7 @@ type Item = {
     description?: string | null;
     default_unit?: string | null;
     pieces_per_box?: number | null;
+    sub_unit?: string | null;
     status: string;
     category?: {
         item_category_id: number;
@@ -70,12 +71,12 @@ export default function ShowItem({ item, canManage }: Props) {
                             <dd className="mt-1 text-sm text-slate-900">{item.category?.category_name || '-'}</dd>
                         </div>
                         <div>
-                            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Packaging Unit</dt>
+                            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Packaging Specification</dt>
                             <dd className="mt-1 text-sm text-slate-900">
                                 <span className="font-medium capitalize">{item.default_unit || '-'}</span>
                                 {item.pieces_per_box ? (
                                     <span className="ml-2 inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">
-                                        {item.pieces_per_box} pcs / {item.default_unit || 'box'}
+                                        {item.pieces_per_box} {item.sub_unit || 'piece'}s / {item.default_unit || 'box'}
                                     </span>
                                 ) : null}
                             </dd>

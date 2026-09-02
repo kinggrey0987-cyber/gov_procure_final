@@ -13,6 +13,7 @@ type ItemOption = {
     item_category_name: string;
     default_unit?: string | null;
     pieces_per_box?: number | null;
+    sub_unit?: string | null;
 };
 
 type ExistingItem = {
@@ -24,7 +25,7 @@ type ExistingItem = {
     estimated_budget?: number;
     procurement_schedule: string;
     remarks?: string | null;
-    item?: { item_name?: string | null; default_unit?: string | null; pieces_per_box?: number | null } | null;
+    item?: { item_name?: string | null; default_unit?: string | null; pieces_per_box?: number | null; sub_unit?: string | null } | null;
 };
 
 type PpmpItemDraft = {
@@ -252,6 +253,7 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                                 const row = editingRows[item.ppmp_item_id];
                                 const selectedOption = itemOptionById.get(String(row.item_id));
                                 const piecesPerBox = row.item?.pieces_per_box ?? selectedOption?.pieces_per_box ?? 1;
+                                const subUnit = row.item?.sub_unit ?? selectedOption?.sub_unit ?? 'piece';
                                 const qtyNum = Number(row.quantity || 0);
                                 const unitCostNum = Number(row.unit_cost || 0);
                                 const totalPieces = qtyNum * piecesPerBox;
@@ -292,7 +294,7 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                                                         {qtyNum} {unit}
                                                         {piecesPerBox > 1 ? (
                                                             <span className="text-indigo-600 font-semibold ml-1">
-                                                                = {totalPieces.toLocaleString()} pcs
+                                                                = {totalPieces.toLocaleString()} total {subUnit}s
                                                             </span>
                                                         ) : null}
                                                     </span>
@@ -304,7 +306,7 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                                                 <input
                                                     type="text"
                                                     className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm"
-                                                    value={unit + (piecesPerBox > 1 ? ` (${piecesPerBox} pcs/${unit})` : '')}
+                                                    value={unit + (piecesPerBox > 1 ? ` (${piecesPerBox} ${subUnit}s/${unit})` : '')}
                                                     readOnly
                                                 />
                                             </label>
@@ -322,7 +324,7 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                                                 />
                                                 {unitCostNum > 0 && piecesPerBox > 1 ? (
                                                     <span className="mt-1 block text-xs text-emerald-700 font-medium">
-                                                        ≈ ₱{costPerPiece.toFixed(2)}/pc
+                                                        ≈ ₱{costPerPiece.toFixed(2)}/{subUnit}
                                                     </span>
                                                 ) : null}
                                             </label>
@@ -406,6 +408,7 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                         const selectedNewOpt = itemOptionById.get(newItem.data.item_id);
                         const newUnit = selectedNewOpt?.default_unit || 'box';
                         const newPieces = selectedNewOpt?.pieces_per_box || 1;
+                        const newSubUnit = selectedNewOpt?.sub_unit || 'piece';
                         const newQtyNum = Number(newItem.data.quantity || 0);
                         const newCostNum = Number(newItem.data.unit_cost || 0);
                         const newTotalPieces = newQtyNum * newPieces;
@@ -420,7 +423,7 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                                         <option value="">Select Item</option>
                                         {itemOptions.map((option) => (
                                             <option key={option.item_id} value={option.item_id}>
-                                                {option.item_name} {option.pieces_per_box && option.pieces_per_box > 1 ? `(${option.pieces_per_box} pcs/${option.default_unit || 'box'})` : ''}
+                                                {option.item_name} {option.pieces_per_box && option.pieces_per_box > 1 ? `(${option.pieces_per_box} ${option.sub_unit || 'piece'}s/${option.default_unit || 'box'})` : ''}
                                             </option>
                                         ))}
                                     </select>
@@ -435,7 +438,7 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                                             {newQtyNum} {newUnit}
                                             {newPieces > 1 ? (
                                                 <span className="text-indigo-600 font-semibold ml-1">
-                                                    = {newTotalPieces.toLocaleString()} pcs
+                                                    = {newTotalPieces.toLocaleString()} total {newSubUnit}s
                                                 </span>
                                             ) : null}
                                         </span>
@@ -445,7 +448,7 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
 
                                 <label className="block">
                                     <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Packaging Unit</span>
-                                    <input type="text" className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm" value={newUnit + (newPieces > 1 ? ` (${newPieces} pcs/${newUnit})` : '')} readOnly />
+                                    <input type="text" className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm" value={newUnit + (newPieces > 1 ? ` (${newPieces} ${newSubUnit}s/${newUnit})` : '')} readOnly />
                                 </label>
 
                                 <label className="block">
@@ -454,7 +457,7 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                                     <div className="mt-1 flex flex-wrap items-center justify-between text-xs text-slate-600">
                                         {newCostNum > 0 && newPieces > 1 ? (
                                             <span className="text-emerald-700 font-medium">
-                                                ≈ ₱{newCostPerPiece.toFixed(2)}/pc
+                                                ≈ ₱{newCostPerPiece.toFixed(2)}/{newSubUnit}
                                             </span>
                                         ) : <span />}
                                         {newSubtotal > 0 ? (

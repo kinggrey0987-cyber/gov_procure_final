@@ -41,6 +41,7 @@ class UpdateItemRequest extends FormRequest
             'description' => ['nullable', 'string'],
             'default_unit' => ['required', 'string', 'max:50', Rule::exists('item_units', 'name')->where('status', 'active')],
             'pieces_per_box' => ['nullable', 'integer', 'min:1'],
+            'sub_unit' => ['nullable', 'string', 'max:50'],
             'status' => ['required', Rule::in(['active', 'inactive'])],
         ];
     }

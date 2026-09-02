@@ -23,6 +23,7 @@ type Props = {
             item_name: string;
             unit: string;
             pieces_per_box?: number | null;
+            sub_unit?: string | null;
             quantity_requested: number;
             available_stock: number;
             shortage: number;
@@ -96,6 +97,7 @@ export default function InventoryOfficeSupplyRequestShow({ request, backFilters 
                         <tbody className="divide-y divide-slate-100">
                             {request.items.map((item) => {
                                 const piecesPerBox = item.pieces_per_box ?? 1;
+                                const subUnit = item.sub_unit || 'piece';
 
                                 return (
                                 <tr key={item.supply_request_item_id}>
@@ -104,7 +106,7 @@ export default function InventoryOfficeSupplyRequestShow({ request, backFilters 
                                         <span>{item.quantity_requested.toFixed(2)} {item.unit}</span>
                                         {piecesPerBox > 1 ? (
                                             <span className="block text-xs font-semibold text-indigo-700">
-                                                ({(item.quantity_requested * piecesPerBox).toLocaleString()} pcs total @ {piecesPerBox} pcs/{item.unit})
+                                                ({(item.quantity_requested * piecesPerBox).toLocaleString()} {subUnit}s total @ {piecesPerBox} {subUnit}s/{item.unit})
                                             </span>
                                         ) : null}
                                     </td>
@@ -112,7 +114,7 @@ export default function InventoryOfficeSupplyRequestShow({ request, backFilters 
                                         <span>{item.available_stock.toFixed(2)} {item.unit}</span>
                                         {piecesPerBox > 1 ? (
                                             <span className="block text-xs text-slate-500">
-                                                ({(item.available_stock * piecesPerBox).toLocaleString()} pcs)
+                                                ({(item.available_stock * piecesPerBox).toLocaleString()} {subUnit}s)
                                             </span>
                                         ) : null}
                                     </td>
@@ -120,7 +122,7 @@ export default function InventoryOfficeSupplyRequestShow({ request, backFilters 
                                         <span>{item.shortage.toFixed(2)} {item.unit}</span>
                                         {piecesPerBox > 1 && item.shortage > 0 ? (
                                             <span className="block text-xs text-rose-600 font-medium">
-                                                ({(item.shortage * piecesPerBox).toLocaleString()} pcs shortage)
+                                                ({(item.shortage * piecesPerBox).toLocaleString()} {subUnit}s shortage)
                                             </span>
                                         ) : null}
                                     </td>

@@ -21,6 +21,7 @@ type Item = {
     description?: string | null;
     default_unit?: string | null;
     pieces_per_box?: number | null;
+    sub_unit?: string | null;
     status: string;
 };
 
@@ -34,8 +35,9 @@ export default function EditItem({ item, categories, units }: Props) {
     const { data, setData, put, processing, errors } = useForm({
         item_name: item.item_name,
         item_category_id: String(item.item_category_id),
-        default_unit: item.default_unit ?? '',
+        default_unit: item.default_unit ?? 'box',
         pieces_per_box: String(item.pieces_per_box ?? 1),
+        sub_unit: item.sub_unit ?? 'piece',
         description: item.description ?? '',
         status: item.status,
     });
@@ -82,7 +84,7 @@ export default function EditItem({ item, categories, units }: Props) {
                         </div>
 
                         <div>
-                            <label className="mb-1 block text-sm font-medium text-slate-700">Packaging / Default Unit</label>
+                            <label className="mb-1 block text-sm font-medium text-slate-700">Packaging Unit (Outer Container / Unit of Issue)</label>
                             <select
                                 value={data.default_unit}
                                 onChange={(event) => setData('default_unit', event.target.value)}
@@ -95,26 +97,54 @@ export default function EditItem({ item, categories, units }: Props) {
                                     </option>
                                 ))}
                             </select>
-                            <p className="mt-1 text-xs text-slate-500">Missing a unit? Add it first in Item Units.</p>
                             <InputError message={errors.default_unit} className="mt-1" />
                         </div>
 
                         <div>
-                            <label className="mb-1 block text-sm font-medium text-slate-700">Pieces / Items per Box or Package</label>
+                            <label className="mb-1 block text-sm font-medium text-slate-700">Count / Pieces per Package</label>
                             <input
                                 type="number"
                                 min="1"
                                 value={data.pieces_per_box}
                                 onChange={(event) => setData('pieces_per_box', event.target.value)}
                                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                                placeholder="e.g. 50 pcs/box, 100 pcs/pack, 1 pc/unit"
+                                placeholder="e.g. 5, 50, 100, 4, 12, 1"
                                 required
                             />
-                            <p className="mt-1 text-xs text-slate-500">Total individual pieces contained inside 1 unit/box (used for PPMP & requisition calculations).</p>
                             <InputError message={errors.pieces_per_box} className="mt-1" />
                         </div>
 
                         <div>
+                            <label className="mb-1 block text-sm font-medium text-slate-700">Content Sub-Unit (Inner Item Type)</label>
+                            <select
+                                value={data.sub_unit}
+                                onChange={(event) => setData('sub_unit', event.target.value)}
+                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                            >
+                                <option value="piece">piece / pcs</option>
+                                <option value="ream">ream</option>
+                                <option value="gallon">gallon</option>
+                                <option value="pair">pair</option>
+                                <option value="book">book</option>
+                                <option value="roll">roll</option>
+                                <option value="pack">pack</option>
+                                <option value="cartridge">cartridge</option>
+                                <option value="bottle">bottle</option>
+                                <option value="meter">meter</option>
+                                <option value="liter">liter</option>
+                                <option value="kilogram">kilogram</option>
+                                <option value="set">set</option>
+                                <option value="unit">unit</option>
+                            </select>
+                            <InputError message={errors.sub_unit} className="mt-1" />
+                        </div>
+
+                        <div className="md:col-span-2 rounded-lg border border-blue-200 bg-blue-50/70 p-3 text-xs text-blue-800">
+                            <strong>Packaging Specification Preview:</strong> 1 {data.default_unit || 'box'} contains {data.pieces_per_box || '1'} {data.sub_unit || 'piece'}(s)
+                            <span className="ml-1 text-blue-600">({data.default_unit || 'box'} [{data.pieces_per_box || '1'} {data.sub_unit || 'piece'}s/{data.default_unit || 'box'}])</span>
+                        </div>
+
+                        <div className="md:col-span-2">
                             <label className="mb-1 block text-sm font-medium text-slate-700">Status</label>
                             <select
                                 value={data.status}

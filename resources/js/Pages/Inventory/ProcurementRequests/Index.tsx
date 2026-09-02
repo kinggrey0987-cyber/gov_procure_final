@@ -34,6 +34,9 @@ type ShortageCandidate = {
 type LowStockItem = {
     inventory_id: number;
     item_name: string;
+    unit?: string;
+    pieces_per_box?: number;
+    sub_unit?: string;
     available_stock: number;
     low_stock_threshold: number;
     deficit: number;
@@ -53,6 +56,9 @@ type Props = {
     atReorderItems: Array<{
         inventory_id: number;
         item_name: string;
+        unit?: string;
+        pieces_per_box?: number;
+        sub_unit?: string;
         available_stock: number;
         low_stock_threshold: number;
     }>;
@@ -169,13 +175,27 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                             The system uses a statistical demand signal to flag supplies before demand outpaces stock. Reorder threshold is the minimum safety stock level, and forecast deficit is the gap between current available stock and that threshold. These signals support proactive GSO purchase request creation only; they are not automated PPMP approval, procurement approval, or PO approval.
                         </p>
                         <div className="mt-4 space-y-3">
-                            {lowStockItems.slice(0, 6).map((item) => (
+                            {lowStockItems.slice(0, 6).map((item) => {
+                                const piecesPerBox = item.pieces_per_box ?? 1;
+                                const unit = item.unit || 'box';
+                                const subUnit = item.sub_unit || 'piece';
+
+                                return (
                                 <div key={item.inventory_id} className={`rounded-lg border border-amber-100 bg-amber-50/70 p-3 ${focusInventoryId === item.inventory_id ? 'ring-2 ring-amber-300' : ''}`}>
-                                    <p className="text-sm font-semibold text-slate-800">{item.item_name}</p>
-                                    <p className="text-xs text-slate-600">
-                                        Available {item.available_stock.toFixed(2)} / Forecast Reorder Threshold {item.low_stock_threshold.toFixed(2)}
+                                    <div className="flex flex-wrap items-center justify-between gap-1">
+                                        <p className="text-sm font-semibold text-slate-800">{item.item_name}</p>
+                                        {piecesPerBox > 1 ? (
+                                            <span className="text-xs font-semibold text-indigo-700">
+                                                [{unit} ({piecesPerBox} {subUnit}s/{unit})]
+                                            </span>
+                                        ) : null}
+                                    </div>
+                                    <p className="text-xs text-slate-600 mt-1">
+                                        Available: <span className="font-semibold text-slate-700">{item.available_stock.toFixed(2)} {unit}s</span> {piecesPerBox > 1 ? `(${(item.available_stock * piecesPerBox).toLocaleString()} ${subUnit}s)` : ''} / Reorder Point: <span className="font-semibold text-slate-700">{item.low_stock_threshold.toFixed(2)} {unit}s</span> {piecesPerBox > 1 ? `(${(item.low_stock_threshold * piecesPerBox).toLocaleString()} ${subUnit}s)` : ''}
                                     </p>
-                                    <p className="mt-1 text-xs font-semibold text-amber-700">Forecast Deficit: {item.deficit.toFixed(2)}</p>
+                                    <p className="mt-1 text-xs font-semibold text-amber-700">
+                                        Forecast Deficit: {item.deficit.toFixed(2)} {unit}s {piecesPerBox > 1 ? `(${(item.deficit * piecesPerBox).toLocaleString()} ${subUnit}s)` : ''}
+                                    </p>
                                     <button
                                         type="button"
                                         disabled={initiatingInventoryId === item.inventory_id || item.is_already_queued}
@@ -192,7 +212,8 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                                         <p className="mt-1 text-[11px] font-semibold text-slate-500">Active PR: PR-{String(item.active_purchase_request_id).padStart(6, '0')}</p>
                                     ) : null}
                                 </div>
-                            ))}
+                                );
+                            })}
                             {lowStockItems.length === 0 ? <p className="text-sm text-slate-500">No low-stock items at the moment.</p> : null}
                         </div>
 
@@ -202,11 +223,17 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                                 These supplies are exactly at the statistical reorder threshold with zero forecast deficit, so they are watchlist cases rather than active proactive PR cases.
                             </p>
                             <div className="mt-3 space-y-2">
-                                {atReorderItems.slice(0, 5).map((item) => (
+                                {atReorderItems.slice(0, 5).map((item) => {
+                                    const piecesPerBox = item.pieces_per_box ?? 1;
+                                    const unit = item.unit || 'box';
+                                    const subUnit = item.sub_unit || 'piece';
+
+                                    return (
                                     <p key={item.inventory_id} className="text-xs text-slate-700">
-                                        {item.item_name}: Available {item.available_stock.toFixed(2)} / Forecast Reorder Point {item.low_stock_threshold.toFixed(2)}
+                                        <span className="font-medium">{item.item_name}</span>: Available {item.available_stock.toFixed(2)} {unit}s {piecesPerBox > 1 ? `(${(item.available_stock * piecesPerBox).toLocaleString()} ${subUnit}s)` : ''} / Reorder Point {item.low_stock_threshold.toFixed(2)} {unit}s
                                     </p>
-                                ))}
+                                    );
+                                })}
                                 {atReorderItems.length === 0 ? <p className="text-xs text-slate-500">No supplies are exactly at the forecast reorder point.</p> : null}
                             </div>
                         </div>
@@ -220,16 +247,34 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                             <p className="mt-1 text-sm text-slate-600">Review the statistical demand signal and adjust the proposed quantity before creating a proactive GSO purchase request. The Procurement Unit must still process the PR and create any PO.</p>
                         </div>
 
-                        {selectedLowStockItem ? (
+                        {selectedLowStockItem ? (() => {
+                            const piecesPerBox = selectedLowStockItem.pieces_per_box ?? 1;
+                            const unit = selectedLowStockItem.unit || 'box';
+                            const subUnit = selectedLowStockItem.sub_unit || 'piece';
+                            const numModalQty = Number(modalQuantity || 0);
+                            const modalPieces = numModalQty * piecesPerBox;
+
+                            return (
                             <div className="space-y-2 rounded-lg border border-amber-100 bg-amber-50/70 p-3">
-                                <p className="text-sm font-semibold text-slate-800">{selectedLowStockItem.item_name}</p>
+                                <div className="flex flex-wrap items-center justify-between gap-1">
+                                    <p className="text-sm font-semibold text-slate-800">{selectedLowStockItem.item_name}</p>
+                                    {piecesPerBox > 1 ? (
+                                        <span className="text-xs font-semibold text-indigo-700">
+                                            [{unit} ({piecesPerBox} {subUnit}s/{unit})]
+                                        </span>
+                                    ) : null}
+                                </div>
                                 <p className="text-xs text-slate-600">
-                                    Available {selectedLowStockItem.available_stock.toFixed(2)} / Forecast Reorder Threshold {selectedLowStockItem.low_stock_threshold.toFixed(2)}
+                                    Available: <span className="font-semibold text-slate-700">{selectedLowStockItem.available_stock.toFixed(2)} {unit}s</span> {piecesPerBox > 1 ? `(${(selectedLowStockItem.available_stock * piecesPerBox).toLocaleString()} ${subUnit}s)` : ''} / Reorder Threshold: <span className="font-semibold text-slate-700">{selectedLowStockItem.low_stock_threshold.toFixed(2)} {unit}s</span>
                                 </p>
-                                <p className="text-xs font-semibold text-amber-700">Forecast Deficit: {selectedLowStockItem.deficit.toFixed(2)}</p>
+                                <p className="text-xs font-semibold text-amber-700">
+                                    Forecast Deficit: {selectedLowStockItem.deficit.toFixed(2)} {unit}s {piecesPerBox > 1 ? `(${(selectedLowStockItem.deficit * piecesPerBox).toLocaleString()} ${subUnit}s)` : ''}
+                                </p>
 
                                 <div>
-                                    <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-600">Proposed PR Quantity</label>
+                                    <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                                        Proposed PR Quantity ({unit}s)
+                                    </label>
                                     <input
                                         type="number"
                                         min="0.01"
@@ -239,10 +284,18 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                                         onChange={(event) => setModalQuantity(event.target.value)}
                                         className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-700 disabled:cursor-not-allowed disabled:bg-slate-100"
                                     />
-                                    <p className="mt-1 text-[11px] text-slate-500">Algorithm-suggested quantity: {selectedLowStockItem.suggested_quantity.toFixed(2)}</p>
+                                    <div className="mt-1 flex flex-wrap items-center justify-between text-[11px] text-slate-500">
+                                        <span>Suggested: {selectedLowStockItem.suggested_quantity.toFixed(2)} {unit}s</span>
+                                        {numModalQty > 0 && piecesPerBox > 1 ? (
+                                            <span className="font-semibold text-indigo-700">
+                                                = {modalPieces.toLocaleString()} total {subUnit}s
+                                            </span>
+                                        ) : null}
+                                    </div>
                                 </div>
                             </div>
-                        ) : null}
+                            );
+                        })() : null}
 
                         <div className="flex items-center justify-end gap-2">
                             <button

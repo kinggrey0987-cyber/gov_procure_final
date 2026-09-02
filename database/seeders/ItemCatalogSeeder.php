@@ -58,6 +58,7 @@ class ItemCatalogSeeder extends Seeder
                 'description' => 'A4 white copy paper, 80 GSM (Box of 5 reams).',
                 'default_unit' => 'box',
                 'pieces_per_box' => 5,
+                'sub_unit' => 'ream',
                 'status' => 'active',
             ],
             [
@@ -66,6 +67,7 @@ class ItemCatalogSeeder extends Seeder
                 'description' => 'Black ink ballpoint pen (Box of 50 pcs).',
                 'default_unit' => 'box',
                 'pieces_per_box' => 50,
+                'sub_unit' => 'piece',
                 'status' => 'active',
             ],
             [
@@ -74,6 +76,7 @@ class ItemCatalogSeeder extends Seeder
                 'description' => 'Standard filing folder (Pack of 100 pcs).',
                 'default_unit' => 'pack',
                 'pieces_per_box' => 100,
+                'sub_unit' => 'piece',
                 'status' => 'active',
             ],
             [
@@ -82,6 +85,7 @@ class ItemCatalogSeeder extends Seeder
                 'description' => 'Bound logbook for attendance and office transactions (Box of 10 books).',
                 'default_unit' => 'box',
                 'pieces_per_box' => 10,
+                'sub_unit' => 'book',
                 'status' => 'active',
             ],
             [
@@ -90,6 +94,7 @@ class ItemCatalogSeeder extends Seeder
                 'description' => 'Heavy-duty staple wire refill (Box of 10,000 pcs).',
                 'default_unit' => 'box',
                 'pieces_per_box' => 10000,
+                'sub_unit' => 'piece',
                 'status' => 'active',
             ],
             [
@@ -98,6 +103,7 @@ class ItemCatalogSeeder extends Seeder
                 'description' => 'Heavy-duty desktop manual stapler (1 pc/box).',
                 'default_unit' => 'box',
                 'pieces_per_box' => 1,
+                'sub_unit' => 'piece',
                 'status' => 'active',
             ],
             [
@@ -106,6 +112,7 @@ class ItemCatalogSeeder extends Seeder
                 'description' => 'Portable USB storage device, 32GB (Box of 10 pcs).',
                 'default_unit' => 'box',
                 'pieces_per_box' => 10,
+                'sub_unit' => 'piece',
                 'status' => 'active',
             ],
             [
@@ -114,6 +121,7 @@ class ItemCatalogSeeder extends Seeder
                 'description' => 'USB optical computer mouse (Box of 10 pcs).',
                 'default_unit' => 'box',
                 'pieces_per_box' => 10,
+                'sub_unit' => 'piece',
                 'status' => 'active',
             ],
             [
@@ -122,6 +130,7 @@ class ItemCatalogSeeder extends Seeder
                 'description' => 'Compatible printer ink cartridge (Box of 5 cartridges).',
                 'default_unit' => 'box',
                 'pieces_per_box' => 5,
+                'sub_unit' => 'cartridge',
                 'status' => 'active',
             ],
             [
@@ -130,6 +139,7 @@ class ItemCatalogSeeder extends Seeder
                 'description' => 'Laser printer toner cartridge (Standard packaging).',
                 'default_unit' => 'cartridge',
                 'pieces_per_box' => 1,
+                'sub_unit' => 'cartridge',
                 'status' => 'active',
             ],
             [
@@ -138,6 +148,7 @@ class ItemCatalogSeeder extends Seeder
                 'description' => 'HP 680 original tri-color ink cartridge (Box of 5 cartridges).',
                 'default_unit' => 'box',
                 'pieces_per_box' => 5,
+                'sub_unit' => 'cartridge',
                 'status' => 'active',
             ],
             [
@@ -146,6 +157,7 @@ class ItemCatalogSeeder extends Seeder
                 'description' => '70% Isopropyl cleaning alcohol (Box of 4 gallons).',
                 'default_unit' => 'box',
                 'pieces_per_box' => 4,
+                'sub_unit' => 'gallon',
                 'status' => 'active',
             ],
             [
@@ -154,6 +166,7 @@ class ItemCatalogSeeder extends Seeder
                 'description' => 'Laundry and surface cleaning detergent (Box of 24 packs @ 1kg).',
                 'default_unit' => 'box',
                 'pieces_per_box' => 24,
+                'sub_unit' => 'pack',
                 'status' => 'active',
             ],
             [
@@ -162,6 +175,7 @@ class ItemCatalogSeeder extends Seeder
                 'description' => 'Heavy-duty waste disposal bag (Box of 10 rolls @ 50 pcs/roll = 500 pcs).',
                 'default_unit' => 'box',
                 'pieces_per_box' => 10,
+                'sub_unit' => 'roll',
                 'status' => 'active',
             ],
             [
@@ -170,6 +184,7 @@ class ItemCatalogSeeder extends Seeder
                 'description' => 'Heavy-duty industrial safety gloves (Box of 12 pairs).',
                 'default_unit' => 'box',
                 'pieces_per_box' => 12,
+                'sub_unit' => 'pair',
                 'status' => 'active',
             ],
             [
@@ -178,6 +193,7 @@ class ItemCatalogSeeder extends Seeder
                 'description' => 'Retractable utility cutter (Box of 12 pcs).',
                 'default_unit' => 'box',
                 'pieces_per_box' => 12,
+                'sub_unit' => 'piece',
                 'status' => 'active',
             ],
         ];
@@ -195,6 +211,7 @@ class ItemCatalogSeeder extends Seeder
                     'description' => $item['description'],
                     'default_unit' => $item['default_unit'],
                     'pieces_per_box' => $item['pieces_per_box'] ?? 1,
+                    'sub_unit' => $item['sub_unit'] ?? 'piece',
                     'status' => $item['status'],
                 ],
             );

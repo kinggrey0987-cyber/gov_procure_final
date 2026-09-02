@@ -269,6 +269,7 @@ class RequestWorkflowController
                     'item_name' => (string) ($item->item?->item_name ?? $item->item_name_snapshot ?? 'Unknown Item'),
                     'unit' => (string) ($item->item?->default_unit ?? 'UNIT'),
                     'pieces_per_box' => (int) ($item->item?->pieces_per_box ?? 1),
+                    'sub_unit' => (string) ($item->item?->sub_unit ?? 'piece'),
                     'quantity_requested' => round($requested, 2),
                     'available_stock' => round($available, 2),
                     'shortage' => round($shortage, 2),
@@ -372,6 +373,8 @@ class RequestWorkflowController
                         'category_name' => (string) ($item->item?->category?->category_name ?? 'Uncategorized'),
                         'quantity_requested' => (float) $item->quantity_requested,
                         'unit' => (string) ($item->item?->default_unit ?? 'UNIT'),
+                        'pieces_per_box' => (int) ($item->item?->pieces_per_box ?? 1),
+                        'sub_unit' => (string) ($item->item?->sub_unit ?? 'piece'),
                         'available_stock' => (float) ($item->item?->inventory?->available_stock ?? 0),
                         'remarks' => $item->remarks,
                     ])
@@ -517,6 +520,9 @@ class RequestWorkflowController
         return [
             'inventory_id' => $inventoryId,
             'item_name' => (string) ($inventory->item?->item_name ?? 'Unassigned Item'),
+            'unit' => (string) ($inventory->item?->default_unit ?? 'box'),
+            'pieces_per_box' => (int) ($inventory->item?->pieces_per_box ?? 1),
+            'sub_unit' => (string) ($inventory->item?->sub_unit ?? 'piece'),
             'available_stock' => (float) $inventory->available_stock,
             'low_stock_threshold' => (float) $inventory->low_stock_threshold,
             'deficit' => $deficit,
@@ -540,6 +546,9 @@ class RequestWorkflowController
             ->map(fn (Inventory $inventory): array => [
                 'inventory_id' => (int) $inventory->inventory_id,
                 'item_name' => (string) ($inventory->item?->item_name ?? 'Unassigned Item'),
+                'unit' => (string) ($inventory->item?->default_unit ?? 'box'),
+                'pieces_per_box' => (int) ($inventory->item?->pieces_per_box ?? 1),
+                'sub_unit' => (string) ($inventory->item?->sub_unit ?? 'piece'),
                 'available_stock' => (float) $inventory->available_stock,
                 'low_stock_threshold' => (float) $inventory->low_stock_threshold,
             ])

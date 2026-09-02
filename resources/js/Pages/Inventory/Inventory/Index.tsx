@@ -14,6 +14,9 @@ type InventoryRow = {
     low_stock_threshold: string;
     item?: {
         item_name?: string;
+        default_unit?: string;
+        pieces_per_box?: number;
+        sub_unit?: string;
         category?: {
             category_name?: string;
         };
@@ -142,11 +145,18 @@ export default function InventoryIndex({ inventories, categories, filters }: Pro
                         <tbody className="divide-y divide-slate-100">
                             {inventories.data.map((row) => {
                                 const available = Number(row.available_stock);
+                                const onHand = Number(row.stock_on_hand);
+                                const reserved = Number(row.reserved_quantity);
+                                const released = Number(row.released_quantity);
                                 const threshold = Number(row.low_stock_threshold);
                                 const deficit = Math.max(threshold - available, 0);
                                 const isCritical = available <= 0;
                                 const isLow = available < threshold && available > 0;
                                 const isAtReorder = available === threshold;
+                                const piecesPerBox = row.item?.pieces_per_box ?? 1;
+                                const unit = row.item?.default_unit || 'box';
+                                const subUnit = row.item?.sub_unit || 'piece';
+
                                 const signalClass = isCritical
                                     ? 'bg-rose-100 text-rose-700'
                                     : isLow
@@ -165,20 +175,67 @@ export default function InventoryIndex({ inventories, categories, filters }: Pro
                                 return (
                                     <tr key={row.inventory_id} className="hover:bg-slate-50/60">
                                         <td className="px-4 py-3 text-slate-700">
-                                            <p>{row.item?.item_name ?? `Item #${row.item_id}`}</p>
-                                            <p className="text-xs text-slate-500">ID: {row.item_id}</p>
+                                            <p className="font-semibold text-slate-800">{row.item?.item_name ?? `Item #${row.item_id}`}</p>
+                                            <p className="text-xs text-slate-500">
+                                                ID: {row.item_id}
+                                                {piecesPerBox > 1 ? (
+                                                    <span className="ml-1.5 font-medium text-indigo-700">
+                                                        [{unit} ({piecesPerBox} {subUnit}s/{unit})]
+                                                    </span>
+                                                ) : null}
+                                            </p>
                                         </td>
                                         <td className="px-4 py-3 text-slate-600">{row.item?.category?.category_name ?? '-'}</td>
-                                        <td className={`px-4 py-3 text-right font-semibold ${isCritical || isLow ? 'text-amber-700' : 'text-slate-700'}`}>{row.available_stock}</td>
-                                        <td className="px-4 py-3 text-right text-slate-700">{row.stock_on_hand}</td>
-                                        <td className="px-4 py-3 text-right text-slate-700">{row.reserved_quantity}</td>
-                                        <td className="px-4 py-3 text-right text-slate-700">{row.released_quantity}</td>
-                                        <td className="px-4 py-3 text-right text-slate-700">{row.low_stock_threshold}</td>
+                                        <td className={`px-4 py-3 text-right font-semibold ${isCritical || isLow ? 'text-amber-700' : 'text-slate-700'}`}>
+                                            <span>{available.toFixed(2)} {unit}s</span>
+                                            {piecesPerBox > 1 ? (
+                                                <span className="block text-xs font-semibold text-indigo-700">
+                                                    ({(available * piecesPerBox).toLocaleString()} {subUnit}s)
+                                                </span>
+                                            ) : null}
+                                        </td>
+                                        <td className="px-4 py-3 text-right text-slate-700">
+                                            <span>{onHand.toFixed(2)} {unit}s</span>
+                                            {piecesPerBox > 1 ? (
+                                                <span className="block text-xs text-slate-500">
+                                                    ({(onHand * piecesPerBox).toLocaleString()} {subUnit}s)
+                                                </span>
+                                            ) : null}
+                                        </td>
+                                        <td className="px-4 py-3 text-right text-slate-700">
+                                            <span>{reserved.toFixed(2)} {unit}s</span>
+                                            {piecesPerBox > 1 ? (
+                                                <span className="block text-xs text-slate-500">
+                                                    ({(reserved * piecesPerBox).toLocaleString()} {subUnit}s)
+                                                </span>
+                                            ) : null}
+                                        </td>
+                                        <td className="px-4 py-3 text-right text-slate-700">
+                                            <span>{released.toFixed(2)} {unit}s</span>
+                                            {piecesPerBox > 1 ? (
+                                                <span className="block text-xs text-slate-500">
+                                                    ({(released * piecesPerBox).toLocaleString()} {subUnit}s)
+                                                </span>
+                                            ) : null}
+                                        </td>
+                                        <td className="px-4 py-3 text-right text-slate-700">
+                                            <span>{threshold.toFixed(2)} {unit}s</span>
+                                            {piecesPerBox > 1 ? (
+                                                <span className="block text-xs text-slate-500">
+                                                    ({(threshold * piecesPerBox).toLocaleString()} {subUnit}s)
+                                                </span>
+                                            ) : null}
+                                        </td>
                                         <td className="px-4 py-3 text-slate-700">
                                             <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${signalClass}`}>
                                                 {signalLabel}
                                             </span>
-                                            {deficit > 0 ? <p className="mt-1 text-xs text-rose-600">Deficit: {deficit.toFixed(2)}</p> : null}
+                                            {deficit > 0 ? (
+                                                <p className="mt-1 text-xs text-rose-600 font-medium">
+                                                    Deficit: {deficit.toFixed(2)} {unit}s
+                                                    {piecesPerBox > 1 ? ` (${(deficit * piecesPerBox).toLocaleString()} ${subUnit}s)` : ''}
+                                                </p>
+                                            ) : null}
                                         </td>
                                         <td className="px-4 py-3 text-right">
                                             <div className="space-y-1">

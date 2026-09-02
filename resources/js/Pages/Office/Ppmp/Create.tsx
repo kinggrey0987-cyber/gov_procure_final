@@ -13,6 +13,7 @@ type ItemOption = {
     item_category_name: string;
     default_unit?: string | null;
     pieces_per_box?: number | null;
+    sub_unit?: string | null;
 };
 
 type ItemDraft = {
@@ -167,6 +168,7 @@ export default function PpmpCreate({ itemOptions }: Props) {
                             const selectedItem = itemOptionById.get(item.item_id);
                             const unit = selectedItem?.default_unit || 'box';
                             const piecesPerBox = selectedItem?.pieces_per_box || 1;
+                            const subUnit = selectedItem?.sub_unit || 'piece';
                             const qtyNum = Number(item.quantity) || 0;
                             const unitCostNum = Number(item.unit_cost) || 0;
                             const totalPieces = qtyNum * piecesPerBox;
@@ -178,31 +180,31 @@ export default function PpmpCreate({ itemOptions }: Props) {
                             <div key={index} className={`rounded-xl border p-4 ${isDuplicate ? 'border-amber-300 bg-amber-50/40' : 'border-slate-200'}`}>
                                 {isDuplicate ? (
                                     <div className="mb-3 rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm font-semibold text-amber-800">
-                                        This item is already planned for {item.procurement_schedule}. Update the existing row instead of saving a duplicate.
+                                        Duplicate combination: this item is already allocated for {item.procurement_schedule || 'this quarter'}. Change the schedule or adjust the existing row.
                                     </div>
                                 ) : null}
-                                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                                    <label className="block">
-                                        <span className="mb-1 block text-sm font-medium text-slate-700">Item</span>
-                                        <select value={item.item_id} onChange={(event) => chooseItem(index, event.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required>
-                                            <option value="">Select item</option>
+                                <div className="grid gap-3 md:grid-cols-2">
+                                    <label className="block md:col-span-2">
+                                        <span className="mb-1 block text-sm font-medium text-slate-700">Catalog Item</span>
+                                        <select value={item.item_id} onChange={(event) => patchItem(index, { item_id: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required>
+                                            <option value="">Select Item</option>
                                             {itemOptions.map((option) => (
                                                 <option key={option.item_id} value={option.item_id}>
-                                                    {option.item_name} {option.pieces_per_box && option.pieces_per_box > 1 ? `(${option.pieces_per_box} pcs/${option.default_unit || 'box'})` : ''}
+                                                    {option.item_name} {option.pieces_per_box && option.pieces_per_box > 1 ? `(${option.pieces_per_box} ${option.sub_unit || 'piece'}s/${option.default_unit || 'box'})` : ''}
                                                 </option>
                                             ))}
                                         </select>
                                         <InputError message={form.errors[`items.${index}.item_id`]} className="mt-1" />
                                     </label>
                                     <label className="block">
-                                        <span className="mb-1 block text-sm font-medium text-slate-700">Quantity ({unit})</span>
-                                        <input type="number" min="1" value={item.quantity} onChange={(event) => patchItem(index, { quantity: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required />
+                                        <span className="mb-1 block text-sm font-medium text-slate-700">Quantity ({unit.toUpperCase()})</span>
+                                        <input type="number" min="1" step="1" value={item.quantity} onChange={(event) => patchItem(index, { quantity: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required />
                                         <div className="mt-1 text-xs text-slate-600">
                                             <span>
                                                 Planned: <strong className="text-slate-800">{qtyNum} {unit}</strong>
                                                 {piecesPerBox > 1 ? (
                                                     <span className="text-indigo-600 font-semibold ml-1">
-                                                        = {totalPieces.toLocaleString()} total pieces ({qtyNum} × {piecesPerBox} pcs/{unit})
+                                                        = {totalPieces.toLocaleString()} total {subUnit}s ({qtyNum} × {piecesPerBox} {subUnit}s/{unit})
                                                     </span>
                                                 ) : null}
                                             </span>
@@ -211,7 +213,7 @@ export default function PpmpCreate({ itemOptions }: Props) {
                                     </label>
                                     <label className="block">
                                         <span className="mb-1 block text-sm font-medium text-slate-700">Packaging Unit</span>
-                                        <input value={unit + (piecesPerBox > 1 ? ` (${piecesPerBox} pcs/${unit})` : '')} readOnly aria-readonly="true" className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700" />
+                                        <input value={unit + (piecesPerBox > 1 ? ` (${piecesPerBox} ${subUnit}s/${unit})` : '')} readOnly aria-readonly="true" className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700" />
                                     </label>
                                     <label className="block">
                                         <span className="mb-1 block text-sm font-medium text-slate-700">Estimated Unit Cost (₱ per {unit})</span>
@@ -219,7 +221,7 @@ export default function PpmpCreate({ itemOptions }: Props) {
                                         <div className="mt-1 flex flex-wrap items-center justify-between text-xs text-slate-600">
                                             {unitCostNum > 0 && piecesPerBox > 1 ? (
                                                 <span className="text-emerald-700 font-medium">
-                                                    ≈ ₱{costPerPiece.toFixed(2)}/pc
+                                                    ≈ ₱{costPerPiece.toFixed(2)}/{subUnit}
                                                 </span>
                                             ) : <span />}
                                             {lineSubtotal > 0 ? (
