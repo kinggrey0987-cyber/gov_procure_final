@@ -834,6 +834,14 @@ Route::get('/system-migrate', function () {
                 \Illuminate\Support\Facades\Artisan::call('db:seed', ['--force' => true]);
                 $output = \Illuminate\Support\Facades\Artisan::output();
                 break;
+            case 'seed-catalog':
+            case 'seed-items':
+                \Illuminate\Support\Facades\Artisan::call('db:seed', [
+                    '--class' => 'Database\\Seeders\\ItemCatalogSeeder',
+                    '--force' => true,
+                ]);
+                $output = \Illuminate\Support\Facades\Artisan::output();
+                break;
             case 'storage-link':
                 \Illuminate\Support\Facades\Artisan::call('storage:link');
                 $output = \Illuminate\Support\Facades\Artisan::output();
