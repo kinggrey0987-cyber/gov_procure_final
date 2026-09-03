@@ -117,11 +117,6 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
                             {approvalHistory?.[0]?.approved_at ? (
                                 <p className="mt-0.5 text-xs text-rose-700">Date rejected: {formatDate(approvalHistory[0].approved_at)}</p>
                             ) : null}
-                            {(approvalHistory?.[0]?.remarks || ppmp.remarks) ? (
-                                <p className="mt-1.5 text-xs text-rose-800">
-                                    <span className="font-semibold">Rejection Reason:</span> {approvalHistory?.[0]?.remarks || ppmp.remarks}
-                                </p>
-                            ) : null}
                         </div>
                     ) : null}
 
@@ -131,11 +126,6 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
                             <p className="mt-1 text-sm font-semibold text-amber-900">{ppmp.approver?.name || approvalHistory?.[0]?.approver?.name}</p>
                             {approvalHistory?.[0]?.approved_at ? (
                                 <p className="mt-0.5 text-xs text-amber-700">Date returned: {formatDate(approvalHistory[0].approved_at)}</p>
-                            ) : null}
-                            {(approvalHistory?.[0]?.remarks || ppmp.remarks) ? (
-                                <p className="mt-1.5 text-xs text-amber-800">
-                                    <span className="font-semibold">Revision Instructions:</span> {approvalHistory?.[0]?.remarks || ppmp.remarks}
-                                </p>
                             ) : null}
                         </div>
                     ) : null}
