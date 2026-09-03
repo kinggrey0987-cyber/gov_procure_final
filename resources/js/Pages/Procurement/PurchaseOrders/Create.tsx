@@ -8,6 +8,13 @@ type PurchaseRequestOption = {
     purchase_request_id: number;
     status: string;
     created_at: string | null;
+    source_type?: string | null;
+    source_delivery_id?: number | null;
+    is_discrepancy_follow_up?: boolean;
+    suggested_supplier_id?: number | null;
+    suggested_supplier_name?: string | null;
+    parent_delivery_code?: string | null;
+    parent_po_number?: string | null;
     office: {
         id: number;
         code: string;
@@ -57,6 +64,19 @@ export default function PurchaseOrdersCreate({ eligiblePurchaseRequests, supplie
         () => eligiblePurchaseRequests.find((row) => row.purchase_request_id === Number(form.data.purchase_request_id)) ?? null,
         [eligiblePurchaseRequests, form.data.purchase_request_id],
     );
+
+    // Auto-lock supplier and preset replacement details if PR is a discrepancy follow-up
+    useEffect(() => {
+        if (selectedPurchaseRequest?.is_discrepancy_follow_up && selectedPurchaseRequest.suggested_supplier_id) {
+            form.setData((prev) => ({
+                ...prev,
+                supplier_id: selectedPurchaseRequest.suggested_supplier_id ?? prev.supplier_id,
+                procurement_method: 'DIRECT_CONTRACTING',
+                remarks: prev.remarks || `Zero-cost warranty replacement for delivery discrepancy under delivery ${selectedPurchaseRequest.parent_delivery_code} (PO ${selectedPurchaseRequest.parent_po_number}).`,
+                terms_notes: prev.terms_notes || 'Zero-cost supplier replacement under warranty rectification (RA 9184 & COA).',
+            }));
+        }
+    }, [selectedPurchaseRequest?.purchase_request_id]);
 
     const hasEligiblePurchaseRequests = eligiblePurchaseRequests.length > 0;
     const hasSuppliers = suppliers.length > 0;
@@ -116,6 +136,27 @@ export default function PurchaseOrdersCreate({ eligiblePurchaseRequests, supplie
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-2">
+                        {selectedPurchaseRequest?.is_discrepancy_follow_up ? (
+                            <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900 shadow-sm md:col-span-2">
+                                <div className="flex items-start gap-3">
+                                    <span className="text-2xl">🛡️</span>
+                                    <div>
+                                        <h4 className="font-bold text-amber-950">
+                                            Zero-Cost Supplier Replacement Order (COA & RA 9184 Compliant)
+                                        </h4>
+                                        <p className="mt-1 text-xs text-amber-800">
+                                            This Purchase Order replaces damaged or missing goods from Delivery <strong className="font-mono">{selectedPurchaseRequest.parent_delivery_code}</strong> (Original PO: <strong className="font-mono">{selectedPurchaseRequest.parent_po_number}</strong>).
+                                        </p>
+                                        <ul className="mt-2 list-disc pl-4 text-xs text-amber-900 space-y-0.5">
+                                            <li><strong>Supplier Auto-Locked:</strong> Contracted to original supplier <strong>{selectedPurchaseRequest.suggested_supplier_name}</strong>.</li>
+                                            <li><strong>₱0.00 Replacement Cost:</strong> Replacement items will be automatically placed at zero additional municipal cost (no budget deduction).</li>
+                                            <li><strong>Auto-Resolve:</strong> When GSO inspects and accepts this replacement delivery, the original delivery will automatically transition to <em>VERIFIED</em>.</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : null}
+
                         <label className="block md:col-span-2">
                             <span className="mb-1 block text-sm font-medium text-slate-700">Select Purchase Request Source</span>
                         <select
@@ -129,6 +170,7 @@ export default function PurchaseOrdersCreate({ eligiblePurchaseRequests, supplie
                             {hasEligiblePurchaseRequests ? (
                                 eligiblePurchaseRequests.map((row) => (
                                     <option key={row.purchase_request_id} value={row.purchase_request_id}>
+                                        {row.is_discrepancy_follow_up ? '🛡️ [WARRANTY REPLACEMENT] ' : ''}
                                         PR #{row.purchase_request_id} | {row.supply_request?.request_code || `SR #${row.supply_request?.supply_request_id ?? '-'}`} | {row.office?.code || row.office?.name || 'Unknown Office'}
                                     </option>
                                 ))
@@ -140,12 +182,14 @@ export default function PurchaseOrdersCreate({ eligiblePurchaseRequests, supplie
                         </label>
 
                         <label className="block">
-                            <span className="mb-1 block text-sm font-medium text-slate-700">Select Supplier</span>
+                            <span className="mb-1 block text-sm font-medium text-slate-700">
+                                Select Supplier {selectedPurchaseRequest?.is_discrepancy_follow_up ? '(Locked to Original Contractor)' : ''}
+                            </span>
                         <select
                             value={form.data.supplier_id}
                             onChange={(event) => form.setData('supplier_id', Number(event.target.value))}
-                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                            disabled={!hasSuppliers}
+                            className={`w-full rounded-lg border border-slate-300 px-3 py-2 text-sm ${selectedPurchaseRequest?.is_discrepancy_follow_up ? 'bg-slate-100 cursor-not-allowed text-slate-700 font-medium' : ''}`}
+                            disabled={!hasSuppliers || Boolean(selectedPurchaseRequest?.is_discrepancy_follow_up)}
                             required
                         >
                             <option value={0}>-- Select a Supplier --</option>
@@ -157,6 +201,11 @@ export default function PurchaseOrdersCreate({ eligiblePurchaseRequests, supplie
                                 ))
                             ) : null}
                         </select>
+                        {selectedPurchaseRequest?.is_discrepancy_follow_up ? (
+                            <p className="mt-1 text-xs text-amber-700 font-medium">
+                                Locked to original delivery contractor under warranty terms.
+                            </p>
+                        ) : null}
                         {form.errors.supplier_id ? (
                             <p className="mt-1 text-xs font-semibold text-rose-600">{form.errors.supplier_id}</p>
                         ) : null}

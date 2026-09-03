@@ -141,7 +141,14 @@ export default function PurchaseOrdersShow({ purchaseOrder, traceability, status
                     <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
-                                <p className="text-xs uppercase tracking-[0.15em] text-slate-500">Purchase Order Details</p>
+                                <div className="flex items-center gap-2">
+                                    <p className="text-xs uppercase tracking-[0.15em] text-slate-500">Purchase Order Details</p>
+                                    {Number(purchaseOrder.total_amount ?? 0) === 0 ? (
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+                                            🛡️ Zero-Cost Warranty Replacement (₱0.00)
+                                        </span>
+                                    ) : null}
+                                </div>
                                 <h3 className="mt-1 text-lg font-semibold text-slate-900">{purchaseOrder.po_number}</h3>
                             </div>
                             <span className={statusClass(purchaseOrder.status)}>{purchaseOrder.status}</span>
@@ -155,12 +162,24 @@ export default function PurchaseOrdersShow({ purchaseOrder, traceability, status
                             <Info label="Requester" value={purchaseOrder.supply_request?.requester?.name ?? '-'} />
                             <Info label="Procurement Method" value={humanizeEnum(purchaseOrder.procurement_method)} />
                             <Info label="Expected Delivery" value={formatDate(purchaseOrder.expected_delivery_date)} />
-                            <Info label="Total Amount" value={formatMoney(Number(purchaseOrder.total_amount ?? 0))} />
+                            <Info
+                                label="Total Amount"
+                                value={Number(purchaseOrder.total_amount ?? 0) === 0 ? '₱0.00 (Zero Municipal Cost)' : formatMoney(Number(purchaseOrder.total_amount ?? 0))}
+                            />
                         </dl>
 
                         <p className="mt-4 text-sm text-slate-600">
                             <span className="font-semibold text-slate-700">Remarks:</span> {purchaseOrder.remarks ?? 'No remarks provided.'}
                         </p>
+
+                        {Number(purchaseOrder.total_amount ?? 0) === 0 ? (
+                            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                                <p className="font-semibold">🛡️ Zero-Cost Warranty Replacement Notice (COA & RA 9184 Compliant):</p>
+                                <p className="mt-0.5">
+                                    This purchase order rectifies missing or damaged goods under supplier warranty obligations at zero additional municipal cost. No budget is deducted from the requesting office's PPMP allocation. Once GSO accepts the replacement shipment, the linked partial delivery will automatically resolve to <em>VERIFIED</em>.
+                                </p>
+                            </div>
+                        ) : null}
 
                         {/* Operational Signatories & Governance Trail */}
                         <div className="mt-5 border-t border-slate-200 pt-4">

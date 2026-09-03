@@ -40,26 +40,74 @@ class PurchaseOrderService
         return DB::transaction(function () use ($actor, $payload): PurchaseOrder {
             $purchaseRequest = PurchaseRequest::query()
                 ->lockForUpdate()
+                ->with(['items.item', 'supplyRequest.items', 'sourceDelivery.purchaseOrder', 'sourceDelivery.supplier'])
                 ->where('purchase_request_id', (int) $payload['purchase_request_id'])
                 ->firstOrFail();
 
             $this->assertPurchaseRequestCanCreatePurchaseOrder($purchaseRequest);
 
+            $isReplacement = (string) $purchaseRequest->source_type === 'PARTIAL_DELIVERY_FOLLOW_UP'
+                || (int) ($purchaseRequest->source_delivery_id ?? 0) > 0;
+
+            $supplierId = (int) $payload['supplier_id'];
+            if ($isReplacement && $purchaseRequest->sourceDelivery) {
+                $supplierId = (int) (
+                    $purchaseRequest->sourceDelivery->supplier_id
+                    ?? $purchaseRequest->sourceDelivery->purchaseOrder?->supplier_id
+                    ?? $supplierId
+                );
+            }
+
+            $remarks = $payload['remarks'] ?? null;
+            if ($isReplacement && empty($remarks)) {
+                $delCode = $purchaseRequest->sourceDelivery?->delivery_code ?? 'N/A';
+                $parentPo = $purchaseRequest->sourceDelivery?->purchaseOrder?->po_number ?? 'N/A';
+                $remarks = sprintf('Zero-cost warranty replacement purchase order for delivery %s (PO %s).', $delCode, $parentPo);
+            }
+
+            $procurementMethod = $payload['procurement_method'] ?? ($isReplacement ? 'DIRECT_CONTRACTING' : 'SHOPPING');
+
             $purchaseOrder = PurchaseOrder::query()->create([
                 'purchase_request_id' => (int) $payload['purchase_request_id'],
                 'supply_request_id' => (int) $purchaseRequest->supply_request_id,
-                'supplier_id' => (int) $payload['supplier_id'],
+                'supplier_id' => $supplierId,
                 'created_by' => (int) $actor->id,
                 'po_number' => $this->generateNextPoNumber(),
-                'procurement_method' => $payload['procurement_method'],
+                'procurement_method' => $procurementMethod,
                 'status' => 'DRAFT',
                 'expected_delivery_date' => $payload['expected_delivery_date'] ?? null,
                 'total_amount' => 0,
-                'terms_notes' => $payload['terms_notes'] ?? null,
-                'remarks' => $payload['remarks'] ?? null,
+                'terms_notes' => $payload['terms_notes'] ?? ($isReplacement ? 'Zero-cost supplier warranty rectification under RA 9184.' : null),
+                'remarks' => $remarks,
             ]);
 
-            $this->recordStatus($purchaseOrder, null, 'DRAFT', $actor, 'Purchase order created.');
+            // If this is a warranty replacement follow-up, auto-populate the items at ₱0.00
+            if ($isReplacement && $purchaseRequest->items->isNotEmpty()) {
+                foreach ($purchaseRequest->items as $prItem) {
+                    $qty = max((int) $prItem->quantity_requested, 1);
+                    $catalogItem = $prItem->item;
+                    $itemName = (string) ($catalogItem?->item_name ?? 'Replacement Item');
+                    $unit = (string) ($catalogItem?->default_unit ?? 'piece');
+
+                    $supplyRequestItem = $purchaseRequest->supplyRequest?->items
+                        ?->firstWhere('item_id', $prItem->item_id);
+
+                    $purchaseOrder->items()->create([
+                        'supply_request_item_id' => (int) ($supplyRequestItem?->supply_request_item_id ?? 1),
+                        'item_id' => (int) $prItem->item_id,
+                        'item_name_snapshot' => $itemName,
+                        'specification' => 'Replacement item under supplier warranty rectification',
+                        'quantity_ordered' => $qty,
+                        'unit' => $unit,
+                        'unit_price' => 0.00,
+                        'total_price' => 0.00,
+                    ]);
+                }
+
+                $purchaseOrder->forceFill(['total_amount' => 0.00])->save();
+            }
+
+            $this->recordStatus($purchaseOrder, null, 'DRAFT', $actor, $isReplacement ? 'Zero-cost replacement purchase order created.' : 'Purchase order created.');
             $this->recordAudit($actor, 'CREATE', $purchaseOrder);
 
             $purchaseRequest->loadMissing('supplyRequest');
@@ -359,7 +407,7 @@ class PurchaseOrderService
 
     private function createOrUpdatePriceZScoreAnomaly(PurchaseOrderItem $purchaseOrderItem): void
     {
-        if (! $purchaseOrderItem->item_id) {
+        if (! $purchaseOrderItem->item_id || (float) $purchaseOrderItem->unit_price <= 0) {
             return;
         }
 

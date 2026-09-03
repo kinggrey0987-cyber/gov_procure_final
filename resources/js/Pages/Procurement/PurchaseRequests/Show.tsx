@@ -8,6 +8,8 @@ type PurchaseRequest = {
     status: string;
     remarks: string | null;
     created_at?: string | null;
+    source_type?: string | null;
+    source_delivery_id?: number | null;
     office?: {
         name?: string | null;
         code?: string | null;
@@ -123,6 +125,11 @@ export default function PurchaseRequestsShow({ purchaseRequest, traceability, re
                             <div>
                                 <div className="flex items-center gap-2">
                                     <p className="text-xs uppercase tracking-[0.15em] text-slate-500">{reviewMode ? 'Request Review' : 'Request Information'}</p>
+                                    {purchaseRequest.source_type === 'PARTIAL_DELIVERY_FOLLOW_UP' || Boolean(purchaseRequest.source_delivery_id) ? (
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+                                            🛡️ Discrepancy Replacement PR (Zero-Cost)
+                                        </span>
+                                    ) : null}
                                     {traceability?.is_consolidated ? (
                                         <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-800">
                                             📦 Consolidated Office PR
@@ -148,6 +155,15 @@ export default function PurchaseRequestsShow({ purchaseRequest, traceability, re
                         <p className="mt-4 text-sm text-slate-600">
                             <span className="font-semibold text-slate-700">Remarks:</span> {normalizedRequestRemarks}
                         </p>
+
+                        {purchaseRequest.source_type === 'PARTIAL_DELIVERY_FOLLOW_UP' || Boolean(purchaseRequest.source_delivery_id) ? (
+                            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                                <p className="font-semibold">🛡️ Zero-Cost Supplier Rectification Request:</p>
+                                <p className="mt-0.5">
+                                    Generated from a delivery discrepancy (damaged/missing items). Under COA and RA 9184 standards, this request will generate a ₱0.00 purchase order directly to the original contractor at no additional cost to the municipal government.
+                                </p>
+                            </div>
+                        ) : null}
 
                         {/* Operational Signatories & Routing Trail */}
                         <div className="mt-5 border-t border-slate-200 pt-4">

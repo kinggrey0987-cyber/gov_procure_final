@@ -70,34 +70,51 @@ class PurchaseOrderController extends Controller
                 'supplyRequest:supply_request_id,request_code,requested_by',
                 'supplyRequest.requester:id,name',
                 'items.item.category:item_category_id,category_name',
+                'sourceDelivery.supplier:supplier_id,supplier_name',
+                'sourceDelivery.purchaseOrder.supplier:supplier_id,supplier_name',
             ])
             ->latest('purchase_request_id')
-            ->get(['purchase_request_id', 'supply_request_id', 'office_id', 'status', 'requested_by', 'created_at'])
-            ->map(fn (PurchaseRequest $purchaseRequest): array => [
-                'purchase_request_id' => (int) $purchaseRequest->purchase_request_id,
-                'status' => (string) $purchaseRequest->status,
-                'created_at' => optional($purchaseRequest->created_at)?->toIso8601String(),
-                'office' => $purchaseRequest->office ? [
-                    'id' => (int) $purchaseRequest->office->id,
-                    'code' => (string) $purchaseRequest->office->code,
-                    'name' => (string) $purchaseRequest->office->name,
-                ] : null,
-                'supply_request' => $purchaseRequest->supplyRequest ? [
-                    'supply_request_id' => (int) $purchaseRequest->supplyRequest->supply_request_id,
-                    'request_code' => (string) ($purchaseRequest->supplyRequest->request_code ?? ''),
-                ] : null,
-                'origin_requester' => $purchaseRequest->supplyRequest?->requester ? [
-                    'id' => (int) $purchaseRequest->supplyRequest->requester->id,
-                    'name' => (string) $purchaseRequest->supplyRequest->requester->name,
-                ] : null,
-                'items' => $purchaseRequest->items->map(fn ($item): array => [
-                    'purchase_request_item_id' => (int) $item->purchase_request_item_id,
-                    'item_name' => (string) ($item->item?->item_name ?? 'Unknown item'),
-                    'category_name' => (string) ($item->item?->category?->category_name ?? 'Uncategorized'),
-                    'quantity_requested' => (float) ($item->quantity_requested ?? 0),
-                    'remarks' => $item->remarks,
-                ])->values(),
-            ])
+            ->get(['purchase_request_id', 'supply_request_id', 'office_id', 'status', 'requested_by', 'created_at', 'source_type', 'source_delivery_id'])
+            ->map(function (PurchaseRequest $purchaseRequest): array {
+                $isDiscrepancyFollowUp = (string) $purchaseRequest->source_type === 'PARTIAL_DELIVERY_FOLLOW_UP'
+                    || (int) ($purchaseRequest->source_delivery_id ?? 0) > 0;
+                $sourceDelivery = $purchaseRequest->sourceDelivery;
+                $parentPo = $sourceDelivery?->purchaseOrder;
+                $parentSupplier = $sourceDelivery?->supplier ?? $parentPo?->supplier;
+
+                return [
+                    'purchase_request_id' => (int) $purchaseRequest->purchase_request_id,
+                    'status' => (string) $purchaseRequest->status,
+                    'created_at' => optional($purchaseRequest->created_at)?->toIso8601String(),
+                    'source_type' => (string) ($purchaseRequest->source_type ?? ''),
+                    'source_delivery_id' => $purchaseRequest->source_delivery_id ? (int) $purchaseRequest->source_delivery_id : null,
+                    'is_discrepancy_follow_up' => $isDiscrepancyFollowUp,
+                    'suggested_supplier_id' => $parentSupplier ? (int) $parentSupplier->supplier_id : null,
+                    'suggested_supplier_name' => (string) ($parentSupplier?->supplier_name ?? ''),
+                    'parent_delivery_code' => (string) ($sourceDelivery?->delivery_code ?? ''),
+                    'parent_po_number' => (string) ($parentPo?->po_number ?? ''),
+                    'office' => $purchaseRequest->office ? [
+                        'id' => (int) $purchaseRequest->office->id,
+                        'code' => (string) $purchaseRequest->office->code,
+                        'name' => (string) $purchaseRequest->office->name,
+                    ] : null,
+                    'supply_request' => $purchaseRequest->supplyRequest ? [
+                        'supply_request_id' => (int) $purchaseRequest->supplyRequest->supply_request_id,
+                        'request_code' => (string) ($purchaseRequest->supplyRequest->request_code ?? ''),
+                    ] : null,
+                    'origin_requester' => $purchaseRequest->supplyRequest?->requester ? [
+                        'id' => (int) $purchaseRequest->supplyRequest->requester->id,
+                        'name' => (string) $purchaseRequest->supplyRequest->requester->name,
+                    ] : null,
+                    'items' => $purchaseRequest->items->map(fn ($item): array => [
+                        'purchase_request_item_id' => (int) $item->purchase_request_item_id,
+                        'item_name' => (string) ($item->item?->item_name ?? 'Unknown item'),
+                        'category_name' => (string) ($item->item?->category?->category_name ?? 'Uncategorized'),
+                        'quantity_requested' => (float) ($item->quantity_requested ?? 0),
+                        'remarks' => $item->remarks,
+                    ])->values(),
+                ];
+            })
             ->values();
 
         $suppliers = Supplier::query()
@@ -121,10 +138,10 @@ class PurchaseOrderController extends Controller
     {
         abort_unless($request->user()?->can('procurement.purchase-order.view-any'), 403);
 
-        $status = trim((string) $request->input('status', ''));
+        $status = strtoupper(trim((string) $request->input('status', '')));
 
         $records = PurchaseOrder::query()
-            ->with(['supplier', 'purchaseRequest.office'])
+            ->with(['purchaseRequest.office', 'supplyRequest', 'supplier', 'items'])
             ->when($status !== '', fn ($query) => $query->where('status', $status))
             ->where('status', '!=', 'DRAFT')
             ->latest('purchase_order_id')
@@ -144,6 +161,11 @@ class PurchaseOrderController extends Controller
         abort_unless($request->user()?->can('procurement.purchase-order.create'), 403);
 
         $purchaseOrder = $this->service->create($request->user(), $request->validated());
+
+        if ($purchaseOrder->items()->count() > 0) {
+            return redirect()->route('procurement.purchase-orders.show', $purchaseOrder->purchase_order_id)
+                ->with('success', 'Zero-cost replacement purchase order created successfully with items auto-populated at ₱0.00.');
+        }
 
         return redirect()->route('procurement.purchase-orders.items.index', $purchaseOrder->purchase_order_id)
             ->with('success', 'Purchase order created successfully. Add item prices and quantities next.');
