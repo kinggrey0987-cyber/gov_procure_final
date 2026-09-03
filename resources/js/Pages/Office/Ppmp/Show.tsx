@@ -100,12 +100,42 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
                         <p className="mt-1 text-sm text-slate-700">{getFundSourceLabel(ppmp.fund_source) || '-'}</p>
                     </div>
 
-                    {ppmp.approver ? (
+                    {ppmp.status === 'APPROVED' && (ppmp.approver || approvalHistory?.[0]?.approver) ? (
                         <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3">
                             <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Approved By</p>
-                            <p className="mt-1 text-sm font-semibold text-emerald-900">{ppmp.approver.name}</p>
+                            <p className="mt-1 text-sm font-semibold text-emerald-900">{ppmp.approver?.name || approvalHistory?.[0]?.approver?.name}</p>
                             {ppmp.date_approved ? (
                                 <p className="mt-0.5 text-xs text-emerald-700">Date approved: {formatDate(ppmp.date_approved)}</p>
+                            ) : null}
+                        </div>
+                    ) : null}
+
+                    {ppmp.status === 'REJECTED' && (ppmp.approver || approvalHistory?.[0]?.approver) ? (
+                        <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50/60 px-4 py-3">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Rejected By</p>
+                            <p className="mt-1 text-sm font-semibold text-rose-900">{ppmp.approver?.name || approvalHistory?.[0]?.approver?.name}</p>
+                            {approvalHistory?.[0]?.approved_at ? (
+                                <p className="mt-0.5 text-xs text-rose-700">Date rejected: {formatDate(approvalHistory[0].approved_at)}</p>
+                            ) : null}
+                            {(approvalHistory?.[0]?.remarks || ppmp.remarks) ? (
+                                <p className="mt-1.5 text-xs text-rose-800">
+                                    <span className="font-semibold">Rejection Reason:</span> {approvalHistory?.[0]?.remarks || ppmp.remarks}
+                                </p>
+                            ) : null}
+                        </div>
+                    ) : null}
+
+                    {ppmp.status === 'RETURNED_FOR_REVISION' && (ppmp.approver || approvalHistory?.[0]?.approver) ? (
+                        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Returned for Revision By</p>
+                            <p className="mt-1 text-sm font-semibold text-amber-900">{ppmp.approver?.name || approvalHistory?.[0]?.approver?.name}</p>
+                            {approvalHistory?.[0]?.approved_at ? (
+                                <p className="mt-0.5 text-xs text-amber-700">Date returned: {formatDate(approvalHistory[0].approved_at)}</p>
+                            ) : null}
+                            {(approvalHistory?.[0]?.remarks || ppmp.remarks) ? (
+                                <p className="mt-1.5 text-xs text-amber-800">
+                                    <span className="font-semibold">Revision Instructions:</span> {approvalHistory?.[0]?.remarks || ppmp.remarks}
+                                </p>
                             ) : null}
                         </div>
                     ) : null}
@@ -119,7 +149,7 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
 
                     <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Remarks</p>
-                        <p className="mt-1 text-sm text-slate-700">{ppmp.remarks ?? '-'}</p>
+                        <p className="mt-1 text-sm text-slate-700">{approvalHistory?.[0]?.remarks || ppmp.remarks || '-'}</p>
                     </div>
                 </section>
 

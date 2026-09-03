@@ -133,12 +133,22 @@ export default function ExecutiveApprovalShow({
                     <div className="mt-4 grid gap-3 text-sm text-slate-700 md:grid-cols-2 lg:grid-cols-3">
                         <p><span className="font-semibold">Office:</span> {ppmp.office?.name ?? '-'}</p>
                         <p><span className="font-semibold">Prepared By:</span> {ppmp.preparer?.name ?? '-'}</p>
-                        <p><span className="font-semibold">Current Approver:</span> {ppmp.approver?.name ?? '-'}</p>
+                        {ppmp.status === 'APPROVED' ? (
+                            <>
+                                <p><span className="font-semibold">Approved By:</span> {ppmp.approver?.name ?? '-'}</p>
+                                <p><span className="font-semibold">Approval Date:</span> {formatDate(ppmp.date_approved)}</p>
+                            </>
+                        ) : ppmp.status === 'REJECTED' ? (
+                            <p><span className="font-semibold">Rejected By:</span> {ppmp.approver?.name ?? '-'}</p>
+                        ) : ppmp.status === 'RETURNED_FOR_REVISION' ? (
+                            <p><span className="font-semibold">Returned By:</span> {ppmp.approver?.name ?? '-'}</p>
+                        ) : (
+                            <p><span className="font-semibold">Review Authority:</span> {ppmp.approver?.name ?? 'Executive Office'}</p>
+                        )}
                         <p><span className="font-semibold">Fiscal Year:</span> {ppmp.fiscal_year}</p>
                         <p><span className="font-semibold">Fund Source:</span> {getFundSourceLabel(ppmp.fund_source) || '-'}</p>
                         <p><span className="font-semibold">Date Prepared:</span> {formatDate(ppmp.date_prepared)}</p>
                         <p><span className="font-semibold">Submission Date:</span> {formatDate(ppmp.submitted_at)}</p>
-                        <p><span className="font-semibold">Approval Date:</span> {formatDate(ppmp.date_approved)}</p>
                         <p><span className="font-semibold">Items:</span> {ppmp.items_count}</p>
                         <p><span className="font-semibold">Total Estimated Budget:</span> {formatCurrency(ppmp.total_estimated_budget)}</p>
                     </div>

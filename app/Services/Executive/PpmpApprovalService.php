@@ -54,6 +54,7 @@ class PpmpApprovalService
                 'status' => $newStatus,
                 'approved_by' => $approverId,
                 'date_approved' => $approvalDate,
+                'remarks' => $remarks ?: $ppmp->remarks,
             ])->save();
 
             $this->recordStatus($ppmp, $currentStatus, $newStatus, $actor, $remarks);
