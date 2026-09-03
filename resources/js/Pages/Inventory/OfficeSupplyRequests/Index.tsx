@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import Modal from '@/Components/Modal';
 import PaginationNav from '@/Components/PaginationNav';
 import useDebouncedValue from '@/hooks/useDebouncedValue';
 import useSmartRefresh from '@/hooks/useSmartRefresh';
@@ -18,7 +19,7 @@ type RequestRow = {
     status: string;
     priority_level: string;
     needed_by_date?: string | null;
-    office?: { name?: string | null } | null;
+    office?: { id?: number; name?: string | null } | null;
     requester?: { name?: string | null } | null;
     item_count: number;
     requested_total: number;
@@ -68,6 +69,8 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
     const [processingRequestId, setProcessingRequestId] = useState<number | null>(null);
     const [selectedRequestIds, setSelectedRequestIds] = useState<Set<number>>(new Set());
     const [isConsolidating, setIsConsolidating] = useState(false);
+    const [showPreviewModal, setShowPreviewModal] = useState(false);
+    const [consolidationRemarks, setConsolidationRemarks] = useState('');
     const hasMountedRef = useRef(false);
 
     useEffect(() => {
@@ -123,17 +126,63 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
         });
     };
 
-    // Eligible requests for consolidation: shortage + submitted + no existing PR
-    const consolidatableRequests = requests.data.filter(
-        (r) => r.stock_assessment === 'SHORTAGE_REQUIRES_PROCUREMENT' && r.status === 'SUBMITTED' && !r.has_purchase_request,
-    );
+    // Offices with pending shortages eligible for consolidation
+    const officeShortageGroups = useMemo(() => {
+        const map = new Map<number, { id: number; name: string; count: number }>();
+        requests.data.forEach((r) => {
+            if (r.stock_assessment === 'SHORTAGE_REQUIRES_PROCUREMENT' && r.status === 'SUBMITTED' && !r.has_purchase_request && r.office?.id) {
+                const existing = map.get(r.office.id) ?? { id: r.office.id, name: r.office.name ?? 'Office', count: 0 };
+                existing.count++;
+                map.set(r.office.id, existing);
+            }
+        });
+        return Array.from(map.values());
+    }, [requests.data]);
+
+    const selectedRequests = useMemo(() => {
+        return requests.data.filter((r) => selectedRequestIds.has(r.supply_request_id));
+    }, [requests.data, selectedRequestIds]);
+
+    const activeOfficeId = useMemo(() => {
+        if (officeId && Number(officeId) > 0) return Number(officeId);
+        if (selectedRequests.length > 0 && selectedRequests[0].office?.id) {
+            return selectedRequests[0].office.id;
+        }
+        return null;
+    }, [officeId, selectedRequests]);
+
+    const targetOfficeName = useMemo(() => {
+        if (!activeOfficeId) return null;
+        const found = offices.find((o) => o.id === activeOfficeId);
+        if (found) return found.name;
+        return selectedRequests[0]?.office?.name ?? 'Selected Office';
+    }, [activeOfficeId, offices, selectedRequests]);
+
+    // Eligible requests for consolidation
+    const consolidatableRequests = useMemo(() => {
+        return requests.data.filter((r) => {
+            if (r.stock_assessment !== 'SHORTAGE_REQUIRES_PROCUREMENT' || r.status !== 'SUBMITTED' || r.has_purchase_request) {
+                return false;
+            }
+            if (activeOfficeId !== null) {
+                return r.office?.id === activeOfficeId;
+            }
+            return true;
+        });
+    }, [requests.data, activeOfficeId]);
 
     const toggleSelect = (id: number) => {
+        const targetReq = requests.data.find((r) => r.supply_request_id === id);
+        if (!targetReq) return;
+
         setSelectedRequestIds((prev) => {
             const next = new Set(prev);
             if (next.has(id)) {
                 next.delete(id);
             } else {
+                if (next.size > 0 && activeOfficeId !== null && targetReq.office?.id !== activeOfficeId) {
+                    return new Set([id]);
+                }
                 next.add(id);
             }
             return next;
@@ -148,22 +197,39 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
         }
     };
 
-    const currentOfficeId = filters.office_id ?? null;
-    const canConsolidate = currentOfficeId !== null && selectedRequestIds.size >= 1;
+    const canConsolidate = activeOfficeId !== null && selectedRequestIds.size >= 1;
+
+    // Aggregated item lines for preview modal
+    const aggregatedItems = useMemo(() => {
+        const itemMap = new Map<string, { item_name: string; unit: string; total_quantity: number }>();
+        selectedRequests.forEach((req) => {
+            (req.requested_items || []).forEach((item) => {
+                const existing = itemMap.get(item.item_name) ?? {
+                    item_name: item.item_name,
+                    unit: item.unit,
+                    total_quantity: 0,
+                };
+                existing.total_quantity += Number(item.quantity_requested || 0);
+                itemMap.set(item.item_name, existing);
+            });
+        });
+        return Array.from(itemMap.values());
+    }, [selectedRequests]);
 
     const submitConsolidatedPr = () => {
-        if (!canConsolidate) return;
+        if (!canConsolidate || !activeOfficeId) return;
         setIsConsolidating(true);
         router.post(
             route('inventory.office-supply-requests.consolidated-queue'),
             {
-                office_id: currentOfficeId,
+                office_id: activeOfficeId,
                 supply_request_ids: Array.from(selectedRequestIds),
             },
             {
                 preserveScroll: true,
                 onFinish: () => {
                     setIsConsolidating(false);
+                    setShowPreviewModal(false);
                     setSelectedRequestIds(new Set());
                 },
             },
@@ -241,27 +307,82 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                     </p>
                 </div>
 
-                {currentOfficeId !== null && consolidatableRequests.length > 0 ? (
-                    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-5 py-3 shadow-sm">
-                        <div className="flex-1">
-                            <p className="text-sm font-semibold text-indigo-800">
-                                📦 Consolidated PR
-                            </p>
+                {officeShortageGroups.length > 0 ? (
+                    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50/70 p-3.5 shadow-sm">
+                        <span className="text-xs font-bold uppercase tracking-wider text-indigo-900">
+                            📦 Consolidate Pending Shortages by Office:
+                        </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                            {officeShortageGroups.map((g) => (
+                                <button
+                                    key={g.id}
+                                    type="button"
+                                    onClick={() => setOfficeId(String(g.id))}
+                                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                        Number(activeOfficeId) === g.id
+                                            ? 'bg-indigo-700 text-white shadow-sm ring-2 ring-indigo-400'
+                                            : 'border border-indigo-200 bg-white text-indigo-800 hover:bg-indigo-100/80'
+                                    }`}
+                                >
+                                    <span>{g.name}</span>
+                                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${Number(activeOfficeId) === g.id ? 'bg-indigo-900 text-indigo-100' : 'bg-indigo-100 text-indigo-800'}`}>
+                                        {g.count} pending
+                                    </span>
+                                </button>
+                            ))}
+                            {officeId ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setOfficeId('')}
+                                    className="ml-2 text-xs font-medium text-indigo-600 underline hover:text-indigo-800"
+                                >
+                                    Show all offices
+                                </button>
+                            ) : null}
+                        </div>
+                    </div>
+                ) : null}
+
+                {consolidatableRequests.length > 0 ? (
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-5 py-3.5 shadow-sm">
+                        <div className="flex-1 min-w-[260px]">
+                            <div className="flex items-center gap-2">
+                                <span className="text-lg">📦</span>
+                                <h4 className="text-sm font-bold text-indigo-900">
+                                    Consolidate Office Requests into PR
+                                </h4>
+                                {targetOfficeName ? (
+                                    <span className="rounded-md bg-indigo-200/80 px-2 py-0.5 text-xs font-bold text-indigo-900">
+                                        {targetOfficeName}
+                                    </span>
+                                ) : null}
+                            </div>
                             <p className="mt-0.5 text-xs text-indigo-700">
-                                Select shortage requests below to create one consolidated purchase request for this office.
+                                Select shortage requests below to merge item quantities into one Consolidated Purchase Request and forward directly to BAC.
                                 {selectedRequestIds.size > 0 ? (
-                                    <span className="ml-1 font-bold">{selectedRequestIds.size} request(s) selected.</span>
+                                    <span className="ml-1.5 font-bold text-indigo-950">
+                                        ({selectedRequestIds.size} request{selectedRequestIds.size > 1 ? 's' : ''} selected)
+                                    </span>
                                 ) : null}
                             </p>
                         </div>
-                        <button
-                            type="button"
-                            disabled={!canConsolidate || isConsolidating}
-                            onClick={submitConsolidatedPr}
-                            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            {isConsolidating ? 'Creating...' : `Create Consolidated PR (${selectedRequestIds.size})`}
-                        </button>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={toggleSelectAll}
+                                className="rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+                            >
+                                {selectedRequestIds.size >= consolidatableRequests.length ? 'Deselect All' : 'Select All'}
+                            </button>
+                            <button
+                                type="button"
+                                disabled={!canConsolidate || isConsolidating}
+                                onClick={() => setShowPreviewModal(true)}
+                                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                {isConsolidating ? 'Processing...' : `Preview & Forward to BAC (${selectedRequestIds.size})`}
+                            </button>
+                        </div>
                     </div>
                 ) : null}
 
@@ -269,8 +390,8 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                     <table className="min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-slate-50">
                             <tr>
-                                {currentOfficeId !== null && consolidatableRequests.length > 0 ? (
-                                    <th className="px-3 py-3 text-center">
+                                {consolidatableRequests.length > 0 ? (
+                                    <th className="px-3 py-3 text-center w-12">
                                         <input
                                             type="checkbox"
                                             checked={selectedRequestIds.size >= consolidatableRequests.length && consolidatableRequests.length > 0}
@@ -294,7 +415,7 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
 
                                 return (
                                 <tr key={request.supply_request_id} className="hover:bg-slate-50/60">
-                                    {currentOfficeId !== null && consolidatableRequests.length > 0 ? (
+                                    {consolidatableRequests.length > 0 ? (
                                         <td className="px-3 py-3 text-center">
                                             {consolidatableRequests.some((r) => r.supply_request_id === request.supply_request_id) ? (
                                                 <input
@@ -384,7 +505,7 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                             })}
                             {requests.data.length === 0 ? (
                                 <tr>
-                                    <td colSpan={currentOfficeId !== null && consolidatableRequests.length > 0 ? 7 : 6} className="px-4 py-8 text-center text-sm text-slate-500">
+                                    <td colSpan={consolidatableRequests.length > 0 ? 7 : 6} className="px-4 py-8 text-center text-sm text-slate-500">
                                         No office supply requests available for review.
                                     </td>
                                 </tr>
@@ -397,6 +518,106 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                     <PaginationNav links={requests.links} preserveState={false} />
                 </div>
             </div>
+
+            {/* Consolidated PR Preview & Forwarding Modal */}
+            <Modal show={showPreviewModal} onClose={() => setShowPreviewModal(false)} maxWidth="2xl">
+                <div className="p-6">
+                    <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                        <div className="flex items-center gap-2">
+                            <span className="text-xl">📦</span>
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-900">
+                                    Forward Consolidated PR to BAC
+                                </h3>
+                                <p className="text-xs text-slate-500">
+                                    Consolidating for {targetOfficeName} • {selectedRequestIds.size} Supply Request(s)
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setShowPreviewModal(false)}
+                            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                        >
+                            ✕
+                        </button>
+                    </div>
+
+                    <div className="mt-4 space-y-4">
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                            <h5 className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                                Selected Source Supply Requests
+                            </h5>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                                {selectedRequests.map((r) => (
+                                    <span key={r.supply_request_id} className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-mono font-medium text-slate-800 shadow-sm">
+                                        <span className="font-semibold">{r.request_code}</span>
+                                        <span className="text-slate-400">({r.item_count} items)</span>
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div>
+                            <h5 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-600">
+                                Merged Items to Order (Aggregated Demand)
+                            </h5>
+                            <div className="max-h-56 overflow-y-auto rounded-lg border border-slate-200">
+                                <table className="min-w-full divide-y divide-slate-200 text-sm">
+                                    <thead className="bg-slate-100 text-xs font-semibold text-slate-700">
+                                        <tr>
+                                            <th className="px-3 py-2 text-left">Item Description</th>
+                                            <th className="px-3 py-2 text-center">Unit</th>
+                                            <th className="px-3 py-2 text-right">Consolidated Qty</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 bg-white">
+                                        {aggregatedItems.map((item, idx) => (
+                                            <tr key={idx}>
+                                                <td className="px-3 py-2 font-medium text-slate-800">{item.item_name}</td>
+                                                <td className="px-3 py-2 text-center text-slate-600">{item.unit}</td>
+                                                <td className="px-3 py-2 text-right font-bold text-indigo-700">{item.total_quantity.toFixed(2)}</td>
+                                            </tr>
+                                        ))}
+                                        {aggregatedItems.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={3} className="px-3 py-4 text-center text-xs text-slate-500">
+                                                    No items found in the selected requests.
+                                                </td>
+                                            </tr>
+                                        ) : null}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div className="rounded-lg border border-indigo-100 bg-indigo-50/70 p-3 text-xs text-indigo-800">
+                            <p className="font-semibold">Signatory Transparency Note:</p>
+                            <p className="mt-0.5">
+                                Submitting will stamp you (GSO Property Custodian) as the Consolidator/Forwarder. The BAC / Procurement Unit will receive this Consolidated PR to initiate supplier canvassing and generate the Consolidated Purchase Order (PO).
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="mt-6 flex justify-end gap-3 border-t border-slate-200 pt-4">
+                        <button
+                            type="button"
+                            onClick={() => setShowPreviewModal(false)}
+                            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            disabled={isConsolidating || aggregatedItems.length === 0}
+                            onClick={submitConsolidatedPr}
+                            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-60"
+                        >
+                            {isConsolidating ? 'Forwarding to BAC...' : 'Confirm & Forward Consolidated PR to BAC'}
+                        </button>
+                    </div>
+                </div>
+            </Modal>
         </AuthenticatedLayout>
     );
 }

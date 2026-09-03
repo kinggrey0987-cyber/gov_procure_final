@@ -11,6 +11,7 @@ type PurchaseOrder = {
     remarks: string | null;
     procurement_method?: string | null;
     expected_delivery_date?: string | null;
+    created_at?: string | null;
     supplier?: {
         supplier_name?: string | null;
     } | null;
@@ -49,8 +50,52 @@ type PurchaseOrder = {
     }>;
 };
 
+type Traceability = {
+    is_consolidated: boolean;
+    gso_forwarder?: {
+        name: string;
+        role: string;
+        forwarded_at: string;
+    } | null;
+    procurement_officer?: {
+        name: string;
+        role: string;
+        processed_at: string;
+    } | null;
+    executive_approver?: {
+        name: string;
+        role: string;
+        approved_at: string;
+    } | null;
+    source_supply_requests?: Array<{
+        supply_request_id: number;
+        request_code: string;
+        office_name: string;
+        office_code: string;
+        requester_name: string;
+        request_date: string;
+        items: Array<{
+            item_name: string;
+            quantity: number;
+            unit: string;
+        }>;
+    }>;
+    office_allocations?: Array<{
+        item_name: string;
+        unit: string;
+        total_quantity: number;
+        allocations: Array<{
+            office_name: string;
+            office_code: string;
+            request_code: string;
+            quantity: number;
+        }>;
+    }>;
+};
+
 type Props = {
     purchaseOrder: PurchaseOrder;
+    traceability?: Traceability;
     statusHistory: Array<{
         id: number;
         old_status?: string | null;
@@ -75,7 +120,7 @@ type Props = {
     };
     showProcurementDocumentsLink?: boolean;
 };
-export default function PurchaseOrdersShow({ purchaseOrder, statusHistory, approvalHistory, permissions, backLink, showProcurementDocumentsLink = true }: Props) {
+export default function PurchaseOrdersShow({ purchaseOrder, traceability, statusHistory, approvalHistory, permissions, backLink, showProcurementDocumentsLink = true }: Props) {
     const placeForm = useForm({ remarks: '' });
     const resolvedBackLink = backLink ?? {
         href: route('procurement.purchase-orders.index'),
@@ -117,22 +162,60 @@ export default function PurchaseOrdersShow({ purchaseOrder, statusHistory, appro
                             <span className="font-semibold text-slate-700">Remarks:</span> {purchaseOrder.remarks ?? 'No remarks provided.'}
                         </p>
 
-                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                            {purchaseOrder.creator?.name ? (
-                                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                                    <dt className="text-xs uppercase tracking-wide text-slate-500">Created By</dt>
-                                    <dd className="mt-1 font-medium text-slate-800">{purchaseOrder.creator.name}</dd>
+                        {/* Operational Signatories & Governance Trail */}
+                        <div className="mt-5 border-t border-slate-200 pt-4">
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                                Operational Signatories & Governance Trail
+                            </h4>
+                            <div className="mt-2.5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                    <dt className="text-[11px] font-bold uppercase tracking-wide text-slate-500">1. Requisitioning Offices</dt>
+                                    {traceability?.source_supply_requests && traceability.source_supply_requests.length > 0 ? (
+                                        <dd className="mt-1 space-y-1">
+                                            {traceability.source_supply_requests.map((sr) => (
+                                                <p key={sr.supply_request_id} className="text-xs text-slate-700">
+                                                    <span className="font-semibold text-slate-900">{sr.office_code}</span>: {sr.requester_name}
+                                                </p>
+                                            ))}
+                                        </dd>
+                                    ) : (
+                                        <dd className="mt-1 font-medium text-slate-800">
+                                            {purchaseOrder.supply_request?.requester?.name || purchaseOrder.purchase_request?.office?.name || 'Requesting Office'}
+                                        </dd>
+                                    )}
                                 </div>
-                            ) : null}
-                            {purchaseOrder.approver?.name ? (
-                                <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2">
-                                    <dt className="text-xs uppercase tracking-wide text-emerald-700">Approved / Placed By</dt>
-                                    <dd className="mt-1 font-semibold text-emerald-900">{purchaseOrder.approver.name}</dd>
-                                    {purchaseOrder.date_approved ? (
-                                        <dd className="mt-0.5 text-xs text-emerald-700">Date: {formatDate(purchaseOrder.date_approved)}</dd>
-                                    ) : null}
+
+                                <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 p-3">
+                                    <dt className="text-[11px] font-bold uppercase tracking-wide text-indigo-700">2. Forwarded by (GSO)</dt>
+                                    <dd className="mt-1 text-sm font-semibold text-indigo-950">
+                                        {traceability?.gso_forwarder?.name || 'GSO Property Officer'}
+                                    </dd>
+                                    <dd className="text-xs text-indigo-700">{traceability?.gso_forwarder?.role || 'GSO Property Custodian'}</dd>
+                                    <dd className="mt-0.5 text-[11px] text-slate-500">{traceability?.gso_forwarder?.forwarded_at || 'Validated & Forwarded'}</dd>
                                 </div>
-                            ) : null}
+
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                    <dt className="text-[11px] font-bold uppercase tracking-wide text-slate-500">3. Processed by (BAC)</dt>
+                                    <dd className="mt-1 text-sm font-semibold text-slate-900">
+                                        {traceability?.procurement_officer?.name || purchaseOrder.creator?.name || 'BAC Procurement Officer'}
+                                    </dd>
+                                    <dd className="text-xs text-slate-600">BAC Procurement Secretariat</dd>
+                                    <dd className="mt-0.5 text-[11px] text-slate-500">
+                                        {traceability?.procurement_officer?.processed_at || formatDate(purchaseOrder.created_at)}
+                                    </dd>
+                                </div>
+
+                                <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
+                                    <dt className="text-[11px] font-bold uppercase tracking-wide text-emerald-700">4. Approved / Placed by</dt>
+                                    <dd className="mt-1 text-sm font-semibold text-emerald-950">
+                                        {purchaseOrder.approver?.name || 'Hon. Municipal Mayor'}
+                                    </dd>
+                                    <dd className="text-xs text-emerald-700">Executive Approving Authority</dd>
+                                    <dd className="mt-0.5 text-[11px] text-emerald-600">
+                                        {purchaseOrder.date_approved ? `Date: ${formatDate(purchaseOrder.date_approved)}` : 'Approved Order'}
+                                    </dd>
+                                </div>
+                            </div>
                         </div>
                     </section>
 
@@ -172,6 +255,62 @@ export default function PurchaseOrdersShow({ purchaseOrder, statusHistory, appro
                             </tbody>
                         </table>
                     </section>
+
+                    {/* Multi-Office Allocation & Distribution Plan (if consolidated) */}
+                    {traceability?.office_allocations && traceability.office_allocations.length > 0 && (traceability.is_consolidated || (traceability.source_supply_requests && traceability.source_supply_requests.length > 1)) ? (
+                        <section className="rounded-xl border border-indigo-200 bg-white p-5 shadow-sm">
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-100 pb-3">
+                                <div>
+                                    <h4 className="text-sm font-bold text-indigo-950">
+                                        📦 Multi-Office Allocation & Supply Distribution Plan
+                                    </h4>
+                                    <p className="text-xs text-slate-500">
+                                        Specifies how ordered items will be distributed by GSO across requesting municipal offices upon delivery and IAR inspection.
+                                    </p>
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {traceability.source_supply_requests?.map((sr) => (
+                                        <span key={sr.supply_request_id} className="inline-flex items-center gap-1 rounded bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-xs font-mono font-medium text-indigo-800">
+                                            {sr.office_code} ({sr.request_code})
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="mt-3 overflow-x-auto">
+                                <table className="min-w-full divide-y divide-slate-200 text-sm">
+                                    <thead className="bg-slate-50 text-xs font-semibold text-slate-700">
+                                        <tr>
+                                            <th className="px-3 py-2 text-left">Item Description</th>
+                                            <th className="px-3 py-2 text-center">Unit</th>
+                                            <th className="px-3 py-2 text-right">Total Ordered</th>
+                                            <th className="px-4 py-2 text-left">Office Allocation Breakdown</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {traceability.office_allocations.map((alloc, idx) => (
+                                            <tr key={idx} className="hover:bg-slate-50/50">
+                                                <td className="px-3 py-2.5 font-medium text-slate-900">{alloc.item_name}</td>
+                                                <td className="px-3 py-2.5 text-center text-slate-600">{alloc.unit}</td>
+                                                <td className="px-3 py-2.5 text-right font-bold text-indigo-700">{alloc.total_quantity.toFixed(2)}</td>
+                                                <td className="px-4 py-2.5">
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {alloc.allocations.map((a, aIdx) => (
+                                                            <span key={aIdx} className="inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-800">
+                                                                <span className="font-semibold">{a.office_code}:</span>
+                                                                <span>{a.quantity.toFixed(2)} {alloc.unit}</span>
+                                                                <span className="text-[10px] text-slate-400">({a.request_code})</span>
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+                    ) : null}
 
                     {purchaseOrder.status === 'DRAFT' && permissions?.place ? (
                         <form onSubmit={placeOrder} className="space-y-3 rounded-lg border bg-white p-6">

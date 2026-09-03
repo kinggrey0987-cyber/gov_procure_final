@@ -23,6 +23,7 @@ class PurchaseOrderController extends Controller
         private readonly PurchaseOrderService $service,
         private readonly DocumentService $documentService,
         private readonly HistoryTimelineService $historyTimelineService,
+        private readonly \App\Services\Procurement\ConsolidationTraceabilityService $traceabilityService,
     ) {
     }
 
@@ -175,6 +176,7 @@ class PurchaseOrderController extends Controller
                 'purchaseRequest.office',
                 'supplyRequest.requester',
             ]),
+            'traceability' => $this->traceabilityService->resolveForPurchaseOrder($purchaseOrder),
             'attachments' => $documents,
             'attachmentPermissions' => [
                 'upload' => $request->user()?->can('procurement.purchase-order.view', $purchaseOrder) ?? false,

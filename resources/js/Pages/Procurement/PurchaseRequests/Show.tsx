@@ -35,8 +35,42 @@ type PurchaseRequest = {
     }>;
 };
 
+type Traceability = {
+    is_consolidated: boolean;
+    gso_forwarder?: {
+        name: string;
+        role: string;
+        forwarded_at: string;
+    } | null;
+    source_supply_requests?: Array<{
+        supply_request_id: number;
+        request_code: string;
+        office_name: string;
+        office_code: string;
+        requester_name: string;
+        request_date: string;
+        items: Array<{
+            item_name: string;
+            quantity: number;
+            unit: string;
+        }>;
+    }>;
+    office_allocations?: Array<{
+        item_name: string;
+        unit: string;
+        total_quantity: number;
+        allocations: Array<{
+            office_name: string;
+            office_code: string;
+            request_code: string;
+            quantity: number;
+        }>;
+    }>;
+};
+
 type Props = {
     purchaseRequest: PurchaseRequest;
+    traceability?: Traceability;
     reviewMode?: boolean;
     backFilters?: {
         status?: string;
@@ -51,7 +85,7 @@ type Props = {
     };
 };
 
-export default function PurchaseRequestsShow({ purchaseRequest, reviewMode = false, backFilters, permissions, backLink }: Props) {
+export default function PurchaseRequestsShow({ purchaseRequest, traceability, reviewMode = false, backFilters, permissions, backLink }: Props) {
     const processForm = useForm({ action: 'process', remarks: '' });
     const totalQuantity = (purchaseRequest.items ?? []).reduce((sum, row) => sum + Number(row.quantity_requested ?? 0), 0);
     const normalizedRequestRemarks = formatRequestRemarks(purchaseRequest.remarks);
@@ -87,7 +121,14 @@ export default function PurchaseRequestsShow({ purchaseRequest, reviewMode = fal
                     <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
-                                <p className="text-xs uppercase tracking-[0.15em] text-slate-500">{reviewMode ? 'Request Review' : 'Request Information'}</p>
+                                <div className="flex items-center gap-2">
+                                    <p className="text-xs uppercase tracking-[0.15em] text-slate-500">{reviewMode ? 'Request Review' : 'Request Information'}</p>
+                                    {traceability?.is_consolidated ? (
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-800">
+                                            📦 Consolidated Office PR
+                                        </span>
+                                    ) : null}
+                                </div>
                                 <h3 className="mt-1 text-lg font-semibold text-slate-900">
                                     {purchaseRequest.supply_request?.request_code || `PR-${String(purchaseRequest.purchase_request_id).padStart(6, '0')}`}
                                 </h3>
@@ -107,7 +148,104 @@ export default function PurchaseRequestsShow({ purchaseRequest, reviewMode = fal
                         <p className="mt-4 text-sm text-slate-600">
                             <span className="font-semibold text-slate-700">Remarks:</span> {normalizedRequestRemarks}
                         </p>
+
+                        {/* Operational Signatories & Routing Trail */}
+                        <div className="mt-5 border-t border-slate-200 pt-4">
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                                Operational Governance & Routing Trail
+                            </h4>
+                            <div className="mt-2.5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                {traceability?.gso_forwarder ? (
+                                    <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 p-3">
+                                        <p className="text-[11px] font-bold uppercase tracking-wide text-indigo-700">Forwarded by (GSO)</p>
+                                        <p className="mt-1 text-sm font-semibold text-indigo-950">{traceability.gso_forwarder.name}</p>
+                                        <p className="text-xs text-indigo-700">{traceability.gso_forwarder.role}</p>
+                                        <p className="mt-1 text-[11px] text-slate-500">{traceability.gso_forwarder.forwarded_at}</p>
+                                    </div>
+                                ) : null}
+
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Origin Requisitioner(s)</p>
+                                    {traceability?.source_supply_requests && traceability.source_supply_requests.length > 0 ? (
+                                        <div className="mt-1 space-y-1">
+                                            {traceability.source_supply_requests.map((sr) => (
+                                                <p key={sr.supply_request_id} className="text-xs text-slate-700">
+                                                    <span className="font-medium text-slate-900">{sr.requester_name}</span> ({sr.office_code})
+                                                </p>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="mt-1 text-sm font-semibold text-slate-800">
+                                            {purchaseRequest.supply_request?.requester?.name || purchaseRequest.requester?.name || 'Office Requisitioner'}
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Procurement Review Authority</p>
+                                    <p className="mt-1 text-sm font-semibold text-slate-800">BAC / Procurement Unit</p>
+                                    <p className="text-xs text-slate-600">Pending Canvass & PO Creation</p>
+                                    <p className="mt-1 text-[11px] text-slate-500">Ref: RA 9184 & RA 12009 Standards</p>
+                                </div>
+                            </div>
+                        </div>
                     </section>
+
+                    {/* Multi-Office Allocation & Traceability Matrix (if consolidated) */}
+                    {traceability?.office_allocations && traceability.office_allocations.length > 0 && (traceability.is_consolidated || (traceability.source_supply_requests && traceability.source_supply_requests.length > 1)) ? (
+                        <section className="rounded-xl border border-indigo-200 bg-white p-5 shadow-sm">
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-100 pb-3">
+                                <div>
+                                    <h4 className="text-sm font-bold text-indigo-950">
+                                        📦 Multi-Office Allocation Matrix
+                                    </h4>
+                                    <p className="text-xs text-slate-500">
+                                        Breakdown of requested supply shares per office for this consolidated procurement.
+                                    </p>
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {traceability.source_supply_requests?.map((sr) => (
+                                        <span key={sr.supply_request_id} className="inline-flex items-center gap-1 rounded bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-xs font-mono font-medium text-indigo-800">
+                                            {sr.request_code} ({sr.office_code})
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="mt-3 overflow-x-auto">
+                                <table className="min-w-full divide-y divide-slate-200 text-sm">
+                                    <thead className="bg-slate-50 text-xs font-semibold text-slate-700">
+                                        <tr>
+                                            <th className="px-3 py-2 text-left">Item Description</th>
+                                            <th className="px-3 py-2 text-center">Unit</th>
+                                            <th className="px-3 py-2 text-right">Consolidated Qty</th>
+                                            <th className="px-4 py-2 text-left">Office Breakdown & Share</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {traceability.office_allocations.map((alloc, idx) => (
+                                            <tr key={idx} className="hover:bg-slate-50/50">
+                                                <td className="px-3 py-2.5 font-medium text-slate-900">{alloc.item_name}</td>
+                                                <td className="px-3 py-2.5 text-center text-slate-600">{alloc.unit}</td>
+                                                <td className="px-3 py-2.5 text-right font-bold text-indigo-700">{alloc.total_quantity.toFixed(2)}</td>
+                                                <td className="px-4 py-2.5">
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {alloc.allocations.map((a, aIdx) => (
+                                                            <span key={aIdx} className="inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-800">
+                                                                <span className="font-semibold">{a.office_code}:</span>
+                                                                <span>{a.quantity.toFixed(2)} {alloc.unit}</span>
+                                                                <span className="text-[10px] text-slate-400">({a.request_code})</span>
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+                    ) : null}
 
                     <section className="responsive-table-wrap rounded-xl border border-slate-200 bg-white shadow-sm">
                     <table className="min-w-full divide-y divide-slate-200 text-sm">

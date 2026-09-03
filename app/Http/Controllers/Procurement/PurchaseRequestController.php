@@ -8,6 +8,7 @@ use App\Http\Requests\Procurement\StorePurchaseRequestRequest;
 use App\Http\Requests\Procurement\UpdatePurchaseRequestRequest;
 use App\Models\PurchaseRequest;
 use App\Models\SupplyRequest;
+use App\Services\Procurement\ConsolidationTraceabilityService;
 use App\Services\Procurement\PurchaseRequestService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,8 +18,10 @@ use Inertia\Response;
 
 class PurchaseRequestController extends Controller
 {
-    public function __construct(private readonly PurchaseRequestService $service)
-    {
+    public function __construct(
+        private readonly PurchaseRequestService $service,
+        private readonly ConsolidationTraceabilityService $traceabilityService,
+    ) {
     }
 
     public function index(Request $request): Response
@@ -60,6 +63,7 @@ class PurchaseRequestController extends Controller
         $mode = strtolower(trim((string) $request->input('mode', 'view')));
         $isReviewMode = $mode === 'review';
         $isExecutiveRoute = $request->routeIs('executive.procurement-records.*');
+        $traceability = $this->traceabilityService->resolveForPurchaseRequest($purchaseRequest);
 
         return Inertia::render('Procurement/PurchaseRequests/Show', [
             'purchaseRequest' => $purchaseRequest->load([
@@ -68,6 +72,7 @@ class PurchaseRequestController extends Controller
                 'requester',
                 'supplyRequest.requester',
             ]),
+            'traceability' => $traceability,
             'reviewMode' => $isReviewMode,
             'backFilters' => [
                 'status' => trim((string) $request->input('status', '')),
