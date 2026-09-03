@@ -38,6 +38,15 @@ export default function CreateUser({ roles, offices }: Props) {
 
     const selectedRole = roles.find((role) => String(role.id) === form.data.role_id);
     const isAdminRole = selectedRole?.code === 'ADMIN';
+    const isExecRole = selectedRole?.code === 'EXEC_OFFICER';
+    const isProcRole = selectedRole?.code === 'PROC_OFFICER';
+    const isGsoRole = selectedRole?.code === 'GSO_OFFICER';
+
+    const mayorOffice = offices.find((o) => o.code === 'MAYOR_OFFICE');
+    const bacOffice = offices.find((o) => o.code === 'BAC');
+    const gsoOffice = offices.find((o) => o.code === 'GSO');
+    const lineOffices = offices.filter((o) => !['MAYOR_OFFICE', 'BAC', 'TECH_ADMIN'].includes(o.code));
+
     const passwordError = normalizePasswordValidationMessage(form.errors.password);
 
     useEffect(() => {
@@ -49,10 +58,39 @@ export default function CreateUser({ roles, offices }: Props) {
             return;
         }
 
-        if (!form.data.office_id && offices[0]) {
-            form.setData('office_id', String(offices[0].id));
+        if (isExecRole && mayorOffice) {
+            if (form.data.office_id !== String(mayorOffice.id)) {
+                form.setData('office_id', String(mayorOffice.id));
+            }
+
+            return;
         }
-    }, [form, form.data.office_id, isAdminRole, offices]);
+
+        if (isProcRole && bacOffice) {
+            if (form.data.office_id !== String(bacOffice.id)) {
+                form.setData('office_id', String(bacOffice.id));
+            }
+
+            return;
+        }
+
+        if (isGsoRole && gsoOffice) {
+            if (form.data.office_id !== String(gsoOffice.id)) {
+                form.setData('office_id', String(gsoOffice.id));
+            }
+
+            return;
+        }
+
+        // For line office users, ensure office_id is not one of the institutional offices
+        const isNonRequesting = [mayorOffice?.id, bacOffice?.id].filter(Boolean).map(String).includes(form.data.office_id);
+        if (!form.data.office_id || isNonRequesting) {
+            const firstLine = lineOffices[0] || offices[0];
+            if (firstLine) {
+                form.setData('office_id', String(firstLine.id));
+            }
+        }
+    }, [form, form.data.office_id, isAdminRole, isExecRole, isProcRole, isGsoRole, mayorOffice, bacOffice, gsoOffice, lineOffices, offices]);
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
@@ -177,6 +215,51 @@ export default function CreateUser({ roles, offices }: Props) {
                                 </p>
                                 <InputError message={form.errors.office_id} className="mt-2" />
                             </div>
+                        ) : isExecRole ? (
+                            <div>
+                                <InputLabel htmlFor="office_exec" value="Office" />
+                                <input
+                                    id="office_exec"
+                                    value={mayorOffice ? `${mayorOffice.code} - ${mayorOffice.name} (Auto-assigned)` : "MAYOR_OFFICE - Municipal Mayor's Office (Auto-assigned)"}
+                                    className="mt-1 block w-full rounded-md border-gray-200 bg-slate-100 text-slate-600"
+                                    disabled
+                                    readOnly
+                                />
+                                <p className="mt-2 text-xs text-slate-500">
+                                    Executive accounts are bound to the Municipal Mayor's Office for executive signoffs and approvals.
+                                </p>
+                                <InputError message={form.errors.office_id} className="mt-2" />
+                            </div>
+                        ) : isProcRole ? (
+                            <div>
+                                <InputLabel htmlFor="office_proc" value="Office" />
+                                <input
+                                    id="office_proc"
+                                    value={bacOffice ? `${bacOffice.code} - ${bacOffice.name} (Auto-assigned)` : "BAC - Procurement Unit (Auto-assigned)"}
+                                    className="mt-1 block w-full rounded-md border-gray-200 bg-slate-100 text-slate-600"
+                                    disabled
+                                    readOnly
+                                />
+                                <p className="mt-2 text-xs text-slate-500">
+                                    Procurement accounts are bound to the Bids and Awards Committee / Procurement Unit.
+                                </p>
+                                <InputError message={form.errors.office_id} className="mt-2" />
+                            </div>
+                        ) : isGsoRole ? (
+                            <div>
+                                <InputLabel htmlFor="office_gso" value="Office" />
+                                <input
+                                    id="office_gso"
+                                    value={gsoOffice ? `${gsoOffice.code} - ${gsoOffice.name} (Auto-assigned)` : "GSO - General Services Office (Auto-assigned)"}
+                                    className="mt-1 block w-full rounded-md border-gray-200 bg-slate-100 text-slate-600"
+                                    disabled
+                                    readOnly
+                                />
+                                <p className="mt-2 text-xs text-slate-500">
+                                    GSO accounts are bound to the General Services Office for municipal inventory and warehouse management.
+                                </p>
+                                <InputError message={form.errors.office_id} className="mt-2" />
+                            </div>
                         ) : (
                             <div>
                                 <InputLabel htmlFor="office_id" value="Office" />
@@ -190,12 +273,15 @@ export default function CreateUser({ roles, offices }: Props) {
                                     <option value="" disabled>
                                         Select office
                                     </option>
-                                    {offices.map((office) => (
+                                    {lineOffices.map((office) => (
                                         <option key={office.id} value={office.id}>
                                             {office.code} - {office.name}
                                         </option>
                                     ))}
                                 </select>
+                                <p className="mt-2 text-xs text-slate-500">
+                                    Select the municipal department or line office this user represents for supply requests and PPMP planning.
+                                </p>
                                 <InputError message={form.errors.office_id} className="mt-2" />
                             </div>
                         )}
