@@ -35,7 +35,28 @@ class RequestWorkflowController
 
         $search = trim((string) $request->query('q', ''));
         $officeId = (int) $request->query('office_id', 0);
-        $rows = $this->officeSupplyRequestRows($search, $officeId);
+        $allRows = $this->officeSupplyRequestRows($search, $officeId);
+
+        // Compute global shortage groups across all offices so chips are always visible
+        $officeShortageGroups = $allRows
+            ->where('stock_assessment', 'SHORTAGE_REQUIRES_PROCUREMENT')
+            ->where('status', 'SUBMITTED')
+            ->where('has_purchase_request', false)
+            ->groupBy(fn ($r) => (int) ($r['office']['id'] ?? 0))
+            ->filter(fn ($group, $id) => $id > 0)
+            ->map(function ($group) {
+                $first = $group->first();
+                return [
+                    'id' => (int) $first['office']['id'],
+                    'name' => (string) $first['office']['name'],
+                    'count' => $group->count(),
+                ];
+            })
+            ->sortByDesc('count')
+            ->values()
+            ->all();
+
+        $rows = $allRows;
 
         $stockAssessmentFilter = trim((string) $request->query('stock_assessment', ''));
         if ($stockAssessmentFilter !== '') {
@@ -47,13 +68,24 @@ class RequestWorkflowController
             $rows = $rows->where('workflow_bucket', $workflowBucketFilter);
         }
 
-        $rows = $rows->values();
+        // Prioritize actionable shortage requests at the top so GSO sees pending consolidation work immediately
+        $rows = $rows->sort(function ($a, $b) {
+            $priorityA = ($a['status'] === 'SUBMITTED' && $a['stock_assessment'] === 'SHORTAGE_REQUIRES_PROCUREMENT' && ! $a['has_purchase_request']) ? 2 : 1;
+            $priorityB = ($b['status'] === 'SUBMITTED' && $b['stock_assessment'] === 'SHORTAGE_REQUIRES_PROCUREMENT' && ! $b['has_purchase_request']) ? 2 : 1;
+
+            if ($priorityA !== $priorityB) {
+                return $priorityB <=> $priorityA;
+            }
+
+            return (int) $b['supply_request_id'] <=> (int) $a['supply_request_id'];
+        })->values();
 
         $requests = $this->paginateOfficeSupplyRows($rows, $request);
 
         return Inertia::render('Inventory/OfficeSupplyRequests/Index', [
             'requests' => $requests,
             'offices' => $this->officeOptions(),
+            'officeShortageGroups' => $officeShortageGroups,
             'filters' => [
                 'q' => $search,
                 'office_id' => $officeId > 0 ? $officeId : null,

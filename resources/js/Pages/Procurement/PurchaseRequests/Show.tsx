@@ -131,7 +131,7 @@ export default function PurchaseRequestsShow({ purchaseRequest, traceability, re
                                         </span>
                                     ) : null}
                                     {traceability?.is_consolidated ? (
-                                        <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-800">
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-800">
                                             📦 Consolidated Office PR
                                         </span>
                                     ) : null}

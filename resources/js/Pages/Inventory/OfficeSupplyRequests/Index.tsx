@@ -49,6 +49,7 @@ type Props = {
         workflow_bucket?: string;
         page?: number | null;
     };
+    officeShortageGroups?: Array<{ id: number; name: string; count: number }>;
 };
 
 type PageProps = {
@@ -58,7 +59,7 @@ type PageProps = {
     };
 };
 
-export default function OfficeSupplyRequestsIndex({ requests, offices, filters }: Props) {
+export default function OfficeSupplyRequestsIndex({ requests, offices, filters, officeShortageGroups: initialShortageGroups }: Props) {
     const { flash } = usePage().props as unknown as PageProps;
     const [q, setQ] = useState(filters.q ?? '');
     const [officeId, setOfficeId] = useState(String(filters.office_id ?? ''));
@@ -126,8 +127,11 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
         });
     };
 
-    // Offices with pending shortages eligible for consolidation
+    // Offices with pending shortages eligible for consolidation (global from server or derived from rows)
     const officeShortageGroups = useMemo(() => {
+        if (initialShortageGroups && initialShortageGroups.length > 0) {
+            return initialShortageGroups;
+        }
         const map = new Map<number, { id: number; name: string; count: number }>();
         requests.data.forEach((r) => {
             if (r.stock_assessment === 'SHORTAGE_REQUIRES_PROCUREMENT' && r.status === 'SUBMITTED' && !r.has_purchase_request && r.office?.id) {
@@ -136,8 +140,8 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                 map.set(r.office.id, existing);
             }
         });
-        return Array.from(map.values());
-    }, [requests.data]);
+        return Array.from(map.values()).sort((a, b) => b.count - a.count);
+    }, [initialShortageGroups, requests.data]);
 
     const selectedRequests = useMemo(() => {
         return requests.data.filter((r) => selectedRequestIds.has(r.supply_request_id));
@@ -308,8 +312,8 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                 </div>
 
                 {officeShortageGroups.length > 0 ? (
-                    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50/70 p-3.5 shadow-sm">
-                        <span className="text-xs font-bold uppercase tracking-wider text-indigo-900">
+                    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-red-200 bg-red-50/70 p-3.5 shadow-sm">
+                        <span className="text-xs font-bold uppercase tracking-wider text-red-950">
                             📦 Consolidate Pending Shortages by Office:
                         </span>
                         <div className="flex flex-wrap items-center gap-2">
@@ -320,12 +324,12 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                                     onClick={() => setOfficeId(String(g.id))}
                                     className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
                                         Number(activeOfficeId) === g.id
-                                            ? 'bg-indigo-700 text-white shadow-sm ring-2 ring-indigo-400'
-                                            : 'border border-indigo-200 bg-white text-indigo-800 hover:bg-indigo-100/80'
+                                            ? 'bg-red-700 text-white shadow-sm ring-2 ring-red-400'
+                                            : 'border border-red-200 bg-white text-red-800 hover:bg-red-100/80'
                                     }`}
                                 >
                                     <span>{g.name}</span>
-                                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${Number(activeOfficeId) === g.id ? 'bg-indigo-900 text-indigo-100' : 'bg-indigo-100 text-indigo-800'}`}>
+                                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${Number(activeOfficeId) === g.id ? 'bg-red-900 text-red-100' : 'bg-red-100 text-red-800'}`}>
                                         {g.count} pending
                                     </span>
                                 </button>
@@ -334,7 +338,7 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                                 <button
                                     type="button"
                                     onClick={() => setOfficeId('')}
-                                    className="ml-2 text-xs font-medium text-indigo-600 underline hover:text-indigo-800"
+                                    className="ml-2 text-xs font-medium text-red-700 underline hover:text-red-900"
                                 >
                                     Show all offices
                                 </button>
@@ -344,23 +348,23 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                 ) : null}
 
                 {consolidatableRequests.length > 0 ? (
-                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-5 py-3.5 shadow-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-5 py-3.5 shadow-sm">
                         <div className="flex-1 min-w-[260px]">
                             <div className="flex items-center gap-2">
                                 <span className="text-lg">📦</span>
-                                <h4 className="text-sm font-bold text-indigo-900">
+                                <h4 className="text-sm font-bold text-red-950">
                                     Consolidate Office Requests into PR
                                 </h4>
                                 {targetOfficeName ? (
-                                    <span className="rounded-md bg-indigo-200/80 px-2 py-0.5 text-xs font-bold text-indigo-900">
+                                    <span className="rounded-md bg-red-200 text-red-950 px-2 py-0.5 text-xs font-bold">
                                         {targetOfficeName}
                                     </span>
                                 ) : null}
                             </div>
-                            <p className="mt-0.5 text-xs text-indigo-700">
+                            <p className="mt-0.5 text-xs text-red-700">
                                 Select shortage requests below to merge item quantities into one Consolidated Purchase Request and forward directly to BAC.
                                 {selectedRequestIds.size > 0 ? (
-                                    <span className="ml-1.5 font-bold text-indigo-950">
+                                    <span className="ml-1.5 font-bold text-red-950">
                                         ({selectedRequestIds.size} request{selectedRequestIds.size > 1 ? 's' : ''} selected)
                                     </span>
                                 ) : null}
@@ -370,7 +374,7 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                             <button
                                 type="button"
                                 onClick={toggleSelectAll}
-                                className="rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+                                className="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
                             >
                                 {selectedRequestIds.size >= consolidatableRequests.length ? 'Deselect All' : 'Select All'}
                             </button>
@@ -378,7 +382,7 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                                 type="button"
                                 disabled={!canConsolidate || isConsolidating}
                                 onClick={() => setShowPreviewModal(true)}
-                                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 {isConsolidating ? 'Processing...' : `Preview & Forward to BAC (${selectedRequestIds.size})`}
                             </button>
@@ -396,7 +400,7 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                                             type="checkbox"
                                             checked={selectedRequestIds.size >= consolidatableRequests.length && consolidatableRequests.length > 0}
                                             onChange={toggleSelectAll}
-                                            className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                            className="h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
                                             title="Select all eligible requests"
                                         />
                                     </th>
@@ -422,7 +426,7 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                                                     type="checkbox"
                                                     checked={selectedRequestIds.has(request.supply_request_id)}
                                                     onChange={() => toggleSelect(request.supply_request_id)}
-                                                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                                    className="h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
                                                 />
                                             ) : (
                                                 <span className="text-xs text-slate-300">—</span>
@@ -576,7 +580,7 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                                             <tr key={idx}>
                                                 <td className="px-3 py-2 font-medium text-slate-800">{item.item_name}</td>
                                                 <td className="px-3 py-2 text-center text-slate-600">{item.unit}</td>
-                                                <td className="px-3 py-2 text-right font-bold text-indigo-700">{item.total_quantity.toFixed(2)}</td>
+                                                <td className="px-3 py-2 text-right font-bold text-red-700">{item.total_quantity.toFixed(2)}</td>
                                             </tr>
                                         ))}
                                         {aggregatedItems.length === 0 ? (
@@ -591,7 +595,7 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                             </div>
                         </div>
 
-                        <div className="rounded-lg border border-indigo-100 bg-indigo-50/70 p-3 text-xs text-indigo-800">
+                        <div className="rounded-lg border border-red-200 bg-red-50/70 p-3 text-xs text-red-900">
                             <p className="font-semibold">Signatory Transparency Note:</p>
                             <p className="mt-0.5">
                                 Submitting will stamp you (GSO Property Custodian) as the Consolidator/Forwarder. The BAC / Procurement Unit will receive this Consolidated PR to initiate supplier canvassing and generate the Consolidated Purchase Order (PO).
@@ -611,7 +615,7 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters }
                             type="button"
                             disabled={isConsolidating || aggregatedItems.length === 0}
                             onClick={submitConsolidatedPr}
-                            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-60"
+                            className="inline-flex items-center gap-2 rounded-lg bg-red-700 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-800 disabled:opacity-60"
                         >
                             {isConsolidating ? 'Forwarding to BAC...' : 'Confirm & Forward Consolidated PR to BAC'}
                         </button>
