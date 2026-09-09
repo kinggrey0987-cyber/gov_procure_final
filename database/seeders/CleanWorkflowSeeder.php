@@ -2,6 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Models\Alert;
+use App\Models\Anomaly;
 use App\Models\ApprovalHistory;
 use App\Models\AuditLog;
 use App\Models\Delivery;
@@ -41,12 +43,27 @@ class CleanWorkflowSeeder extends Seeder
         $procUser = User::query()->whereHas('role', fn ($q) => $q->where('code', 'PROC_OFFICER'))->first()
             ?? $execUser;
 
-        // Resolve offices
-        $mpdo = Office::query()->where('code', 'MPDO')->first();
-        $mswdo = Office::query()->where('code', 'MSWDO')->first();
-        $eng = Office::query()->where('code', 'ENG')->first();
-        $mho = Office::query()->where('code', 'MHO')->first();
-        $gsoOffice = Office::query()->where('code', 'GSO')->first();
+        // Resolve offices defensively
+        $mpdo = Office::query()->firstOrCreate(
+            ['code' => 'MPDO'],
+            ['name' => 'Municipal Planning and Development Office', 'description' => 'Planning and development office for municipal programs and PPMP ownership.']
+        );
+        $mswdo = Office::query()->firstOrCreate(
+            ['code' => 'MSWDO'],
+            ['name' => 'Municipal Social Welfare and Development Office', 'description' => 'Social welfare and development office for municipal services.']
+        );
+        $eng = Office::query()->firstOrCreate(
+            ['code' => 'ENG'],
+            ['name' => 'Municipal Engineering Office', 'description' => 'Municipal infrastructure and engineering office.']
+        );
+        $mho = Office::query()->firstOrCreate(
+            ['code' => 'MHO'],
+            ['name' => 'Municipal Health Office', 'description' => 'Public healthcare and community medical services.']
+        );
+        $gsoOffice = Office::query()->firstOrCreate(
+            ['code' => 'GSO'],
+            ['name' => 'General Services Office', 'description' => 'Handles inventory, deliveries, and supply distribution.']
+        );
 
         // Office requisitioners
         $mpdoUser = ($mpdo ? User::query()->where('office_id', $mpdo->id)->first() : null) ?? $execUser;
@@ -631,9 +648,113 @@ class CleanWorkflowSeeder extends Seeder
         }
 
         // =========================================================================
-        // 6. System Governance Ops (Backups and Yearly Archive)
+        // 6. Executive Anomaly Detection & AI Governance Alerts
         // =========================================================================
-        $this->command?->info('6/6 Seeding system governance backups and yearly archive logs...');
+        $this->command?->info('6/7 Seeding executive anomaly detection records and governance alerts...');
+
+        $printerInk = $items->get('Printer Ink') ?? $items->first();
+        $bondPaper = $items->get('Bond Paper') ?? $items->first();
+
+        // 1. High Severity Price Z-Score Anomaly
+        $priceAnomaly = Anomaly::query()->create([
+            'anomaly_type' => Anomaly::TYPE_PRICE_Z_SCORE,
+            'reference_type' => PurchaseOrder::class,
+            'reference_id' => $poPlaced->purchase_order_id ?? 1,
+            'item_id' => $printerInk?->item_id,
+            'office_id' => $mho->id,
+            'detected_value' => 2450.00,
+            'expected_value' => 1850.00,
+            'threshold_value' => 2100.00,
+            'z_score' => 2.45,
+            'detection_method' => 'STATISTICAL_Z_SCORE',
+            'severity' => 'MEDIUM',
+            'status' => 'IN_REVIEW',
+            'detected_at' => Carbon::parse('2026-09-08 14:30:00'),
+            'remarks' => 'Supplier quotation unit cost deviates +32.4% from historical average procurement cost.',
+        ]);
+
+        // 2. Excessive Quantity Anomaly
+        $qtyAnomaly = Anomaly::query()->create([
+            'anomaly_type' => Anomaly::TYPE_EXCESSIVE_QUANTITY,
+            'reference_type' => SupplyRequest::class,
+            'reference_id' => $srInStock->supply_request_id ?? 1,
+            'item_id' => $bondPaper?->item_id,
+            'office_id' => $mswdo->id,
+            'detected_value' => 120.00,
+            'expected_value' => 25.00,
+            'threshold_value' => 50.00,
+            'z_score' => 3.12,
+            'detection_method' => 'HISTORICAL_SPIKE_DETECTOR',
+            'severity' => 'HIGH',
+            'status' => 'OPEN',
+            'detected_at' => Carbon::parse('2026-09-08 16:15:00'),
+            'remarks' => 'Requested quantity exceeds office historical consumption velocity by 380%.',
+        ]);
+
+        // 3. Resolved PPMP Schedule Mismatch Anomaly
+        $scheduleAnomaly = Anomaly::query()->create([
+            'anomaly_type' => Anomaly::TYPE_PPMP_SCHEDULE_MISMATCH,
+            'reference_type' => Ppmp::class,
+            'reference_id' => $ppmps['ENG']->ppmp_id ?? 1,
+            'item_id' => $printerInk?->item_id,
+            'office_id' => $eng->id,
+            'detected_value' => 1.00,
+            'expected_value' => 3.00,
+            'threshold_value' => 0.00,
+            'z_score' => 1.00,
+            'detection_method' => 'SCHEDULE_TIMING_AUDIT',
+            'severity' => 'LOW',
+            'status' => 'RESOLVED',
+            'detected_at' => Carbon::parse('2026-09-05 09:00:00'),
+            'remarks' => 'Requisition timing realigned with approved quarterly schedule.',
+        ]);
+
+        // Seed corresponding Alerts for Executive and Procurement
+        Alert::query()->create([
+            'alert_type' => 'LOW_STOCK',
+            'severity' => 'HIGH',
+            'supplier_id' => $supplier->id,
+            'office_id' => $gsoOffice->id,
+            'alert_message' => 'Central Warehouse stock for Printer Ink is below critical safety threshold (3 boxes remaining, threshold 8).',
+            'detected_at' => Carbon::parse('2026-09-08 10:00:00'),
+            'status' => 'TRIGGERED',
+        ]);
+
+        Alert::query()->create([
+            'alert_type' => 'DELAYED_DELIVERY',
+            'severity' => 'MEDIUM',
+            'purchase_order_id' => $poPlaced->purchase_order_id ?? null,
+            'supplier_id' => $supplier->id,
+            'office_id' => $mho->id,
+            'alert_message' => 'Supplier Metro Office Depot Trading PO-2026-09-001 delivery status pending follow-up.',
+            'detected_at' => Carbon::parse('2026-09-08 11:30:00'),
+            'status' => 'TRIGGERED',
+        ]);
+
+        Alert::query()->create([
+            'alert_type' => 'ANOMALY_DETECTED',
+            'severity' => 'HIGH',
+            'anomaly_id' => $qtyAnomaly->anomaly_id,
+            'office_id' => $mswdo->id,
+            'alert_message' => 'High Severity Anomaly: Excessive requisition quantity detected for Municipal Social Welfare and Development Office.',
+            'detected_at' => Carbon::parse('2026-09-08 16:20:00'),
+            'status' => 'TRIGGERED',
+        ]);
+
+        Alert::query()->create([
+            'alert_type' => 'PRICE_DEVIATION',
+            'severity' => 'MEDIUM',
+            'anomaly_id' => $priceAnomaly->anomaly_id,
+            'office_id' => $mho->id,
+            'alert_message' => 'Price Deviation Flag: Quotation unit cost deviates +32.4% above statistical benchmark.',
+            'detected_at' => Carbon::parse('2026-09-08 14:35:00'),
+            'status' => 'TRIGGERED',
+        ]);
+
+        // =========================================================================
+        // 7. System Governance Ops (Backups and Yearly Archive)
+        // =========================================================================
+        $this->command?->info('7/7 Seeding system governance backups and yearly archive logs...');
         $this->call(GovernanceOpsDemoSeeder::class);
 
         $this->command?->info('Workflow data successfully populated with clean, realistic operational dataset spanning 2024, 2025, and 2026!');

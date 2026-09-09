@@ -47,16 +47,25 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
             return;
         }
 
-        $offices = Office::query()->whereIn('code', ['MPDO', 'MSWDO', 'ENG', 'MHO'])->get()->keyBy('code');
-        if ($offices->count() < 3) {
-            $this->command?->warn('MultiYearHistoricalProcurementSeeder skipped: Required offices (MPDO, MSWDO, ENG, MHO) not found.');
-            return;
+        $officeDefs = [
+            'MPDO' => ['name' => 'Municipal Planning and Development Office', 'description' => 'Planning and development office for municipal programs and PPMP ownership.'],
+            'MSWDO' => ['name' => 'Municipal Social Welfare and Development Office', 'description' => 'Social welfare and development office for municipal services.'],
+            'ENG' => ['name' => 'Municipal Engineering Office', 'description' => 'Municipal infrastructure and engineering office.'],
+            'MHO' => ['name' => 'Municipal Health Office', 'description' => 'Public healthcare and community medical services.'],
+        ];
+
+        $offices = collect();
+        foreach ($officeDefs as $code => $info) {
+            $offices[$code] = Office::query()->firstOrCreate(
+                ['code' => $code],
+                ['name' => $info['name'], 'description' => $info['description']]
+            );
         }
 
-        $mpdoUser = isset($offices['MPDO']) ? (User::query()->where('office_id', $offices['MPDO']->id)->first() ?? $execUser) : $execUser;
-        $mswdoUser = isset($offices['MSWDO']) ? (User::query()->where('office_id', $offices['MSWDO']->id)->first() ?? $execUser) : $execUser;
-        $engUser = isset($offices['ENG']) ? (User::query()->where('office_id', $offices['ENG']->id)->first() ?? $execUser) : $execUser;
-        $mhoUser = isset($offices['MHO']) ? (User::query()->where('office_id', $offices['MHO']->id)->first() ?? $execUser) : $execUser;
+        $mpdoUser = User::query()->where('office_id', $offices['MPDO']->id)->first() ?? $execUser;
+        $mswdoUser = User::query()->where('office_id', $offices['MSWDO']->id)->first() ?? $execUser;
+        $engUser = User::query()->where('office_id', $offices['ENG']->id)->first() ?? $execUser;
+        $mhoUser = User::query()->where('office_id', $offices['MHO']->id)->first() ?? $execUser;
 
         $supplier = Supplier::query()->firstOrCreate(
             ['supplier_name' => 'Metro Office Depot Trading'],
@@ -121,48 +130,58 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
         float $priceScale
     ): void {
         DB::transaction(function () use ($year, $execUser, $gsoUser, $procUser, $officeUsers, $offices, $supplier, $items, $priceScale) {
-            $plans = [
-                'MPDO' => [
-                    'user' => $officeUsers['MPDO'],
+            $plans = [];
+            if (isset($offices['MPDO'])) {
+                $plans['MPDO'] = [
+                    'user' => $officeUsers['MPDO'] ?? $execUser,
                     'office' => $offices['MPDO'],
                     'items' => [
                         ['name' => 'Bond Paper', 'q1' => 10, 'q2' => 10, 'q3' => 10, 'q4' => 10, 'base_cost' => 950],
                         ['name' => 'Ballpen', 'q1' => 5, 'q2' => 5, 'q3' => 5, 'q4' => 5, 'base_cost' => 300],
                         ['name' => 'Folder', 'q1' => 2, 'q2' => 2, 'q3' => 2, 'q4' => 2, 'base_cost' => 1200],
                     ],
-                ],
-                'MSWDO' => [
-                    'user' => $officeUsers['MSWDO'],
+                ];
+            }
+            if (isset($offices['MSWDO'])) {
+                $plans['MSWDO'] = [
+                    'user' => $officeUsers['MSWDO'] ?? $execUser,
                     'office' => $offices['MSWDO'],
                     'items' => [
                         ['name' => 'Rubbing Alcohol', 'q1' => 10, 'q2' => 10, 'q3' => 10, 'q4' => 10, 'base_cost' => 400],
                         ['name' => 'Detergent Powder', 'q1' => 15, 'q2' => 15, 'q3' => 15, 'q4' => 15, 'base_cost' => 120],
                         ['name' => 'Safety Gloves', 'q1' => 10, 'q2' => 10, 'q3' => 10, 'q4' => 10, 'base_cost' => 45],
                     ],
-                ],
-                'ENG' => [
-                    'user' => $officeUsers['ENG'],
+                ];
+            }
+            if (isset($offices['ENG'])) {
+                $plans['ENG'] = [
+                    'user' => $officeUsers['ENG'] ?? $execUser,
                     'office' => $offices['ENG'],
                     'items' => [
                         ['name' => 'Printer Ink', 'q1' => 5, 'q2' => 5, 'q3' => 5, 'q4' => 5, 'base_cost' => 850],
                         ['name' => 'Mouse', 'q1' => 10, 'q2' => 10, 'q3' => 10, 'q4' => 10, 'base_cost' => 325],
                         ['name' => 'Logbook', 'q1' => 5, 'q2' => 5, 'q3' => 5, 'q4' => 5, 'base_cost' => 150],
                     ],
-                ],
-                'MHO' => [
-                    'user' => $officeUsers['MHO'],
+                ];
+            }
+            if (isset($offices['MHO'])) {
+                $plans['MHO'] = [
+                    'user' => $officeUsers['MHO'] ?? $execUser,
                     'office' => $offices['MHO'],
                     'items' => [
                         ['name' => 'Rubbing Alcohol', 'q1' => 12, 'q2' => 12, 'q3' => 12, 'q4' => 12, 'base_cost' => 400],
                         ['name' => 'Detergent Powder', 'q1' => 10, 'q2' => 10, 'q3' => 10, 'q4' => 10, 'base_cost' => 120],
                         ['name' => 'Safety Gloves', 'q1' => 15, 'q2' => 15, 'q3' => 15, 'q4' => 15, 'base_cost' => 45],
                     ],
-                ],
-            ];
+                ];
+            }
 
             foreach ($plans as $officeCode => $planData) {
-                $user = $planData['user'];
-                $office = $planData['office'];
+                $user = $planData['user'] ?? $execUser;
+                $office = $planData['office'] ?? null;
+                if (! $office) {
+                    continue;
+                }
 
                 $datePrepared = Carbon::create($year - 1, 11, 15);
                 $dateApproved = Carbon::create($year - 1, 12, 20);

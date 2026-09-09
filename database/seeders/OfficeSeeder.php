@@ -44,6 +44,11 @@ class OfficeSeeder extends Seeder
                 'description' => 'Sample requesting office for capstone baseline data.',
             ],
             [
+                'name' => 'Municipal Health Office',
+                'code' => 'MHO',
+                'description' => 'Public healthcare and community medical services.',
+            ],
+            [
                 'name' => 'Technical Administration',
                 'code' => 'TECH_ADMIN',
                 'description' => 'Reserved technical office for system administrator accounts.',
