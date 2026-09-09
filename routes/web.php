@@ -876,8 +876,25 @@ Route::get('/system-migrate', function () {
                             ->where('verification_status', 'APPROVED');
                     })
                     ->update(['receipt_status' => 'VERIFIED']);
+
+                // Auto-correct any delivery item where 5 was entered as received and 5 as damaged for expected 10
+                $del34 = \Illuminate\Support\Facades\DB::table('deliveries')->where('delivery_code', 'DEL-2026-00034')->first();
+                if ($del34) {
+                    \Illuminate\Support\Facades\DB::table('delivery_items')
+                        ->where('delivery_id', $del34->delivery_id)
+                        ->where('expected_quantity', 10)
+                        ->where('received_quantity', 5)
+                        ->where('damaged_quantity', 5)
+                        ->update([
+                            'received_quantity' => 10,
+                            'damaged_quantity' => 5,
+                            'missing_quantity' => 0,
+                            'item_condition' => 'DAMAGED',
+                        ]);
+                }
+
                 \Illuminate\Support\Facades\Artisan::call('optimize:clear');
-                $output = "Normalized legacy supply requests and verified deliveries.\n" . \Illuminate\Support\Facades\Artisan::output();
+                $output = "Normalized legacy supply requests, verified deliveries, and corrected DEL-2026-00034 intake counts.\n" . \Illuminate\Support\Facades\Artisan::output();
                 break;
             case 'refresh-disclosures':
                 \Illuminate\Support\Facades\Artisan::call('disclosures:refresh-packages');

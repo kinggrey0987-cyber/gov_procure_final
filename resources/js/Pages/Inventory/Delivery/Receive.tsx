@@ -142,11 +142,17 @@ export default function DeliveryReceive({ delivery }: Props) {
         const warnings: string[] = [];
 
         if (receivedQuantity > expectedQuantity) {
-            warnings.push(`${itemName}: received quantity exceeds expected quantity.`);
+            warnings.push(`${itemName}: Total delivered (${receivedQuantity}) cannot exceed expected PO quantity (${expectedQuantity}).`);
         }
 
         if (damagedQuantity > receivedQuantity) {
-            warnings.push(`${itemName}: damaged quantity cannot exceed received quantity.`);
+            warnings.push(`${itemName}: Damaged quantity (${damagedQuantity}) cannot exceed total delivered (${receivedQuantity}).`);
+        }
+
+        if (damagedQuantity > 0 && damagedQuantity === receivedQuantity && expectedQuantity > receivedQuantity) {
+            warnings.push(
+                `Notice for ${itemName}: You entered Total Delivered = ${receivedQuantity} and Damaged = ${damagedQuantity}. This results in 0 Accepted units and ${expectedQuantity - receivedQuantity} Missing units. If the supplier physically brought all ${expectedQuantity} items (some good and some damaged), enter ${expectedQuantity} in Total Delivered and ${damagedQuantity} in Damaged.`
+            );
         }
 
         return warnings;
@@ -259,22 +265,16 @@ export default function DeliveryReceive({ delivery }: Props) {
                                                 value={data.sales_invoice_amount}
                                                 onChange={(e) => setData('sales_invoice_amount', e.target.value)}
                                                 placeholder="0.00"
-                                                className="w-full rounded-lg border border-slate-300 pl-8 pr-4 py-2.5 text-sm font-medium text-slate-900 focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600"
+                                                className="w-full rounded-lg border border-slate-300 pl-8 pr-4 py-2.5 text-sm font-semibold text-slate-900 placeholder-slate-400 focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600"
                                             />
                                         </div>
-                                        <p className="mt-1 text-xs text-slate-500">Total payable amount on invoice (matches PO or accepted lines).</p>
+                                        <p className="mt-1 text-xs text-slate-500">Total gross amount billed on the supplier's invoice.</p>
                                     </FormField>
                                 </div>
 
-                                {/* File Upload Cards with Live Camera Support */}
+                                {/* Scanned File Upload Area */}
                                 <div className="border-t border-slate-200 pt-5">
-                                    <div className="mb-3 flex items-center justify-between">
-                                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                                            Attach Scanned Documents or Photos (Optional Now, Can Upload Later)
-                                        </h4>
-                                        <span className="text-[11px] text-slate-500">Supports Camera Capture, PNG, JPG, PDF (Up to 10MB)</span>
-                                    </div>
-
+                                    <p className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-3">Scanned Attachments (Audit Readiness)</p>
                                     <div className="grid gap-4 sm:grid-cols-2">
                                         {/* Upload Delivery Receipt */}
                                         <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-4 transition hover:border-indigo-400">
@@ -283,12 +283,12 @@ export default function DeliveryReceive({ delivery }: Props) {
                                                     <p className="text-xs font-bold text-slate-800">Scanned Delivery Receipt (DR)</p>
                                                     <p className="text-[11px] text-slate-500">Take a photo with your phone camera or browse file</p>
                                                 </div>
-                                                <span className="text-lg">📦</span>
+                                                <span className="text-lg">📷</span>
                                             </div>
 
                                             {drPreview ? (
                                                 <div className="mt-3 relative inline-block">
-                                                    <img src={drPreview} alt="DR Preview" className="h-24 w-auto rounded border object-contain bg-white shadow-sm" />
+                                                    <img src={drPreview} alt="Receipt Preview" className="h-24 w-auto rounded border object-contain bg-white shadow-sm" />
                                                     <button
                                                         type="button"
                                                         onClick={() => {
@@ -378,9 +378,6 @@ export default function DeliveryReceive({ delivery }: Props) {
                                             )}
                                         </div>
                                     </div>
-                                    <p className="mt-2 text-[11px] text-slate-500 italic">
-                                        💡 Tip: DR No. and Sales Invoice No. are required to complete receiving. If you cannot take photos at the loading dock, you can attach scanned files later in the Delivery Details view.
-                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -391,6 +388,17 @@ export default function DeliveryReceive({ delivery }: Props) {
                                 <h3 className="text-lg font-semibold text-slate-800">Physical Items Inspection</h3>
                                 <p className="mt-1 text-sm text-slate-600">Count and inspect the items delivered. Item condition is automatically calculated based on damaged and missing counts.</p>
                             </div>
+                            <div className="border-b border-indigo-100 bg-indigo-50/60 px-6 py-3 text-xs text-indigo-950 flex items-start gap-2.5">
+                                <span className="text-base leading-none">💡</span>
+                                <div className="space-y-0.5">
+                                    <p className="font-bold">Dock Intake Counting Guide:</p>
+                                    <p className="text-indigo-900 leading-relaxed">
+                                        • <strong>Total Delivered</strong> is the complete physical count of all boxes/units delivered by the supplier truck (good + damaged).<br />
+                                        • <strong>Damaged</strong> is how many of those delivered units are broken or defective.<br />
+                                        • The system automatically computes <span className="font-semibold text-emerald-800">Net Accepted</span> into inventory (<code className="rounded bg-white/80 px-1 py-0.5 font-mono text-indigo-900">Total Delivered - Damaged</code>) and <span className="font-semibold text-amber-800">Missing Shortage</span> (<code className="rounded bg-white/80 px-1 py-0.5 font-mono text-indigo-900">Expected - Total Delivered</code>).
+                                    </p>
+                                </div>
+                            </div>
                             {hasLineWarnings ? (
                                 <div className="border-b border-amber-200 bg-amber-50 px-6 py-3 text-sm font-semibold text-amber-800">
                                     <ul className="list-disc space-y-1 pl-5">
@@ -400,46 +408,94 @@ export default function DeliveryReceive({ delivery }: Props) {
                                     </ul>
                                 </div>
                             ) : null}
-                            <table className="min-w-full divide-y divide-slate-200 text-sm">
-                                <thead className="bg-slate-50">
-                                    <tr>
-                                        <th className="px-6 py-3 text-left font-semibold text-slate-700">Item Description</th>
-                                        <th className="px-6 py-3 text-center font-semibold text-slate-700">Expected (PO)</th>
-                                        <th className="px-6 py-3 text-center font-semibold text-slate-700">Actual Received</th>
-                                        <th className="px-6 py-3 text-center font-semibold text-slate-700">Damaged / Defective</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {delivery.items.map((item, index) => (
-                                        <tr key={item.delivery_item_id} className="hover:bg-slate-50/50">
-                                            <td className="px-6 py-4 font-medium text-slate-800">{item.item?.item_name ?? 'Unknown Item'}</td>
-                                            <td className="px-6 py-4 text-center font-semibold text-slate-700">{toWholeQuantity(item.expected_quantity)}</td>
-                                            <td className="px-6 py-4 text-center">
-                                                <input
-                                                    type="number"
-                                                    step="1"
-                                                    min="0"
-                                                    inputMode="numeric"
-                                                    value={data.items[index].received_quantity}
-                                                    onChange={(e) => handleItemChange(index, 'received_quantity', e.target.value)}
-                                                    className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-center text-sm font-bold text-slate-900 focus:border-blue-500 focus:outline-none"
-                                                />
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <input
-                                                    type="number"
-                                                    step="1"
-                                                    min="0"
-                                                    inputMode="numeric"
-                                                    value={data.items[index].damaged_quantity}
-                                                    onChange={(e) => handleItemChange(index, 'damaged_quantity', e.target.value)}
-                                                    className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-center text-sm font-bold text-rose-700 focus:border-rose-500 focus:outline-none"
-                                                />
-                                            </td>
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-slate-200 text-sm">
+                                    <thead className="bg-slate-50">
+                                        <tr>
+                                            <th className="px-5 py-3 text-left font-semibold text-slate-700">Item Description</th>
+                                            <th className="px-4 py-3 text-center font-semibold text-slate-700">Expected (PO)</th>
+                                            <th className="px-4 py-3 text-center font-semibold text-slate-700">
+                                                <div>Total Delivered</div>
+                                                <div className="text-[10px] font-normal text-slate-500">Gross Dock Count</div>
+                                            </th>
+                                            <th className="px-4 py-3 text-center font-semibold text-slate-700">
+                                                <div>Damaged / Defective</div>
+                                                <div className="text-[10px] font-normal text-rose-500">Broken Units</div>
+                                            </th>
+                                            <th className="px-4 py-3 text-center font-semibold text-slate-700">
+                                                <div>Net Accepted</div>
+                                                <div className="text-[10px] font-normal text-emerald-600">To Inventory</div>
+                                            </th>
+                                            <th className="px-4 py-3 text-center font-semibold text-slate-700">
+                                                <div>Missing / Shortage</div>
+                                                <div className="text-[10px] font-normal text-amber-600">Undelivered</div>
+                                            </th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {delivery.items.map((item, index) => {
+                                            const expected = toWholeQuantity(item.expected_quantity);
+                                            const received = toWholeQuantity(data.items[index]?.received_quantity || 0);
+                                            const damaged = toWholeQuantity(data.items[index]?.damaged_quantity || 0);
+                                            const accepted = Math.max(received - damaged, 0);
+                                            const missing = Math.max(expected - received, 0);
+
+                                            return (
+                                                <tr key={item.delivery_item_id} className="hover:bg-slate-50/50">
+                                                    <td className="px-5 py-4 font-medium text-slate-800">
+                                                        <div>{item.item?.item_name ?? 'Unknown Item'}</div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const updatedItems = [...data.items];
+                                                                updatedItems[index].received_quantity = String(expected);
+                                                                updatedItems[index].damaged_quantity = '0';
+                                                                setData('items', updatedItems);
+                                                            }}
+                                                            className="mt-1 text-[11px] font-medium text-indigo-600 hover:text-indigo-800 hover:underline"
+                                                        >
+                                                            Pre-fill full expected ({expected})
+                                                        </button>
+                                                    </td>
+                                                    <td className="px-4 py-4 text-center font-semibold text-slate-700">{expected}</td>
+                                                    <td className="px-4 py-4 text-center">
+                                                        <input
+                                                            type="number"
+                                                            step="1"
+                                                            min="0"
+                                                            inputMode="numeric"
+                                                            value={data.items[index]?.received_quantity ?? ''}
+                                                            onChange={(e) => handleItemChange(index, 'received_quantity', e.target.value)}
+                                                            className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-center text-sm font-bold text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                                        />
+                                                    </td>
+                                                    <td className="px-4 py-4 text-center">
+                                                        <input
+                                                            type="number"
+                                                            step="1"
+                                                            min="0"
+                                                            inputMode="numeric"
+                                                            value={data.items[index]?.damaged_quantity ?? ''}
+                                                            onChange={(e) => handleItemChange(index, 'damaged_quantity', e.target.value)}
+                                                            className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-center text-sm font-bold text-rose-700 focus:border-rose-500 focus:outline-none focus:ring-1 focus:ring-rose-500"
+                                                        />
+                                                    </td>
+                                                    <td className="px-4 py-4 text-center">
+                                                        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${accepted > 0 ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-300' : 'bg-slate-100 text-slate-500'}`}>
+                                                            {accepted}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-4 text-center">
+                                                        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${missing > 0 ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-300' : 'bg-slate-50 text-slate-400'}`}>
+                                                            {missing}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
 
                         {/* 3. Delivery Date and Remarks */}
