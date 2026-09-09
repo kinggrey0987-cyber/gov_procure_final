@@ -816,10 +816,14 @@ Route::prefix('public')
 require __DIR__.'/auth.php';
 
 Route::get('/system-migrate', function () {
+    @set_time_limit(600);
+    @ini_set('max_execution_time', '600');
+    @ini_set('memory_limit', '512M');
+
     $expectedKey = env('DEPLOY_SECRET_KEY', 'deploy-secret-2026');
     $providedKey = (string) request('key', '');
     if ($providedKey !== $expectedKey) {
-        return response("<!DOCTYPE html><html><head><title>System Migrate - Unauthorized</title></head><body style='background:#121212;color:#fff;font-family:monospace;padding:30px;'><div style='background:#1e1e1e;color:#ff6b6b;padding:24px;font-size:14px;border-radius:8px;max-width:800px;margin:0 auto;border:1px solid #ff4444;'><h2 style='margin-top:0;color:#ff6b6b;'>⚠️ 403 Unauthorized</h2><p>Please provide the secret key in the URL parameter.</p><p><strong>Quick Links:</strong></p><ul><li><a href='/system-migrate?key=deploy-secret-2026&action=migrate' style='color:#4af626;'>Run Migrations: ?key=deploy-secret-2026&action=migrate</a></li><li><a href='/system-migrate?key=deploy-secret-2026&action=clear-cache' style='color:#4af626;'>Clear Cache: ?key=deploy-secret-2026&action=clear-cache</a></li><li><a href='/system-migrate?key=deploy-secret-2026&action=status' style='color:#4af626;'>Migration Status: ?key=deploy-secret-2026&action=status</a></li></ul></div></body></html>", 403)->header('Content-Type', 'text/html');
+        return response("<!DOCTYPE html><html><head><title>System Migrate - Unauthorized</title></head><body style='background:#121212;color:#fff;font-family:monospace;padding:30px;'><div style='background:#1e1e1e;color:#ff6b6b;padding:24px;font-size:14px;border-radius:8px;max-width:800px;margin:0 auto;border:1px solid #ff4444;'><h2 style='margin-top:0;color:#ff6b6b;'>⚠️ 403 Unauthorized</h2><p>Please provide the secret key in the URL parameter.</p><p><strong>Quick Links:</strong></p><ul><li><a href='/system-migrate?key=deploy-secret-2026&action=reset-transactions' style='color:#f6c326;font-weight:bold;'>⭐ Reset & Repopulate Defense Workflow (2024-2026): ?action=reset-transactions</a></li><li><a href='/system-migrate?key=deploy-secret-2026&action=migrate' style='color:#4af626;'>Run Migrations: ?key=deploy-secret-2026&action=migrate</a></li><li><a href='/system-migrate?key=deploy-secret-2026&action=clear-cache' style='color:#4af626;'>Clear Cache: ?key=deploy-secret-2026&action=clear-cache</a></li><li><a href='/system-migrate?key=deploy-secret-2026&action=status' style='color:#4af626;'>Migration Status: ?key=deploy-secret-2026&action=status</a></li></ul></div></body></html>", 403)->header('Content-Type', 'text/html');
     }
 
     $action = request('action', 'status');
@@ -827,6 +831,13 @@ Route::get('/system-migrate', function () {
 
     try {
         switch ($action) {
+            case 'reset-transactions':
+            case 'reset-workflow':
+            case 'seed-clean':
+            case 'seed-defense':
+                \Illuminate\Support\Facades\Artisan::call('data:reset-transactions', ['--force' => true]);
+                $output = \Illuminate\Support\Facades\Artisan::output();
+                break;
             case 'migrate':
                 \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
                 $output = \Illuminate\Support\Facades\Artisan::output();
@@ -868,10 +879,10 @@ Route::get('/system-migrate', function () {
                 break;
         }
     } catch (\Throwable $e) {
-        $output = 'Error: '.$e->getMessage();
+        $output = 'Error: '.$e->getMessage()."\n\nTrace:\n".$e->getTraceAsString();
     }
 
-    return response("<!DOCTYPE html><html><head><title>System Migration - {$action}</title></head><body style='background:#121212;color:#fff;font-family:monospace;padding:30px;'><div style='background:#1e1e1e;color:#4af626;padding:24px;font-size:14px;border-radius:8px;max-width:900px;margin:0 auto;border:1px solid #333;'><h2 style='margin-top:0;color:#4af626;'>Action: " . htmlspecialchars($action) . "</h2><pre style='white-space:pre-wrap;word-break:break-all;font-size:13px;line-height:1.6;'>" . htmlspecialchars($output) . "</pre><hr style='border-color:#333;margin:20px 0;'><p style='color:#aaa;'><strong>Other Actions:</strong></p><ul style='color:#aaa;'><li><a href='/system-migrate?key=deploy-secret-2026&action=migrate' style='color:#4af626;'>Run Migrations (migrate)</a></li><li><a href='/system-migrate?key=deploy-secret-2026&action=seed-multiyear' style='color:#4af626;'>Seed 3-Year Historical Data (seed-multiyear)</a></li><li><a href='/system-migrate?key=deploy-secret-2026&action=clear-cache' style='color:#4af626;'>Clear All Caches (clear-cache)</a></li><li><a href='/system-migrate?key=deploy-secret-2026&action=status' style='color:#4af626;'>Check Migration Status (status)</a></li></ul></div></body></html>")->header('Content-Type', 'text/html');
+    return response("<!DOCTYPE html><html><head><title>System Migration - {$action}</title></head><body style='background:#121212;color:#fff;font-family:monospace;padding:30px;'><div style='background:#1e1e1e;color:#4af626;padding:24px;font-size:14px;border-radius:8px;max-width:900px;margin:0 auto;border:1px solid #333;'><h2 style='margin-top:0;color:#4af626;'>Action: " . htmlspecialchars($action) . "</h2><pre style='white-space:pre-wrap;word-break:break-all;font-size:13px;line-height:1.6;'>" . htmlspecialchars($output) . "</pre><hr style='border-color:#333;margin:20px 0;'><p style='color:#aaa;'><strong>Actions:</strong></p><ul style='color:#aaa;'><li><a href='/system-migrate?key=deploy-secret-2026&action=reset-transactions' style='color:#f6c326;font-weight:bold;'>⭐ Reset & Repopulate Defense Workflow (2024-2026): action=reset-transactions</a></li><li><a href='/system-migrate?key=deploy-secret-2026&action=migrate' style='color:#4af626;'>Run Migrations (migrate)</a></li><li><a href='/system-migrate?key=deploy-secret-2026&action=seed-multiyear' style='color:#4af626;'>Seed 3-Year Historical Data (seed-multiyear)</a></li><li><a href='/system-migrate?key=deploy-secret-2026&action=clear-cache' style='color:#4af626;'>Clear All Caches (clear-cache)</a></li><li><a href='/system-migrate?key=deploy-secret-2026&action=status' style='color:#4af626;'>Check Migration Status (status)</a></li></ul></div></body></html>")->header('Content-Type', 'text/html');
 });
 
 

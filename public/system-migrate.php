@@ -14,6 +14,7 @@ if ($providedKey !== $secretKey) {
     echo "<p>Please provide the secret key in the URL parameter.</p>";
     echo "<p><strong>Quick Links:</strong></p>";
     echo "<ul>";
+    echo "<li><a href='system-migrate.php?key=deploy-secret-2026&action=reset-transactions' style='color:#f6c326;font-weight:bold;'>⭐ Reset & Repopulate Defense Workflow (2024-2026): ?action=reset-transactions</a></li>";
     echo "<li><a href='system-migrate.php?key=deploy-secret-2026&action=migrate' style='color:#4af626;'>Run Migrations: ?key=deploy-secret-2026&action=migrate</a></li>";
     echo "<li><a href='system-migrate.php?key=deploy-secret-2026&action=clear-cache' style='color:#4af626;'>Clear Cache: ?key=deploy-secret-2026&action=clear-cache</a></li>";
     echo "<li><a href='system-migrate.php?key=deploy-secret-2026&action=status' style='color:#4af626;'>Migration Status: ?key=deploy-secret-2026&action=status</a></li>";
@@ -21,6 +22,10 @@ if ($providedKey !== $secretKey) {
     echo "</div></body></html>";
     exit;
 }
+
+@set_time_limit(600);
+@ini_set('max_execution_time', '600');
+@ini_set('memory_limit', '512M');
 
 require __DIR__.'/../vendor/autoload.php';
 $app = require_once __DIR__.'/../bootstrap/app.php';
@@ -34,6 +39,13 @@ $isSuccess = true;
 
 try {
     switch ($action) {
+        case 'reset-transactions':
+        case 'reset-workflow':
+        case 'seed-clean':
+        case 'seed-defense':
+            \Illuminate\Support\Facades\Artisan::call('data:reset-transactions', ['--force' => true]);
+            $output = \Illuminate\Support\Facades\Artisan::output();
+            break;
         case 'migrate':
             \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
             $output = \Illuminate\Support\Facades\Artisan::output();
@@ -88,8 +100,9 @@ echo "<div style='background:#1e1e1e;color:{$color};padding:24px;font-size:14px;
 echo "<h2 style='margin-top:0;color:{$color};'>{$title}: " . htmlspecialchars($action) . "</h2>";
 echo "<pre style='white-space:pre-wrap;word-break:break-all;font-size:13px;line-height:1.6;'>" . htmlspecialchars($output) . "</pre>";
 echo "<hr style='border-color:#333;margin:20px 0;'>";
-echo "<p style='color:#aaa;'><strong>Other Actions:</strong></p>";
+echo "<p style='color:#aaa;'><strong>Actions:</strong></p>";
 echo "<ul style='color:#aaa;'>";
+echo "<li><a href='system-migrate.php?key=deploy-secret-2026&action=reset-transactions' style='color:#f6c326;font-weight:bold;'>⭐ Reset & Repopulate Defense Workflow (2024-2026): ?action=reset-transactions</a></li>";
 echo "<li><a href='system-migrate.php?key=deploy-secret-2026&action=migrate' style='color:#4af626;'>Run Migrations (migrate)</a></li>";
 echo "<li><a href='system-migrate.php?key=deploy-secret-2026&action=seed-multiyear' style='color:#4af626;'>Seed 3-Year Historical Data (seed-multiyear)</a></li>";
 echo "<li><a href='system-migrate.php?key=deploy-secret-2026&action=refresh-disclosures' style='color:#4af626;'>Refresh All Disclosure Packages (refresh-disclosures)</a></li>";
