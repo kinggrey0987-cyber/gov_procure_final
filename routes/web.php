@@ -866,8 +866,9 @@ Route::get('/system-migrate', function () {
                 $output = \Illuminate\Support\Facades\Artisan::output();
                 break;
             case 'clear-cache':
+                \Illuminate\Support\Facades\DB::table('supply_requests')->where('status', 'FULFILLED')->update(['status' => 'COMPLETED']);
                 \Illuminate\Support\Facades\Artisan::call('optimize:clear');
-                $output = \Illuminate\Support\Facades\Artisan::output();
+                $output = "Normalized legacy supply request statuses to COMPLETED.\n" . \Illuminate\Support\Facades\Artisan::output();
                 break;
             case 'refresh-disclosures':
                 \Illuminate\Support\Facades\Artisan::call('disclosures:refresh-packages');

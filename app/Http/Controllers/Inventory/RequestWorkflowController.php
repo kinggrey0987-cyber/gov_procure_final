@@ -178,7 +178,8 @@ class RequestWorkflowController
 
         $hasPurchaseRequest = $request->purchaseRequests
             ->contains(fn (PurchaseRequest $purchaseRequest): bool => in_array((string) $purchaseRequest->status, ['OPEN', 'PROCESSING'], true));
-        $stockAssessment = $shortageTotal > 0 ? 'SHORTAGE_REQUIRES_PROCUREMENT' : 'STOCK_READY';
+        $isQueuedForProcurement = (string) $request->status === 'FOR_PROCUREMENT' || $hasPurchaseRequest;
+        $stockAssessment = ($shortageTotal > 0 || $isQueuedForProcurement) ? 'SHORTAGE_REQUIRES_PROCUREMENT' : 'STOCK_READY';
         $distributionRecordsCount = (int) $request->distribution_records_count;
         $hasDraftDistribution = $request->distributionRecords->contains(fn ($record): bool => (string) $record->status === 'DRAFT');
         $isSubmitted = (string) $request->status === 'SUBMITTED';
@@ -205,7 +206,7 @@ class RequestWorkflowController
             'has_purchase_request' => $hasPurchaseRequest,
             'has_distribution_candidate' => isset($distributionReadyLookup[(int) $request->supply_request_id]) || $canCreateInventoryDistribution,
             'distribution_records_count' => $distributionRecordsCount,
-            'workflow_bucket' => $this->workflowBucket($hasPurchaseRequest, $stockAssessment, $canCreateInventoryDistribution),
+            'workflow_bucket' => $this->workflowBucket($hasPurchaseRequest, $stockAssessment, $canCreateInventoryDistribution, (string) $request->status),
         ];
     }
 
@@ -222,9 +223,13 @@ class RequestWorkflowController
             ->all();
     }
 
-    private function workflowBucket(bool $hasPurchaseRequest, string $stockAssessment, bool $canCreateInventoryDistribution): string
+    private function workflowBucket(bool $hasPurchaseRequest, string $stockAssessment, bool $canCreateInventoryDistribution, string $status = ''): string
     {
-        if ($hasPurchaseRequest) {
+        if (in_array($status, ['COMPLETED', 'FULFILLED', 'RECEIVED'], true)) {
+            return 'COMPLETED';
+        }
+
+        if ($hasPurchaseRequest || $status === 'FOR_PROCUREMENT') {
             return 'QUEUED_FOR_PROCUREMENT';
         }
 
