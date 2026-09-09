@@ -1098,9 +1098,9 @@ class PurchaseRequestService
             return ! $hasActivePr;
         });
 
-        if ($eligible->isEmpty()) {
+        if ($eligible->count() < 2) {
             throw ValidationException::withMessages([
-                'supply_request_ids' => 'No eligible supply requests found. Requests must be SUBMITTED and not already queued for procurement.',
+                'supply_request_ids' => 'Consolidation requires at least 2 eligible supply requests to merge. For a single request, initiate a direct purchase request instead.',
             ]);
         }
 

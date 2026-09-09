@@ -169,7 +169,7 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                                     <tr key={row.purchase_request_id} className="hover:bg-slate-50/60">
                                         <td className="px-4 py-3 font-semibold text-red-700">
                                             {(() => {
-                                                const isConsolidated = Boolean(row.remarks && (row.remarks.includes('Consolidated PR') || row.remarks.includes('supply request(s)')));
+                                                const isConsolidated = Boolean(row.remarks && (row.remarks.includes('Consolidated PR') || /from \d+ supply requests/i.test(row.remarks)));
                                                 const prNumber = `PR-${String(row.purchase_request_id).padStart(6, '0')}`;
                                                 return (
                                                     <div>

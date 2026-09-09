@@ -38,12 +38,13 @@ class RequestWorkflowController
         $allRows = $this->officeSupplyRequestRows($search, $officeId);
 
         // Compute global shortage groups across all offices so chips are always visible
+        // Only show offices with at least 2 pending shortages eligible for consolidation
         $officeShortageGroups = $allRows
             ->where('stock_assessment', 'SHORTAGE_REQUIRES_PROCUREMENT')
             ->where('status', 'SUBMITTED')
             ->where('has_purchase_request', false)
             ->groupBy(fn ($r) => (int) ($r['office']['id'] ?? 0))
-            ->filter(fn ($group, $id) => $id > 0)
+            ->filter(fn ($group, $id) => $id > 0 && $group->count() >= 2)
             ->map(function ($group) {
                 $first = $group->first();
                 return [
@@ -713,8 +714,10 @@ class RequestWorkflowController
 
         $validated = $request->validate([
             'office_id' => ['required', 'integer', 'exists:offices,id'],
-            'supply_request_ids' => ['required', 'array', 'min:1'],
+            'supply_request_ids' => ['required', 'array', 'min:2'],
             'supply_request_ids.*' => ['required', 'integer', 'exists:supply_requests,supply_request_id'],
+        ], [
+            'supply_request_ids.min' => 'Consolidation requires at least 2 pending supply requests to merge.',
         ]);
 
         try {

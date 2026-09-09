@@ -60,9 +60,8 @@ class ConsolidationTraceabilityService
 
         $allSupplyRequests = $allSupplyRequests->unique('supply_request_id')->values();
 
-        if ($allSupplyRequests->count() > 1) {
-            $isConsolidated = true;
-        }
+        // A PR is only considered consolidated if it merges 2 or more distinct supply requests
+        $isConsolidated = $allSupplyRequests->count() >= 2;
 
         // Build GSO Forwarder attribution
         $gsoForwarder = null;

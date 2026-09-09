@@ -128,9 +128,10 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
     };
 
     // Offices with pending shortages eligible for consolidation (global from server or derived from rows)
+    // Only includes offices with at least 2 pending shortage requests
     const officeShortageGroups = useMemo(() => {
         if (initialShortageGroups && initialShortageGroups.length > 0) {
-            return initialShortageGroups;
+            return initialShortageGroups.filter((g) => g.count >= 2);
         }
         const map = new Map<number, { id: number; name: string; count: number }>();
         requests.data.forEach((r) => {
@@ -140,7 +141,9 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
                 map.set(r.office.id, existing);
             }
         });
-        return Array.from(map.values()).sort((a, b) => b.count - a.count);
+        return Array.from(map.values())
+            .filter((g) => g.count >= 2)
+            .sort((a, b) => b.count - a.count);
     }, [initialShortageGroups, requests.data]);
 
     const selectedRequests = useMemo(() => {
@@ -162,29 +165,53 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
         return selectedRequests[0]?.office?.name ?? 'Selected Office';
     }, [activeOfficeId, offices, selectedRequests]);
 
-    // Eligible requests for consolidation
+    // An office is only eligible for consolidation if it has 2 or more pending shortage requests
+    const eligibleOfficeIds = useMemo(() => {
+        const ids = new Set<number>();
+        officeShortageGroups.forEach((g) => {
+            if (g.count >= 2) {
+                ids.add(g.id);
+            }
+        });
+        return ids;
+    }, [officeShortageGroups]);
+
+    // Eligible requests for consolidation (only from offices that have >= 2 pending shortages)
     const consolidatableRequests = useMemo(() => {
         return requests.data.filter((r) => {
             if (r.stock_assessment !== 'SHORTAGE_REQUIRES_PROCUREMENT' || r.status !== 'SUBMITTED' || r.has_purchase_request) {
                 return false;
             }
+            if (!r.office?.id || !eligibleOfficeIds.has(r.office.id)) {
+                return false;
+            }
             if (activeOfficeId !== null) {
-                return r.office?.id === activeOfficeId;
+                return r.office.id === activeOfficeId;
             }
             return true;
         });
-    }, [requests.data, activeOfficeId]);
+    }, [requests.data, activeOfficeId, eligibleOfficeIds]);
+
+    // Consolidation UI should only be shown if there is at least one office with >= 2 pending shortage requests
+    const isConsolidationAvailable = useMemo(() => {
+        if (activeOfficeId !== null) {
+            return eligibleOfficeIds.has(activeOfficeId) && consolidatableRequests.length >= 2;
+        }
+        return eligibleOfficeIds.size > 0 && consolidatableRequests.length >= 2;
+    }, [activeOfficeId, eligibleOfficeIds, consolidatableRequests.length]);
 
     const toggleSelect = (id: number) => {
         const targetReq = requests.data.find((r) => r.supply_request_id === id);
-        if (!targetReq) return;
+        const targetOfficeId = targetReq?.office?.id;
+        if (!targetReq || !targetOfficeId || !eligibleOfficeIds.has(targetOfficeId)) return;
 
         setSelectedRequestIds((prev) => {
             const next = new Set(prev);
             if (next.has(id)) {
                 next.delete(id);
             } else {
-                if (next.size > 0 && activeOfficeId !== null && targetReq.office?.id !== activeOfficeId) {
+                const prevOfficeId = selectedRequests[0]?.office?.id;
+                if (prevOfficeId && prevOfficeId !== targetOfficeId) {
                     return new Set([id]);
                 }
                 next.add(id);
@@ -197,11 +224,15 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
         if (selectedRequestIds.size >= consolidatableRequests.length) {
             setSelectedRequestIds(new Set());
         } else {
-            setSelectedRequestIds(new Set(consolidatableRequests.map((r) => r.supply_request_id)));
+            const targetOffice = activeOfficeId ?? (consolidatableRequests[0]?.office?.id ?? null);
+            if (targetOffice) {
+                const officeReqs = consolidatableRequests.filter((r) => r.office?.id === targetOffice);
+                setSelectedRequestIds(new Set(officeReqs.map((r) => r.supply_request_id)));
+            }
         }
     };
 
-    const canConsolidate = activeOfficeId !== null && selectedRequestIds.size >= 1;
+    const canConsolidate = activeOfficeId !== null && selectedRequestIds.size >= 2;
 
     // Aggregated item lines for preview modal
     const aggregatedItems = useMemo(() => {
@@ -347,7 +378,7 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
                     </div>
                 ) : null}
 
-                {consolidatableRequests.length > 0 ? (
+                {isConsolidationAvailable ? (
                     <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-5 py-3.5 shadow-sm">
                         <div className="flex-1 min-w-[260px]">
                             <div className="flex items-center gap-2">
@@ -362,7 +393,7 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
                                 ) : null}
                             </div>
                             <p className="mt-0.5 text-xs text-red-700">
-                                Select shortage requests below to merge item quantities into one Consolidated Purchase Request and forward directly to BAC.
+                                Select 2 or more shortage requests below to merge item quantities into one Consolidated Purchase Request and forward directly to BAC.
                                 {selectedRequestIds.size > 0 ? (
                                     <span className="ml-1.5 font-bold text-red-950">
                                         ({selectedRequestIds.size} request{selectedRequestIds.size > 1 ? 's' : ''} selected)
@@ -394,7 +425,7 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
                     <table className="min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-slate-50">
                             <tr>
-                                {consolidatableRequests.length > 0 ? (
+                                {isConsolidationAvailable ? (
                                     <th className="px-3 py-3 text-center w-12">
                                         <input
                                             type="checkbox"
@@ -419,7 +450,7 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
 
                                 return (
                                 <tr key={request.supply_request_id} className="hover:bg-slate-50/60">
-                                    {consolidatableRequests.length > 0 ? (
+                                    {isConsolidationAvailable ? (
                                         <td className="px-3 py-3 text-center">
                                             {consolidatableRequests.some((r) => r.supply_request_id === request.supply_request_id) ? (
                                                 <input
@@ -509,7 +540,7 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
                             })}
                             {requests.data.length === 0 ? (
                                 <tr>
-                                    <td colSpan={consolidatableRequests.length > 0 ? 7 : 6} className="px-4 py-8 text-center text-sm text-slate-500">
+                                    <td colSpan={isConsolidationAvailable ? 7 : 6} className="px-4 py-8 text-center text-sm text-slate-500">
                                         No office supply requests available for review.
                                     </td>
                                 </tr>
