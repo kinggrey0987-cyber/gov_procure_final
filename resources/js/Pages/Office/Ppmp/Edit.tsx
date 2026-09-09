@@ -179,26 +179,6 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                     </div>
                 ) : null}
 
-                <section className="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-5 shadow-sm">
-                    <div className="flex items-start gap-3">
-                        <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-700">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" /></svg>
-                        </div>
-                        <div>
-                            <h4 className="text-sm font-bold text-indigo-900">RA 12009 — Government Procurement Reform Act Guidance</h4>
-                            <p className="mt-1 text-sm leading-relaxed text-indigo-800">
-                                The <strong>PPMP (Project Procurement Management Plan)</strong> covers <strong>non-common use items</strong> such as capital outlay, infrastructure projects, and specialized equipment unique to your office's needs.
-                            </p>
-                            <p className="mt-1 text-sm leading-relaxed text-indigo-800">
-                                <strong>Common-use supplies</strong> (e.g., ballpens, folders, bond paper, ink cartridges) should be included in the <strong>APP (Annual Procurement Plan)</strong> and procured through the Procurement Service (PS-DBM), <em>not</em> in this PPMP.
-                            </p>
-                            <p className="mt-2 text-xs text-indigo-700">
-                                Reference: Republic Act No. 12009, Sec. 7 — Procurement Planning; IRR Rule VI — Annual Procurement Plan and Project Procurement Management Plan.
-                            </p>
-                        </div>
-                    </div>
-                </section>
-
                 <form onSubmit={submitHeader} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                     <div className="flex items-center justify-between">
                         <h3 className="text-2xl font-semibold text-slate-800">PPMP #{ppmp.ppmp_id}</h3>
