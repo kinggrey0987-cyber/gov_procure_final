@@ -113,7 +113,7 @@ export default function OfficeIndex({ offices, filters }: Props) {
             <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <header className="flex flex-col gap-4 border-b border-slate-200 px-4 py-5 sm:px-6 md:flex-row md:items-center md:justify-between">
                     <div>
-                        <h3 className="text-2xl font-semibold text-slate-800 sm:text-3xl">Office Management</h3>
+                        <h3 className="text-2xl font-semibold text-slate-800 sm:text-3xl"></h3>
                         <p className="mt-1 text-sm text-slate-500 sm:text-base">Manage municipal offices and departmental access context</p>
                     </div>
                     <Link
@@ -213,11 +213,10 @@ export default function OfficeIndex({ offices, filters }: Props) {
                                     </td>
                                     <td className="px-5 py-4 text-slate-700">{office.users_count}</td>
                                     <td className="px-5 py-4">
-                                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                            office.is_active
+                                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${office.is_active
                                                 ? 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20'
                                                 : 'bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-500/20'
-                                        }`}>
+                                            }`}>
                                             <span className={`h-1.5 w-1.5 rounded-full ${office.is_active ? 'bg-emerald-600' : 'bg-slate-400'}`} />
                                             {office.is_active ? 'Active' : 'Inactive'}
                                         </span>
@@ -234,11 +233,10 @@ export default function OfficeIndex({ offices, filters }: Props) {
                                                 type="button"
                                                 onClick={() => setSelectedOffice(office)}
                                                 disabled={!office.can_delete_action}
-                                                className={`inline-flex h-8 items-center rounded-lg border px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-transparent disabled:text-slate-400 ${
-                                                    office.can_hard_delete
+                                                className={`inline-flex h-8 items-center rounded-lg border px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-transparent disabled:text-slate-400 ${office.can_hard_delete
                                                         ? 'border-rose-300 text-rose-700 hover:bg-rose-50'
                                                         : 'border-amber-300 bg-amber-50/50 text-amber-700 hover:bg-amber-100/70'
-                                                }`}
+                                                    }`}
                                                 title={
                                                     office.can_delete_action
                                                         ? (office.can_hard_delete ? 'Delete this office' : 'Safely deactivate this office')
