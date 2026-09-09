@@ -88,7 +88,10 @@ class ResetTransactionsCommand extends Command
 
         if (! $this->option('no-seed')) {
             $this->info('Repopulating system with clean, realistic operational workflow data...');
-            $this->call('db:seed', ['--class' => CleanWorkflowSeeder::class]);
+            $this->call('db:seed', [
+                '--class' => CleanWorkflowSeeder::class,
+                '--force' => true,
+            ]);
         }
 
         $this->info('Workflow data successfully reset and repopulated!');
