@@ -109,7 +109,7 @@ type Props = {
 };
 
 export default function DeliveryShow({ delivery }: Props) {
-    const canVerify = delivery.receipt_status === 'RECEIVED';
+    const canVerify = delivery.receipt_status === 'RECEIVED' && (!delivery.verifications || delivery.verifications.length === 0);
     const canCreateFollowUpPurchaseRequest = delivery.permissions?.can_create_follow_up_purchase_request === true
         && !delivery.follow_up_purchase_request;
     const { post, processing } = useForm({ remarks: '' });

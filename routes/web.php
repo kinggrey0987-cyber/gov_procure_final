@@ -867,8 +867,17 @@ Route::get('/system-migrate', function () {
                 break;
             case 'clear-cache':
                 \Illuminate\Support\Facades\DB::table('supply_requests')->where('status', 'FULFILLED')->update(['status' => 'COMPLETED']);
+                \Illuminate\Support\Facades\DB::table('deliveries')
+                    ->where('receipt_status', 'RECEIVED')
+                    ->whereExists(function ($q) {
+                        $q->select(\Illuminate\Support\Facades\DB::raw(1))
+                            ->from('delivery_verifications')
+                            ->whereColumn('delivery_verifications.delivery_id', 'deliveries.delivery_id')
+                            ->where('verification_status', 'APPROVED');
+                    })
+                    ->update(['receipt_status' => 'VERIFIED']);
                 \Illuminate\Support\Facades\Artisan::call('optimize:clear');
-                $output = "Normalized legacy supply request statuses to COMPLETED.\n" . \Illuminate\Support\Facades\Artisan::output();
+                $output = "Normalized legacy supply requests and verified deliveries.\n" . \Illuminate\Support\Facades\Artisan::output();
                 break;
             case 'refresh-disclosures':
                 \Illuminate\Support\Facades\Artisan::call('disclosures:refresh-packages');

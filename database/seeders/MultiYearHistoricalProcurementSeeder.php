@@ -454,7 +454,7 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
                             'sales_invoice_date' => $delDate,
                             'sales_invoice_amount' => $poTotal,
                             'received_by' => $gsoUser->id,
-                            'receipt_status' => 'RECEIVED',
+                            'receipt_status' => 'VERIFIED',
                             'remarks' => sprintf('Full delivery received and inspected by GSO Property for FY %d.', $year),
                             'created_at' => $delDate,
                             'updated_at' => $delDate,
