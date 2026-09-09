@@ -50,14 +50,56 @@ class GovernanceOpsDemoSeeder extends Seeder
             return;
         }
 
-        $systemBackupService->createBackup($admin, [
+        $dbBackupPath = sprintf('system-backups/database_backup/database_backup_%s.json', now()->format('Ymd_His'));
+        Storage::disk('local')->put($dbBackupPath, json_encode([
             'backup_type' => 'database_backup',
+            'created_at' => now()->toIso8601String(),
+            'database' => ['default_connection' => config('database.default')],
+            'status' => 'completed',
+            'notes' => 'Completed demo database backup generated during reseed.',
+        ], JSON_PRETTY_PRINT));
+
+        SystemBackup::query()->create([
+            'backup_type' => 'database_backup',
+            'file_name' => basename($dbBackupPath),
+            'file_path' => $dbBackupPath,
+            'file_size' => 2097152,
+            'sha256_checksum' => hash('sha256', 'demo_database_backup'),
+            'table_metrics' => [
+                'users' => 10,
+                'offices' => 8,
+                'items' => 15,
+                'ppmp' => 12,
+                'supply_requests' => 39,
+                'purchase_requests' => 35,
+                'purchase_orders' => 34,
+                'deliveries' => 33,
+                'distribution_records' => 34,
+            ],
+            'created_by' => (int) $admin->id,
+            'created_at' => now(),
+            'backup_status' => 'completed',
             'notes' => 'Completed demo database backup generated during reseed.',
         ]);
 
-        $systemBackupService->createBackup($admin, [
+        $storageBackupPath = sprintf('system-backups/storage_backup/storage_backup_%s.json', now()->format('Ymd_His'));
+        Storage::disk('local')->put($storageBackupPath, json_encode([
             'backup_type' => 'storage_backup',
-            'notes' => 'Completed demo storage backup generated during reseed.',
+            'created_at' => now()->toIso8601String(),
+            'total_files' => 24,
+            'status' => 'completed',
+        ], JSON_PRETTY_PRINT));
+
+        SystemBackup::query()->create([
+            'backup_type' => 'storage_backup',
+            'file_name' => basename($storageBackupPath),
+            'file_path' => $storageBackupPath,
+            'file_size' => 1048576,
+            'sha256_checksum' => hash('sha256', 'demo_storage_backup'),
+            'created_by' => (int) $admin->id,
+            'created_at' => now(),
+            'backup_status' => 'completed',
+            'notes' => 'Completed demo storage backup registered for governance demonstration.',
         ]);
 
         SystemBackup::query()->create([

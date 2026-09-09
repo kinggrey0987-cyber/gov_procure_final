@@ -137,7 +137,12 @@ export default function PurchaseRequestsShow({ purchaseRequest, traceability, re
                                     ) : null}
                                 </div>
                                 <h3 className="mt-1 text-lg font-semibold text-slate-900">
-                                    {purchaseRequest.supply_request?.request_code || `PR-${String(purchaseRequest.purchase_request_id).padStart(6, '0')}`}
+                                    {`PR-${String(purchaseRequest.purchase_request_id).padStart(6, '0')}`}
+                                    {purchaseRequest.supply_request?.request_code ? (
+                                        <span className="ml-2 text-sm font-normal text-slate-500">
+                                            ({traceability?.is_consolidated ? `Primary Source: ${purchaseRequest.supply_request.request_code}` : purchaseRequest.supply_request.request_code})
+                                        </span>
+                                    ) : null}
                                 </h3>
                             </div>
                             <span className={statusClass(purchaseRequest.status)}>{purchaseRequest.status}</span>

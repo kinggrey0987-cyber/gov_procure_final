@@ -968,17 +968,12 @@ class PurchaseRequestService
         ]);
     }
 
-    private function syncSupplyRequestStatus(
-        PurchaseRequest $purchaseRequest,
+    private function syncSingleSupplyRequestStatus(
+        SupplyRequest $supplyRequest,
         User $actor,
         string $newStatus,
         string $remarks
     ): void {
-        $supplyRequest = $purchaseRequest->supplyRequest()->first();
-        if (! $supplyRequest instanceof SupplyRequest) {
-            return;
-        }
-
         $oldStatus = (string) $supplyRequest->status;
         if ($oldStatus === $newStatus) {
             return;
@@ -1009,6 +1004,20 @@ class PurchaseRequestService
             'remarks' => $remarks,
             'approved_at' => null,
         ]);
+    }
+
+    private function syncSupplyRequestStatus(
+        PurchaseRequest $purchaseRequest,
+        User $actor,
+        string $newStatus,
+        string $remarks
+    ): void {
+        $supplyRequest = $purchaseRequest->supplyRequest()->first();
+        if (! $supplyRequest instanceof SupplyRequest) {
+            return;
+        }
+
+        $this->syncSingleSupplyRequestStatus($supplyRequest, $actor, $newStatus, $remarks);
 
         $message = match ($newStatus) {
             'DRAFT' => 'Your supply request was returned for revision by Procurement. Please review the remarks and resubmit it after updating.',
@@ -1153,28 +1162,10 @@ class PurchaseRequestService
 
             PurchaseRequestItem::query()->insert($itemRows);
 
-            // Update all source supply requests
+            // Update all source supply requests to FOR_PROCUREMENT
             foreach ($eligible as $supplyRequest) {
-                // Also create individual PR links for non-primary supply requests
-                if ((int) $supplyRequest->supply_request_id !== (int) $primarySupplyRequest->supply_request_id) {
-                    PurchaseRequest::query()->create([
-                        'supply_request_id' => (int) $supplyRequest->supply_request_id,
-                        'office_id' => (int) $office->id,
-                        'requested_by' => (int) $actor->id,
-                        'status' => 'OPEN',
-                        'remarks' => sprintf(
-                            'Linked to consolidated PR-%06d for %s.',
-                            (int) $purchaseRequest->purchase_request_id,
-                            (string) $office->name,
-                        ),
-                    ]);
-                }
-
-                $this->syncSupplyRequestStatus(
-                    PurchaseRequest::query()
-                        ->where('supply_request_id', $supplyRequest->supply_request_id)
-                        ->latest('purchase_request_id')
-                        ->first() ?? $purchaseRequest,
+                $this->syncSingleSupplyRequestStatus(
+                    $supplyRequest,
                     $actor,
                     'FOR_PROCUREMENT',
                     sprintf('Supply request consolidated into PR-%06d for office %s.', (int) $purchaseRequest->purchase_request_id, (string) $office->name),

@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use Database\Seeders\CleanWorkflowSeeder;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -13,36 +14,47 @@ class ResetTransactionsCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'data:reset-transactions';
+    protected $signature = 'data:reset-transactions 
+                            {--force : Force reset without confirmation}
+                            {--no-seed : Only purge workflow tables without reseeding}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Wipes transactional data (leaving users intact) and reseeds standard demo workflow.';
+    protected $description = 'Wipes workflow transactional data (preserving user accounts, offices, items, and item catalogs) and reseeds clean operational data.';
 
     /**
      * Execute the console command.
      */
-    public function handle()
+    public function handle(): int
     {
-        $this->warn('This will wipe all transactional data (PPMP, PR, PO, Inventory, Items, Alerts, etc) and re-seed the dummy data.');
-        
-        if (! $this->confirm('Do you wish to continue?', true)) {
+        $this->warn('This will purge all workflow transactional data (PPMP, PRs, POs, Deliveries, Distribution, Alerts, Inventory Stock, History).');
+        $this->info('User accounts, roles, offices, items, and item catalog categories will be 100% preserved.');
+
+        if (! $this->option('force') && ! $this->confirm('Do you wish to proceed with resetting workflow data?', true)) {
             $this->info('Aborted.');
-            return;
+            return 0;
         }
 
         $tables = [
+            'public_disclosure_sources',
+            'public_disclosures',
             'anomalies',
             'alerts',
+            'notifications',
+            'audit_logs',
+            'approval_history',
+            'status_history',
             'claims',
+            'distribution_items',
+            'distribution_records',
             'delivery_verifications',
             'delivery_items',
             'deliveries',
-            'distribution_items',
-            'distribution_records',
+            'inventory_movements',
+            'inventory',
             'purchase_order_items',
             'purchase_orders',
             'purchase_request_items',
@@ -51,34 +63,36 @@ class ResetTransactionsCommand extends Command
             'supply_requests',
             'ppmp_items',
             'ppmp',
-            'inventory',
-            'items',
-            'item_categories',
-            'status_history',
-            'approval_history',
             'documents',
         ];
 
         $this->info('Disabling foreign key constraints...');
         Schema::disableForeignKeyConstraints();
 
-        $this->info('Truncating tables...');
+        $this->info('Purging workflow tables...');
         foreach ($tables as $table) {
-            DB::table($table)->truncate();
-            $this->line("Truncated {$table}");
+            try {
+                if (Schema::hasTable($table)) {
+                    DB::table($table)->truncate();
+                    $this->line("  ✓ Truncated {$table}");
+                }
+            } catch (\Throwable $e) {
+                // Fallback to delete if truncate hits cascade restrictions
+                DB::table($table)->delete();
+                $this->line("  ✓ Cleared {$table}");
+            }
         }
 
         $this->info('Re-enabling foreign key constraints...');
         Schema::enableForeignKeyConstraints();
 
-        $this->info('Running seeders...');
-        $this->call('db:seed', ['--class' => 'ItemCatalogSeeder']);
-        
-        $this->info('Running Demo Workflow seeders...');
-        $this->call('db:seed', ['--class' => 'LongitudinalDemoWorkflowSeeder']);
-        $this->call('db:seed', ['--class' => 'ExecutiveDisclosureDemoSeeder']);
-        $this->call('db:seed', ['--class' => 'GovernanceOpsDemoSeeder']);
+        if (! $this->option('no-seed')) {
+            $this->info('Repopulating system with clean, realistic operational workflow data...');
+            $this->call('db:seed', ['--class' => CleanWorkflowSeeder::class]);
+        }
 
-        $this->info('Transactions reset and seeded successfully.');
+        $this->info('Workflow data successfully reset and repopulated!');
+
+        return 0;
     }
 }

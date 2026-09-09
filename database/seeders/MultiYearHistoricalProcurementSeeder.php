@@ -47,15 +47,16 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
             return;
         }
 
-        $offices = Office::query()->whereIn('code', ['MPDO', 'MSWDO', 'ENG'])->get()->keyBy('code');
+        $offices = Office::query()->whereIn('code', ['MPDO', 'MSWDO', 'ENG', 'MHO'])->get()->keyBy('code');
         if ($offices->count() < 3) {
-            $this->command?->warn('MultiYearHistoricalProcurementSeeder skipped: Required offices (MPDO, MSWDO, ENG) not found.');
+            $this->command?->warn('MultiYearHistoricalProcurementSeeder skipped: Required offices (MPDO, MSWDO, ENG, MHO) not found.');
             return;
         }
 
-        $mpdoUser = User::query()->where('office_id', $offices['MPDO']->id)->first() ?? $execUser;
-        $mswdoUser = User::query()->where('office_id', $offices['MSWDO']->id)->first() ?? $execUser;
-        $engUser = User::query()->where('office_id', $offices['ENG']->id)->first() ?? $execUser;
+        $mpdoUser = isset($offices['MPDO']) ? (User::query()->where('office_id', $offices['MPDO']->id)->first() ?? $execUser) : $execUser;
+        $mswdoUser = isset($offices['MSWDO']) ? (User::query()->where('office_id', $offices['MSWDO']->id)->first() ?? $execUser) : $execUser;
+        $engUser = isset($offices['ENG']) ? (User::query()->where('office_id', $offices['ENG']->id)->first() ?? $execUser) : $execUser;
+        $mhoUser = isset($offices['MHO']) ? (User::query()->where('office_id', $offices['MHO']->id)->first() ?? $execUser) : $execUser;
 
         $supplier = Supplier::query()->firstOrCreate(
             ['supplier_name' => 'Metro Office Depot Trading'],
@@ -74,26 +75,26 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
             return;
         }
 
-        $this->command?->info('Seeding FY 2024 Historical Procurement Dataset...');
+        $this->command?->info('Seeding FY 2024 Historical Procurement Dataset (4 quarters, all offices, closed workflows)...');
         $this->seedFiscalYear(
             year: 2024,
             execUser: $execUser,
             gsoUser: $gsoUser,
             procUser: $procUser,
-            officeUsers: ['MPDO' => $mpdoUser, 'MSWDO' => $mswdoUser, 'ENG' => $engUser],
+            officeUsers: ['MPDO' => $mpdoUser, 'MSWDO' => $mswdoUser, 'ENG' => $engUser, 'MHO' => $mhoUser],
             offices: $offices,
             supplier: $supplier,
             items: $items,
             priceScale: 0.89, // 2024 baseline (~11% lower than 2026)
         );
 
-        $this->command?->info('Seeding FY 2025 Historical Procurement Dataset...');
+        $this->command?->info('Seeding FY 2025 Historical Procurement Dataset (4 quarters, all offices, closed workflows)...');
         $this->seedFiscalYear(
             year: 2025,
             execUser: $execUser,
             gsoUser: $gsoUser,
             procUser: $procUser,
-            officeUsers: ['MPDO' => $mpdoUser, 'MSWDO' => $mswdoUser, 'ENG' => $engUser],
+            officeUsers: ['MPDO' => $mpdoUser, 'MSWDO' => $mswdoUser, 'ENG' => $engUser, 'MHO' => $mhoUser],
             offices: $offices,
             supplier: $supplier,
             items: $items,
@@ -146,6 +147,15 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
                         ['name' => 'Printer Ink', 'q1' => 5, 'q2' => 5, 'q3' => 5, 'q4' => 5, 'base_cost' => 850],
                         ['name' => 'Mouse', 'q1' => 10, 'q2' => 10, 'q3' => 10, 'q4' => 10, 'base_cost' => 325],
                         ['name' => 'Logbook', 'q1' => 5, 'q2' => 5, 'q3' => 5, 'q4' => 5, 'base_cost' => 150],
+                    ],
+                ],
+                'MHO' => [
+                    'user' => $officeUsers['MHO'],
+                    'office' => $offices['MHO'],
+                    'items' => [
+                        ['name' => 'Rubbing Alcohol', 'q1' => 12, 'q2' => 12, 'q3' => 12, 'q4' => 12, 'base_cost' => 400],
+                        ['name' => 'Detergent Powder', 'q1' => 10, 'q2' => 10, 'q3' => 10, 'q4' => 10, 'base_cost' => 120],
+                        ['name' => 'Safety Gloves', 'q1' => 15, 'q2' => 15, 'q3' => 15, 'q4' => 15, 'base_cost' => 45],
                     ],
                 ],
             ];
@@ -213,16 +223,19 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
 
                 $ppmp->update(['total_estimated_budget' => $totalBudget]);
 
-                // 2. Create Completed Supply Requests & Procurement for Q1 & Q2
+                // 2. Create Completed Supply Requests & Procurement for all 4 Quarters
                 $quarters = [
                     ['q' => 1, 'month' => 2, 'day' => 10, 'po_day' => 20, 'del_day' => 28],
                     ['q' => 2, 'month' => 5, 'day' => 12, 'po_day' => 22, 'del_day' => 30],
+                    ['q' => 3, 'month' => 8, 'day' => 14, 'po_day' => 24, 'del_day' => 31],
+                    ['q' => 4, 'month' => 11, 'day' => 8,  'po_day' => 18, 'del_day' => 26],
                 ];
 
                 foreach ($quarters as $qData) {
                     $reqDate = Carbon::create($year, $qData['month'], $qData['day']);
                     $poDate = Carbon::create($year, $qData['month'], $qData['po_day']);
                     $delDate = Carbon::create($year, $qData['month'], $qData['del_day']);
+                    $distDate = $delDate->copy()->addDays(2);
 
                     $requestCode = sprintf('SR-%s-%d%02d-01', $officeCode, $year, $qData['month']);
 
@@ -241,7 +254,7 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
                             'approved_by' => $execUser->id,
                             'approved_at' => $reqDate->copy()->addDays(2),
                             'created_at' => $reqDate,
-                            'updated_at' => $delDate,
+                            'updated_at' => $distDate,
                         ]
                     );
 
@@ -275,11 +288,82 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
                             'office_id' => $office->id,
                             'requested_by' => $user->id,
                             'status' => 'COMPLETED',
-                            'remarks' => sprintf('Consolidated PR for %s Q%d %d.', $officeCode, $qData['q'], $year),
+                            'remarks' => sprintf('Official approved PR for %s Q%d %d.', $officeCode, $qData['q'], $year),
                             'created_at' => $reqDate->copy()->addDays(3),
                             'updated_at' => $poDate,
                         ]
                     );
+
+                    // Create Purchase Request Items (never leave PRs empty!)
+                    foreach ($srItems as $srItemData) {
+                        PurchaseRequestItem::query()->updateOrCreate(
+                            [
+                                'purchase_request_id' => $pr->purchase_request_id,
+                                'item_id' => $srItemData['item']->item_id,
+                            ],
+                            [
+                                'quantity_requested' => $srItemData['qty'],
+                                'remarks' => sprintf('Procured allocation for %s Q%d %d.', $srItemData['item']->item_name, $qData['q'], $year),
+                                'created_at' => $reqDate->copy()->addDays(3),
+                                'updated_at' => $poDate,
+                            ]
+                        );
+                    }
+
+                    // Audit Status History for Supply Request & Purchase Request
+                    StatusHistory::query()->create([
+                        'reference_type' => SupplyRequest::class,
+                        'reference_id' => $supplyRequest->supply_request_id,
+                        'old_status' => 'DRAFT',
+                        'new_status' => 'SUBMITTED',
+                        'changed_by' => $user->id,
+                        'remarks' => 'Submitted by office for review.',
+                        'changed_at' => $reqDate,
+                    ]);
+                    StatusHistory::query()->create([
+                        'reference_type' => SupplyRequest::class,
+                        'reference_id' => $supplyRequest->supply_request_id,
+                        'old_status' => 'SUBMITTED',
+                        'new_status' => 'FULFILLED',
+                        'changed_by' => $gsoUser->id,
+                        'remarks' => 'Fulfillment and distribution completed.',
+                        'changed_at' => $distDate,
+                    ]);
+                    ApprovalHistory::query()->create([
+                        'reference_type' => SupplyRequest::class,
+                        'reference_id' => $supplyRequest->supply_request_id,
+                        'approved_by' => $execUser->id,
+                        'status' => 'APPROVED',
+                        'remarks' => 'Approved against annual PPMP.',
+                        'approved_at' => $reqDate->copy()->addDays(2),
+                    ]);
+
+                    StatusHistory::query()->create([
+                        'reference_type' => PurchaseRequest::class,
+                        'reference_id' => $pr->purchase_request_id,
+                        'old_status' => 'DRAFT',
+                        'new_status' => 'OPEN',
+                        'changed_by' => $user->id,
+                        'remarks' => 'Purchase request forwarded to BAC.',
+                        'changed_at' => $reqDate->copy()->addDays(3),
+                    ]);
+                    StatusHistory::query()->create([
+                        'reference_type' => PurchaseRequest::class,
+                        'reference_id' => $pr->purchase_request_id,
+                        'old_status' => 'OPEN',
+                        'new_status' => 'COMPLETED',
+                        'changed_by' => $procUser->id,
+                        'remarks' => 'Procurement and delivery finalized.',
+                        'changed_at' => $distDate,
+                    ]);
+                    ApprovalHistory::query()->create([
+                        'reference_type' => PurchaseRequest::class,
+                        'reference_id' => $pr->purchase_request_id,
+                        'approved_by' => $execUser->id,
+                        'status' => 'APPROVED',
+                        'remarks' => 'Approved by BAC & Executive.',
+                        'approved_at' => $poDate,
+                    ]);
 
                     $poNumber = sprintf('PO-%d-%02d%02d-%s', $year, $qData['month'], $office->id, $officeCode);
                     $poTotal = 0;
@@ -336,6 +420,9 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
 
                     // 4. Delivery & Verification (IAR)
                     $deliveryCode = sprintf('DEL-%d-%02d-%03d', $year, $qData['month'], $po->purchase_order_id);
+                    $drNumber = sprintf('DR-%d-%02d-%03d', $year, $qData['month'], $po->purchase_order_id);
+                    $siNumber = sprintf('SI-%d-%02d-%03d', $year, $qData['month'], $po->purchase_order_id);
+
                     $delivery = Delivery::query()->updateOrCreate(
                         ['delivery_code' => $deliveryCode],
                         [
@@ -343,6 +430,10 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
                             'supplier_id' => $supplier->supplier_id,
                             'actual_delivery_date' => $delDate,
                             'expected_arrival_date' => $delDate,
+                            'delivery_receipt_no' => $drNumber,
+                            'sales_invoice_no' => $siNumber,
+                            'sales_invoice_date' => $delDate,
+                            'sales_invoice_amount' => $poTotal,
                             'received_by' => $gsoUser->id,
                             'receipt_status' => 'RECEIVED',
                             'remarks' => sprintf('Full delivery received and inspected by GSO Property for FY %d.', $year),
@@ -384,7 +475,6 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
 
                     // 5. Distribution Record to Office
                     $distCode = sprintf('DIST-%d-%02d-%03d', $year, $qData['month'], $delivery->delivery_id);
-                    $distDate = $delDate->copy()->addDays(2);
 
                     $distribution = DistributionRecord::query()->updateOrCreate(
                         ['distribution_code' => $distCode],
@@ -425,6 +515,35 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
                             ]
                         );
                     }
+
+                    // Audit Status History for PO, Delivery, and Distribution
+                    StatusHistory::query()->create([
+                        'reference_type' => PurchaseOrder::class,
+                        'reference_id' => $po->purchase_order_id,
+                        'old_status' => 'DRAFT',
+                        'new_status' => 'COMPLETED',
+                        'changed_by' => $procUser->id,
+                        'remarks' => 'Purchase order delivered, inspected and closed.',
+                        'changed_at' => $distDate,
+                    ]);
+                    StatusHistory::query()->create([
+                        'reference_type' => Delivery::class,
+                        'reference_id' => $delivery->delivery_id,
+                        'old_status' => 'PENDING',
+                        'new_status' => 'RECEIVED',
+                        'changed_by' => $gsoUser->id,
+                        'remarks' => 'Items physically received, DR/SI verified and accepted.',
+                        'changed_at' => $delDate,
+                    ]);
+                    StatusHistory::query()->create([
+                        'reference_type' => DistributionRecord::class,
+                        'reference_id' => $distribution->distribution_record_id,
+                        'old_status' => 'PENDING',
+                        'new_status' => 'RECEIVED',
+                        'changed_by' => $user->id,
+                        'remarks' => 'Supplies officially received and acknowledged by office.',
+                        'changed_at' => $distDate,
+                    ]);
                 }
             }
 

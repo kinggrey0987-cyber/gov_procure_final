@@ -22,6 +22,7 @@ type PurchaseRequestRow = {
     }>;
     items_count?: number;
     items_sum_quantity_requested?: string | number | null;
+    remarks?: string | null;
 };
 
 type Props = {
@@ -167,7 +168,27 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                                 return (
                                     <tr key={row.purchase_request_id} className="hover:bg-slate-50/60">
                                         <td className="px-4 py-3 font-semibold text-red-700">
-                                            {row.supply_request?.request_code || `PR-${String(row.purchase_request_id).padStart(6, '0')}`}
+                                            {(() => {
+                                                const isConsolidated = Boolean(row.remarks && (row.remarks.includes('Consolidated PR') || row.remarks.includes('supply request(s)')));
+                                                const prNumber = `PR-${String(row.purchase_request_id).padStart(6, '0')}`;
+                                                return (
+                                                    <div>
+                                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                                            <span>{prNumber}</span>
+                                                            {isConsolidated ? (
+                                                                <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-800">
+                                                                    📦 Consolidated
+                                                                </span>
+                                                            ) : null}
+                                                        </div>
+                                                        {row.supply_request?.request_code ? (
+                                                            <p className="text-xs font-normal text-slate-500">
+                                                                {isConsolidated ? `Source: ${row.supply_request.request_code}` : row.supply_request.request_code}
+                                                            </p>
+                                                        ) : null}
+                                                    </div>
+                                                );
+                                            })()}
                                         </td>
                                         <td className="px-4 py-3 text-slate-700">{row.office?.name ?? '-'}</td>
                                         <td className="px-4 py-3 text-slate-700">
