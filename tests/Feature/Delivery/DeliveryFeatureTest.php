@@ -23,6 +23,7 @@ use App\Services\Delivery\DeliveryService;
 use App\Services\Delivery\DeliveryVerificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class DeliveryFeatureTest extends TestCase
@@ -197,6 +198,8 @@ class DeliveryFeatureTest extends TestCase
         $this->actingAs($this->gsoOfficer)
             ->put(route('inventory.deliveries.update', $delivery->delivery_id), [
                 'actual_delivery_date' => now()->toDateString(),
+                'delivery_receipt_no' => 'DR-2026-TEST',
+                'sales_invoice_no' => 'SI-2026-TEST',
                 'remarks' => 'Received with one damaged item.',
                 'items' => [[
                     'delivery_item_id' => $item->delivery_item_id,
@@ -211,6 +214,8 @@ class DeliveryFeatureTest extends TestCase
             'delivery_id' => $delivery->delivery_id,
             'received_by' => $this->gsoOfficer->id,
             'receipt_status' => 'RECEIVED',
+            'delivery_receipt_no' => 'DR-2026-TEST',
+            'sales_invoice_no' => 'SI-2026-TEST',
         ]);
 
         $this->assertDatabaseHas('delivery_items', [
@@ -975,6 +980,64 @@ class DeliveryFeatureTest extends TestCase
         return User::factory()->withRole($role)->forOffice($office)->create([
             'role_id' => $roleModel->id,
             'office_id' => $office->id,
+        ]);
+    }
+
+    public function test_receiving_saves_dr_number_sales_invoice_number_and_uploads_scanned_files(): void
+    {
+        Storage::fake('public');
+
+        $delivery = $this->createDelivery();
+        $item = DeliveryItem::query()->create([
+            'delivery_id' => $delivery->delivery_id,
+            'purchase_order_item_id' => $this->purchaseOrderItem->purchase_order_item_id,
+            'expected_quantity' => 10,
+            'received_quantity' => 0,
+            'damaged_quantity' => 0,
+            'missing_quantity' => 0,
+            'item_condition' => 'PENDING_RECEIPT',
+        ]);
+
+        $drFile = UploadedFile::fake()->create('dr_scan.pdf', 500, 'application/pdf');
+        $siFile = UploadedFile::fake()->image('invoice_scan.jpg');
+
+        $this->actingAs($this->gsoOfficer)
+            ->put(route('inventory.deliveries.update', $delivery->delivery_id), [
+                'actual_delivery_date' => now()->toDateString(),
+                'delivery_receipt_no' => 'DR-2026-9999',
+                'sales_invoice_no' => 'SI-2026-8888',
+                'sales_invoice_date' => now()->toDateString(),
+                'sales_invoice_amount' => 125000.50,
+                'delivery_receipt_file' => $drFile,
+                'sales_invoice_file' => $siFile,
+                'remarks' => 'All items complete with scanned receipts.',
+                'items' => [[
+                    'delivery_item_id' => $item->delivery_item_id,
+                    'received_quantity' => 10,
+                    'damaged_quantity' => 0,
+                    'item_condition' => 'GOOD',
+                ]],
+            ])
+            ->assertRedirect(route('inventory.deliveries.show', $delivery->delivery_id));
+
+        $this->assertDatabaseHas('deliveries', [
+            'delivery_id' => $delivery->delivery_id,
+            'delivery_receipt_no' => 'DR-2026-9999',
+            'sales_invoice_no' => 'SI-2026-8888',
+            'sales_invoice_amount' => 125000.50,
+            'receipt_status' => 'RECEIVED',
+        ]);
+
+        $this->assertDatabaseHas('documents', [
+            'related_module' => 'deliveries',
+            'related_reference_id' => $delivery->delivery_id,
+            'document_kind' => 'delivery_receipt',
+        ]);
+
+        $this->assertDatabaseHas('documents', [
+            'related_module' => 'deliveries',
+            'related_reference_id' => $delivery->delivery_id,
+            'document_kind' => 'sales_invoice',
         ]);
     }
 }

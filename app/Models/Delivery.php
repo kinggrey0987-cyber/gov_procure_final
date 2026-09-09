@@ -26,6 +26,10 @@ class Delivery extends Model
         'supplier_id',
         'actual_delivery_date',
         'expected_arrival_date',
+        'delivery_receipt_no',
+        'sales_invoice_no',
+        'sales_invoice_date',
+        'sales_invoice_amount',
         'received_by',
         'receipt_status',
         'remarks',
@@ -37,7 +41,15 @@ class Delivery extends Model
         'received_by' => 'integer',
         'actual_delivery_date' => 'date',
         'expected_arrival_date' => 'date',
+        'sales_invoice_date' => 'date',
+        'sales_invoice_amount' => 'decimal:2',
     ];
+
+    public function documents(): HasMany
+    {
+        return $this->hasMany(Document::class, 'related_reference_id', 'delivery_id')
+            ->where('related_module', 'deliveries');
+    }
 
     public function purchaseOrder(): BelongsTo
     {

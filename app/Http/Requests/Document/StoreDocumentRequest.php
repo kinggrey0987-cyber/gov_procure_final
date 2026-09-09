@@ -18,6 +18,18 @@ class StoreDocumentRequest extends FormRequest
         'other_supporting_doc',
     ];
 
+    private const ALLOWED_DOCUMENT_KINDS = [
+        'procurement_record',
+        'supplier_quotation',
+        'canvass_sheet',
+        'noa',
+        'signed_po',
+        'other_supporting_doc',
+        'delivery_receipt',
+        'sales_invoice',
+        'verification_evidence',
+    ];
+
     public function authorize(): bool
     {
         $accessService = app(DocumentAccessService::class);
@@ -33,12 +45,12 @@ class StoreDocumentRequest extends FormRequest
 
         return [
             'title' => ['required', 'string', 'max:200'],
-            'document_kind' => ['sometimes', 'string', Rule::in(self::PROCUREMENT_DOCUMENT_KINDS)],
+            'document_kind' => ['sometimes', 'nullable', 'string', Rule::in(self::ALLOWED_DOCUMENT_KINDS)],
             'file' => [
                 'required',
                 'file',
                 'max:10240',
-                'mimes:pdf,doc,docx,csv',
+                'mimes:pdf,doc,docx,csv,png,jpg,jpeg,webp',
             ],
             'related_module' => ['sometimes', 'string', Rule::in($accessService->allowedModules())],
             'related_reference_id' => ['sometimes', 'integer', 'min:1'],
