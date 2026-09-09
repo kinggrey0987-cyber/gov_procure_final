@@ -5,6 +5,7 @@ namespace App\Services\Office;
 use App\Models\ApprovalHistory;
 use App\Enums\UserRole;
 use App\Enums\FundSource;
+use App\Models\Item;
 use App\Models\Ppmp;
 use App\Models\PpmpItem;
 use App\Models\StatusHistory;
@@ -152,10 +153,13 @@ class PpmpService
             $quantity = (float) $payload['quantity'];
             $unitCost = (float) $payload['unit_cost'];
             $estimatedBudget = round($quantity * $unitCost, 2);
+            $categoryId = ! empty($payload['item_category_id'])
+                ? (int) $payload['item_category_id']
+                : (int) Item::where('item_id', $payload['item_id'])->value('item_category_id');
 
             $item = $ppmp->items()->create([
                 'item_id' => (int) $payload['item_id'],
-                'item_category_id' => (int) $payload['item_category_id'],
+                'item_category_id' => $categoryId,
                 'quantity' => $quantity,
                 'unit_cost' => $unitCost,
                 'estimated_budget' => $estimatedBudget,
@@ -189,10 +193,13 @@ class PpmpService
         return DB::transaction(function () use ($ppmp, $item, $actor, $payload): PpmpItem {
             $quantity = (float) $payload['quantity'];
             $unitCost = (float) $payload['unit_cost'];
+            $categoryId = ! empty($payload['item_category_id'])
+                ? (int) $payload['item_category_id']
+                : (int) ($item->item_category_id ?: Item::where('item_id', $payload['item_id'])->value('item_category_id'));
 
             $item->fill([
                 'item_id' => (int) $payload['item_id'],
-                'item_category_id' => (int) $payload['item_category_id'],
+                'item_category_id' => $categoryId,
                 'quantity' => $quantity,
                 'unit_cost' => $unitCost,
                 'estimated_budget' => round($quantity * $unitCost, 2),

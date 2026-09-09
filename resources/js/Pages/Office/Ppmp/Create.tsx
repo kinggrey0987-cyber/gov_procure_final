@@ -91,6 +91,11 @@ export default function PpmpCreate({ itemOptions }: Props) {
                     <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm">
                         <p className="font-semibold">Unable to save PPMP.</p>
                         <p className="mt-1">Please complete all required fields and review the highlighted item rows.</p>
+                        <ul className="mt-2 list-disc list-inside space-y-0.5 text-xs text-rose-600">
+                            {Object.entries(form.errors).map(([key, msg]) => (
+                                <li key={key}>{msg}</li>
+                            ))}
+                        </ul>
                     </div>
                 ) : null}
 
@@ -125,19 +130,19 @@ export default function PpmpCreate({ itemOptions }: Props) {
                     <div className="grid gap-4 md:grid-cols-2">
                         <label className="block">
                             <span className="mb-1 block text-sm font-medium text-slate-700">Fiscal Year</span>
-                            <input type="number" min={CURRENT_YEAR} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={form.data.fiscal_year} onChange={(event) => form.setData('fiscal_year', Number(event.target.value))} required />
+                            <input type="number" min={CURRENT_YEAR} className={`w-full rounded-lg border px-3 py-2 text-sm ${form.errors.fiscal_year ? 'border-rose-400 bg-rose-50/30' : 'border-slate-300'}`} value={form.data.fiscal_year} onChange={(event) => form.setData('fiscal_year', Number(event.target.value))} required />
                             <span className="mt-1 block text-xs text-slate-500">Fiscal year cannot be earlier than {CURRENT_YEAR}.</span>
                             <InputError message={form.errors.fiscal_year} className="mt-1" />
                         </label>
                         <label className="block">
                             <span className="mb-1 block text-sm font-medium text-slate-700">Date Prepared</span>
-                            <input type="date" className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700" value={form.data.date_prepared} readOnly aria-readonly="true" required />
+                            <input type="date" className={`w-full rounded-lg border bg-slate-50 px-3 py-2 text-sm text-slate-700 ${form.errors.date_prepared ? 'border-rose-400 bg-rose-50/30' : 'border-slate-300'}`} value={form.data.date_prepared} readOnly aria-readonly="true" required />
                             <span className="mt-1 block text-xs text-slate-500">Automatically set to today and locked for audit consistency.</span>
                             <InputError message={form.errors.date_prepared} className="mt-1" />
                         </label>
                         <label className="block md:col-span-2">
                             <span className="mb-1 block text-sm font-medium text-slate-700">Fund Source</span>
-                            <select value={form.data.fund_source} onChange={(event) => form.setData('fund_source', event.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required>
+                            <select value={form.data.fund_source} onChange={(event) => form.setData('fund_source', event.target.value)} className={`w-full rounded-lg border px-3 py-2 text-sm ${form.errors.fund_source ? 'border-rose-400 bg-rose-50/30' : 'border-slate-300'}`} required>
                                 {FUND_SOURCES.map((option) => (
                                     <option key={option.value} value={option.value}>{option.label}</option>
                                 ))}
@@ -147,7 +152,8 @@ export default function PpmpCreate({ itemOptions }: Props) {
                     </div>
                     <label className="mt-4 block">
                         <span className="mb-1 block text-sm font-medium text-slate-700">Remarks</span>
-                        <textarea className="h-20 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={form.data.remarks} onChange={(event) => form.setData('remarks', event.target.value)} />
+                        <textarea className={`h-20 w-full rounded-lg border px-3 py-2 text-sm ${form.errors.remarks ? 'border-rose-400 bg-rose-50/30' : 'border-slate-300'}`} value={form.data.remarks} onChange={(event) => form.setData('remarks', event.target.value)} />
+                        <InputError message={form.errors.remarks} className="mt-1" />
                     </label>
                 </section>
 
@@ -175,9 +181,16 @@ export default function PpmpCreate({ itemOptions }: Props) {
                             const lineSubtotal = qtyNum * unitCostNum;
                             const costPerPiece = piecesPerBox > 0 ? unitCostNum / piecesPerBox : unitCostNum;
                             const isDuplicate = duplicateRowIndexes.has(index);
+                            const hasRowError = Object.keys(form.errors).some((key) => key.startsWith(`items.${index}.`));
 
                             return (
-                            <div key={index} className={`rounded-xl border p-4 ${isDuplicate ? 'border-amber-300 bg-amber-50/40' : 'border-slate-200'}`}>
+                            <div key={index} className={`rounded-xl border p-4 transition ${
+                                isDuplicate
+                                    ? 'border-amber-300 bg-amber-50/40'
+                                    : hasRowError
+                                    ? 'border-rose-300 bg-rose-50/20 ring-1 ring-rose-200'
+                                    : 'border-slate-200'
+                            }`}>
                                 {isDuplicate ? (
                                     <div className="mb-3 rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm font-semibold text-amber-800">
                                         Duplicate combination: this item is already allocated for {item.procurement_schedule || 'this quarter'}. Change the schedule or adjust the existing row.
@@ -186,7 +199,16 @@ export default function PpmpCreate({ itemOptions }: Props) {
                                 <div className="grid gap-3 md:grid-cols-2">
                                     <label className="block md:col-span-2">
                                         <span className="mb-1 block text-sm font-medium text-slate-700">Catalog Item</span>
-                                        <select value={item.item_id} onChange={(event) => patchItem(index, { item_id: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required>
+                                        <select
+                                            value={item.item_id}
+                                            onChange={(event) => chooseItem(index, event.target.value)}
+                                            className={`w-full rounded-lg border px-3 py-2 text-sm ${
+                                                form.errors[`items.${index}.item_id`] || form.errors[`items.${index}.item_category_id`]
+                                                    ? 'border-rose-400 bg-rose-50/30'
+                                                    : 'border-slate-300'
+                                            }`}
+                                            required
+                                        >
                                             <option value="">Select Item</option>
                                             {itemOptions.map((option) => (
                                                 <option key={option.item_id} value={option.item_id}>
@@ -195,10 +217,23 @@ export default function PpmpCreate({ itemOptions }: Props) {
                                             ))}
                                         </select>
                                         <InputError message={form.errors[`items.${index}.item_id`]} className="mt-1" />
+                                        <InputError message={form.errors[`items.${index}.item_category_id`]} className="mt-1" />
                                     </label>
                                     <label className="block">
                                         <span className="mb-1 block text-sm font-medium text-slate-700">Quantity ({unit.toUpperCase()})</span>
-                                        <input type="number" min="1" step="1" value={item.quantity} onChange={(event) => patchItem(index, { quantity: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required />
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            step="1"
+                                            value={item.quantity}
+                                            onChange={(event) => patchItem(index, { quantity: event.target.value })}
+                                            className={`w-full rounded-lg border px-3 py-2 text-sm ${
+                                                form.errors[`items.${index}.quantity`]
+                                                    ? 'border-rose-400 bg-rose-50/30'
+                                                    : 'border-slate-300'
+                                            }`}
+                                            required
+                                        />
                                         <div className="mt-1 text-xs text-slate-600">
                                             <span>
                                                 Planned: <strong className="text-slate-800">{qtyNum} {unit}</strong>
@@ -217,7 +252,19 @@ export default function PpmpCreate({ itemOptions }: Props) {
                                     </label>
                                     <label className="block">
                                         <span className="mb-1 block text-sm font-medium text-slate-700">Estimated Unit Cost (₱ per {unit})</span>
-                                        <input type="number" min="0.01" step="0.01" value={item.unit_cost} onChange={(event) => patchItem(index, { unit_cost: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required />
+                                        <input
+                                            type="number"
+                                            min="0.01"
+                                            step="0.01"
+                                            value={item.unit_cost}
+                                            onChange={(event) => patchItem(index, { unit_cost: event.target.value })}
+                                            className={`w-full rounded-lg border px-3 py-2 text-sm ${
+                                                form.errors[`items.${index}.unit_cost`]
+                                                    ? 'border-rose-400 bg-rose-50/30'
+                                                    : 'border-slate-300'
+                                            }`}
+                                            required
+                                        />
                                         <div className="mt-1 flex flex-wrap items-center justify-between text-xs text-slate-600">
                                             {unitCostNum > 0 && piecesPerBox > 1 ? (
                                                 <span className="text-emerald-700 font-medium">
@@ -234,7 +281,16 @@ export default function PpmpCreate({ itemOptions }: Props) {
                                     </label>
                                     <label className="block">
                                         <span className="mb-1 block text-sm font-medium text-slate-700">Procurement Schedule</span>
-                                        <select value={item.procurement_schedule} onChange={(event) => patchItem(index, { procurement_schedule: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required>
+                                        <select
+                                            value={item.procurement_schedule}
+                                            onChange={(event) => patchItem(index, { procurement_schedule: event.target.value })}
+                                            className={`w-full rounded-lg border px-3 py-2 text-sm ${
+                                                form.errors[`items.${index}.procurement_schedule`]
+                                                    ? 'border-rose-400 bg-rose-50/30'
+                                                    : 'border-slate-300'
+                                            }`}
+                                            required
+                                        >
                                             <option value="">Select Quarter</option>
                                             {QUARTER_OPTIONS.map((quarter) => (
                                                 <option key={quarter} value={quarter}>{quarter}</option>
@@ -244,7 +300,17 @@ export default function PpmpCreate({ itemOptions }: Props) {
                                     </label>
                                     <label className="block">
                                         <span className="mb-1 block text-sm font-medium text-slate-700">Item Specification / Brand Details</span>
-                                        <input value={item.remarks} onChange={(event) => patchItem(index, { remarks: event.target.value })} placeholder="e.g. Panda 0.7mm Black, A4 80gsm 500 sheets" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required />
+                                        <input
+                                            value={item.remarks}
+                                            onChange={(event) => patchItem(index, { remarks: event.target.value })}
+                                            placeholder="e.g. Panda 0.7mm Black, A4 80gsm 500 sheets"
+                                            className={`w-full rounded-lg border px-3 py-2 text-sm ${
+                                                form.errors[`items.${index}.remarks`]
+                                                    ? 'border-rose-400 bg-rose-50/30'
+                                                    : 'border-slate-300'
+                                            }`}
+                                            required
+                                        />
                                         <span className="mt-1 block text-xs text-slate-500">Essential technical specification auto-filled into Supply Requests and Purchase Orders.</span>
                                         <InputError message={form.errors[`items.${index}.remarks`]} className="mt-1" />
                                     </label>

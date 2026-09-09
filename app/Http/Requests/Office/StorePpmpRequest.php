@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Office;
 
 use App\Enums\FundSource;
+use App\Models\Item;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -25,7 +26,7 @@ class StorePpmpRequest extends FormRequest
             'remarks' => ['nullable', 'string', 'max:2000'],
             'items' => ['nullable', 'array'],
             'items.*.item_id' => ['required_with:items', 'integer', 'exists:items,item_id'],
-            'items.*.item_category_id' => ['required_with:items', 'integer', 'exists:item_categories,item_category_id'],
+            'items.*.item_category_id' => ['nullable', 'integer', 'exists:item_categories,item_category_id'],
             'items.*.quantity' => ['required_with:items', 'numeric', 'gt:0'],
             'items.*.unit_cost' => ['required_with:items', 'numeric', 'gt:0'],
             'items.*.procurement_schedule' => ['required_with:items', 'string', Rule::in(['Q1', 'Q2', 'Q3', 'Q4'])],
@@ -42,6 +43,10 @@ class StorePpmpRequest extends FormRequest
                 }
 
                 $item['procurement_schedule'] = strtoupper(trim((string) ($item['procurement_schedule'] ?? '')));
+
+                if (empty($item['item_category_id']) && ! empty($item['item_id'])) {
+                    $item['item_category_id'] = Item::where('item_id', $item['item_id'])->value('item_category_id');
+                }
 
                 return $item;
             })

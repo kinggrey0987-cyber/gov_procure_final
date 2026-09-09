@@ -311,6 +311,52 @@ class OfficeTransactionalFlowTest extends TestCase
         $this->assertDatabaseCount('ppmp', 0);
     }
 
+    public function test_ppmp_creation_with_items_succeeds_even_when_category_id_is_not_passed(): void
+    {
+        $office = $this->createOffice();
+        $officeUser = $this->createUser(UserRole::OFFICE_USER, $office);
+
+        $category = ItemCategory::query()->create([
+            'category_name' => 'Stationery',
+            'description' => 'Stationery description',
+            'status' => 'active',
+        ]);
+
+        $item = Item::query()->create([
+            'item_category_id' => $category->item_category_id,
+            'item_name' => 'Ballpen (50 pieces/box)',
+            'description' => 'Panda Ballpen',
+            'default_unit' => 'box',
+            'status' => 'active',
+        ]);
+
+        $response = $this->actingAs($officeUser)
+            ->post(route('office.ppmp.store'), [
+                'fiscal_year' => 2026,
+                'fund_source' => 'GAA_CURRENT',
+                'date_prepared' => now()->toDateString(),
+                'remarks' => 'test remarks',
+                'items' => [[
+                    'item_id' => $item->item_id,
+                    'item_category_id' => '',
+                    'quantity' => 2,
+                    'unit_cost' => 70,
+                    'procurement_schedule' => 'Q1',
+                    'remarks' => 'test spec',
+                ]],
+            ]);
+
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect();
+
+        $ppmp = Ppmp::query()->latest('ppmp_id')->first();
+        $this->assertNotNull($ppmp);
+        $this->assertCount(1, $ppmp->items);
+        $this->assertEquals($item->item_id, $ppmp->items[0]->item_id);
+        $this->assertEquals($category->item_category_id, $ppmp->items[0]->item_category_id);
+        $this->assertEquals(140.00, $ppmp->items[0]->estimated_budget);
+    }
+
     public function test_ppmp_item_add_and_update_reject_zero_unit_cost(): void
     {
         $office = $this->createOffice();

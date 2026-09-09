@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Office;
 
+use App\Models\Item;
 use App\Models\Ppmp;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -20,7 +21,7 @@ class UpdatePpmpItemRequest extends FormRequest
     {
         return [
             'item_id' => ['required', 'integer'],
-            'item_category_id' => ['required', 'integer'],
+            'item_category_id' => ['nullable', 'integer'],
             'quantity' => ['required', 'numeric', 'gt:0'],
             'unit_cost' => ['required', 'numeric', 'gt:0'],
             'procurement_schedule' => ['required', 'string', Rule::in(['Q1', 'Q2', 'Q3', 'Q4'])],
@@ -30,7 +31,13 @@ class UpdatePpmpItemRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        $categoryId = $this->input('item_category_id');
+        if (empty($categoryId) && ! empty($this->input('item_id'))) {
+            $categoryId = Item::where('item_id', $this->input('item_id'))->value('item_category_id');
+        }
+
         $this->merge([
+            'item_category_id' => $categoryId,
             'procurement_schedule' => strtoupper(trim((string) $this->input('procurement_schedule', ''))),
         ]);
     }
