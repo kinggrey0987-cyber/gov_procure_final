@@ -50,6 +50,9 @@ export function printSectionById(sectionId: string, options: PrintSectionOptions
         .print-hide {
             display: none !important;
         }
+        .pdf-export-content {
+            display: block !important;
+        }
     </style>
 </head>
 <body style="margin: 0; padding: 16px; background: #fff;">

@@ -1,8 +1,10 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Modal from '@/Components/Modal';
+import { GovDocumentPage, GovDocumentMetadata } from '@/Components/Executive/GovDocumentLayout';
+import { downloadSectionAsPdfById, printSectionById } from '@/lib/printSection';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { getFundSourceLabel } from '@/constants/fundSources';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 type PpmpItem = {
     ppmp_item_id: number;
@@ -22,6 +24,7 @@ type Props = {
         date_prepared: string;
         date_approved?: string | null;
         remarks: string | null;
+        office?: { id: number; name: string } | null;
         items: PpmpItem[];
         approver?: { id: number; name: string } | null;
         preparer?: { id: number; name: string } | null;
@@ -49,10 +52,12 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
     const submitForm = useForm({ remarks: ppmp.remarks ?? '' });
     const [confirmingDelete, setConfirmingDelete] = useState(false);
     const [confirmingSubmit, setConfirmingSubmit] = useState(false);
+    const [isExportingPdf, setIsExportingPdf] = useState(false);
 
     const totalBudget = ppmp.items.reduce((total, item) => total + item.quantity * item.unit_cost, 0);
     const isDraft = ppmp.status.toUpperCase() === 'DRAFT';
     const ppmpCode = `PPMP-${ppmp.fiscal_year}-${String(ppmp.ppmp_id).padStart(4, '0')}`;
+    const exportSectionId = `ppmp-${ppmp.ppmp_id}-export-section`;
 
     const deleteDraft = () => {
         if (!isDraft) {
@@ -62,6 +67,58 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
         router.delete(route('office.ppmp.destroy', ppmp.ppmp_id), {
             preserveScroll: true,
             onFinish: () => setConfirmingDelete(false),
+        });
+    };
+
+    const baseMetadata: GovDocumentMetadata = {
+        title: 'PROJECT PROCUREMENT MANAGEMENT PLAN (PPMP)',
+        formCode: 'PPMP Form - RA 12009 Standard Annual Plan',
+        trackingCode: ppmpCode,
+        fiscalYear: ppmp.fiscal_year,
+        period: `Fiscal Year ${ppmp.fiscal_year}`,
+        moduleScope: `${getFundSourceLabel(ppmp.fund_source)} | Status: ${ppmp.status.replaceAll('_', ' ')}`,
+        officeName: ppmp.office?.name || 'Department / End-User Unit',
+        preparedByName: ppmp.preparer?.name || 'Department Officer',
+        preparedByRole: 'End-User Unit Head / Requisitioning Officer',
+        preparedAt: formatDate(ppmp.date_prepared),
+        approverName: ppmp.status === 'APPROVED' ? (ppmp.approver?.name || approvalHistory?.[0]?.approver?.name || 'Hon. Municipal Mayor') : undefined,
+        approverRole: ppmp.status === 'APPROVED' ? 'Municipal Mayor / Local Chief Executive' : undefined,
+    };
+
+    const itemPages = useMemo(() => {
+        if (ppmp.items.length === 0) return [[]];
+        const chunks: PpmpItem[][] = [];
+        const pageSize = 12;
+        for (let i = 0; i < ppmp.items.length; i += pageSize) {
+            chunks.push(ppmp.items.slice(i, i + pageSize));
+        }
+        return chunks;
+    }, [ppmp.items]);
+    const totalPages = itemPages.length;
+
+    const exportPdf = async () => {
+        if (isExportingPdf) return;
+        setIsExportingPdf(true);
+        try {
+            await downloadSectionAsPdfById(exportSectionId, {
+                title: `${ppmpCode} - Project Procurement Management Plan`,
+                fileName: `${ppmpCode.toLowerCase()}-procurement-plan.pdf`,
+                marginMm: 6,
+                paperWidthPx: 820,
+                orientation: 'portrait',
+                excludeSelectors: ['.print-hide', 'nav', 'aside', '[role="navigation"]'],
+                revealSelectors: ['.pdf-export-content'],
+                pageBreakSelectors: ['.pdf-page'],
+                includeDefaultHeading: false,
+            });
+        } finally {
+            setIsExportingPdf(false);
+        }
+    };
+
+    const handlePrint = () => {
+        printSectionById(exportSectionId, {
+            title: `${ppmpCode} - Project Procurement Management Plan`,
         });
     };
 
@@ -86,7 +143,28 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
                             <h3 className="text-2xl font-bold text-red-700">{ppmpCode}</h3>
                             <p className="mt-2 text-sm text-slate-600">Date prepared: {formatDate(ppmp.date_prepared)}</p>
                         </div>
-                        <StatusBadge status={ppmp.status} />
+                        <div className="flex flex-wrap items-center gap-3">
+                            <div className="print-hide flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={handlePrint}
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                                    Print PPMP
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={exportPdf}
+                                    disabled={isExportingPdf}
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 shadow-sm hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                    {isExportingPdf ? 'Generating PDF...' : 'Export PDF'}
+                                </button>
+                            </div>
+                            <StatusBadge status={ppmp.status} />
+                        </div>
                     </div>
 
                     <div className="mt-5 grid gap-4 md:grid-cols-3">
@@ -203,32 +281,150 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
                 </section>
 
                 <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <div className="flex flex-wrap gap-3">
-                        <Link href={route('office.ppmp.index')} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">Back to PPMP List</Link>
-                        {canEdit ? (
-                            <Link href={route('office.ppmp.edit', ppmp.ppmp_id)} className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">Edit PPMP</Link>
-                        ) : null}
-                        {isDraft ? (
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex flex-wrap items-center gap-3">
+                            <Link href={route('office.ppmp.index')} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Back to PPMP List</Link>
+                            {canEdit ? (
+                                <Link href={route('office.ppmp.edit', ppmp.ppmp_id)} className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">Edit PPMP</Link>
+                            ) : null}
+                            {isDraft ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setConfirmingDelete(true)}
+                                    className="rounded-lg border border-rose-300 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50"
+                                >
+                                    Delete PPMP
+                                </button>
+                            ) : null}
+                            {canSubmit ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setConfirmingSubmit(true)}
+                                    className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2"
+                                >
+                                    Submit PPMP for Approval
+                                </button>
+                            ) : null}
+                        </div>
+                        <div className="print-hide flex items-center gap-2">
                             <button
                                 type="button"
-                                onClick={() => setConfirmingDelete(true)}
-                                className="rounded-lg border border-rose-300 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50"
+                                onClick={handlePrint}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
                             >
-                                Delete PPMP
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                                Print PPMP
                             </button>
-                        ) : null}
-                        {canSubmit ? (
                             <button
                                 type="button"
-                                onClick={() => setConfirmingSubmit(true)}
-                                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2"
+                                onClick={exportPdf}
+                                disabled={isExportingPdf}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 shadow-sm hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                Submit PPMP for Approval
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                {isExportingPdf ? 'Generating PDF...' : 'Export PDF'}
                             </button>
-                        ) : null}
+                        </div>
                     </div>
                 </section>
+            </div>
 
+            {/* Hidden Printable / PDF Container using GovDocumentLayout (exact format of Exec Office) */}
+            <div id={exportSectionId} className="hidden print:block pdf-export-content space-y-6">
+                {itemPages.map((itemsChunk, pageIndex) => {
+                    const pageNumber = pageIndex + 1;
+                    const isLast = pageNumber === totalPages;
+
+                    return (
+                        <GovDocumentPage
+                            key={`ppmp-export-page-${pageNumber}`}
+                            metadata={{
+                                ...baseMetadata,
+                                period: `Fiscal Year ${ppmp.fiscal_year} (Quarterly Distribution: Q1–Q4)`,
+                            }}
+                            pageNumber={pageNumber}
+                            totalPages={totalPages}
+                            showLetterhead={true}
+                            letterheadOfficeName={ppmp.office?.name || 'Municipal Planning and Development Office'}
+                            officeName={ppmp.office?.name || 'Municipal Planning and Development Office'}
+                            showSignatories={isLast}
+                            showAttestation={isLast}
+                        >
+                            <div className="overflow-x-auto rounded-md border border-slate-300">
+                                <table className="min-w-full table-fixed divide-y divide-slate-300 text-[11px]">
+                                    <thead className="bg-slate-100 text-slate-800 font-bold uppercase">
+                                        <tr>
+                                            <th className="w-[6%] px-2 py-2.5 text-center border-r border-slate-300">Item No.</th>
+                                            <th className="w-[28%] px-2.5 py-2.5 text-left border-r border-slate-300">General Description</th>
+                                            <th className="w-[22%] px-2.5 py-2.5 text-left border-r border-slate-300">Item Specification</th>
+                                            <th className="w-[12%] px-2 py-2.5 text-center border-r border-slate-300">Planned Qty</th>
+                                            <th className="w-[10%] px-2 py-2.5 text-right border-r border-slate-300">Unit Cost</th>
+                                            <th className="w-[8%] px-2 py-2.5 text-center border-r border-slate-300">Schedule</th>
+                                            <th className="w-[14%] px-2.5 py-2.5 text-right">Total Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-200 bg-white">
+                                        {itemsChunk.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={7} className="px-4 py-6 text-center text-slate-500 italic">No PPMP items recorded.</td>
+                                            </tr>
+                                        ) : (
+                                            itemsChunk.map((item, idx) => {
+                                                const rowNum = pageIndex * 12 + idx + 1;
+                                                const subtotal = item.quantity * item.unit_cost;
+                                                const unit = item.item?.default_unit || 'unit';
+                                                const piecesPerBox = item.item?.pieces_per_box ?? 1;
+                                                const subUnit = item.item?.sub_unit ?? 'piece';
+                                                const totalPieces = item.quantity * piecesPerBox;
+
+                                                return (
+                                                    <tr key={`print-item-${item.ppmp_item_id}`}>
+                                                        <td className="px-2 py-2 text-center font-bold text-slate-700 border-r border-slate-200">{rowNum}</td>
+                                                        <td className="px-2.5 py-2 font-semibold text-slate-950 border-r border-slate-200">
+                                                            {item.item?.item_name || `Item #${item.ppmp_item_id}`}
+                                                        </td>
+                                                        <td className="px-2.5 py-2 text-slate-700 border-r border-slate-200 leading-snug">
+                                                            {item.remarks || '-'}
+                                                        </td>
+                                                        <td className="px-2 py-2 text-center text-slate-800 border-r border-slate-200 whitespace-nowrap">
+                                                            <span className="font-semibold">{formatQuantity(item.quantity, unit)}</span>
+                                                            {piecesPerBox > 1 ? (
+                                                                <span className="block text-[9px] text-indigo-700 font-medium">
+                                                                    ({totalPieces.toLocaleString()} {subUnit}s)
+                                                                </span>
+                                                            ) : null}
+                                                        </td>
+                                                        <td className="px-2 py-2 text-right text-slate-700 border-r border-slate-200 whitespace-nowrap font-medium">
+                                                            {formatMoney(item.unit_cost)}
+                                                        </td>
+                                                        <td className="px-2 py-2 text-center border-r border-slate-200 font-bold text-slate-900 whitespace-nowrap">
+                                                            {item.procurement_schedule}
+                                                        </td>
+                                                        <td className="px-2.5 py-2 text-right font-bold text-slate-950 whitespace-nowrap">
+                                                            {formatMoney(subtotal)}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
+                                        )}
+                                    </tbody>
+                                    {isLast && (
+                                        <tfoot className="border-t-2 border-slate-800 bg-slate-100 font-extrabold text-slate-950">
+                                            <tr>
+                                                <td colSpan={6} className="px-3 py-2 text-right uppercase tracking-wider text-[10px]">
+                                                    Total Estimated Budget (PHP):
+                                                </td>
+                                                <td className="px-2.5 py-2 text-right text-xs font-black text-red-900 whitespace-nowrap">
+                                                    {formatMoney(totalBudget)}
+                                                </td>
+                                            </tr>
+                                        </tfoot>
+                                    )}
+                                </table>
+                            </div>
+                        </GovDocumentPage>
+                    );
+                })}
             </div>
 
             {/* Submit Confirmation Modal */}
@@ -354,6 +550,3 @@ function StatusBadge({ status }: { status: string }) {
 
     return <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${style}`}>{status.replaceAll('_', ' ')}</span>;
 }
-
-
-

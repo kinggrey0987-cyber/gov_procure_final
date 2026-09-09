@@ -7,6 +7,7 @@ export type GovDocumentMetadata = {
     fiscalYear?: string | number;
     period?: string;
     moduleScope?: string;
+    officeName?: string;
     preparedByName?: string;
     preparedByRole?: string;
     preparedAt?: string;
@@ -174,12 +175,17 @@ export type GovSignatoriesProps = {
     approverName?: string;
     approverRole?: string;
     approverOffice?: string;
+    officeName?: string;
 };
 
 export function GovSignatories({
     preparedByName = 'Mayor Jeron',
     preparedByRole = 'Municipal Mayor / Local Chief Executive',
     preparedAt,
+    approverName,
+    approverRole,
+    approverOffice,
+    officeName,
 }: GovSignatoriesProps) {
     const formattedDate = preparedAt || new Date().toLocaleDateString('en-PH', {
         year: 'numeric',
@@ -195,6 +201,44 @@ export function GovSignatories({
         return role.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
     };
 
+    if (approverName) {
+        return (
+            <div className="mt-6 pt-4 border-t border-slate-300 grid grid-cols-2 gap-8">
+                <div className="flex flex-col items-center text-center">
+                    <p className="self-start text-xs font-bold uppercase tracking-wider text-slate-800 mb-8">
+                        Prepared By:
+                    </p>
+                    <div className="w-full border-b-2 border-slate-900 pb-1">
+                        <p className="text-sm font-extrabold uppercase tracking-wide text-slate-950">
+                            {preparedByName}
+                        </p>
+                    </div>
+                    <p className="mt-1 text-xs font-bold text-slate-900">
+                        {formatRole(preparedByRole)}
+                    </p>
+                    <p className="text-[11px] font-medium text-slate-600">{officeName || 'Requesting Department'}</p>
+                    <p className="mt-0.5 text-[10px] text-slate-500">Date: {formattedDate}</p>
+                </div>
+
+                <div className="flex flex-col items-center text-center">
+                    <p className="self-start text-xs font-bold uppercase tracking-wider text-slate-800 mb-8">
+                        Approved By:
+                    </p>
+                    <div className="w-full border-b-2 border-slate-900 pb-1">
+                        <p className="text-sm font-extrabold uppercase tracking-wide text-slate-950">
+                            {approverName}
+                        </p>
+                    </div>
+                    <p className="mt-1 text-xs font-bold text-slate-900">
+                        {approverRole || 'Municipal Mayor / Local Chief Executive'}
+                    </p>
+                    <p className="text-[11px] font-medium text-slate-600">{approverOffice || 'Office of the Municipal Mayor'}</p>
+                    <p className="mt-0.5 text-[10px] text-slate-500">Official Executive Approval</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="mt-6 pt-4 border-t border-slate-300 flex justify-end">
             <div className="flex flex-col items-center text-center min-w-[280px] max-w-[340px]">
@@ -209,7 +253,7 @@ export function GovSignatories({
                 <p className="mt-1 text-xs font-bold text-slate-900">
                     {formatRole(preparedByRole)}
                 </p>
-                <p className="text-[11px] font-medium text-slate-600">Office of the Municipal Mayor</p>
+                <p className="text-[11px] font-medium text-slate-600">{officeName || 'Office of the Municipal Mayor'}</p>
                 <p className="mt-0.5 text-[10px] text-slate-500">Date: {formattedDate}</p>
             </div>
         </div>
@@ -252,6 +296,8 @@ export type GovDocumentPageProps = {
     showLetterhead?: boolean;
     showSignatories?: boolean;
     showAttestation?: boolean;
+    letterheadOfficeName?: string;
+    officeName?: string;
     children: ReactNode;
     className?: string;
 };
@@ -263,6 +309,8 @@ export function GovDocumentPage({
     showLetterhead = true,
     showSignatories = false,
     showAttestation = false,
+    letterheadOfficeName,
+    officeName,
     children,
     className = '',
 }: GovDocumentPageProps) {
@@ -271,7 +319,7 @@ export function GovDocumentPage({
     return (
         <section className={`pdf-page overflow-hidden rounded-xl border border-slate-300 bg-white p-6 shadow-sm space-y-3 text-slate-900 ${className}`}>
             {/* Letterhead */}
-            {showLetterhead && <GovLetterhead />}
+            {showLetterhead && <GovLetterhead officeName={letterheadOfficeName || metadata.officeName} />}
 
             {/* Document Header & Metadata Table */}
             <GovDocumentHeader
@@ -295,6 +343,7 @@ export function GovDocumentPage({
                     preparedAt={metadata.preparedAt}
                     approverName={metadata.approverName}
                     approverRole={metadata.approverRole}
+                    officeName={officeName || letterheadOfficeName || metadata.officeName}
                 />
             )}
 
