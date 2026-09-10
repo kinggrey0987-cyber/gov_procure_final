@@ -198,6 +198,7 @@ class PurchaseOrderController extends Controller
                 'purchaseRequest.office',
                 'supplyRequest.requester',
             ]),
+            'isZeroCostReplacement' => (bool) $purchaseOrder->is_zero_cost_replacement,
             'traceability' => $this->traceabilityService->resolveForPurchaseOrder($purchaseOrder),
             'attachments' => $documents,
             'attachmentPermissions' => [

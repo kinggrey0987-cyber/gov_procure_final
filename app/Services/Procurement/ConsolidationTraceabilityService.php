@@ -11,6 +11,90 @@ use App\Models\User;
 class ConsolidationTraceabilityService
 {
     /**
+     * Get all source supply requests associated with a Purchase Request or Purchase Order.
+     *
+     * @return \Illuminate\Support\Collection<int, SupplyRequest>
+     */
+    public function getSourceSupplyRequests(PurchaseRequest|PurchaseOrder $context): \Illuminate\Support\Collection
+    {
+        $purchaseRequest = $context instanceof PurchaseRequest ? $context : $context->purchaseRequest;
+
+        $allSupplyRequests = collect();
+
+        if ($context instanceof PurchaseOrder && $context->supplyRequest instanceof SupplyRequest) {
+            $allSupplyRequests->push($context->supplyRequest);
+        }
+
+        if ($purchaseRequest instanceof PurchaseRequest) {
+            $purchaseRequest->loadMissing([
+                'supplyRequest.office',
+                'supplyRequest.requester',
+                'supplyRequest.items.item',
+                'supplyRequest.items.ppmpItem',
+            ]);
+
+            if ($purchaseRequest->supplyRequest instanceof SupplyRequest) {
+                $allSupplyRequests->push($purchaseRequest->supplyRequest);
+            }
+
+            $remarks = (string) $purchaseRequest->remarks;
+            $prIdPad = sprintf('%06d', (int) $purchaseRequest->purchase_request_id);
+
+            $linkedPrs = PurchaseRequest::query()
+                ->where('remarks', 'like', "%PR-{$prIdPad}%")
+                ->where('purchase_request_id', '!=', $purchaseRequest->purchase_request_id)
+                ->with([
+                    'supplyRequest.office',
+                    'supplyRequest.requester',
+                    'supplyRequest.items.item',
+                    'supplyRequest.items.ppmpItem',
+                ])
+                ->get();
+
+            foreach ($linkedPrs as $lPr) {
+                if ($lPr->supplyRequest instanceof SupplyRequest) {
+                    $allSupplyRequests->push($lPr->supplyRequest);
+                }
+            }
+
+            preg_match_all('/SR-[A-Z0-9-]+/', $remarks, $matches);
+            if (! empty($matches[0])) {
+                $extraRequests = SupplyRequest::query()
+                    ->whereIn('request_code', $matches[0])
+                    ->with([
+                        'office',
+                        'requester',
+                        'items.item',
+                        'items.ppmpItem',
+                    ])
+                    ->get();
+                $allSupplyRequests = $allSupplyRequests->merge($extraRequests);
+            }
+
+            $historySrIds = \App\Models\StatusHistory::query()
+                ->where('reference_type', SupplyRequest::class)
+                ->where('remarks', 'like', "%PR-{$prIdPad}%")
+                ->pluck('reference_id')
+                ->toArray();
+
+            if (! empty($historySrIds)) {
+                $historyRequests = SupplyRequest::query()
+                    ->whereIn('supply_request_id', $historySrIds)
+                    ->with([
+                        'office',
+                        'requester',
+                        'items.item',
+                        'items.ppmpItem',
+                    ])
+                    ->get();
+                $allSupplyRequests = $allSupplyRequests->merge($historyRequests);
+            }
+        }
+
+        return $allSupplyRequests->unique('supply_request_id')->values();
+    }
+
+    /**
      * Build full multi-office and signatory traceability for a Purchase Request.
      *
      * @return array<string, mixed>
@@ -26,39 +110,7 @@ class ConsolidationTraceabilityService
             'items.item',
         ]);
 
-        $remarks = (string) $purchaseRequest->remarks;
-        $isConsolidated = str_contains($remarks, 'Consolidated PR') || str_contains($remarks, 'supply request(s)');
-
-        // Find any other supply requests linked to this PR via remarks or direct linkage
-        $prIdPad = sprintf('%06d', (int) $purchaseRequest->purchase_request_id);
-        $linkedPrs = PurchaseRequest::query()
-            ->where('remarks', 'like', "%PR-{$prIdPad}%")
-            ->where('purchase_request_id', '!=', $purchaseRequest->purchase_request_id)
-            ->with(['supplyRequest.office', 'supplyRequest.requester', 'supplyRequest.items.item'])
-            ->get();
-
-        $allSupplyRequests = collect();
-        if ($purchaseRequest->supplyRequest instanceof SupplyRequest) {
-            $allSupplyRequests->push($purchaseRequest->supplyRequest);
-        }
-        foreach ($linkedPrs as $lPr) {
-            if ($lPr->supplyRequest instanceof SupplyRequest) {
-                $allSupplyRequests->push($lPr->supplyRequest);
-            }
-        }
-
-        // If remarks list request codes like SR-XXXX, also look them up if not yet in the collection
-        preg_match_all('/SR-[A-Z0-9-]+/', $remarks, $matches);
-        if (! empty($matches[0])) {
-            $foundCodes = $matches[0];
-            $extraRequests = SupplyRequest::query()
-                ->whereIn('request_code', $foundCodes)
-                ->with(['office', 'requester', 'items.item'])
-                ->get();
-            $allSupplyRequests = $allSupplyRequests->merge($extraRequests);
-        }
-
-        $allSupplyRequests = $allSupplyRequests->unique('supply_request_id')->values();
+        $allSupplyRequests = $this->getSourceSupplyRequests($purchaseRequest);
 
         // A PR is only considered consolidated if it merges 2 or more distinct supply requests
         $isConsolidated = $allSupplyRequests->count() >= 2;
@@ -91,6 +143,23 @@ class ConsolidationTraceabilityService
             ];
         })->values()->all();
 
+        // Build unique requisitioning signatories (deduplicated by office and requester)
+        $seenSignatories = [];
+        foreach ($sourceRequests as $sr) {
+            $key = $sr['office_code'] . '::' . $sr['requester_name'];
+            if (! isset($seenSignatories[$key])) {
+                $seenSignatories[$key] = [
+                    'office_code' => $sr['office_code'],
+                    'office_name' => $sr['office_name'],
+                    'requester_name' => $sr['requester_name'],
+                    'request_codes' => [$sr['request_code']],
+                ];
+            } else {
+                $seenSignatories[$key]['request_codes'][] = $sr['request_code'];
+            }
+        }
+        $requisitioningSignatories = array_values($seenSignatories);
+
         // Build office allocations per item
         $officeAllocations = $this->buildOfficeAllocations($allSupplyRequests);
 
@@ -98,6 +167,7 @@ class ConsolidationTraceabilityService
             'is_consolidated' => $isConsolidated,
             'gso_forwarder' => $gsoForwarder,
             'source_supply_requests' => $sourceRequests,
+            'requisitioning_signatories' => $requisitioningSignatories,
             'office_allocations' => $officeAllocations,
         ];
     }
@@ -151,6 +221,7 @@ class ConsolidationTraceabilityService
             'procurement_officer' => $procurementOfficer,
             'executive_approver' => $executiveApprover,
             'source_supply_requests' => $prTraceability['source_supply_requests'] ?? [],
+            'requisitioning_signatories' => $prTraceability['requisitioning_signatories'] ?? [],
             'office_allocations' => $prTraceability['office_allocations'] ?? [],
         ];
     }

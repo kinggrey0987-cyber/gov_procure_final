@@ -15,8 +15,10 @@ use Inertia\Response;
 
 class PurchaseOrderItemController extends Controller
 {
-    public function __construct(private readonly PurchaseOrderService $service)
-    {
+    public function __construct(
+        private readonly PurchaseOrderService $service,
+        private readonly \App\Services\Procurement\ConsolidationTraceabilityService $traceabilityService,
+    ) {
     }
 
     public function index(Request $request, PurchaseOrder $purchaseOrder): Response
@@ -25,25 +27,51 @@ class PurchaseOrderItemController extends Controller
 
         $purchaseOrder->load([
             'items.item.category',
-            'supplyRequest.items.item',
-            'supplyRequest.items.ppmpItem',
+            'purchaseRequest.office',
+            'supplyRequest.office',
         ]);
 
-        $sourceItems = collect($purchaseOrder->supplyRequest?->items ?? [])
-            ->map(fn ($row): array => [
-                'supply_request_item_id' => (int) $row->supply_request_item_id,
-                'item_id' => (int) $row->item_id,
-                'item_name_snapshot' => (string) ($row->item_name_snapshot ?: ($row->item?->item_name ?? 'Unknown item')),
-                'item_specification' => (string) ($row->ppmpItem?->remarks ?? ''),
-                'default_unit' => (string) ($row->item?->default_unit ?? ''),
-                'quantity_requested' => (float) ($row->quantity_requested ?? 0),
-            ])
-            ->values();
+        $sourceSupplyRequests = $this->traceabilityService->getSourceSupplyRequests($purchaseOrder);
+
+        $sourceItems = collect();
+        foreach ($sourceSupplyRequests as $sr) {
+            $sr->loadMissing(['items.item', 'items.ppmpItem', 'office']);
+            foreach ($sr->items ?? [] as $row) {
+                $sourceItems->push([
+                    'supply_request_item_id' => (int) $row->supply_request_item_id,
+                    'supply_request_id' => (int) $row->supply_request_id,
+                    'request_code' => (string) $sr->request_code,
+                    'office_code' => (string) ($sr->office?->code ?? ''),
+                    'item_id' => (int) $row->item_id,
+                    'item_name_snapshot' => (string) ($row->item_name_snapshot ?: ($row->item?->item_name ?? 'Unknown item')),
+                    'item_specification' => (string) ($row->ppmpItem?->remarks ?? ''),
+                    'default_unit' => (string) ($row->item?->default_unit ?? ''),
+                    'quantity_requested' => (float) ($row->quantity_requested ?? 0),
+                ]);
+            }
+        }
+
+        if ($sourceItems->isEmpty() && $purchaseOrder->supplyRequest) {
+            $purchaseOrder->loadMissing(['supplyRequest.items.item', 'supplyRequest.items.ppmpItem', 'supplyRequest.office']);
+            foreach ($purchaseOrder->supplyRequest->items ?? [] as $row) {
+                $sourceItems->push([
+                    'supply_request_item_id' => (int) $row->supply_request_item_id,
+                    'supply_request_id' => (int) $row->supply_request_id,
+                    'request_code' => (string) $purchaseOrder->supplyRequest->request_code,
+                    'office_code' => (string) ($purchaseOrder->supplyRequest->office?->code ?? ''),
+                    'item_id' => (int) $row->item_id,
+                    'item_name_snapshot' => (string) ($row->item_name_snapshot ?: ($row->item?->item_name ?? 'Unknown item')),
+                    'item_specification' => (string) ($row->ppmpItem?->remarks ?? ''),
+                    'default_unit' => (string) ($row->item?->default_unit ?? ''),
+                    'quantity_requested' => (float) ($row->quantity_requested ?? 0),
+                ]);
+            }
+        }
 
         return Inertia::render('Procurement/PurchaseOrderItems/Index', [
             'purchaseOrder' => $purchaseOrder,
             'items' => $purchaseOrder->items()->latest('purchase_order_item_id')->paginate(5)->withQueryString(),
-            'sourceItems' => $sourceItems,
+            'sourceItems' => $sourceItems->values(),
         ]);
     }
 

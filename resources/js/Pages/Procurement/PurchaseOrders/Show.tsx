@@ -15,8 +15,11 @@ type PurchaseOrder = {
     supplier?: {
         supplier_name?: string | null;
     } | null;
+    is_zero_cost_replacement?: boolean;
     purchase_request?: {
         purchase_request_id?: number;
+        source_type?: string | null;
+        source_delivery_id?: number | null;
         office?: {
             name?: string | null;
         } | null;
@@ -80,6 +83,12 @@ type Traceability = {
             unit: string;
         }>;
     }>;
+    requisitioning_signatories?: Array<{
+        office_code: string;
+        office_name: string;
+        requester_name: string;
+        request_codes: string[];
+    }>;
     office_allocations?: Array<{
         item_name: string;
         unit: string;
@@ -95,6 +104,7 @@ type Traceability = {
 
 type Props = {
     purchaseOrder: PurchaseOrder;
+    isZeroCostReplacement?: boolean;
     traceability?: Traceability;
     statusHistory: Array<{
         id: number;
@@ -120,7 +130,15 @@ type Props = {
     };
     showProcurementDocumentsLink?: boolean;
 };
-export default function PurchaseOrdersShow({ purchaseOrder, traceability, statusHistory, approvalHistory, permissions, backLink, showProcurementDocumentsLink = true }: Props) {
+
+export default function PurchaseOrdersShow({ purchaseOrder, isZeroCostReplacement: propsIsZeroCostReplacement, traceability, statusHistory, approvalHistory, permissions, backLink, showProcurementDocumentsLink = true }: Props) {
+    const isZeroCostReplacement = Boolean(
+        propsIsZeroCostReplacement ||
+        purchaseOrder.is_zero_cost_replacement ||
+        purchaseOrder.purchase_request?.source_type === 'PARTIAL_DELIVERY_FOLLOW_UP' ||
+        Boolean(purchaseOrder.purchase_request?.source_delivery_id)
+    );
+
     const placeForm = useForm({ remarks: '' });
     const resolvedBackLink = backLink ?? {
         href: route('procurement.purchase-orders.index'),
@@ -143,7 +161,7 @@ export default function PurchaseOrdersShow({ purchaseOrder, traceability, status
                             <div>
                                 <div className="flex items-center gap-2">
                                     <p className="text-xs uppercase tracking-[0.15em] text-slate-500">Purchase Order Details</p>
-                                    {Number(purchaseOrder.total_amount ?? 0) === 0 ? (
+                                    {isZeroCostReplacement ? (
                                         <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
                                             🛡️ Zero-Cost Warranty Replacement (₱0.00)
                                         </span>
@@ -164,7 +182,7 @@ export default function PurchaseOrdersShow({ purchaseOrder, traceability, status
                             <Info label="Expected Delivery" value={formatDate(purchaseOrder.expected_delivery_date)} />
                             <Info
                                 label="Total Amount"
-                                value={Number(purchaseOrder.total_amount ?? 0) === 0 ? '₱0.00 (Zero Municipal Cost)' : formatMoney(Number(purchaseOrder.total_amount ?? 0))}
+                                value={isZeroCostReplacement ? '₱0.00 (Zero Municipal Cost)' : formatMoney(Number(purchaseOrder.total_amount ?? 0))}
                             />
                         </dl>
 
@@ -172,7 +190,7 @@ export default function PurchaseOrdersShow({ purchaseOrder, traceability, status
                             <span className="font-semibold text-slate-700">Remarks:</span> {purchaseOrder.remarks ?? 'No remarks provided.'}
                         </p>
 
-                        {Number(purchaseOrder.total_amount ?? 0) === 0 ? (
+                        {isZeroCostReplacement ? (
                             <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
                                 <p className="font-semibold">🛡️ Zero-Cost Warranty Replacement Notice (COA & RA 9184 Compliant):</p>
                                 <p className="mt-0.5">
@@ -189,9 +207,24 @@ export default function PurchaseOrdersShow({ purchaseOrder, traceability, status
                             <div className="mt-2.5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                                     <dt className="text-[11px] font-bold uppercase tracking-wide text-slate-500">1. Requisitioning Offices</dt>
-                                    {traceability?.source_supply_requests && traceability.source_supply_requests.length > 0 ? (
+                                    {traceability?.requisitioning_signatories && traceability.requisitioning_signatories.length > 0 ? (
                                         <dd className="mt-1 space-y-1">
-                                            {traceability.source_supply_requests.map((sr) => (
+                                            {traceability.requisitioning_signatories.map((sig) => (
+                                                <p key={`${sig.office_code}:${sig.requester_name}`} className="text-xs text-slate-700">
+                                                    <span className="font-semibold text-slate-900">{sig.office_code}</span>: {sig.requester_name}
+                                                </p>
+                                            ))}
+                                        </dd>
+                                    ) : traceability?.source_supply_requests && traceability.source_supply_requests.length > 0 ? (
+                                        <dd className="mt-1 space-y-1">
+                                            {Array.from(
+                                                new Map(
+                                                    traceability.source_supply_requests.map((sr) => [
+                                                        `${sr.office_code}:${sr.requester_name}`,
+                                                        sr,
+                                                    ])
+                                                ).values()
+                                            ).map((sr) => (
                                                 <p key={sr.supply_request_id} className="text-xs text-slate-700">
                                                     <span className="font-semibold text-slate-900">{sr.office_code}</span>: {sr.requester_name}
                                                 </p>

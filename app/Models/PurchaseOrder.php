@@ -47,6 +47,16 @@ class PurchaseOrder extends Model
         'total_amount' => 'decimal:2',
     ];
 
+    protected $appends = [
+        'is_zero_cost_replacement',
+    ];
+
+    public function getIsZeroCostReplacementAttribute(): bool
+    {
+        return (string) ($this->purchaseRequest?->source_type ?? '') === 'PARTIAL_DELIVERY_FOLLOW_UP'
+            || (int) ($this->purchaseRequest?->source_delivery_id ?? 0) > 0;
+    }
+
     public function purchaseRequest(): BelongsTo
     {
         return $this->belongsTo(PurchaseRequest::class, 'purchase_request_id', 'purchase_request_id');

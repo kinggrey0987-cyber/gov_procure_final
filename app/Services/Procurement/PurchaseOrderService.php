@@ -24,6 +24,7 @@ class PurchaseOrderService
         private readonly AuditLogService $auditLogService,
         private readonly NotificationService $notificationService,
         private readonly AnomalyService $anomalyService,
+        private readonly ConsolidationTraceabilityService $traceabilityService,
     ) {
     }
 
@@ -237,14 +238,26 @@ class PurchaseOrderService
                 }
             }
 
-            $purchaseOrder->loadMissing('supplyRequest');
-            if ($purchaseOrder->supplyRequest) {
-                $this->notificationService->notifySupplyRequestOfficeRequester(
-                    supplyRequest: $purchaseOrder->supplyRequest,
-                    title: 'Purchase Order Placed',
-                    message: sprintf('PO %s for your supply request %s was placed and queued for GSO receiving.', (string) $purchaseOrder->po_number, (string) $purchaseOrder->supplyRequest->request_code),
-                    notificationType: 'PROCUREMENT_PURCHASE_ORDER_PLACED',
-                );
+            $sourceSupplyRequests = $this->traceabilityService->getSourceSupplyRequests($purchaseOrder);
+            if ($sourceSupplyRequests->isNotEmpty()) {
+                foreach ($sourceSupplyRequests as $sr) {
+                    $this->notificationService->notifySupplyRequestOfficeRequester(
+                        supplyRequest: $sr,
+                        title: 'Purchase Order Placed',
+                        message: sprintf('PO %s for your supply request %s was placed and queued for GSO receiving.', (string) $purchaseOrder->po_number, (string) $sr->request_code),
+                        notificationType: 'PROCUREMENT_PURCHASE_ORDER_PLACED',
+                    );
+                }
+            } else {
+                $purchaseOrder->loadMissing('supplyRequest');
+                if ($purchaseOrder->supplyRequest) {
+                    $this->notificationService->notifySupplyRequestOfficeRequester(
+                        supplyRequest: $purchaseOrder->supplyRequest,
+                        title: 'Purchase Order Placed',
+                        message: sprintf('PO %s for your supply request %s was placed and queued for GSO receiving.', (string) $purchaseOrder->po_number, (string) $purchaseOrder->supplyRequest->request_code),
+                        notificationType: 'PROCUREMENT_PURCHASE_ORDER_PLACED',
+                    );
+                }
             }
 
             $purchaseOrder->loadMissing('items');
@@ -512,7 +525,17 @@ class PurchaseOrderService
 
     private function assertItemMatchesOrderContext(PurchaseOrder $purchaseOrder, SupplyRequestItem $supplyRequestItem): void
     {
-        if ((int) $supplyRequestItem->supply_request_id !== (int) $purchaseOrder->supply_request_id) {
+        if ((int) $supplyRequestItem->supply_request_id === (int) $purchaseOrder->supply_request_id) {
+            return;
+        }
+
+        $allowedSrIds = $this->traceabilityService
+            ->getSourceSupplyRequests($purchaseOrder)
+            ->pluck('supply_request_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        if (! in_array((int) $supplyRequestItem->supply_request_id, $allowedSrIds, true)) {
             throw ValidationException::withMessages([
                 'supply_request_item_id' => 'Supply request item does not belong to the selected supply request.',
             ]);

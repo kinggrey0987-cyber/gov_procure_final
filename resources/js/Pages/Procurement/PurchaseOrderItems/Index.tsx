@@ -28,6 +28,8 @@ type SourceItem = {
     item_specification: string;
     default_unit: string;
     quantity_requested: number;
+    request_code?: string;
+    office_code?: string;
 };
 
 type Props = {
@@ -160,11 +162,18 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                                 required
                             >
                                 <option value="">Select Source Request Item</option>
-                                {sourceItems.map((row) => (
-                                    <option key={row.supply_request_item_id} value={row.supply_request_item_id}>
-                                        SR Line #{row.supply_request_item_id} · {row.item_name_snapshot} · Req Qty {toWholeQuantity(row.quantity_requested ?? 0)} {row.default_unit || ''}
-                                    </option>
-                                ))}
+                                {sourceItems.map((row) => {
+                                    const isAlreadyEncoded = encodedSourceIds.has(Number(row.supply_request_item_id));
+                                    return (
+                                        <option
+                                            key={row.supply_request_item_id}
+                                            value={row.supply_request_item_id}
+                                            disabled={isAlreadyEncoded}
+                                        >
+                                            {row.request_code ? `${row.request_code} · ` : ''}SR Line #{row.supply_request_item_id} · {row.item_name_snapshot} · Req Qty {toWholeQuantity(row.quantity_requested ?? 0)} {row.default_unit || ''}{isAlreadyEncoded ? ' (Already Added)' : ''}
+                                        </option>
+                                    );
+                                })}
                             </select>
                         </label>
                         <ReadOnlyField label="Supply Request Line Reference" value={form.data.supply_request_item_id ? `SR Line #${form.data.supply_request_item_id}` : 'Select a source line'} />
