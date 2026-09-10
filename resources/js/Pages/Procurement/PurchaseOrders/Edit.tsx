@@ -148,10 +148,13 @@ export default function PurchaseOrdersEdit({ purchaseOrder, suppliers }: Props) 
                             <input
                                 type="text"
                                 value={form.data.po_number}
-                                onChange={(event) => form.setData('po_number', event.target.value)}
-                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                                required
+                                className="w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-600 shadow-inner"
+                                readOnly
+                                aria-readonly="true"
                             />
+                            <span className="mt-1 block text-xs text-slate-500">
+                                PO numbers are system-generated identifiers and cannot be edited.
+                            </span>
                         </label>
                     </div>
                 </section>

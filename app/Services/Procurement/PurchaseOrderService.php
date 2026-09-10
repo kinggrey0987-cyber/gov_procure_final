@@ -144,7 +144,6 @@ class PurchaseOrderService
         return DB::transaction(function () use ($purchaseOrder, $actor, $payload): PurchaseOrder {
             $purchaseOrder->fill([
                 'supplier_id' => (int) $payload['supplier_id'],
-                'po_number' => $payload['po_number'],
                 'procurement_method' => $payload['procurement_method'],
                 'expected_delivery_date' => $payload['expected_delivery_date'] ?? null,
                 'terms_notes' => $payload['terms_notes'] ?? null,

@@ -24,7 +24,7 @@ class UpdatePurchaseOrderRequest extends FormRequest
 
         return [
             'supplier_id' => ['required', 'integer', 'exists:suppliers,supplier_id'],
-            'po_number' => ['required', 'string', 'max:80', Rule::unique('purchase_orders', 'po_number')->ignore($purchaseOrderId, 'purchase_order_id')],
+            'po_number' => ['nullable', 'string', 'max:80'],
             'procurement_method' => ['required', 'string', Rule::in(ProcurementMethod::values())],
             'expected_delivery_date' => ['required', 'date', 'after_or_equal:today'],
             'terms_notes' => ['nullable', 'string'],
