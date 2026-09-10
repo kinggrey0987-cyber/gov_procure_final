@@ -49,15 +49,13 @@ export default function CreateItemCategory() {
 
                         <div>
                             <label className="mb-1 block text-sm font-medium text-slate-700">Status</label>
-                            <select
-                                value={data.status}
-                                onChange={(event) => setData('status', event.target.value)}
-                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                            >
-                                <option value="active">Active</option>
-                                <option value="inactive">Inactive</option>
-                            </select>
-                            <InputError message={errors.status} className="mt-1" />
+                            <div className="flex h-[38px] items-center">
+                                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                                    Active (Default)
+                                </span>
+                            </div>
+                            <p className="mt-1 text-xs text-slate-500">New categories are always created as active. You can deactivate them later from the edit screen.</p>
                         </div>
 
                         <div className="md:col-span-2">

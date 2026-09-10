@@ -1,7 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { PageProps } from '@/types';
 import { Head, usePage } from '@inertiajs/react';
-import DeleteUserForm from './Partials/DeleteUserForm';
 import UpdatePasswordForm from './Partials/UpdatePasswordForm';
 import UpdateProfileInformationForm from './Partials/UpdateProfileInformationForm';
 
@@ -23,7 +22,6 @@ export default function Edit({
         pendingEmailChange?: { email: string; expires_at?: string | null } | null;
     };
     const roleCode = page.auth.user.role_code ?? '';
-    const canDeleteAccount = !['ADMIN', 'EXEC_OFFICER'].includes(roleCode);
     const twoFactor = page.twoFactor ?? { required: false, policy: 'optional' };
 
     return (
@@ -81,18 +79,6 @@ export default function Edit({
                                 <div className="max-w-2xl rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
                                     Account role: Executive Officer. Access policies are enforced by role-based authorization and workflow permissions.
                                 </div>
-                            </div>
-                        </section>
-                    )}
-
-                    {canDeleteAccount && (
-                        <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-                            <div className="border-b border-slate-200 px-6 py-4">
-                                <h3 className="text-lg font-semibold text-slate-900">Account Deletion</h3>
-                                <p className="text-sm text-slate-600">Permanently remove this account if needed.</p>
-                            </div>
-                            <div className="p-6 sm:p-8">
-                                <DeleteUserForm className="max-w-2xl" />
                             </div>
                         </section>
                     )}

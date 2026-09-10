@@ -75,7 +75,9 @@ class ItemCatalogController
     {
         abort_unless($request->user()?->can('inventory.catalog.manage'), 403);
 
-        $item = Item::query()->create($request->validated());
+        $payload = $request->validated();
+        $payload['status'] = 'active';
+        $item = Item::query()->create($payload);
 
         return Redirect::route('inventory.items.show', $item->item_id)
             ->with('success', 'Item created successfully.');

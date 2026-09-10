@@ -54,7 +54,9 @@ class ItemCategoryController
     {
         abort_unless($request->user()?->can('inventory.catalog.manage'), 403);
 
-        $category = ItemCategory::query()->create($request->validated());
+        $payload = $request->validated();
+        $payload['status'] = 'active';
+        $category = ItemCategory::query()->create($payload);
 
         return Redirect::route('inventory.item-categories.show', $category->item_category_id)
             ->with('success', 'Item category created successfully.');

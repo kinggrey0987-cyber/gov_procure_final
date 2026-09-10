@@ -21,7 +21,7 @@ class StoreItemCategoryRequest extends FormRequest
             'category_name' => ['required', 'string', 'max:150', 'unique:item_categories,category_name'],
             'standard_delivery_days' => ['required', 'integer', 'min:0'],
             'description' => ['nullable', 'string'],
-            'status' => ['required', Rule::in(['active', 'inactive'])],
+            'status' => ['nullable', Rule::in(['active', 'inactive'])],
         ];
     }
 }
