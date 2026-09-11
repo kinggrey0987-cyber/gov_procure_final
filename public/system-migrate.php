@@ -2,24 +2,19 @@
 
 declare(strict_types=1);
 
-// Security Key check
-$secretKey = 'deploy-secret-2026';
-$providedKey = $_GET['key'] ?? '';
+// Bootstrap environment to safely read secret key
+require __DIR__.'/../vendor/autoload.php';
+$app = require_once __DIR__.'/../bootstrap/app.php';
+$kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
+$kernel->bootstrap();
 
-if ($providedKey !== $secretKey) {
+$secretKey = (string) env('DEPLOY_SECRET_KEY', '');
+$providedKey = (string) ($_GET['key'] ?? '');
+
+if ($secretKey === '' || $providedKey === '' || ! hash_equals($secretKey, $providedKey)) {
     http_response_code(403);
-    echo "<!DOCTYPE html><html><head><title>System Migrate - Unauthorized</title></head><body style='background:#121212;color:#fff;font-family:monospace;padding:30px;'>";
-    echo "<div style='background:#1e1e1e;color:#ff6b6b;padding:24px;font-size:14px;border-radius:8px;max-width:800px;margin:0 auto;border:1px solid #ff4444;'>";
-    echo "<h2 style='margin-top:0;color:#ff6b6b;'>⚠️ 403 Unauthorized</h2>";
-    echo "<p>Please provide the secret key in the URL parameter.</p>";
-    echo "<p><strong>Quick Links:</strong></p>";
-    echo "<ul>";
-    echo "<li><a href='system-migrate.php?key=deploy-secret-2026&action=reset-transactions' style='color:#f6c326;font-weight:bold;'>⭐ Reset & Repopulate Defense Workflow (2024-2026): ?action=reset-transactions</a></li>";
-    echo "<li><a href='system-migrate.php?key=deploy-secret-2026&action=migrate' style='color:#4af626;'>Run Migrations: ?key=deploy-secret-2026&action=migrate</a></li>";
-    echo "<li><a href='system-migrate.php?key=deploy-secret-2026&action=clear-cache' style='color:#4af626;'>Clear Cache: ?key=deploy-secret-2026&action=clear-cache</a></li>";
-    echo "<li><a href='system-migrate.php?key=deploy-secret-2026&action=status' style='color:#4af626;'>Migration Status: ?key=deploy-secret-2026&action=status</a></li>";
-    echo "</ul>";
-    echo "</div></body></html>";
+    header('Content-Type: text/plain; charset=utf-8');
+    echo "403 Forbidden: Access denied.";
     exit;
 }
 
@@ -27,11 +22,6 @@ if ($providedKey !== $secretKey) {
 @ini_set('max_execution_time', '600');
 @ini_set('memory_limit', '512M');
 
-require __DIR__.'/../vendor/autoload.php';
-$app = require_once __DIR__.'/../bootstrap/app.php';
-
-$kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
-$kernel->bootstrap();
 
 $action = $_GET['action'] ?? 'status';
 $output = '';

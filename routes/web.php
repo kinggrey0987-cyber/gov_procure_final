@@ -820,10 +820,11 @@ Route::get('/system-migrate', function () {
     @ini_set('max_execution_time', '600');
     @ini_set('memory_limit', '512M');
 
-    $expectedKey = env('DEPLOY_SECRET_KEY', 'deploy-secret-2026');
+    $expectedKey = (string) env('DEPLOY_SECRET_KEY', '');
     $providedKey = (string) request('key', '');
-    if ($providedKey !== $expectedKey) {
-        return response("<!DOCTYPE html><html><head><title>System Migrate - Unauthorized</title></head><body style='background:#121212;color:#fff;font-family:monospace;padding:30px;'><div style='background:#1e1e1e;color:#ff6b6b;padding:24px;font-size:14px;border-radius:8px;max-width:800px;margin:0 auto;border:1px solid #ff4444;'><h2 style='margin-top:0;color:#ff6b6b;'>⚠️ 403 Unauthorized</h2><p>Please provide the secret key in the URL parameter.</p><p><strong>Quick Links:</strong></p><ul><li><a href='/system-migrate?key=deploy-secret-2026&action=reset-transactions' style='color:#f6c326;font-weight:bold;'>⭐ Reset & Repopulate Defense Workflow (2024-2026): ?action=reset-transactions</a></li><li><a href='/system-migrate?key=deploy-secret-2026&action=migrate' style='color:#4af626;'>Run Migrations: ?key=deploy-secret-2026&action=migrate</a></li><li><a href='/system-migrate?key=deploy-secret-2026&action=clear-cache' style='color:#4af626;'>Clear Cache: ?key=deploy-secret-2026&action=clear-cache</a></li><li><a href='/system-migrate?key=deploy-secret-2026&action=status' style='color:#4af626;'>Migration Status: ?key=deploy-secret-2026&action=status</a></li></ul></div></body></html>", 403)->header('Content-Type', 'text/html');
+
+    if ($expectedKey === '' || $providedKey === '' || ! hash_equals($expectedKey, $providedKey)) {
+        abort(403, 'Access denied.');
     }
 
     $action = request('action', 'status');
