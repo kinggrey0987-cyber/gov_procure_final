@@ -439,7 +439,7 @@ export default function ExecutiveDashboardIndex({
                             tone="emerald"
                             action={
                                 <Link
-                                    href={route('executive.approvals')}
+                                    href={route('executive.ppmp-approvals.index')}
                                     className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:underline"
                                 >
                                     Approvals Desk &rarr;
@@ -504,7 +504,7 @@ export default function ExecutiveDashboardIndex({
                                 </div>
 
                                 <Link
-                                    href={route('executive.approvals')}
+                                    href={route('executive.ppmp-approvals.index')}
                                     className="inline-flex w-full items-center justify-center rounded-xl bg-slate-900 px-3.5 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800"
                                 >
                                     Review PPMP Submissions &rarr;
@@ -615,7 +615,7 @@ export default function ExecutiveDashboardIndex({
                             tone="neutral"
                             action={
                                 <Link
-                                    href={route('executive.offices-oversight')}
+                                    href={route('executive.procurement-analytics')}
                                     className="text-xs font-semibold text-slate-700 hover:text-slate-900 hover:underline"
                                 >
                                     Office Ledger &rarr;
@@ -639,7 +639,7 @@ export default function ExecutiveDashboardIndex({
                             tone="emerald"
                             action={
                                 <Link
-                                    href={route('executive.transparency')}
+                                    href={route('executive.transparency-monitoring')}
                                     className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:underline"
                                 >
                                     Full Portal &rarr;
@@ -682,7 +682,7 @@ export default function ExecutiveDashboardIndex({
                                 </p>
 
                                 <Link
-                                    href={route('executive.transparency')}
+                                    href={route('executive.disclosures.index')}
                                     className="inline-flex w-full items-center justify-center rounded-xl bg-emerald-700 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-800"
                                 >
                                     Manage Public Disclosures &rarr;
