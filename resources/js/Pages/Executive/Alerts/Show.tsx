@@ -303,7 +303,7 @@ function interpretOperationalAlert(
     }
 
     return {
-        category: 'Operational Alert Signal',
+        category: 'Operational Alert',
         headline: formatAlertLabel(alertType),
         unitLabel: 'Records',
         explanation: message,
@@ -333,8 +333,8 @@ function getSeverityTone(value: string): { shell: string; badge: string; label: 
     const normalized = (value || '').toUpperCase();
     if (normalized === 'HIGH' || normalized === 'CRITICAL') {
         return {
-            shell: 'border-red-200 bg-gradient-to-r from-red-50/80 via-white to-white',
-            badge: 'bg-red-100 text-red-800 border-red-300',
+            shell: 'border-rose-200 bg-gradient-to-r from-rose-50/80 via-white to-white',
+            badge: 'bg-rose-100 text-rose-800 border-rose-300',
             label: 'High Severity',
         };
     }
@@ -360,7 +360,7 @@ function StatusBadge({ status }: { status: string }) {
     if (normalized === 'IN_REVIEW') {
         return <span className="inline-flex rounded-full bg-indigo-100 border border-indigo-300 px-3 py-1 text-xs font-bold text-indigo-800 uppercase">Under Review</span>;
     }
-    return <span className="inline-flex rounded-full bg-rose-100 border border-rose-300 px-3 py-1 text-xs font-bold text-rose-800 uppercase">Open Signal</span>;
+    return null;
 }
 
 function formatDate(dateStr?: string | null): string {

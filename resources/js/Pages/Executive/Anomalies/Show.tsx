@@ -286,7 +286,7 @@ function StatusBadge({ status }: { status: string }) {
     if (normalized === 'IN_REVIEW') {
         return <span className="inline-flex rounded-full bg-indigo-100 border border-indigo-300 px-3 py-1 text-xs font-bold text-indigo-800 uppercase">Under Review</span>;
     }
-    return <span className="inline-flex rounded-full bg-rose-100 border border-rose-300 px-3 py-1 text-xs font-bold text-rose-800 uppercase">Open Signal</span>;
+    return null;
 }
 
 function formatDate(dateStr?: string | null): string {
