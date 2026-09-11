@@ -1,4 +1,4 @@
-import { ExecutiveChartCard, HorizontalBarChart, TrendGroupedBarChart } from '@/Components/Executive/Charts';
+import { DonutChart, ExecutiveChartCard, HorizontalBarChart, TrendGroupedBarChart } from '@/Components/Executive/Charts';
 import { GovDocumentPage, GovDocumentMetadata } from '@/Components/Executive/GovDocumentLayout';
 import MonthFilterSelect from '@/Components/MonthFilterSelect';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
@@ -327,14 +327,69 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
 
                 <div className="grid gap-6 xl:grid-cols-12">
                     <div className="xl:col-span-7">
-                        <ExecutiveChartCard title="Incident Trend" subtitle="Anomaly and alert movement" tone="critical">
+                        <ExecutiveChartCard
+                            title="Incident Movement & Distribution"
+                            subtitle="Anomaly and alert movement across fiscal monitoring periods"
+                            eyebrow="Incident Activity"
+                            tone="critical"
+                        >
                             {trendData.length === 0 ? (
                                 <CompactEmpty text="No incident trend data in current filter scope." />
                             ) : trendData.length === 1 ? (
-                                <div className="grid gap-3 md:grid-cols-3">
-                                    <MiniStat label="Month" value={trendData[0].label} />
-                                    <MiniStat label="Anomalies" value={trendData[0].first} />
-                                    <MiniStat label="Alerts" value={trendData[0].second} />
+                                <div className="space-y-4">
+                                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3">
+                                        <div className="flex items-center gap-2">
+                                            <span className="h-2.5 w-2.5 rounded-full bg-red-600 animate-pulse" />
+                                            <span className="text-xs font-medium text-slate-600">Active Monitored Period:</span>
+                                            <strong className="text-sm font-bold text-slate-900">{trendData[0].label}</strong>
+                                        </div>
+                                        <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-800">
+                                            {trendData[0].first + trendData[0].second} Total Active Signals
+                                        </span>
+                                    </div>
+
+                                    <div className="grid gap-3 sm:grid-cols-3">
+                                        <div className="rounded-xl border border-red-200 bg-gradient-to-br from-red-50 to-white p-4 shadow-sm">
+                                            <p className="text-xs font-semibold uppercase tracking-wider text-red-700">Flagged Anomalies</p>
+                                            <p className="mt-1 text-2xl font-bold text-red-900">{trendData[0].first}</p>
+                                            <p className="mt-1 text-[11px] text-slate-500">Pattern & threshold irregularities</p>
+                                        </div>
+                                        <div className="rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-4 shadow-sm">
+                                            <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">Workflow Alerts</p>
+                                            <p className="mt-1 text-2xl font-bold text-amber-900">{trendData[0].second}</p>
+                                            <p className="mt-1 text-[11px] text-slate-500">Operational queue notifications</p>
+                                        </div>
+                                        <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 shadow-sm">
+                                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-700">Anomaly Share</p>
+                                            <p className="mt-1 text-2xl font-bold text-slate-900">
+                                                {trendData[0].first + trendData[0].second > 0
+                                                    ? Math.round((trendData[0].first / (trendData[0].first + trendData[0].second)) * 100)
+                                                    : 0}%
+                                            </p>
+                                            <p className="mt-1 text-[11px] text-slate-500">Share of total incident volume</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-1.5 pt-1">
+                                        <div className="flex justify-between text-xs font-semibold text-slate-600">
+                                            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-red-600" /> Pattern Anomalies ({trendData[0].first})</span>
+                                            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> Operational Alerts ({trendData[0].second})</span>
+                                        </div>
+                                        <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+                                            <div
+                                                className="bg-gradient-to-r from-red-600 to-rose-500 transition-all duration-500"
+                                                style={{
+                                                    width: `${(trendData[0].first / Math.max(trendData[0].first + trendData[0].second, 1)) * 100}%`,
+                                                }}
+                                            />
+                                            <div
+                                                className="bg-gradient-to-r from-amber-500 to-yellow-400 transition-all duration-500"
+                                                style={{
+                                                    width: `${(trendData[0].second / Math.max(trendData[0].first + trendData[0].second, 1)) * 100}%`,
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
                             ) : (
                                 <TrendGroupedBarChart
@@ -348,27 +403,63 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                     </div>
 
                     <div className="xl:col-span-5">
-                        <ExecutiveChartCard title="Office Risk Ranking" subtitle="Total incidents by office" tone="neutral">
-                            <HorizontalBarChart data={officeRisk} emptyText="No data in current filter scope" />
+                        <ExecutiveChartCard
+                            title="Office Incident Ranking"
+                            subtitle="Total anomalies & alerts concentrated by municipal department"
+                            eyebrow="Departmental Risk"
+                            tone="neutral"
+                        >
+                            <HorizontalBarChart
+                                data={officeRisk}
+                                palette="multi"
+                                showPercentage={true}
+                                emptyText="No data in current filter scope"
+                            />
                         </ExecutiveChartCard>
                     </div>
 
                     <div className="xl:col-span-6">
-                        <ExecutiveChartCard title="Top Anomaly Categories" subtitle="Most frequent anomaly types" tone="warning">
-                            <HorizontalBarChart data={anomalyTypeMix} emptyText="No data in current filter scope" />
+                        <ExecutiveChartCard
+                            title="Top Anomaly Categories"
+                            subtitle="Most frequent irregularity types detected across requisitions"
+                            eyebrow="Pattern Breakdown"
+                            tone="warning"
+                        >
+                            <HorizontalBarChart
+                                data={anomalyTypeMix}
+                                palette="multi"
+                                showPercentage={true}
+                                emptyText="No data in current filter scope"
+                            />
                         </ExecutiveChartCard>
                     </div>
 
                     <div className="xl:col-span-6">
-                        <ExecutiveChartCard title="Severity and Status Snapshot" subtitle="Compact comparison" tone="default">
-                            <div className="grid gap-4 sm:grid-cols-2">
+                        <ExecutiveChartCard
+                            title="Severity & Lifecycle Status Breakdown"
+                            subtitle="Risk level concentration and incident resolution velocity"
+                            eyebrow="Risk & Velocity"
+                            tone="default"
+                        >
+                            <div className="grid gap-6 sm:grid-cols-2 items-start">
                                 <div>
-                                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">Severity</p>
-                                    <HorizontalBarChart data={severityMix} emptyText="No data in current filter scope" />
+                                    <p className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-600">Severity Distribution</p>
+                                    <DonutChart
+                                        data={severityMix}
+                                        emptyText="No severity data"
+                                        centerLabel="Total"
+                                        layout="col"
+                                        paletteType="severity"
+                                    />
                                 </div>
                                 <div>
-                                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">Status</p>
-                                    <HorizontalBarChart data={statusMix} emptyText="No data in current filter scope" />
+                                    <p className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-600">Resolution Status</p>
+                                    <HorizontalBarChart
+                                        data={statusMix}
+                                        palette="severity"
+                                        showPercentage={true}
+                                        emptyText="No status data"
+                                    />
                                 </div>
                             </div>
                         </ExecutiveChartCard>

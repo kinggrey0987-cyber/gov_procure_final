@@ -152,6 +152,10 @@ export default function ExecutiveDashboardIndex({
         value: row.total,
     }));
 
+    const ppmpClearanceRate = approvals.ppmp_workflow_total > 0
+        ? Math.round((approvals.recently_approved / approvals.ppmp_workflow_total) * 100)
+        : 100;
+
     const topAnomalyCategories = (anomaly_type_breakdown.length > 0
         ? anomaly_type_breakdown.map((row) => ({
             label: formatAnomalyType(row.label || 'N/A'),
@@ -394,8 +398,14 @@ export default function ExecutiveDashboardIndex({
                 </div>
 
                 <div className="grid gap-6 xl:grid-cols-12">
+                    {/* Row 2: Trend & Velocity (8 cols) + PPMP Budget Clearance Gauge (4 cols) */}
                     <div className="xl:col-span-8">
-                        <ExecutiveChartCard title="Procurement Activity Trend" subtitle="Monthly procurement movement" tone="critical">
+                        <ExecutiveChartCard
+                            title="Procurement Velocity & Trend"
+                            subtitle="Monthly requisition and purchase order movement across fiscal periods"
+                            eyebrow="Activity Signal"
+                            tone="critical"
+                        >
                             {monthlyProcurement.length === 0 ? (
                                 <CompactEmpty text="No data in current filter scope" />
                             ) : monthlyProcurement.length === 1 ? (
@@ -415,127 +425,268 @@ export default function ExecutiveDashboardIndex({
                                 <TrendLineChart
                                     data={totalActivityTrend}
                                     emptyText="No data in current filter scope"
+                                    showPointCards={false}
                                 />
                             )}
                         </ExecutiveChartCard>
                     </div>
 
                     <div className="xl:col-span-4">
-                        <ExecutiveChartCard title="PPMP Workflow Summary" subtitle="Approval status at a glance" tone="default">
-                            {approvalStatusMix.length <= 2 ? (
-                                <div className="grid gap-2">
-                                    {approvalStatusMix.map((row) => (
-                                        <MiniStat key={row.label} label={row.label} value={row.value} />
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    <div className="mx-auto h-[150px] w-[150px] lg:h-[160px] lg:w-[160px]">
-                                        <svg viewBox="0 0 220 220" className="h-full w-full">
-                                            <circle cx="110" cy="110" r={72} fill="none" stroke="rgb(254 226 226)" strokeWidth={24} />
-                                            {approvalStatusMix.map((segment, index) => {
-                                                const total = approvalStatusMix.reduce((sum, row) => sum + row.value, 0);
-                                                const circumference = 2 * Math.PI * 72;
-                                                const segmentLength = (segment.value / total) * circumference;
-                                                const offset = approvalStatusMix.slice(0, index).reduce((sum, row) => sum + (row.value / total) * circumference, 0);
-
-                                                return (
-                                                    <circle
-                                                        key={segment.label}
-                                                        cx="110"
-                                                        cy="110"
-                                                        r={72}
-                                                        fill="none"
-                                                        stroke={['rgb(185 28 28)', 'rgb(245 158 11)', 'rgb(37 99 235)', 'rgb(22 163 74)'][index % 4]}
-                                                        strokeWidth={24}
-                                                        strokeDasharray={`${segmentLength} ${circumference - segmentLength}`}
-                                                        strokeDashoffset={-offset}
-                                                        transform="rotate(-90 110 110)"
-                                                        strokeLinecap="butt"
-                                                    />
-                                                );
-                                            })}
-
-                                            <text x="110" y="105" textAnchor="middle" className="fill-slate-500 text-[10px] uppercase tracking-[0.14em]">
-                                                PPMP
-                                            </text>
-                                            <text x="110" y="128" textAnchor="middle" className="fill-slate-900 text-[22px] font-bold">
-                                                {approvals.ppmp_workflow_total}
-                                            </text>
+                        <ExecutiveChartCard
+                            title="Annual PPMP & Budget Clearance"
+                            subtitle="Departmental annual procurement plan clearance status"
+                            eyebrow="Governance"
+                            tone="emerald"
+                            action={
+                                <Link
+                                    href={route('executive.approvals')}
+                                    className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:underline"
+                                >
+                                    Approvals Desk &rarr;
+                                </Link>
+                            }
+                        >
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-4 rounded-xl border border-emerald-100 bg-emerald-50/40 p-4">
+                                    <div className="relative h-24 w-24 shrink-0">
+                                        <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
+                                            <circle
+                                                cx="50"
+                                                cy="50"
+                                                r="40"
+                                                fill="none"
+                                                stroke="rgb(226 232 240)"
+                                                strokeWidth="10"
+                                            />
+                                            <circle
+                                                cx="50"
+                                                cy="50"
+                                                r="40"
+                                                fill="none"
+                                                stroke={ppmpClearanceRate === 100 ? 'rgb(16 185 129)' : 'rgb(245 158 11)'}
+                                                strokeWidth="10"
+                                                strokeDasharray={2 * Math.PI * 40}
+                                                strokeDashoffset={(2 * Math.PI * 40) * (1 - ppmpClearanceRate / 100)}
+                                                strokeLinecap="round"
+                                                className="transition-all duration-700 ease-out"
+                                            />
                                         </svg>
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                                            <span className="text-xl font-extrabold text-slate-900 leading-none">{ppmpClearanceRate}%</span>
+                                            <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 mt-0.5">Cleared</span>
+                                        </div>
                                     </div>
-
-                                    <div className="grid gap-2">
-                                        {approvalStatusMix.map((segment, index) => {
-                                            const total = approvalStatusMix.reduce((sum, row) => sum + row.value, 0);
-                                            const percent = total > 0 ? Math.round((segment.value / total) * 100) : 0;
-
-                                            return (
-                                                <div key={segment.label} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                                                    <div className="flex min-w-0 items-start gap-2">
-                                                        <span className="mt-1 h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: ['rgb(185 28 28)', 'rgb(245 158 11)', 'rgb(37 99 235)', 'rgb(22 163 74)'][index % 4] }} />
-                                                        <span className="min-w-0 flex-1 break-words font-medium leading-5 text-slate-700">
-                                                            {segment.label}
-                                                        </span>
-                                                    </div>
-                                                    <div className="mt-1 pl-5 text-sm font-semibold text-slate-900">
-                                                        {segment.value} ({percent}%)
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        <MiniStat label="Pending" value={approvals.pending_ppmp_approvals} />
-                                        <MiniStat label="Returned" value={approvals.returned_for_revision} />
-                                        <MiniStat label="Approved" value={approvals.recently_approved} />
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-xs font-bold uppercase tracking-wider text-emerald-800">
+                                            {approvals.ppmp_workflow_total} Municipal Submissions
+                                        </p>
+                                        <p className="mt-1 text-xs text-slate-600 leading-relaxed">
+                                            {approvals.pending_ppmp_approvals === 0
+                                                ? 'All departmental annual procurement plans have been cleared for budget execution.'
+                                                : `${approvals.pending_ppmp_approvals} plan(s) currently awaiting executive authorization.`}
+                                        </p>
                                     </div>
                                 </div>
-                            )}
-                        </ExecutiveChartCard>
-                    </div>
 
-                    <div className="xl:col-span-4">
-                        <ExecutiveChartCard title="Risk Summary" subtitle="Active and high-severity risk pressure" tone="critical">
-                            <div className="space-y-3">
-                                <RiskStrip label="Active Anomalies" value={activeAnomalies} max={Math.max(activeAnomalies, activeAlerts, highSeverityTotal, 1)} tone="rose" />
-                                <RiskStrip label="Active Alerts" value={activeAlerts} max={Math.max(activeAnomalies, activeAlerts, highSeverityTotal, 1)} tone="amber" />
-                                <RiskStrip label="High Severity Total" value={highSeverityTotal} max={Math.max(activeAnomalies, activeAlerts, highSeverityTotal, 1)} tone="slate" />
+                                <div className="grid grid-cols-3 gap-2 text-center">
+                                    <div className="rounded-xl border border-emerald-200 bg-white p-2.5 shadow-sm">
+                                        <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Approved</p>
+                                        <p className="mt-0.5 text-base font-extrabold text-emerald-900">{approvals.recently_approved}</p>
+                                    </div>
+                                    <div className="rounded-xl border border-amber-200 bg-white p-2.5 shadow-sm">
+                                        <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Pending</p>
+                                        <p className="mt-0.5 text-base font-extrabold text-amber-900">{approvals.pending_ppmp_approvals}</p>
+                                    </div>
+                                    <div className="rounded-xl border border-rose-200 bg-white p-2.5 shadow-sm">
+                                        <p className="text-[10px] font-bold uppercase tracking-wider text-rose-700">Returned</p>
+                                        <p className="mt-0.5 text-base font-extrabold text-rose-900">{approvals.returned_for_revision}</p>
+                                    </div>
+                                </div>
+
+                                <Link
+                                    href={route('executive.approvals')}
+                                    className="inline-flex w-full items-center justify-center rounded-xl bg-slate-900 px-3.5 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800"
+                                >
+                                    Review PPMP Submissions &rarr;
+                                </Link>
                             </div>
                         </ExecutiveChartCard>
                     </div>
 
-                    <div className="xl:col-span-8">
-                        <ExecutiveChartCard title="Risk Breakdown" subtitle="Top anomaly categories and severity snapshot" tone="warning">
-                            <div className="grid gap-5 lg:grid-cols-2">
-                                <div>
-                                    <p className="mb-2 text-sm font-semibold text-slate-700">Top anomaly categories</p>
-                                    <HorizontalBarChart data={topAnomalyCategories} emptyText="No data in current filter scope" />
+                    {/* Row 3: Municipal Risk Scorecard (5 cols) + Detected Anomaly Patterns (7 cols) */}
+                    <div className="xl:col-span-5">
+                        <ExecutiveChartCard
+                            title="Municipal Risk & Integrity Scorecard"
+                            subtitle="Active risk exposure & governance threshold signals"
+                            eyebrow="Integrity Radar"
+                            tone="critical"
+                            action={
+                                <Link
+                                    href={route('executive.anomalies-monitoring')}
+                                    className="text-xs font-semibold text-rose-700 hover:text-rose-800 hover:underline"
+                                >
+                                    Monitor All &rarr;
+                                </Link>
+                            }
+                        >
+                            <div className="space-y-3.5">
+                                <div className="flex items-center justify-between rounded-xl border border-red-200 bg-gradient-to-r from-red-50 to-rose-50/50 p-3.5">
+                                    <div className="flex items-center gap-3">
+                                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-600 text-base font-extrabold text-white shadow-sm">
+                                            {activeAnomalies + activeAlerts}
+                                        </span>
+                                        <div>
+                                            <p className="text-xs font-bold uppercase tracking-wider text-red-900">Active Risk Signals</p>
+                                            <p className="text-[11px] text-red-700 font-medium">Requiring executive oversight or review</p>
+                                        </div>
+                                    </div>
+                                    <span className="rounded-full bg-red-200/80 px-2.5 py-1 text-[11px] font-bold text-red-900">
+                                        {highSeverityTotal} High-Severity
+                                    </span>
                                 </div>
-                                <div>
-                                    <p className="mb-2 text-sm font-semibold text-slate-700">Severity snapshot</p>
-                                    <HorizontalBarChart data={severitySnapshot} emptyText="No data in current filter scope" />
+
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-2.5 transition hover:border-slate-300">
+                                        <div className="flex items-center gap-2.5">
+                                            <span className="h-2.5 w-2.5 rounded-full bg-red-600" />
+                                            <div>
+                                                <p className="text-xs font-bold text-slate-800">Critical / High Severity</p>
+                                                <p className="text-[11px] text-slate-500">Exceeds municipal risk threshold limits</p>
+                                            </div>
+                                        </div>
+                                        <span className="rounded-lg bg-red-100 px-2.5 py-0.5 text-xs font-bold text-red-800">{highSeverityTotal}</span>
+                                    </div>
+
+                                    <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-2.5 transition hover:border-slate-300">
+                                        <div className="flex items-center gap-2.5">
+                                            <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+                                            <div>
+                                                <p className="text-xs font-bold text-slate-800">Pattern Anomalies</p>
+                                                <p className="text-[11px] text-slate-500">Price variance, frequent spikes, quantity jumps</p>
+                                            </div>
+                                        </div>
+                                        <span className="rounded-lg bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-800">{activeAnomalies}</span>
+                                    </div>
+
+                                    <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-2.5 transition hover:border-slate-300">
+                                        <div className="flex items-center gap-2.5">
+                                            <span className="h-2.5 w-2.5 rounded-full bg-indigo-500" />
+                                            <div>
+                                                <p className="text-xs font-bold text-slate-800">Operational Alerts</p>
+                                                <p className="text-[11px] text-slate-500">Workflow bottlenecks and threshold notifications</p>
+                                            </div>
+                                        </div>
+                                        <span className="rounded-lg bg-indigo-100 px-2.5 py-0.5 text-xs font-bold text-indigo-800">{activeAlerts}</span>
+                                    </div>
                                 </div>
+
+                                <Link
+                                    href={route('executive.anomalies-monitoring')}
+                                    className="inline-flex w-full items-center justify-center rounded-xl bg-red-700 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-red-800"
+                                >
+                                    Investigate Risk Signals &rarr;
+                                </Link>
                             </div>
                         </ExecutiveChartCard>
                     </div>
 
-                    <div className="xl:col-span-8">
-                        <ExecutiveChartCard title="Office Oversight Comparison" subtitle="Risk concentration by office" tone="neutral">
-                            <HorizontalBarChart data={officeRanking} emptyText="No data in current filter scope" />
+                    <div className="xl:col-span-7">
+                        <ExecutiveChartCard
+                            title="Detected Anomaly Patterns"
+                            subtitle="Distribution of flagged irregularities across municipal procurement"
+                            eyebrow="Pattern Breakdown"
+                            tone="warning"
+                        >
+                            <HorizontalBarChart
+                                data={topAnomalyCategories}
+                                palette="multi"
+                                showPercentage={true}
+                                emptyText="No anomalies detected in current scope"
+                            />
                         </ExecutiveChartCard>
                     </div>
 
-                    <div className="xl:col-span-4 space-y-4">
-                        <ExecutiveChartCard title="Procurement Throughput" subtitle="Compact process concentration" tone="neutral">
-                            <HorizontalBarChart data={throughputMix} emptyText="No data in current filter scope" />
+                    {/* Row 4: Departmental Concentration (7 cols) + SGLG Citizen Transparency (5 cols) */}
+                    <div className="xl:col-span-7">
+                        <ExecutiveChartCard
+                            title="Departmental Risk & Requisition Concentration"
+                            subtitle="Combined anomaly & alert incidents concentrated by municipal office"
+                            eyebrow="Office Oversight"
+                            tone="neutral"
+                            action={
+                                <Link
+                                    href={route('executive.offices-oversight')}
+                                    className="text-xs font-semibold text-slate-700 hover:text-slate-900 hover:underline"
+                                >
+                                    Office Ledger &rarr;
+                                </Link>
+                            }
+                        >
+                            <HorizontalBarChart
+                                data={officeRanking}
+                                palette="multi"
+                                showPercentage={true}
+                                emptyText="No office incidents in current filter scope"
+                            />
                         </ExecutiveChartCard>
+                    </div>
 
-                        <ExecutiveChartCard title="Disclosure Snapshot" subtitle="Publication status summary" tone="default">
-                            <div className="grid gap-2">
-                                <MiniStat label="Published" value={transparency.published_disclosure_count} />
-                                <MiniStat label="Draft" value={transparency.draft_disclosure_count} />
-                                <MiniStat label="Pending / Review" value={pendingOrReviewDisclosures} />
+                    <div className="xl:col-span-5">
+                        <ExecutiveChartCard
+                            title="Citizen Transparency & SGLG Full Disclosure"
+                            subtitle="DILG Full Disclosure Policy (FDP) compliance board"
+                            eyebrow="Public Accountability"
+                            tone="emerald"
+                            action={
+                                <Link
+                                    href={route('executive.transparency')}
+                                    className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:underline"
+                                >
+                                    Full Portal &rarr;
+                                </Link>
+                            }
+                        >
+                            <div className="space-y-3.5">
+                                <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50/50 p-3.5">
+                                    <div className="flex items-center gap-3">
+                                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-base font-extrabold text-white shadow-sm">
+                                            {transparency.published_disclosure_count}
+                                        </span>
+                                        <div>
+                                            <p className="text-xs font-bold uppercase tracking-wider text-emerald-900">Published Records</p>
+                                            <p className="text-[11px] text-emerald-700 font-medium">Citizen-accessible transparency postings</p>
+                                        </div>
+                                    </div>
+                                    <span className="rounded-full bg-emerald-200/80 px-2.5 py-1 text-[11px] font-bold text-emerald-900">
+                                        SGLG Compliant
+                                    </span>
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-2 text-center">
+                                    <div className="rounded-xl border border-emerald-200 bg-white p-2.5 shadow-sm">
+                                        <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Published</p>
+                                        <p className="mt-0.5 text-base font-extrabold text-emerald-900">{transparency.published_disclosure_count}</p>
+                                    </div>
+                                    <div className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm">
+                                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Draft</p>
+                                        <p className="mt-0.5 text-base font-extrabold text-slate-800">{transparency.draft_disclosure_count}</p>
+                                    </div>
+                                    <div className="rounded-xl border border-amber-200 bg-white p-2.5 shadow-sm">
+                                        <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Pending</p>
+                                        <p className="mt-0.5 text-base font-extrabold text-amber-900">{pendingOrReviewDisclosures}</p>
+                                    </div>
+                                </div>
+
+                                <p className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-xs leading-relaxed text-slate-600">
+                                    Compliant with DILG Full Disclosure Policy standards and mandatory procurement transparency postings for Seal of Good Local Governance (SGLG) eligibility.
+                                </p>
+
+                                <Link
+                                    href={route('executive.transparency')}
+                                    className="inline-flex w-full items-center justify-center rounded-xl bg-emerald-700 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-800"
+                                >
+                                    Manage Public Disclosures &rarr;
+                                </Link>
                             </div>
                         </ExecutiveChartCard>
                     </div>
