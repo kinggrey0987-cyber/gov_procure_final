@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import WorkflowHistoryTimeline from '@/Components/WorkflowHistoryTimeline';
 import { humanizeEnum } from '@/lib/displayLabels';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEvent } from 'react';
@@ -112,14 +113,24 @@ type Props = {
         new_status: string;
         remarks?: string | null;
         changed_at?: string | null;
-        changed_by?: { id: number; name: string } | null;
+        changed_by?: {
+            id: number;
+            name: string;
+            role?: string | null;
+            office?: string | null;
+        } | null;
     }>;
     approvalHistory: Array<{
         id: number;
         status: string;
         remarks?: string | null;
         approved_at?: string | null;
-        approver?: { id: number; name: string } | null;
+        approver?: {
+            id: number;
+            name: string;
+            role?: string | null;
+            office?: string | null;
+        } | null;
     }>;
     permissions?: {
         place?: boolean;
@@ -447,6 +458,13 @@ export default function PurchaseOrdersShow({ purchaseOrder, isZeroCostReplacemen
                             </Link>
                         </div>
                     )}
+
+                    <WorkflowHistoryTimeline
+                        statusHistory={statusHistory}
+                        approvalHistory={approvalHistory}
+                        title="Purchase Order Workflow & Audit Trail"
+                        subtitle="Chronological timeline of PO drafting, item allocation, placement, and delivery verification."
+                    />
 
                     {showProcurementDocumentsLink ? <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                         <h3 className="text-lg font-semibold text-slate-900">Purchase Order Documents</h3>

@@ -1,6 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import AttachmentsPanel from '@/Components/AttachmentsPanel';
 import ProcurementTraceabilityMatrix from '@/Components/Executive/ProcurementTraceabilityMatrix';
+import WorkflowHistoryTimeline from '@/Components/WorkflowHistoryTimeline';
 import { Head, Link, useForm } from '@inertiajs/react';
 
 type ProcurementDocument = {
@@ -50,14 +51,24 @@ type Props = {
         new_status: string;
         remarks?: string | null;
         changed_at?: string | null;
-        changed_by?: { id: number; name: string } | null;
+        changed_by?: {
+            id: number;
+            name: string;
+            role?: string | null;
+            office?: string | null;
+        } | null;
     }>;
     approvalHistory: Array<{
         id: number;
         status: string;
         remarks?: string | null;
         approved_at?: string | null;
-        approver?: { id: number; name: string } | null;
+        approver?: {
+            id: number;
+            name: string;
+            role?: string | null;
+            office?: string | null;
+        } | null;
     }>;
 };
 
@@ -159,6 +170,13 @@ export default function DisclosureShow({ disclosure, attachments, availableProcu
                             </button>
                         </section>
                     )}
+
+                    <WorkflowHistoryTimeline
+                        statusHistory={statusHistory}
+                        approvalHistory={approvalHistory}
+                        title="Disclosure Publication & Governance History"
+                        subtitle="Chronological timeline of draft preparation, executive approvals, and public releases."
+                    />
 
                     <AttachmentsPanel
                         title="Disclosure Attachments"

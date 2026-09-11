@@ -29,14 +29,14 @@ class HistoryTimelineService
 
         $statusHistory = StatusHistory::query()
             ->forReference($referenceType, $referenceId)
-            ->with('changedBy')
+            ->with(['changedBy.role', 'changedBy.office'])
             ->orderByDesc('changed_at')
             ->orderByDesc('id')
             ->get();
 
         $approvalHistory = ApprovalHistory::query()
             ->forReference($referenceType, $referenceId)
-            ->with('approver')
+            ->with(['approver.role', 'approver.office'])
             ->orderByDesc('approved_at')
             ->orderByDesc('id')
             ->get();

@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import WorkflowHistoryTimeline from '@/Components/WorkflowHistoryTimeline';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEvent } from 'react';
 
@@ -85,9 +86,34 @@ type Props = {
         href: string;
         label: string;
     };
+    statusHistory?: Array<{
+        id: number;
+        old_status?: string | null;
+        new_status: string;
+        remarks?: string | null;
+        changed_at?: string | null;
+        changed_by?: {
+            id: number;
+            name: string;
+            role?: string | null;
+            office?: string | null;
+        } | null;
+    }>;
+    approvalHistory?: Array<{
+        id: number;
+        status: string;
+        remarks?: string | null;
+        approved_at?: string | null;
+        approver?: {
+            id: number;
+            name: string;
+            role?: string | null;
+            office?: string | null;
+        } | null;
+    }>;
 };
 
-export default function PurchaseRequestsShow({ purchaseRequest, traceability, reviewMode = false, backFilters, permissions, backLink }: Props) {
+export default function PurchaseRequestsShow({ purchaseRequest, traceability, reviewMode = false, backFilters, permissions, backLink, statusHistory = [], approvalHistory = [] }: Props) {
     const processForm = useForm({ action: 'process', remarks: '' });
     const totalQuantity = (purchaseRequest.items ?? []).reduce((sum, row) => sum + Number(row.quantity_requested ?? 0), 0);
     const normalizedRequestRemarks = formatRequestRemarks(purchaseRequest.remarks);
@@ -299,6 +325,13 @@ export default function PurchaseRequestsShow({ purchaseRequest, traceability, re
                             </tbody>
                         </table>
                     </section>
+
+                    <WorkflowHistoryTimeline
+                        statusHistory={statusHistory}
+                        approvalHistory={approvalHistory}
+                        title="Purchase Request Review & Audit History"
+                        subtitle="Chronological audit trail of requisitions, BAC validations, reviews, and decisions."
+                    />
 
                     {canReviewRequest ? (
                         <form onSubmit={processRequest} className="space-y-3 rounded-lg border bg-white p-6">

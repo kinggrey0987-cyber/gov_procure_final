@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Modal from '@/Components/Modal';
+import WorkflowHistoryTimeline from '@/Components/WorkflowHistoryTimeline';
 import { GovDocumentPage, GovDocumentMetadata } from '@/Components/Executive/GovDocumentLayout';
 import { downloadSectionAsPdfById, printSectionById } from '@/lib/printSection';
 import { Head, Link, router, useForm } from '@inertiajs/react';
@@ -37,14 +38,24 @@ type Props = {
         new_status: string;
         remarks?: string | null;
         changed_at?: string | null;
-        changed_by?: { id: number; name: string } | null;
+        changed_by?: {
+            id: number;
+            name: string;
+            role?: string | null;
+            office?: string | null;
+        } | null;
     }>;
     approvalHistory: Array<{
         id: number;
         status: string;
         remarks?: string | null;
         approved_at?: string | null;
-        approver?: { id: number; name: string } | null;
+        approver?: {
+            id: number;
+            name: string;
+            role?: string | null;
+            office?: string | null;
+        } | null;
     }>;
 };
 
@@ -279,6 +290,15 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
                         </div>
                     )}
                 </section>
+
+                <div className="print-hide">
+                    <WorkflowHistoryTimeline
+                        statusHistory={statusHistory}
+                        approvalHistory={approvalHistory}
+                        title="PPMP Workflow & Approval History"
+                        subtitle="Chronological audit log of PPMP preparation, submissions, and executive decisions."
+                    />
+                </div>
 
                 <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                     <div className="flex flex-wrap items-center justify-between gap-3">

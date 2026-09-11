@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Modal from '@/Components/Modal';
+import WorkflowHistoryTimeline from '@/Components/WorkflowHistoryTimeline';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { FormEvent, useMemo, useState } from 'react';
 
@@ -46,11 +47,17 @@ type Props = {
             current_status: string;
             is_rejected: boolean;
             stages: Array<{
+                order?: number;
                 key: string;
                 label: string;
                 owner: string;
                 reached: boolean;
                 is_current: boolean;
+                actor_name?: string | null;
+                actor_role?: string | null;
+                actor_office?: string | null;
+                completed_at?: string | null;
+                action_summary?: string | null;
             }>;
         };
     };
@@ -68,14 +75,24 @@ type Props = {
         new_status: string;
         remarks?: string | null;
         changed_at?: string | null;
-        changed_by?: { id: number; name: string } | null;
+        changed_by?: {
+            id: number;
+            name: string;
+            role?: string | null;
+            office?: string | null;
+        } | null;
     }>;
     approvalHistory: Array<{
         id: number;
         status: string;
         remarks?: string | null;
         approved_at?: string | null;
-        approver?: { id: number; name: string } | null;
+        approver?: {
+            id: number;
+            name: string;
+            role?: string | null;
+            office?: string | null;
+        } | null;
     }>;
 };
 
@@ -256,32 +273,152 @@ export default function SupplyRequestShow({
                 ) : null}
 
                 {activeTab === 'status' ? (
-                    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <h4 className="text-xl font-semibold text-slate-800">Processing Timeline</h4>
-                    <p className="mt-1 text-sm text-slate-600">
-                        Track each stage and responsible office. Route: {supplyRequest.processing_timeline.mode === 'PROCUREMENT' ? 'Procurement Required' : 'Direct Stock Release'}
-                    </p>
-
-                    <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                        {supplyRequest.processing_timeline.stages.map((stage) => {
-                            return (
-                                <div
-                                    key={stage.key}
-                                    className={`rounded-xl border px-4 py-3 ${stage.reached ? 'border-emerald-300 bg-emerald-50/70' : 'border-slate-200 bg-slate-50'} ${stage.is_current ? 'ring-1 ring-emerald-400' : ''}`}
-                                >
-                                    <p className="text-sm font-semibold text-slate-800">{stage.label}</p>
-                                    <p className="text-xs text-slate-600">Responsible: {stage.owner}</p>
+                    <div className="space-y-6">
+                        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-4">
+                                <div>
+                                    <h4 className="text-xl font-bold text-slate-900">Processing Timeline & Accountable Officers</h4>
+                                    <p className="mt-1 text-sm text-slate-500">
+                                        Real-time operational tracking showing designated offices, accountable officers, and completion timestamps.
+                                    </p>
                                 </div>
-                            );
-                        })}
-                    </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                                        Route: <strong className="text-slate-900">{supplyRequest.processing_timeline.mode === 'PROCUREMENT' ? 'Procurement Required' : 'Direct Stock Release'}</strong>
+                                    </span>
+                                </div>
+                            </div>
 
-                    {supplyRequest.processing_timeline.is_rejected ? (
-                        <div className="mt-3 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs text-rose-900">
-                            Request was rejected in validation/procurement. Please review remarks in status history.
-                        </div>
-                    ) : null}
-                    </section>
+                            <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                                {supplyRequest.processing_timeline.stages.map((stage) => {
+                                    const isCurrent = stage.is_current;
+                                    const isCompleted = stage.reached && !isCurrent;
+
+                                    return (
+                                        <div
+                                            key={stage.key}
+                                            className={`relative flex flex-col justify-between rounded-2xl border p-4 sm:p-5 transition ${
+                                                isCurrent
+                                                    ? 'border-indigo-400 bg-gradient-to-br from-indigo-50/70 via-white to-indigo-50/30 shadow-md ring-2 ring-indigo-200'
+                                                    : isCompleted
+                                                    ? 'border-emerald-300 bg-gradient-to-br from-emerald-50/60 via-white to-emerald-50/20 shadow-sm'
+                                                    : 'border-slate-200 bg-slate-50/60 opacity-80'
+                                            }`}
+                                        >
+                                            <div>
+                                                {/* Top header: stage label + status pill */}
+                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                    <h5 className={`text-base font-bold ${isCurrent ? 'text-indigo-950' : isCompleted ? 'text-slate-900' : 'text-slate-600'}`}>
+                                                        {stage.label}
+                                                    </h5>
+
+                                                    {isCurrent ? (
+                                                        <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-100 px-3 py-1 text-xs font-bold text-indigo-800 ring-1 ring-indigo-300">
+                                                            <span className="h-2 w-2 rounded-full bg-indigo-600 animate-ping"></span>
+                                                            Active Stage
+                                                        </span>
+                                                    ) : isCompleted ? (
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-800">
+                                                            <span>✓</span> Completed
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-200/80 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                                                            <span>⏳</span> Pending
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {/* Real-time Officer Information */}
+                                                <div className="mt-3.5 space-y-1.5">
+                                                    {isCompleted ? (
+                                                        <div className="rounded-xl border border-emerald-200/70 bg-white/80 p-3 shadow-xs">
+                                                            <div className="flex items-center justify-between text-xs">
+                                                                <span className="font-semibold text-emerald-900">Executed by:</span>
+                                                                <span className="text-slate-500 font-medium">
+                                                                    🕒 {formatTimelineDateTime(stage.completed_at)}
+                                                                </span>
+                                                            </div>
+                                                            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                                                <span className="text-sm font-bold text-slate-900">{stage.actor_name || 'Authorized Officer'}</span>
+                                                                {stage.actor_role ? (
+                                                                    <span className="rounded bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-800">
+                                                                        {stage.actor_role}
+                                                                    </span>
+                                                                ) : null}
+                                                                {stage.actor_office ? (
+                                                                    <span className="text-xs text-slate-500">• {stage.actor_office}</span>
+                                                                ) : null}
+                                                            </div>
+                                                            {stage.action_summary ? (
+                                                                <p className="mt-2 text-xs text-slate-600 border-t border-slate-100 pt-2 leading-relaxed">
+                                                                    {stage.action_summary}
+                                                                </p>
+                                                            ) : null}
+                                                        </div>
+                                                    ) : isCurrent ? (
+                                                        <div className="rounded-xl border border-indigo-200 bg-white/90 p-3 shadow-sm">
+                                                            <div className="flex items-center justify-between text-xs">
+                                                                <span className="font-semibold text-indigo-900">Currently Handled By:</span>
+                                                                {stage.completed_at ? (
+                                                                    <span className="text-indigo-600 font-medium">
+                                                                        🕒 Since {formatTimelineDateTime(stage.completed_at)}
+                                                                    </span>
+                                                                ) : null}
+                                                            </div>
+                                                            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                                                <span className="text-sm font-bold text-indigo-950">{stage.actor_name || stage.owner}</span>
+                                                                {stage.actor_role ? (
+                                                                    <span className="rounded bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 text-[11px] font-semibold text-indigo-800">
+                                                                        {stage.actor_role}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="rounded bg-slate-100 border border-slate-200 px-1.5 py-0.5 text-[11px] font-semibold text-slate-700">
+                                                                        {stage.owner}
+                                                                    </span>
+                                                                )}
+                                                                {stage.actor_office ? (
+                                                                    <span className="text-xs text-indigo-700">• {stage.actor_office}</span>
+                                                                ) : null}
+                                                            </div>
+                                                            {stage.action_summary ? (
+                                                                <p className="mt-2 text-xs font-medium text-indigo-900 border-t border-indigo-100 pt-2 leading-relaxed">
+                                                                    {stage.action_summary}
+                                                                </p>
+                                                            ) : null}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="rounded-xl border border-slate-200 bg-white/60 p-3">
+                                                            <div className="flex items-center justify-between text-xs text-slate-500">
+                                                                <span className="font-semibold text-slate-600">Designated Unit / Officer:</span>
+                                                                <span>Pending</span>
+                                                            </div>
+                                                            <p className="mt-1 text-sm font-semibold text-slate-700">{stage.owner}</p>
+                                                            <p className="mt-2 text-xs text-slate-500 border-t border-slate-100 pt-2 leading-relaxed">
+                                                                {stage.action_summary || 'Prerequisite stages must conclude before this stage is engaged.'}
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {supplyRequest.processing_timeline.is_rejected ? (
+                                <div className="mt-4 rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-xs text-rose-900 shadow-sm">
+                                    <strong className="font-bold">Request Returned / Rejected:</strong> This request was flagged during review/procurement. Check the chronological workflow log below for detailed remarks.
+                                </div>
+                            ) : null}
+                        </section>
+
+                        <WorkflowHistoryTimeline
+                            statusHistory={statusHistory}
+                            approvalHistory={approvalHistory}
+                            title="Real-Time Workflow & Audit History"
+                            subtitle="Chronological immutable log of state transitions, accountable officers, and official timestamps."
+                        />
+                    </div>
                 ) : null}
 
                 {activeTab === 'items' ? (
@@ -439,19 +576,7 @@ export default function SupplyRequestShow({
                     </section>
                 ) : null}
 
-                {activeTab === 'status' ? (
-                    <>
-                        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                            <h4 className="text-xl font-semibold text-slate-800">Workflow History</h4>
-                            <p className="mt-2 text-sm text-slate-600">
-                                Detailed status and approval history is intentionally kept out of the page layout to reduce visual noise.
-                            </p>
-                            <p className="mt-3 text-sm text-slate-600">
-                                Use the current request state at the top of the page as the primary on-screen status indicator.
-                            </p>
-                        </section>
-                    </>
-                ) : null}
+
             </div>
 
             {reportIssueOpen ? (
@@ -593,6 +718,20 @@ function formatDate(value?: string | null): string {
 
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString();
+}
+
+function formatTimelineDateTime(value?: string | null): string {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleString('en-PH', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+    });
 }
 
 function formatNumber(value?: number | null): string {

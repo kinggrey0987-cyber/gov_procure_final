@@ -206,20 +206,28 @@ class SupplyRequestController extends Controller
     {
         abort_unless($request->user()?->can('office.supply-request.view', $supplyRequest), 403);
 
-        $supplyRequest->load([
+        $supplyRequest->loadMissing([
             'items.ppmpItem.item.inventory',
             'office',
-            'requester',
-            'approver',
-            'purchaseRequests',
-            'purchaseOrders',
+            'requester.role',
+            'requester.office',
+            'approver.role',
+            'purchaseRequests.requester.role',
+            'purchaseRequests.purchaseOrders.creator.role',
+            'purchaseRequests.purchaseOrders.approver.role',
+            'purchaseRequests.purchaseOrders.supplier',
+            'purchaseOrders.creator.role',
+            'purchaseOrders.approver.role',
+            'purchaseOrders.supplier',
             'distributionRecords.items',
+            'distributionRecords.preparer.role',
+            'distributionRecords.receiver.role',
         ]);
 
         $requiresProcurement = $this->requiresProcurement($supplyRequest);
         $trackingStatus = $this->resolveTrackingStatus($supplyRequest, $requiresProcurement);
         $history = $this->historyTimelineService->forRecord($request->user(), $supplyRequest);
-        $supplyRequestData = $this->showPayload($supplyRequest, $trackingStatus, $requiresProcurement);
+        $supplyRequestData = $this->showPayload($supplyRequest, $trackingStatus, $requiresProcurement, $history);
         $distributionRecords = $this->releasedDistributionRecords($supplyRequest);
 
         $canEdit = $request->user()?->can('office.supply-request.update', $supplyRequest) ?? false;
@@ -239,6 +247,8 @@ class SupplyRequestController extends Controller
                 'changed_by' => $entry->changedBy ? [
                     'id' => (int) $entry->changedBy->id,
                     'name' => (string) $entry->changedBy->name,
+                    'role' => (string) ($entry->changedBy->role?->name ?? $entry->changedBy->role?->code ?? 'Officer'),
+                    'office' => (string) ($entry->changedBy->office?->name ?? $entry->changedBy->office?->code ?? ''),
                 ] : null,
             ])->values(),
             'approvalHistory' => $history['approval']->map(fn ($entry): array => [
@@ -249,12 +259,14 @@ class SupplyRequestController extends Controller
                 'approver' => $entry->approver ? [
                     'id' => (int) $entry->approver->id,
                     'name' => (string) $entry->approver->name,
+                    'role' => (string) ($entry->approver->role?->name ?? $entry->approver->role?->code ?? 'Approver'),
+                    'office' => (string) ($entry->approver->office?->name ?? $entry->approver->office?->code ?? ''),
                 ] : null,
             ])->values(),
         ]);
     }
 
-    private function showPayload(SupplyRequest $supplyRequest, string $trackingStatus, bool $requiresProcurement): array
+    private function showPayload(SupplyRequest $supplyRequest, string $trackingStatus, bool $requiresProcurement, array $history = []): array
     {
         $ppmpItemContext = $this->ppmpItemContext($supplyRequest);
 
@@ -283,7 +295,7 @@ class SupplyRequestController extends Controller
                 ->values()
                 ->all(),
             'items' => $this->mappedSupplyRequestItems($supplyRequest, $ppmpItemContext),
-            'processing_timeline' => $this->buildProcessingTimeline($trackingStatus, $requiresProcurement),
+            'processing_timeline' => $this->buildProcessingTimeline($supplyRequest, $trackingStatus, $requiresProcurement, $history),
         ];
     }
 
@@ -538,29 +550,13 @@ class SupplyRequestController extends Controller
     }
 
     /**
+     * @param  array{status?: \Illuminate\Support\Collection<int, \App\Models\StatusHistory>, approval?: \Illuminate\Support\Collection<int, \App\Models\ApprovalHistory>}  $history
      * @return array{mode: string, current_status: string, is_rejected: bool, stages: array<int, array<string, mixed>>}
      */
-    private function buildProcessingTimeline(string $trackingStatus, bool $requiresProcurement): array
+    private function buildProcessingTimeline(SupplyRequest $supplyRequest, string $trackingStatus, bool $requiresProcurement, array $history = []): array
     {
         $mode = $requiresProcurement ? 'PROCUREMENT' : 'DIRECT_STOCK';
         $status = strtoupper($trackingStatus);
-
-        $stages = $requiresProcurement
-            ? [
-                ['order' => 1, 'key' => 'DRAFT', 'label' => 'Stage 1: Draft Request', 'owner' => 'Office User'],
-                ['order' => 2, 'key' => 'SUBMITTED', 'label' => 'Stage 2: Submitted to GSO', 'owner' => 'GSO Officer'],
-                ['order' => 3, 'key' => 'IN_REVIEW', 'label' => 'Stage 3: GSO Validation', 'owner' => 'GSO Officer'],
-                ['order' => 4, 'key' => 'PROCESSING', 'label' => 'Stage 4: Procurement Unit', 'owner' => 'Procurement Unit'],
-                ['order' => 5, 'key' => 'RELEASED', 'label' => 'Stage 5: Released for Office', 'owner' => 'GSO Officer'],
-                ['order' => 6, 'key' => 'COMPLETED', 'label' => 'Stage 6: Completed', 'owner' => 'Office User'],
-            ]
-            : [
-                ['order' => 1, 'key' => 'DRAFT', 'label' => 'Stage 1: Draft Request', 'owner' => 'Office User'],
-                ['order' => 2, 'key' => 'SUBMITTED', 'label' => 'Stage 2: Submitted to GSO', 'owner' => 'GSO Officer'],
-                ['order' => 3, 'key' => 'IN_REVIEW', 'label' => 'Stage 3: GSO Validation', 'owner' => 'GSO Officer'],
-                ['order' => 4, 'key' => 'RELEASED', 'label' => 'Stage 4: Released for Office', 'owner' => 'GSO Officer'],
-                ['order' => 5, 'key' => 'COMPLETED', 'label' => 'Stage 5: Completed', 'owner' => 'Office User'],
-            ];
 
         $orderMap = $requiresProcurement
             ? [
@@ -594,6 +590,256 @@ class SupplyRequestController extends Controller
 
         $currentOrder = $orderMap[$status] ?? 1;
 
+        $statusHistory = collect($history['status'] ?? []);
+        $requester = $supplyRequest->requester;
+        $office = $supplyRequest->office;
+        $primaryPr = $supplyRequest->purchaseRequests->sortByDesc('purchase_request_id')->first();
+        $primaryPo = $supplyRequest->purchaseOrders->sortByDesc('purchase_order_id')->first()
+            ?? $supplyRequest->purchaseRequests->flatMap->purchaseOrders->sortByDesc('purchase_order_id')->first();
+        $primaryDist = $supplyRequest->distributionRecords
+            ->whereIn('status', ['RELEASED', 'RECEIVED'])
+            ->sortByDesc('distribution_record_id')
+            ->first();
+
+        // 1. Resolve Stage 1 (Draft)
+        $draftEntry = $statusHistory->firstWhere('new_status', 'DRAFT') ?? $statusHistory->last();
+        $stage1Actor = $draftEntry?->changedBy?->name ?? $requester?->name ?? 'Requisitioning Officer';
+        $stage1Role = $draftEntry?->changedBy?->role?->name ?? $requester?->role?->name ?? 'Office Requisitioner';
+        $stage1Office = $draftEntry?->changedBy?->office?->name ?? $office?->name ?? 'End-User Office';
+        $stage1Time = optional($draftEntry?->changed_at ?? $supplyRequest->created_at)?->toIso8601String();
+        $stage1Summary = sprintf('Request %s drafted and item quantities configured.', (string) $supplyRequest->request_code);
+
+        // 2. Resolve Stage 2 (Submitted to GSO)
+        $submittedEntry = $statusHistory->firstWhere('new_status', 'SUBMITTED');
+        $stage2Reached = $currentOrder >= 2;
+        $stage2Actor = $submittedEntry?->changedBy?->name ?? ($stage2Reached ? ($requester?->name ?? 'Office Requisitioner') : null);
+        $stage2Role = $submittedEntry?->changedBy?->role?->name ?? ($stage2Reached ? ($requester?->role?->name ?? 'Office Requisitioner') : 'Office Requisitioner');
+        $stage2Office = $submittedEntry?->changedBy?->office?->name ?? ($stage2Reached ? ($office?->name ?? 'End-User Office') : $office?->name);
+        $stage2Time = $stage2Reached ? optional($submittedEntry?->changed_at ?? $supplyRequest->request_date ?? $supplyRequest->created_at)?->toIso8601String() : null;
+        $stage2Summary = $stage2Reached
+            ? 'Submitted to GSO for warehouse stock verification and municipal allocation.'
+            : 'Pending official submission by requesting office.';
+
+        // 3. Resolve Stage 3 (GSO Validation)
+        $gsoEntry = $statusHistory->first(fn ($e) => in_array($e->new_status, ['IN_REVIEW', 'FOR_PROCUREMENT', 'APPROVED', 'RELEASED', 'PARTIALLY_RELEASED', 'REJECTED']));
+        $stage3Reached = $currentOrder >= 3;
+        $stage3Actor = $gsoEntry?->changedBy?->name
+            ?? ($stage3Reached ? ($primaryPr?->requester?->name ?? $primaryDist?->preparer?->name ?? 'GSO Property Officer') : null);
+        $stage3Role = $gsoEntry?->changedBy?->role?->name
+            ?? ($stage3Reached ? 'GSO Property Officer' : 'GSO Property Officer');
+        $stage3Office = $gsoEntry?->changedBy?->office?->name ?? 'General Services Office';
+        $stage3Time = $stage3Reached ? optional($gsoEntry?->changed_at ?? $primaryPr?->created_at ?? $primaryDist?->created_at)?->toIso8601String() : null;
+        $stage3Summary = $stage3Reached
+            ? ($requiresProcurement
+                ? 'Warehouse stock verified: shortage identified and routed to BAC Procurement Unit.'
+                : 'Warehouse stock verified: supplies available in stock and approved for direct release.')
+            : 'Pending GSO warehouse inventory assessment and stock availability check.';
+
+        if ($requiresProcurement) {
+            // Stage 4: Procurement Unit
+            $stage4Reached = $currentOrder >= 4;
+            $stage4Actor = null;
+            $stage4Role = 'BAC Procurement Unit';
+            $stage4Office = 'Bids and Awards Committee';
+            $stage4Time = null;
+            $stage4Summary = 'Pending BAC procurement evaluation upon shortage routing.';
+
+            if ($stage4Reached) {
+                if ($primaryPo && in_array(strtoupper((string) $primaryPo->status), ['PLACED', 'RECEIVED', 'COMPLETED'])) {
+                    $stage4Actor = $primaryPo->approver?->name ?? $primaryPo->creator?->name ?? 'BAC Procurement Secretariat';
+                    $stage4Role = $primaryPo->approver ? 'Executive Approving Authority' : ($primaryPo->creator?->role?->name ?? 'BAC Procurement Officer');
+                    $stage4Office = $primaryPo->approver ? 'Office of the Mayor / BAC' : 'Bids and Awards Committee';
+                    $stage4Time = optional($primaryPo->date_approved ?? $primaryPo->created_at)?->toIso8601String();
+                    $stage4Summary = sprintf('Purchase Order %s issued to %s (%s).', (string) $primaryPo->po_number, (string) ($primaryPo->supplier?->supplier_name ?? 'Contractor'), $primaryPo->status === 'COMPLETED' || $primaryPo->status === 'RECEIVED' ? 'Delivered & Inspected' : 'Awaiting Delivery');
+                } elseif ($primaryPo) {
+                    $stage4Actor = $primaryPo->creator?->name ?? 'BAC Procurement Officer';
+                    $stage4Role = 'BAC Procurement Officer';
+                    $stage4Office = 'Bids and Awards Committee';
+                    $stage4Time = optional($primaryPo->created_at)?->toIso8601String();
+                    $stage4Summary = sprintf('Purchase Order %s drafted; awaiting executive placement.', (string) $primaryPo->po_number);
+                } elseif ($primaryPr) {
+                    $stage4Actor = $primaryPr->requester?->name ?? 'BAC Procurement Secretariat';
+                    $stage4Role = 'Procurement Officer';
+                    $stage4Office = 'Bids and Awards Committee';
+                    $stage4Time = optional($primaryPr->created_at)?->toIso8601String();
+                    $stage4Summary = sprintf('Purchase Request PR-%06d queued in BAC procurement review.', (int) $primaryPr->purchase_request_id);
+                } else {
+                    $stage4Actor = 'BAC Procurement Secretariat';
+                    $stage4Summary = 'In procurement review; evaluating supplier pricing and purchase requirements.';
+                }
+            }
+
+            // Stage 5: Released for Office
+            $stage5Reached = $currentOrder >= 5;
+            $stage5Actor = $primaryDist?->preparer?->name ?? ($stage5Reached ? 'GSO Warehouse Custodian' : null);
+            $stage5Role = $primaryDist?->preparer?->role?->name ?? 'GSO Property Custodian';
+            $stage5Office = 'General Services Office';
+            $stage5Time = $stage5Reached ? optional($primaryDist?->release_date ?? $primaryDist?->created_at)?->toIso8601String() : null;
+            $stage5Summary = $stage5Reached
+                ? ($primaryDist
+                    ? sprintf('Supplies prepared and released for pickup under %s (Storage: %s).', (string) $primaryDist->distribution_code, (string) ($primaryDist->storage_location ?? 'GSO Warehouse'))
+                    : 'Supplies received from supplier and released for office collection.')
+                : 'Pending procurement delivery and GSO warehouse staging for office pickup.';
+
+            // Stage 6: Completed
+            $stage6Reached = $currentOrder >= 6;
+            $stage6Actor = $primaryDist?->receiver?->name ?? ($stage6Reached ? ($requester?->name ?? 'Office Requisitioner') : null);
+            $stage6Role = $primaryDist?->receiver?->role?->name ?? 'End-User Unit Recipient';
+            $stage6Office = $office?->name ?? 'End-User Office';
+            $stage6Time = $stage6Reached ? optional($primaryDist?->received_date ?? $primaryDist?->updated_at ?? $supplyRequest->updated_at)?->toIso8601String() : null;
+            $stage6Summary = $stage6Reached
+                ? 'Supplies claimed, inspected, and confirmed received by requesting office.'
+                : 'Office to confirm receipt and verify items upon physical pickup.';
+
+            $stages = [
+                [
+                    'order' => 1,
+                    'key' => 'DRAFT',
+                    'label' => 'Stage 1: Draft Request',
+                    'owner' => 'Office User',
+                    'actor_name' => $stage1Actor,
+                    'actor_role' => $stage1Role,
+                    'actor_office' => $stage1Office,
+                    'completed_at' => $stage1Time,
+                    'action_summary' => $stage1Summary,
+                ],
+                [
+                    'order' => 2,
+                    'key' => 'SUBMITTED',
+                    'label' => 'Stage 2: Submitted to GSO',
+                    'owner' => 'GSO Officer',
+                    'actor_name' => $stage2Actor,
+                    'actor_role' => $stage2Role,
+                    'actor_office' => $stage2Office,
+                    'completed_at' => $stage2Time,
+                    'action_summary' => $stage2Summary,
+                ],
+                [
+                    'order' => 3,
+                    'key' => 'IN_REVIEW',
+                    'label' => 'Stage 3: GSO Validation',
+                    'owner' => 'GSO Officer',
+                    'actor_name' => $stage3Actor,
+                    'actor_role' => $stage3Role,
+                    'actor_office' => $stage3Office,
+                    'completed_at' => $stage3Time,
+                    'action_summary' => $stage3Summary,
+                ],
+                [
+                    'order' => 4,
+                    'key' => 'PROCESSING',
+                    'label' => 'Stage 4: Procurement Unit',
+                    'owner' => 'Procurement Unit',
+                    'actor_name' => $stage4Actor,
+                    'actor_role' => $stage4Role,
+                    'actor_office' => $stage4Office,
+                    'completed_at' => $stage4Time,
+                    'action_summary' => $stage4Summary,
+                ],
+                [
+                    'order' => 5,
+                    'key' => 'RELEASED',
+                    'label' => 'Stage 5: Released for Office',
+                    'owner' => 'GSO Officer',
+                    'actor_name' => $stage5Actor,
+                    'actor_role' => $stage5Role,
+                    'actor_office' => $stage5Office,
+                    'completed_at' => $stage5Time,
+                    'action_summary' => $stage5Summary,
+                ],
+                [
+                    'order' => 6,
+                    'key' => 'COMPLETED',
+                    'label' => 'Stage 6: Completed',
+                    'owner' => 'Office User',
+                    'actor_name' => $stage6Actor,
+                    'actor_role' => $stage6Role,
+                    'actor_office' => $stage6Office,
+                    'completed_at' => $stage6Time,
+                    'action_summary' => $stage6Summary,
+                ],
+            ];
+        } else {
+            // Direct Stock mode
+            $stage4Reached = $currentOrder >= 4;
+            $stage4Actor = $primaryDist?->preparer?->name ?? ($stage4Reached ? 'GSO Warehouse Custodian' : null);
+            $stage4Role = $primaryDist?->preparer?->role?->name ?? 'GSO Property Custodian';
+            $stage4Office = 'General Services Office';
+            $stage4Time = $stage4Reached ? optional($primaryDist?->release_date ?? $primaryDist?->created_at)?->toIso8601String() : null;
+            $stage4Summary = $stage4Reached
+                ? ($primaryDist
+                    ? sprintf('Supplies released directly from warehouse stock under %s (Storage: %s).', (string) $primaryDist->distribution_code, (string) ($primaryDist->storage_location ?? 'GSO Warehouse'))
+                    : 'Direct stock supplies released for office collection.')
+                : 'Pending GSO warehouse staging for office pickup.';
+
+            $stage5Reached = $currentOrder >= 5;
+            $stage5Actor = $primaryDist?->receiver?->name ?? ($stage5Reached ? ($requester?->name ?? 'Office Requisitioner') : null);
+            $stage5Role = $primaryDist?->receiver?->role?->name ?? 'End-User Unit Recipient';
+            $stage5Office = $office?->name ?? 'End-User Office';
+            $stage5Time = $stage5Reached ? optional($primaryDist?->received_date ?? $primaryDist?->updated_at ?? $supplyRequest->updated_at)?->toIso8601String() : null;
+            $stage5Summary = $stage5Reached
+                ? 'Supplies claimed, inspected, and confirmed received by requesting office.'
+                : 'Office to confirm receipt and verify items upon physical pickup.';
+
+            $stages = [
+                [
+                    'order' => 1,
+                    'key' => 'DRAFT',
+                    'label' => 'Stage 1: Draft Request',
+                    'owner' => 'Office User',
+                    'actor_name' => $stage1Actor,
+                    'actor_role' => $stage1Role,
+                    'actor_office' => $stage1Office,
+                    'completed_at' => $stage1Time,
+                    'action_summary' => $stage1Summary,
+                ],
+                [
+                    'order' => 2,
+                    'key' => 'SUBMITTED',
+                    'label' => 'Stage 2: Submitted to GSO',
+                    'owner' => 'GSO Officer',
+                    'actor_name' => $stage2Actor,
+                    'actor_role' => $stage2Role,
+                    'actor_office' => $stage2Office,
+                    'completed_at' => $stage2Time,
+                    'action_summary' => $stage2Summary,
+                ],
+                [
+                    'order' => 3,
+                    'key' => 'IN_REVIEW',
+                    'label' => 'Stage 3: GSO Validation',
+                    'owner' => 'GSO Officer',
+                    'actor_name' => $stage3Actor,
+                    'actor_role' => $stage3Role,
+                    'actor_office' => $stage3Office,
+                    'completed_at' => $stage3Time,
+                    'action_summary' => $stage3Summary,
+                ],
+                [
+                    'order' => 4,
+                    'key' => 'RELEASED',
+                    'label' => 'Stage 4: Released for Office',
+                    'owner' => 'GSO Officer',
+                    'actor_name' => $stage4Actor,
+                    'actor_role' => $stage4Role,
+                    'actor_office' => $stage4Office,
+                    'completed_at' => $stage4Time,
+                    'action_summary' => $stage4Summary,
+                ],
+                [
+                    'order' => 5,
+                    'key' => 'COMPLETED',
+                    'label' => 'Stage 5: Completed',
+                    'owner' => 'Office User',
+                    'actor_name' => $stage5Actor,
+                    'actor_role' => $stage5Role,
+                    'actor_office' => $stage5Office,
+                    'completed_at' => $stage5Time,
+                    'action_summary' => $stage5Summary,
+                ],
+            ];
+        }
+
         return [
             'mode' => $mode,
             'current_status' => $status,
@@ -603,6 +849,11 @@ class SupplyRequestController extends Controller
                     'key' => $stage['key'],
                     'label' => $stage['label'],
                     'owner' => $stage['owner'],
+                    'actor_name' => $stage['actor_name'] ?? null,
+                    'actor_role' => $stage['actor_role'] ?? null,
+                    'actor_office' => $stage['actor_office'] ?? null,
+                    'completed_at' => $stage['completed_at'] ?? null,
+                    'action_summary' => $stage['action_summary'] ?? null,
                     'reached' => (int) $stage['order'] <= $currentOrder,
                     'is_current' => (int) $stage['order'] === $currentOrder,
                 ])

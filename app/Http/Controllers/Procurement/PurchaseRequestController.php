@@ -8,6 +8,7 @@ use App\Http\Requests\Procurement\StorePurchaseRequestRequest;
 use App\Http\Requests\Procurement\UpdatePurchaseRequestRequest;
 use App\Models\PurchaseRequest;
 use App\Models\SupplyRequest;
+use App\Services\History\HistoryTimelineService;
 use App\Services\Procurement\ConsolidationTraceabilityService;
 use App\Services\Procurement\PurchaseRequestService;
 use Illuminate\Http\RedirectResponse;
@@ -21,6 +22,7 @@ class PurchaseRequestController extends Controller
     public function __construct(
         private readonly PurchaseRequestService $service,
         private readonly ConsolidationTraceabilityService $traceabilityService,
+        private readonly HistoryTimelineService $historyService,
     ) {
     }
 
@@ -66,6 +68,7 @@ class PurchaseRequestController extends Controller
         $isReviewMode = $mode === 'review';
         $isExecutiveRoute = $request->routeIs('executive.procurement-records.*');
         $traceability = $this->traceabilityService->resolveForPurchaseRequest($purchaseRequest);
+        $history = $this->historyService->forRecord($request->user(), $purchaseRequest);
 
         return Inertia::render('Procurement/PurchaseRequests/Show', [
             'purchaseRequest' => $purchaseRequest->load([
@@ -93,6 +96,31 @@ class PurchaseRequestController extends Controller
                 ]),
                 'label' => 'Back to Request Review',
             ],
+            'statusHistory' => $history['status']->map(fn ($entry): array => [
+                'id' => (int) $entry->id,
+                'old_status' => $entry->old_status,
+                'new_status' => (string) $entry->new_status,
+                'remarks' => $entry->remarks,
+                'changed_at' => optional($entry->changed_at)?->toIso8601String(),
+                'changed_by' => $entry->changedBy ? [
+                    'id' => (int) $entry->changedBy->id,
+                    'name' => (string) $entry->changedBy->name,
+                    'role' => (string) ($entry->changedBy->role?->name ?? ''),
+                    'office' => (string) ($entry->changedBy->office?->name ?? ''),
+                ] : null,
+            ])->values(),
+            'approvalHistory' => $history['approval']->map(fn ($entry): array => [
+                'id' => (int) $entry->id,
+                'status' => (string) $entry->status,
+                'remarks' => $entry->remarks,
+                'approved_at' => optional($entry->approved_at)?->toIso8601String(),
+                'approver' => $entry->approver ? [
+                    'id' => (int) $entry->approver->id,
+                    'name' => (string) $entry->approver->name,
+                    'role' => (string) ($entry->approver->role?->name ?? ''),
+                    'office' => (string) ($entry->approver->office?->name ?? ''),
+                ] : null,
+            ])->values(),
         ]);
     }
 

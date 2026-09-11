@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import AttachmentsPanel from '@/Components/AttachmentsPanel';
+import WorkflowHistoryTimeline from '@/Components/WorkflowHistoryTimeline';
 import { humanizeEnum } from '@/lib/displayLabels';
 import { Head, Link, useForm } from '@inertiajs/react';
 import type { FormEvent } from 'react';
@@ -69,14 +70,24 @@ type Props = {
         new_status: string;
         remarks?: string | null;
         changed_at?: string | null;
-        changed_by?: { id: number; name: string } | null;
+        changed_by?: {
+            id: number;
+            name: string;
+            role?: string | null;
+            office?: string | null;
+        } | null;
     }>;
     approvalHistory: Array<{
         id: number;
         status: string;
         remarks?: string | null;
         approved_at?: string | null;
-        approver?: { id: number; name: string } | null;
+        approver?: {
+            id: number;
+            name: string;
+            role?: string | null;
+            office?: string | null;
+        } | null;
     }>;
     routes?: {
         index: string;
@@ -336,23 +347,12 @@ export default function ClaimShow({ claim, parentClaim, followUpClaims = [], lin
                 ) : null}
 
                 {activeTab === 'status' ? (
-                    <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Workflow History</h3>
-                        <div className="mt-4 space-y-3">
-                            {statusHistory.map((entry) => (
-                                <div key={entry.id} className="rounded-lg border border-slate-200 p-3">
-                                    <p className="text-sm font-semibold text-slate-800">
-                                        {entry.old_status ? `${displayClaimStatus(entry.old_status)} to ` : ''}{displayClaimStatus(entry.new_status)}
-                                    </p>
-                                    <p className="mt-1 text-xs text-slate-500">
-                                        {formatDateTime(entry.changed_at)} by {entry.changed_by?.name ?? 'System'}
-                                    </p>
-                                    {entry.remarks ? <p className="mt-2 text-sm text-slate-600">{entry.remarks}</p> : null}
-                                </div>
-                            ))}
-                            {statusHistory.length === 0 ? <p className="text-sm text-slate-600">No status history has been recorded.</p> : null}
-                        </div>
-                    </section>
+                    <WorkflowHistoryTimeline
+                        statusHistory={statusHistory}
+                        approvalHistory={approvalHistory}
+                        title="Claim Workflow & Status History"
+                        subtitle="Chronological timeline of discrepancy reporting, GSO investigation, and resolution."
+                    />
                 ) : null}
 
                 {activeTab === 'items' ? (

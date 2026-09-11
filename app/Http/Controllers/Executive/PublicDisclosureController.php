@@ -189,6 +189,8 @@ class PublicDisclosureController
                 'changed_by' => $entry->changedBy ? [
                     'id' => (int) $entry->changedBy->id,
                     'name' => (string) $entry->changedBy->name,
+                    'role' => (string) ($entry->changedBy->role?->name ?? ''),
+                    'office' => (string) ($entry->changedBy->office?->name ?? ''),
                 ] : null,
             ])->values(),
             'approvalHistory' => $history['approval']->map(fn ($entry): array => [
@@ -199,6 +201,8 @@ class PublicDisclosureController
                 'approver' => $entry->approver ? [
                     'id' => (int) $entry->approver->id,
                     'name' => (string) $entry->approver->name,
+                    'role' => (string) ($entry->approver->role?->name ?? ''),
+                    'office' => (string) ($entry->approver->office?->name ?? ''),
                 ] : null,
             ])->values(),
         ]);
