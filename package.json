@@ -14,7 +14,8 @@
         "test:selenium": "python tests/selenium/test_portal.py",
         "test:api": "python -m coverage run -m pytest tests/api && python -m coverage report -m",
         "test:backend": "php artisan test",
-        "test:phpstan": "vendor/bin/phpstan analyse --memory-limit=2G"
+        "test:phpstan": "vendor/bin/phpstan analyse --memory-limit=2G",
+        "test:all": "powershell -ExecutionPolicy Bypass -File ./run_all_tests.ps1"
     },
     "devDependencies": {
         "@headlessui/react": "^2.0.0",
