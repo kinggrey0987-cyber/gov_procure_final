@@ -27,3 +27,19 @@ deployment_packages/
 *.zip
 documents/
 scratch/
+
+# Automated Testing Frameworks, Caches & Reports
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+test-results/
+playwright-report/
+playwright.config.ts
+cypress/
+cypress.config.cjs
+tests/e2e/
+tests/selenium/
+tests/api/
+phpstan.neon
+.phpstan.cache/
