@@ -49,7 +49,12 @@ type Props = {
         workflow_bucket?: string;
         page?: number | null;
     };
-    officeShortageGroups?: Array<{ id: number; name: string; count: number }>;
+    officeShortageGroups?: Array<{
+        id: number;
+        name: string;
+        count: number;
+        requests?: RequestRow[];
+    }>;
 };
 
 type PageProps = {
@@ -127,17 +132,20 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
         });
     };
 
+    const [selectedConsolidationOfficeId, setSelectedConsolidationOfficeId] = useState<number | null>(null);
+
     // Offices with pending shortages eligible for consolidation (global from server or derived from rows)
     // Only includes offices with at least 2 pending shortage requests
     const officeShortageGroups = useMemo(() => {
         if (initialShortageGroups && initialShortageGroups.length > 0) {
             return initialShortageGroups.filter((g) => g.count >= 2);
         }
-        const map = new Map<number, { id: number; name: string; count: number }>();
+        const map = new Map<number, { id: number; name: string; count: number; requests: RequestRow[] }>();
         requests.data.forEach((r) => {
             if (r.stock_assessment === 'SHORTAGE_REQUIRES_PROCUREMENT' && r.status === 'SUBMITTED' && !r.has_purchase_request && r.office?.id) {
-                const existing = map.get(r.office.id) ?? { id: r.office.id, name: r.office.name ?? 'Office', count: 0 };
+                const existing = map.get(r.office.id) ?? { id: r.office.id, name: r.office.name ?? 'Office', count: 0, requests: [] };
                 existing.count++;
+                existing.requests.push(r);
                 map.set(r.office.id, existing);
             }
         });
@@ -146,74 +154,56 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
             .sort((a, b) => b.count - a.count);
     }, [initialShortageGroups, requests.data]);
 
-    const selectedRequests = useMemo(() => {
-        return requests.data.filter((r) => selectedRequestIds.has(r.supply_request_id));
-    }, [requests.data, selectedRequestIds]);
-
-    const activeOfficeId = useMemo(() => {
-        if (officeId && Number(officeId) > 0) return Number(officeId);
-        if (selectedRequests.length > 0 && selectedRequests[0].office?.id) {
-            return selectedRequests[0].office.id;
+    // Active office for consolidation
+    const activeConsolidationOffice = useMemo(() => {
+        if (officeShortageGroups.length === 0) return null;
+        if (selectedConsolidationOfficeId) {
+            const found = officeShortageGroups.find((g) => g.id === selectedConsolidationOfficeId);
+            if (found) return found;
         }
-        return null;
-    }, [officeId, selectedRequests]);
+        return officeShortageGroups[0];
+    }, [officeShortageGroups, selectedConsolidationOfficeId]);
 
-    const targetOfficeName = useMemo(() => {
-        if (!activeOfficeId) return null;
-        const found = offices.find((o) => o.id === activeOfficeId);
-        if (found) return found.name;
-        return selectedRequests[0]?.office?.name ?? 'Selected Office';
-    }, [activeOfficeId, offices, selectedRequests]);
+    const activeOfficeId = activeConsolidationOffice?.id ?? null;
+    const targetOfficeName = activeConsolidationOffice?.name ?? null;
 
-    // An office is only eligible for consolidation if it has 2 or more pending shortage requests
-    const eligibleOfficeIds = useMemo(() => {
-        const ids = new Set<number>();
-        officeShortageGroups.forEach((g) => {
-            if (g.count >= 2) {
-                ids.add(g.id);
-            }
-        });
-        return ids;
-    }, [officeShortageGroups]);
-
-    // Eligible requests for consolidation (only from offices that have >= 2 pending shortages)
+    // Eligible requests for the active office
     const consolidatableRequests = useMemo(() => {
-        return requests.data.filter((r) => {
-            if (r.stock_assessment !== 'SHORTAGE_REQUIRES_PROCUREMENT' || r.status !== 'SUBMITTED' || r.has_purchase_request) {
-                return false;
-            }
-            if (!r.office?.id || !eligibleOfficeIds.has(r.office.id)) {
-                return false;
-            }
-            if (activeOfficeId !== null) {
-                return r.office.id === activeOfficeId;
-            }
-            return true;
-        });
-    }, [requests.data, activeOfficeId, eligibleOfficeIds]);
-
-    // Consolidation UI should only be shown if there is at least one office with >= 2 pending shortage requests
-    const isConsolidationAvailable = useMemo(() => {
-        if (activeOfficeId !== null) {
-            return eligibleOfficeIds.has(activeOfficeId) && consolidatableRequests.length >= 2;
+        if (!activeConsolidationOffice) return [];
+        if (activeConsolidationOffice.requests && activeConsolidationOffice.requests.length > 0) {
+            return activeConsolidationOffice.requests;
         }
-        return eligibleOfficeIds.size > 0 && consolidatableRequests.length >= 2;
-    }, [activeOfficeId, eligibleOfficeIds, consolidatableRequests.length]);
+        return requests.data.filter((r) => {
+            return (
+                r.stock_assessment === 'SHORTAGE_REQUIRES_PROCUREMENT' &&
+                r.status === 'SUBMITTED' &&
+                !r.has_purchase_request &&
+                r.office?.id === activeConsolidationOffice.id
+            );
+        });
+    }, [activeConsolidationOffice, requests.data]);
+
+    // Automatically pre-select all eligible requests for the active office
+    useEffect(() => {
+        if (consolidatableRequests.length >= 2) {
+            setSelectedRequestIds(new Set(consolidatableRequests.map((r) => r.supply_request_id)));
+        } else {
+            setSelectedRequestIds(new Set());
+        }
+    }, [activeConsolidationOffice?.id, consolidatableRequests.length]);
+
+    const selectedRequests = useMemo(() => {
+        return consolidatableRequests.filter((r) => selectedRequestIds.has(r.supply_request_id));
+    }, [consolidatableRequests, selectedRequestIds]);
+
+    const canConsolidate = activeOfficeId !== null && selectedRequestIds.size >= 2;
 
     const toggleSelect = (id: number) => {
-        const targetReq = requests.data.find((r) => r.supply_request_id === id);
-        const targetOfficeId = targetReq?.office?.id;
-        if (!targetReq || !targetOfficeId || !eligibleOfficeIds.has(targetOfficeId)) return;
-
         setSelectedRequestIds((prev) => {
             const next = new Set(prev);
             if (next.has(id)) {
                 next.delete(id);
             } else {
-                const prevOfficeId = selectedRequests[0]?.office?.id;
-                if (prevOfficeId && prevOfficeId !== targetOfficeId) {
-                    return new Set([id]);
-                }
                 next.add(id);
             }
             return next;
@@ -224,15 +214,9 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
         if (selectedRequestIds.size >= consolidatableRequests.length) {
             setSelectedRequestIds(new Set());
         } else {
-            const targetOffice = activeOfficeId ?? (consolidatableRequests[0]?.office?.id ?? null);
-            if (targetOffice) {
-                const officeReqs = consolidatableRequests.filter((r) => r.office?.id === targetOffice);
-                setSelectedRequestIds(new Set(officeReqs.map((r) => r.supply_request_id)));
-            }
+            setSelectedRequestIds(new Set(consolidatableRequests.map((r) => r.supply_request_id)));
         }
     };
-
-    const canConsolidate = activeOfficeId !== null && selectedRequestIds.size >= 2;
 
     // Aggregated item lines for preview modal
     const aggregatedItems = useMemo(() => {
@@ -342,99 +326,226 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
                     </p>
                 </div>
 
-                {officeShortageGroups.length > 0 ? (
-                    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-red-200 bg-red-50/70 p-3.5 shadow-sm">
-                        <span className="text-xs font-bold uppercase tracking-wider text-red-950">
-                            📦 Consolidate Pending Shortages by Office:
-                        </span>
-                        <div className="flex flex-wrap items-center gap-2">
-                            {officeShortageGroups.map((g) => (
-                                <button
-                                    key={g.id}
-                                    type="button"
-                                    onClick={() => setOfficeId(String(g.id))}
-                                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${Number(activeOfficeId) === g.id
-                                            ? 'bg-red-700 text-white shadow-sm ring-2 ring-red-400'
-                                            : 'border border-red-200 bg-white text-red-800 hover:bg-red-100/80'
-                                        }`}
-                                >
-                                    <span>{g.name}</span>
-                                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${Number(activeOfficeId) === g.id ? 'bg-red-900 text-red-100' : 'bg-red-100 text-red-800'}`}>
-                                        {g.count} pending
-                                    </span>
-                                </button>
-                            ))}
-                            {officeId ? (
-                                <button
-                                    type="button"
-                                    onClick={() => setOfficeId('')}
-                                    className="ml-2 text-xs font-medium text-red-700 underline hover:text-red-900"
-                                >
-                                    Show all offices
-                                </button>
-                            ) : null}
-                        </div>
-                    </div>
-                ) : null}
+                {officeShortageGroups.length > 0 && activeConsolidationOffice && (
+                    <div className="relative overflow-hidden rounded-2xl border border-slate-200/90 bg-gradient-to-b from-white via-slate-50/40 to-white p-5 sm:p-6 shadow-sm">
+                        {/* Top decorative gradient bar */}
+                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-600 via-amber-500 to-red-700" />
 
-                {isConsolidationAvailable ? (
-                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-5 py-3.5 shadow-sm">
-                        <div className="flex-1 min-w-[260px]">
-                            <div className="flex items-center gap-2">
-                                <span className="text-lg">📦</span>
-                                <h4 className="text-sm font-bold text-red-950">
-                                    Consolidate Office Requests into PR
-                                </h4>
-                                {targetOfficeName ? (
-                                    <span className="rounded-md bg-red-200 text-red-950 px-2 py-0.5 text-xs font-bold">
-                                        {targetOfficeName}
-                                    </span>
-                                ) : null}
+                        {/* Hub Header */}
+                        <div className="flex flex-col gap-4 border-b border-slate-200/80 pb-5 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-start gap-3.5">
+                                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-red-200/70 bg-red-50 text-red-700 shadow-2xs">
+                                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <h3 className="text-base font-bold tracking-tight text-slate-900">
+                                            Consolidated PR Creation Hub
+                                        </h3>
+                                        <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200/80 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+                                            <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                            {officeShortageGroups.reduce((acc, g) => acc + g.count, 0)} Shortages Ready for Consolidation
+                                        </span>
+                                    </div>
+                                    <p className="mt-1 text-xs text-slate-500">
+                                        Batch multiple shortage requests from the same department into one official Purchase Request for BAC procurement.
+                                    </p>
+                                </div>
                             </div>
-                            <p className="mt-0.5 text-xs text-red-700">
-                                Select 2 or more shortage requests below to merge item quantities into one Consolidated Purchase Request and forward directly to BAC.
-                                {selectedRequestIds.size > 0 ? (
-                                    <span className="ml-1.5 font-bold text-red-950">
-                                        ({selectedRequestIds.size} request{selectedRequestIds.size > 1 ? 's' : ''} selected)
-                                    </span>
-                                ) : null}
-                            </p>
+
+                            {/* Multi-Office Selector (Only displayed if 2 or more offices have multiple shortages) */}
+                            {officeShortageGroups.length > 1 && (
+                                <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-200/90 bg-slate-100/90 p-1.5 shadow-2xs">
+                                    <span className="px-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">Department:</span>
+                                    {officeShortageGroups.map((g) => {
+                                        const isSelected = g.id === activeOfficeId;
+                                        return (
+                                            <button
+                                                key={g.id}
+                                                type="button"
+                                                onClick={() => setSelectedConsolidationOfficeId(g.id)}
+                                                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                                                    isSelected
+                                                        ? 'border border-slate-300/80 bg-white font-bold text-slate-900 shadow-2xs'
+                                                        : 'text-slate-600 hover:bg-slate-200/70 hover:text-slate-900'
+                                                }`}
+                                            >
+                                                <span>{g.name}</span>
+                                                <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                                                    isSelected ? 'bg-red-100 text-red-700' : 'bg-slate-200 text-slate-600'
+                                                }`}>
+                                                    {g.count}
+                                                </span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={toggleSelectAll}
-                                className="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
-                            >
-                                {selectedRequestIds.size >= consolidatableRequests.length ? 'Deselect All' : 'Select All'}
-                            </button>
-                            <button
-                                type="button"
-                                disabled={!canConsolidate || isConsolidating}
-                                onClick={() => setShowPreviewModal(true)}
-                                className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                                {isConsolidating ? 'Processing...' : `Preview & Forward to BAC (${selectedRequestIds.size})`}
-                            </button>
+
+                        {/* Office Context & Action Bar */}
+                        <div className="mt-4 flex flex-col gap-3 rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-100 text-base shadow-2xs">
+                                    🏢
+                                </div>
+                                <div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span className="text-xs font-medium text-slate-500">Target Office:</span>
+                                        <span className="text-sm font-bold text-slate-900">{targetOfficeName}</span>
+                                        <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                                            {consolidatableRequests.length} pending requests
+                                        </span>
+                                    </div>
+                                    <p className="mt-0.5 text-xs text-slate-500">
+                                        {selectedRequestIds.size === 0
+                                            ? 'Select 2 or more requests below to merge into a single PR.'
+                                            : `${selectedRequestIds.size} of ${consolidatableRequests.length} requests selected for consolidation.`}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex flex-wrap items-center gap-2 sm:self-center">
+                                <button
+                                    type="button"
+                                    onClick={toggleSelectAll}
+                                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 transition"
+                                >
+                                    <svg className="h-3.5 w-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    {selectedRequestIds.size >= consolidatableRequests.length ? 'Deselect All' : `Select All (${consolidatableRequests.length})`}
+                                </button>
+
+                                <button
+                                    type="button"
+                                    disabled={!canConsolidate || isConsolidating}
+                                    onClick={() => setShowPreviewModal(true)}
+                                    className="inline-flex items-center gap-2 rounded-xl bg-red-700 px-4 py-2 text-xs sm:text-sm font-semibold text-white shadow-sm transition hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-40"
+                                >
+                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                    </svg>
+                                    <span>{isConsolidating ? 'Processing...' : `Preview & Forward to BAC (${selectedRequestIds.size})`}</span>
+                                </button>
+                            </div>
                         </div>
+
+                        {/* Interactive Request Cards */}
+                        <div className="mt-4 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+                            {consolidatableRequests.map((request) => {
+                                const isSelected = selectedRequestIds.has(request.supply_request_id);
+                                return (
+                                    <div
+                                        key={request.supply_request_id}
+                                        onClick={() => toggleSelect(request.supply_request_id)}
+                                        className={`group relative flex cursor-pointer flex-col justify-between rounded-xl border p-4 transition-all duration-200 ${
+                                            isSelected
+                                                ? 'border-red-400 bg-red-50/30 ring-2 ring-red-400/25 shadow-xs'
+                                                : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50'
+                                        }`}
+                                    >
+                                        <div>
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div className="flex items-center gap-2.5">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isSelected}
+                                                        onChange={() => {}}
+                                                        className="h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                                                    />
+                                                    <span className="font-mono text-xs font-bold text-slate-800">
+                                                        {request.request_code}
+                                                    </span>
+                                                </div>
+                                                <span className="inline-flex rounded-full border border-rose-200/60 bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-rose-700">
+                                                    Needs Procurement
+                                                </span>
+                                            </div>
+
+                                            <div className="mt-2 text-xs text-slate-600">
+                                                <span className="font-medium text-slate-700">Requester: </span>
+                                                {request.requester?.name ? request.requester.name : 'Office Staff'}
+                                            </div>
+
+                                            {/* Item preview chips */}
+                                            {request.requested_items && request.requested_items.length > 0 && (
+                                                <div className="mt-2.5 flex flex-wrap gap-1">
+                                                    {request.requested_items.slice(0, 3).map((item, i) => (
+                                                        <span
+                                                            key={i}
+                                                            className="inline-flex items-center rounded-md border border-slate-200/70 bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-700"
+                                                        >
+                                                            {item.item_name}: <strong className="ml-1 text-slate-900">{item.quantity_requested} {item.unit}</strong>
+                                                        </span>
+                                                    ))}
+                                                    {request.requested_items.length > 3 && (
+                                                        <span className="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
+                                                            +{request.requested_items.length - 3} more
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="mt-3.5 flex items-center justify-between border-t border-slate-100 pt-2 text-[11px] text-slate-500">
+                                            <span>Needed: {request.needed_by_date || 'ASAP'}</span>
+                                            <span className="font-semibold text-slate-700">{request.item_count} item(s)</span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Live Merged Demand Drawer */}
+                        {selectedRequests.length >= 2 && aggregatedItems.length > 0 && (
+                            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/80 p-3.5 transition-all">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm">📊</span>
+                                        <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                                            Merged Demand Summary:
+                                        </span>
+                                        <span className="text-xs font-semibold text-slate-600">
+                                            {aggregatedItems.length} unique items across {selectedRequests.length} requests
+                                        </span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPreviewModal(true)}
+                                        className="text-xs font-semibold text-red-700 hover:text-red-900 underline"
+                                    >
+                                        View Full Breakdown ({aggregatedItems.length}) →
+                                    </button>
+                                </div>
+                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                    {aggregatedItems.slice(0, 6).map((item, idx) => (
+                                        <span
+                                            key={idx}
+                                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-700 shadow-2xs"
+                                        >
+                                            <span className="font-medium text-slate-800">{item.item_name}:</span>
+                                            <span className="font-bold text-red-700">{item.total_quantity} {item.unit}</span>
+                                        </span>
+                                    ))}
+                                    {aggregatedItems.length > 6 && (
+                                        <span className="inline-flex items-center rounded-lg bg-slate-200/70 px-2 py-1 text-xs font-semibold text-slate-600">
+                                            +{aggregatedItems.length - 6} more items
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
-                ) : null}
+                )}
 
                 <div className="responsive-table-wrap rounded-xl border border-slate-200 bg-white shadow-sm">
                     <table className="min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-slate-50">
                             <tr>
-                                {isConsolidationAvailable ? (
-                                    <th className="px-3 py-3 text-center w-12">
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedRequestIds.size >= consolidatableRequests.length && consolidatableRequests.length > 0}
-                                            onChange={toggleSelectAll}
-                                            className="h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
-                                            title="Select all eligible requests"
-                                        />
-                                    </th>
-                                ) : null}
                                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Request</th>
                                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Office</th>
                                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Needed By</th>
@@ -449,20 +560,6 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
 
                                 return (
                                     <tr key={request.supply_request_id} className="hover:bg-slate-50/60">
-                                        {isConsolidationAvailable ? (
-                                            <td className="px-3 py-3 text-center">
-                                                {consolidatableRequests.some((r) => r.supply_request_id === request.supply_request_id) ? (
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selectedRequestIds.has(request.supply_request_id)}
-                                                        onChange={() => toggleSelect(request.supply_request_id)}
-                                                        className="h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
-                                                    />
-                                                ) : (
-                                                    <span className="text-xs text-slate-300">—</span>
-                                                )}
-                                            </td>
-                                        ) : null}
                                         <td className="px-4 py-3">
                                             <p className="font-mono text-xs text-slate-700">{request.request_code}</p>
                                             <p className="mt-1 text-xs text-slate-500">
@@ -576,7 +673,7 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
                             })}
                             {requests.data.length === 0 ? (
                                 <tr>
-                                    <td colSpan={isConsolidationAvailable ? 7 : 6} className="px-4 py-8 text-center text-sm text-slate-500">
+                                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-500">
                                         No office supply requests available for review.
                                     </td>
                                 </tr>

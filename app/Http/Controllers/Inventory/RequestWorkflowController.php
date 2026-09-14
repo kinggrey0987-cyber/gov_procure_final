@@ -37,9 +37,13 @@ class RequestWorkflowController
         $officeId = (int) $request->query('office_id', 0);
         $allRows = $this->officeSupplyRequestRows($search, $officeId);
 
-        // Compute global shortage groups across all offices so chips are always visible
+        $shortageSourceRows = ($officeId > 0 || $search !== '')
+            ? $this->officeSupplyRequestRows('', 0)
+            : $allRows;
+
+        // Compute global shortage groups across all offices so the Consolidation Hub is always fully informed
         // Only show offices with at least 2 pending shortages eligible for consolidation
-        $officeShortageGroups = $allRows
+        $officeShortageGroups = $shortageSourceRows
             ->where('stock_assessment', 'SHORTAGE_REQUIRES_PROCUREMENT')
             ->where('status', 'SUBMITTED')
             ->where('has_purchase_request', false)
@@ -51,6 +55,7 @@ class RequestWorkflowController
                     'id' => (int) $first['office']['id'],
                     'name' => (string) $first['office']['name'],
                     'count' => $group->count(),
+                    'requests' => $group->values()->all(),
                 ];
             })
             ->sortByDesc('count')
