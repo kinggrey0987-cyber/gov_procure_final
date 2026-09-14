@@ -62,11 +62,12 @@ class PurchaseRequestService
 
         return DB::transaction(function () use ($actor, $payload, $supplyRequest): PurchaseRequest {
             $purchaseRequest = PurchaseRequest::query()->create([
-                    'supply_request_id' => (int) $supplyRequest->supply_request_id,
-                    'office_id' => (int) $supplyRequest->office_id,
-                    'requested_by' => (int) $supplyRequest->requested_by,
-                    'status' => 'OPEN',
-                    'remarks' => $payload['remarks'] ?? null,
+                'pr_number' => $this->generateNextPrNumber(),
+                'supply_request_id' => (int) $supplyRequest->supply_request_id,
+                'office_id' => (int) $supplyRequest->office_id,
+                'requested_by' => (int) $supplyRequest->requested_by,
+                'status' => 'OPEN',
+                'remarks' => $payload['remarks'] ?? null,
             ]);
 
             $itemRows = [];
@@ -172,6 +173,7 @@ class PurchaseRequestService
                 $this->recordAudit($actor, 'REQUEUE', $purchaseRequest);
             } else {
                 $purchaseRequest = PurchaseRequest::query()->create([
+                    'pr_number' => $this->generateNextPrNumber(),
                     'supply_request_id' => (int) $supplyRequest->supply_request_id,
                     'office_id' => (int) $supplyRequest->office_id,
                     'requested_by' => (int) $supplyRequest->requested_by,
@@ -203,8 +205,8 @@ class PurchaseRequestService
                 role: UserRole::PROCUREMENT_OFFICER,
                 title: 'Purchase Request Queued for Review',
                 message: sprintf(
-                    'GSO queued PR-%06d from supply request %s for Procurement Unit review.',
-                    (int) $purchaseRequest->purchase_request_id,
+                    'GSO queued %s from supply request %s for Procurement Unit review.',
+                    (string) $purchaseRequest->pr_number,
                     (string) $supplyRequest->request_code,
                 ),
                 notificationType: 'PROCUREMENT_PURCHASE_REQUEST_QUEUED',
@@ -313,6 +315,7 @@ class PurchaseRequestService
             ]);
 
             $purchaseRequest = PurchaseRequest::query()->create([
+                'pr_number' => $this->generateNextPrNumber(),
                 'supply_request_id' => (int) $supplyRequest->supply_request_id,
                 'office_id' => $officeId,
                 'requested_by' => (int) $actor->id,
@@ -401,8 +404,8 @@ class PurchaseRequestService
         if ($existing instanceof PurchaseRequest) {
             throw ValidationException::withMessages([
                 'replacement_quantity' => sprintf(
-                    'A replacement purchase request is already active for this claim (PR-%06d).',
-                    (int) $existing->purchase_request_id
+                    'A replacement purchase request is already active for this claim (%s).',
+                    (string) $existing->pr_number
                 ),
             ]);
         }
@@ -452,6 +455,7 @@ class PurchaseRequestService
             ]);
 
             $purchaseRequest = PurchaseRequest::query()->create([
+                'pr_number' => $this->generateNextPrNumber(),
                 'supply_request_id' => (int) $supplyRequest->supply_request_id,
                 'office_id' => $officeId,
                 'requested_by' => (int) $actor->id,
@@ -519,8 +523,8 @@ class PurchaseRequestService
         if ($existing instanceof PurchaseRequest) {
             throw ValidationException::withMessages([
                 'delivery_id' => sprintf(
-                    'A follow-up purchase request already exists for this partially received delivery (PR-%06d).',
-                    (int) $existing->purchase_request_id
+                    'A follow-up purchase request already exists for this partially received delivery (%s).',
+                    (string) $existing->pr_number
                 ),
             ]);
         }
@@ -585,6 +589,7 @@ class PurchaseRequestService
             ]);
 
             $purchaseRequest = PurchaseRequest::query()->create([
+                'pr_number' => $this->generateNextPrNumber(),
                 'supply_request_id' => (int) $supplyRequest->supply_request_id,
                 'office_id' => $officeId,
                 'requested_by' => (int) $actor->id,
@@ -903,25 +908,43 @@ class PurchaseRequestService
         });
     }
 
+    public function generateNextPrNumber(?\DateTimeInterface $date = null): string
+    {
+        $targetDate = $date ?? now();
+        $prefix = sprintf('PR-%s-', $targetDate->format('Y-m'));
+
+        $latest = PurchaseRequest::query()
+            ->where('pr_number', 'like', $prefix.'%')
+            ->orderByDesc('pr_number')
+            ->value('pr_number');
+
+        $nextSequence = 1;
+        if (is_string($latest) && preg_match('/^PR-\d{4}-\d{2}-(\d+)$/', $latest, $matches) === 1) {
+            $nextSequence = ((int) $matches[1]) + 1;
+        }
+
+        do {
+            $candidate = sprintf('%s%04d', $prefix, $nextSequence);
+            $nextSequence++;
+        } while (PurchaseRequest::query()->where('pr_number', $candidate)->exists());
+
+        return $candidate;
+    }
+
     private function buildRequestCode(int $officeId): string
     {
         $office = Office::query()->find($officeId);
         $officeCode = $office ? (string) $office->code : 'GEN';
+        $prefix = sprintf('SR-%s-%s-', $officeCode, now()->format('Y-m'));
 
         $countThisMonth = SupplyRequest::query()
             ->where('office_id', $officeId)
-            ->whereYear('created_at', now()->year)
-            ->whereMonth('created_at', now()->month)
+            ->where('request_code', 'like', $prefix.'%')
             ->count();
 
         $nextSequence = $countThisMonth + 1;
         do {
-            $code = sprintf(
-                'SR-%s-%s-%02d',
-                $officeCode,
-                now()->format('Ym'),
-                $nextSequence
-            );
+            $code = sprintf('%s%04d', $prefix, $nextSequence);
             $nextSequence++;
         } while (SupplyRequest::query()->where('request_code', $code)->exists());
 
@@ -1136,6 +1159,7 @@ class PurchaseRequestService
             $sourceRequestCodes = $eligible->pluck('request_code')->implode(', ');
 
             $purchaseRequest = PurchaseRequest::query()->create([
+                'pr_number' => $this->generateNextPrNumber(),
                 'supply_request_id' => (int) $primarySupplyRequest->supply_request_id,
                 'office_id' => (int) $office->id,
                 'requested_by' => (int) $actor->id,
@@ -1168,7 +1192,7 @@ class PurchaseRequestService
                     $supplyRequest,
                     $actor,
                     'FOR_PROCUREMENT',
-                    sprintf('Supply request consolidated into PR-%06d for office %s.', (int) $purchaseRequest->purchase_request_id, (string) $office->name),
+                    sprintf('Supply request consolidated into %s for office %s.', (string) $purchaseRequest->pr_number, (string) $office->name),
                 );
             }
 
@@ -1183,10 +1207,10 @@ class PurchaseRequestService
                 role: UserRole::PROCUREMENT_OFFICER,
                 title: 'Consolidated Purchase Request Queued',
                 message: sprintf(
-                    'GSO consolidated %d supply request(s) from %s into PR-%06d for Procurement Unit review.',
+                    'GSO consolidated %d supply request(s) from %s into %s for Procurement Unit review.',
                     $eligible->count(),
                     (string) $office->name,
-                    (int) $purchaseRequest->purchase_request_id,
+                    (string) $purchaseRequest->pr_number,
                 ),
                 notificationType: 'PROCUREMENT_PURCHASE_REQUEST_QUEUED',
                 referenceType: PurchaseRequest::class,

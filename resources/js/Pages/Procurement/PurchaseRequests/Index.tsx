@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 type PurchaseRequestRow = {
     purchase_request_id: number;
+    pr_number?: string | null;
     supply_request_id?: number | null;
     status: string;
     created_at?: string;
@@ -170,7 +171,7 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                                         <td className="px-4 py-3 font-semibold text-red-700">
                                             {(() => {
                                                 const isConsolidated = Boolean(row.remarks && (row.remarks.includes('Consolidated PR') || /from \d+ supply requests/i.test(row.remarks)));
-                                                const prNumber = `PR-${String(row.purchase_request_id).padStart(6, '0')}`;
+                                                const prNumber = row.pr_number || `PR-${String(row.purchase_request_id).padStart(6, '0')}`;
                                                 return (
                                                     <div>
                                                         <div className="flex items-center gap-1.5 flex-wrap">

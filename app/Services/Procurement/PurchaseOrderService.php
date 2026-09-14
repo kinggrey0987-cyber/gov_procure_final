@@ -541,20 +541,28 @@ class PurchaseOrderService
         }
     }
 
-    private function generateNextPoNumber(): string
+    public function generateNextPoNumber(?\DateTimeInterface $date = null): string
     {
+        $targetDate = $date ?? now();
+        $prefix = sprintf('PO-%s-', $targetDate->format('Y-m'));
+
         $latest = PurchaseOrder::query()
-            ->where('po_number', 'like', 'PO-'.date('Y').'-%')
-            ->latest('purchase_order_id')
+            ->where('po_number', 'like', $prefix.'%')
+            ->orderByDesc('po_number')
             ->value('po_number');
 
         $nextSequence = 1;
 
-        if (is_string($latest) && preg_match('/^PO-\d{4}-(\d+)$/', $latest, $matches) === 1) {
+        if (is_string($latest) && preg_match('/^PO-\d{4}-\d{2}-(\d+)$/', $latest, $matches) === 1) {
             $nextSequence = ((int) $matches[1]) + 1;
         }
 
-        return sprintf('PO-%s-%05d', date('Y'), $nextSequence);
+        do {
+            $candidate = sprintf('%s%04d', $prefix, $nextSequence);
+            $nextSequence++;
+        } while (PurchaseOrder::query()->where('po_number', $candidate)->exists());
+
+        return $candidate;
     }
 
     private function generateAutoDeliveryCode(): string

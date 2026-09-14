@@ -21,6 +21,7 @@ class PurchaseRequest extends Model
     }
 
      protected $fillable = [
+         'pr_number',
          'supply_request_id',
          'office_id',
          'requested_by',
@@ -39,15 +40,26 @@ class PurchaseRequest extends Model
          'source_claim_id' => 'integer',
      ];
 
-    public function supplyRequest(): BelongsTo
-    {
-        return $this->belongsTo(SupplyRequest::class, 'supply_request_id', 'supply_request_id');
-    }
+     public function getPrNumberAttribute(?string $value): string
+     {
+         if (! empty($value)) {
+             return $value;
+         }
 
-    public function office(): BelongsTo
-    {
-        return $this->belongsTo(Office::class);
-    }
+         $date = $this->created_at ?? now();
+
+         return sprintf('PR-%s-%04d', $date->format('Y-m'), (int) $this->purchase_request_id);
+     }
+
+     public function supplyRequest(): BelongsTo
+     {
+         return $this->belongsTo(SupplyRequest::class, 'supply_request_id', 'supply_request_id');
+     }
+
+     public function office(): BelongsTo
+     {
+         return $this->belongsTo(Office::class);
+     }
 
      public function requester(): BelongsTo
      {

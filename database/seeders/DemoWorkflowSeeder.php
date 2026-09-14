@@ -613,6 +613,7 @@ class DemoWorkflowSeeder extends Seeder
             $purchaseRequest = PurchaseRequest::query()->updateOrCreate(
                 ['supply_request_id' => (int) $request->supply_request_id],
                 [
+                    'pr_number' => sprintf('PR-%s-%04d', now()->format('Y-m'), $index + 1),
                     'office_id' => (int) $request->office_id,
                     'requested_by' => (int) $request->requested_by,
                     'status' => $index === 0 ? 'PENDING' : ($index % 2 === 0 ? 'PROCESSING' : 'COMPLETED'),
@@ -637,7 +638,7 @@ class DemoWorkflowSeeder extends Seeder
 
             if ((string) $purchaseRequest->status === 'PROCESSING') {
                 $purchaseOrder = PurchaseOrder::query()->updateOrCreate(
-                    ['po_number' => sprintf('PO-PRES-%04d', $index + 1)],
+                    ['po_number' => sprintf('PO-%s-%04d', now()->format('Y-m'), $index + 1)],
                     [
                         'purchase_request_id' => (int) $purchaseRequest->purchase_request_id,
                         'supply_request_id' => (int) $request->supply_request_id,

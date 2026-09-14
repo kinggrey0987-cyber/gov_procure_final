@@ -42,7 +42,8 @@ class PurchaseOrderController extends Controller
                 $query->where(function ($nested) use ($search): void {
                     $nested->whereLikeInsensitive('po_number', $search)
                         ->orWhereHas('supplier', fn ($supplierQuery) => $supplierQuery->whereLikeInsensitive('supplier_name', $search))
-                        ->orWhereHas('purchaseRequest.office', fn ($officeQuery) => $officeQuery->whereLikeInsensitive('name', $search));
+                        ->orWhereHas('purchaseRequest.office', fn ($officeQuery) => $officeQuery->whereLikeInsensitive('name', $search))
+                        ->orWhereHas('purchaseRequest', fn ($prQuery) => $prQuery->whereLikeInsensitive('pr_number', $search));
                 });
             })
             ->latest('purchase_order_id')
@@ -74,7 +75,7 @@ class PurchaseOrderController extends Controller
                 'sourceDelivery.purchaseOrder.supplier:supplier_id,supplier_name',
             ])
             ->latest('purchase_request_id')
-            ->get(['purchase_request_id', 'supply_request_id', 'office_id', 'status', 'requested_by', 'created_at', 'source_type', 'source_delivery_id'])
+            ->get(['purchase_request_id', 'pr_number', 'supply_request_id', 'office_id', 'status', 'requested_by', 'created_at', 'source_type', 'source_delivery_id'])
             ->map(function (PurchaseRequest $purchaseRequest): array {
                 $isDiscrepancyFollowUp = (string) $purchaseRequest->source_type === 'PARTIAL_DELIVERY_FOLLOW_UP'
                     || (int) ($purchaseRequest->source_delivery_id ?? 0) > 0;
@@ -84,6 +85,7 @@ class PurchaseOrderController extends Controller
 
                 return [
                     'purchase_request_id' => (int) $purchaseRequest->purchase_request_id,
+                    'pr_number' => (string) $purchaseRequest->pr_number,
                     'status' => (string) $purchaseRequest->status,
                     'created_at' => optional($purchaseRequest->created_at)?->toIso8601String(),
                     'source_type' => (string) ($purchaseRequest->source_type ?? ''),

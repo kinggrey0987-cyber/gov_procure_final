@@ -15,6 +15,7 @@ type PurchaseOrderRow = {
     } | null;
     purchase_request?: {
         purchase_request_id: number;
+        pr_number?: string | null;
         office?: {
             name?: string | null;
         } | null;
@@ -150,7 +151,7 @@ export default function PurchaseOrdersIndex({ purchaseOrders, filters }: Props) 
                                     <td className="px-4 py-3 font-semibold text-red-700">{row.po_number}</td>
                                     <td className="px-4 py-3 text-slate-700">{row.supplier?.supplier_name ?? '-'}</td>
                                     <td className="px-4 py-3 text-slate-700">
-                                        {row.purchase_request?.purchase_request_id ? `PR-${String(row.purchase_request.purchase_request_id).padStart(6, '0')}` : '-'}
+                                        {row.purchase_request?.pr_number || (row.purchase_request?.purchase_request_id ? `PR-${String(row.purchase_request.purchase_request_id).padStart(6, '0')}` : '-')}
                                         <p className="text-xs text-slate-500">{row.purchase_request?.office?.name ?? '-'}</p>
                                     </td>
                                     <td className="px-4 py-3 font-semibold text-slate-800">{formatMoney(Number(row.total_amount || 0))}</td>

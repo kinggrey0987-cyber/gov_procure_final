@@ -27,6 +27,7 @@ type PurchaseOrder = {
     is_zero_cost_replacement?: boolean;
     purchase_request?: {
         purchase_request_id?: number;
+        pr_number?: string | null;
         source_type?: string | null;
         source_delivery_id?: number | null;
         office?: {
@@ -293,7 +294,7 @@ export default function PurchaseOrdersShow({ purchaseOrder, isZeroCostReplacemen
 
                         <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
                             <Info label="Supplier" value={purchaseOrder.supplier?.supplier_name ?? '-'} />
-                            <Info label="Linked Request" value={purchaseOrder.purchase_request?.purchase_request_id ? `PR-${String(purchaseOrder.purchase_request.purchase_request_id).padStart(6, '0')}` : '-'} />
+                            <Info label="Linked Request" value={purchaseOrder.purchase_request?.pr_number || (purchaseOrder.purchase_request?.purchase_request_id ? `PR-${String(purchaseOrder.purchase_request.purchase_request_id).padStart(6, '0')}` : '-')} />
                             <Info label="Office" value={purchaseOrder.purchase_request?.office?.name ?? '-'} />
                             <Info label="Supply Request" value={purchaseOrder.supply_request?.request_code ?? '-'} />
                             <Info label="Requester" value={purchaseOrder.supply_request?.requester?.name ?? '-'} />

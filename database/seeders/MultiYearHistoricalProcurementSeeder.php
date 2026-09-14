@@ -256,7 +256,7 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
                     $delDate = Carbon::create($year, $qData['month'], $qData['del_day']);
                     $distDate = $delDate->copy()->addDays(2);
 
-                    $requestCode = sprintf('SR-%s-%d%02d-01', $officeCode, $year, $qData['month']);
+                    $requestCode = sprintf('SR-%s-%d-%02d-0001', $officeCode, $year, $qData['month']);
 
                     $supplyRequest = SupplyRequest::query()->updateOrCreate(
                         ['request_code' => $requestCode],
@@ -301,9 +301,11 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
                     }
 
                     // 3. Purchase Request & Purchase Order
+                    $prNumber = sprintf('PR-%d-%02d-%04d', $year, $qData['month'], (int) $office->id);
                     $pr = PurchaseRequest::query()->updateOrCreate(
                         ['supply_request_id' => $supplyRequest->supply_request_id],
                         [
+                            'pr_number' => $prNumber,
                             'office_id' => $office->id,
                             'requested_by' => $user->id,
                             'status' => 'COMPLETED',
@@ -384,7 +386,7 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
                         'approved_at' => $poDate,
                     ]);
 
-                    $poNumber = sprintf('PO-%d-%02d%02d-%s', $year, $qData['month'], $office->id, $officeCode);
+                    $poNumber = sprintf('PO-%d-%02d-%04d', $year, $qData['month'], (int) $office->id);
                     $poTotal = 0;
 
                     $po = PurchaseOrder::query()->updateOrCreate(

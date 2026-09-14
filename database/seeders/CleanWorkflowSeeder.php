@@ -207,7 +207,7 @@ class CleanWorkflowSeeder extends Seeder
         // Scenario A: STOCK READY Supply Request (MSWDO) -> for immediate distribution testing
         if ($mswdo) {
             $srDistributionReady = SupplyRequest::query()->create([
-                'request_code' => 'SR-MSWDO-202609-01',
+                'request_code' => 'SR-MSWDO-2026-09-0001',
                 'office_id' => $mswdo->id,
                 'requested_by' => $mswdoUser->id,
                 'ppmp_id' => $ppmps['MSWDO']->ppmp_id ?? null,
@@ -242,7 +242,7 @@ class CleanWorkflowSeeder extends Seeder
         // Two requests from MPDO and MSWDO requesting items that exceed warehouse stock
         if ($mpdo) {
             $srShortage1 = SupplyRequest::query()->create([
-                'request_code' => 'SR-MPDO-202609-02',
+                'request_code' => 'SR-MPDO-2026-09-0002',
                 'office_id' => $mpdo->id,
                 'requested_by' => $mpdoUser->id,
                 'ppmp_id' => $ppmps['MPDO']->ppmp_id ?? null,
@@ -274,7 +274,7 @@ class CleanWorkflowSeeder extends Seeder
 
         if ($mswdo) {
             $srShortage2 = SupplyRequest::query()->create([
-                'request_code' => 'SR-MSWDO-202609-03',
+                'request_code' => 'SR-MSWDO-2026-09-0002',
                 'office_id' => $mswdo->id,
                 'requested_by' => $mswdoUser->id,
                 'ppmp_id' => $ppmps['MSWDO']->ppmp_id ?? null,
@@ -312,7 +312,7 @@ class CleanWorkflowSeeder extends Seeder
         if ($eng && $mpdo) {
             // Source request 1 (MPDO Q3 supplies)
             $srConsolidatedSource1 = SupplyRequest::query()->create([
-                'request_code' => 'SR-MPDO-202609-01',
+                'request_code' => 'SR-MPDO-2026-09-0001',
                 'office_id' => $mpdo->id,
                 'requested_by' => $mpdoUser->id,
                 'ppmp_id' => $ppmps['MPDO']->ppmp_id ?? null,
@@ -322,7 +322,7 @@ class CleanWorkflowSeeder extends Seeder
                 'purpose' => 'Q3 municipal geospatial and statistical quarterly reports.',
                 'priority_level' => 'NORMAL',
                 'status' => 'FOR_PROCUREMENT',
-                'review_notes' => 'Supply request consolidated into PR-000001 for procurement.',
+                'review_notes' => 'Supply request consolidated into PR-2026-09-0001 for procurement.',
             ]);
 
             SupplyRequestItem::query()->create([
@@ -343,7 +343,7 @@ class CleanWorkflowSeeder extends Seeder
 
             // Source request 2 (ENG engineering survey supplies)
             $srConsolidatedSource2 = SupplyRequest::query()->create([
-                'request_code' => 'SR-ENG-202609-01',
+                'request_code' => 'SR-ENG-2026-09-0001',
                 'office_id' => $eng->id,
                 'requested_by' => $engUser->id,
                 'ppmp_id' => $ppmps['ENG']->ppmp_id ?? null,
@@ -353,7 +353,7 @@ class CleanWorkflowSeeder extends Seeder
                 'purpose' => 'Road network and drainage infrastructure project blueprints.',
                 'priority_level' => 'NORMAL',
                 'status' => 'FOR_PROCUREMENT',
-                'review_notes' => 'Supply request consolidated into PR-000001 for procurement.',
+                'review_notes' => 'Supply request consolidated into PR-2026-09-0001 for procurement.',
             ]);
 
             SupplyRequestItem::query()->create([
@@ -374,6 +374,7 @@ class CleanWorkflowSeeder extends Seeder
 
             // Exactly ONE Consolidated Purchase Request forwarded to BAC
             $consolidatedPr = PurchaseRequest::query()->create([
+                'pr_number' => 'PR-2026-09-0001',
                 'supply_request_id' => $srConsolidatedSource1->supply_request_id,
                 'office_id' => $mpdo->id,
                 'requested_by' => $gsoUser->id,
@@ -420,7 +421,7 @@ class CleanWorkflowSeeder extends Seeder
         if ($mho) {
             // Requisition for MHO
             $srMho = SupplyRequest::query()->create([
-                'request_code' => 'SR-MHO-202608-01',
+                'request_code' => 'SR-MHO-2026-08-0001',
                 'office_id' => $mho->id,
                 'requested_by' => $mhoUser->id,
                 'ppmp_id' => $ppmps['MHO']->ppmp_id ?? null,
@@ -451,6 +452,7 @@ class CleanWorkflowSeeder extends Seeder
 
             // Purchase Request
             $prMho = PurchaseRequest::query()->create([
+                'pr_number' => 'PR-2026-08-0001',
                 'supply_request_id' => $srMho->supply_request_id,
                 'office_id' => $mho->id,
                 'requested_by' => $gsoUser->id,
@@ -472,7 +474,7 @@ class CleanWorkflowSeeder extends Seeder
 
             // Active Purchase Order (Placed with supplier)
             $poActive = PurchaseOrder::query()->create([
-                'po_number' => 'PO-2026-09-001',
+                'po_number' => 'PO-2026-09-0001',
                 'purchase_request_id' => $prMho->purchase_request_id,
                 'supply_request_id' => $srMho->supply_request_id,
                 'supplier_id' => $supplier->supplier_id,
@@ -510,7 +512,7 @@ class CleanWorkflowSeeder extends Seeder
         // Completed historical procurement (Q2) for Analytics, Timeline & Disclosures
         if ($mpdo) {
             $srHistorical = SupplyRequest::query()->create([
-                'request_code' => 'SR-MPDO-202604-01',
+                'request_code' => 'SR-MPDO-2026-04-0001',
                 'office_id' => $mpdo->id,
                 'requested_by' => $mpdoUser->id,
                 'ppmp_id' => $ppmps['MPDO']->ppmp_id ?? null,
@@ -532,6 +534,7 @@ class CleanWorkflowSeeder extends Seeder
             ]);
 
             $prHistorical = PurchaseRequest::query()->create([
+                'pr_number' => 'PR-2026-04-0001',
                 'supply_request_id' => $srHistorical->supply_request_id,
                 'office_id' => $mpdo->id,
                 'requested_by' => $gsoUser->id,
@@ -546,7 +549,7 @@ class CleanWorkflowSeeder extends Seeder
             ]);
 
             $poHistorical = PurchaseOrder::query()->create([
-                'po_number' => 'PO-2026-05-001',
+                'po_number' => 'PO-2026-05-0001',
                 'purchase_request_id' => $prHistorical->purchase_request_id,
                 'supply_request_id' => $srHistorical->supply_request_id,
                 'supplier_id' => $supplier->supplier_id,
@@ -726,7 +729,7 @@ class CleanWorkflowSeeder extends Seeder
             'purchase_order_id' => $poPlaced->purchase_order_id ?? null,
             'supplier_id' => $supplier->id,
             'office_id' => $mho->id,
-            'alert_message' => 'Supplier Metro Office Depot Trading PO-2026-09-001 delivery status pending follow-up.',
+            'alert_message' => 'Supplier Metro Office Depot Trading PO-2026-09-0001 delivery status pending follow-up.',
             'detected_at' => Carbon::parse('2026-09-08 11:30:00'),
             'status' => 'TRIGGERED',
         ]);

@@ -521,22 +521,24 @@ class SupplyRequestService
         );
     }
 
-    private function buildRequestCode(int $officeId, Office $office): string
+    public function buildRequestCode(int $officeId, Office $office, ?\DateTimeInterface $date = null): string
     {
+        $targetDate = $date ?? now();
+        $prefix = sprintf('SR-%s-%s-', (string) $office->code, $targetDate->format('Y-m'));
+
         $countThisMonth = SupplyRequest::query()
             ->where('office_id', $officeId)
-            ->whereYear('created_at', now()->year)
-            ->whereMonth('created_at', now()->month)
+            ->where('request_code', 'like', $prefix.'%')
             ->count();
 
         $nextSequence = $countThisMonth + 1;
 
-        return sprintf(
-            'SR-%s-%s-%02d',
-            (string) $office->code,
-            now()->format('Ym'),
-            $nextSequence
-        );
+        do {
+            $candidate = sprintf('%s%04d', $prefix, $nextSequence);
+            $nextSequence++;
+        } while (SupplyRequest::query()->where('request_code', $candidate)->exists());
+
+        return $candidate;
     }
 
     private function createOrUpdatePpmpOverRequestAnomalies(SupplyRequest $supplyRequest): int

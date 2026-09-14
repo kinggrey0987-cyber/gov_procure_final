@@ -5,6 +5,7 @@ import { FormEvent } from 'react';
 
 type PurchaseRequest = {
     purchase_request_id: number;
+    pr_number?: string | null;
     supply_request_id: number | null;
     status: string;
     remarks: string | null;
@@ -163,7 +164,7 @@ export default function PurchaseRequestsShow({ purchaseRequest, traceability, re
                                     ) : null}
                                 </div>
                                 <h3 className="mt-1 text-lg font-semibold text-slate-900">
-                                    {`PR-${String(purchaseRequest.purchase_request_id).padStart(6, '0')}`}
+                                    {purchaseRequest.pr_number || `PR-${String(purchaseRequest.purchase_request_id).padStart(6, '0')}`}
                                     {purchaseRequest.supply_request?.request_code ? (
                                         <span className="ml-2 text-sm font-normal text-slate-500">
                                             ({traceability?.is_consolidated ? `Primary Source: ${purchaseRequest.supply_request.request_code}` : purchaseRequest.supply_request.request_code})
