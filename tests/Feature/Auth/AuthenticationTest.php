@@ -91,4 +91,24 @@ class AuthenticationTest extends TestCase
         $this->assertGuest();
         $response->assertRedirect('/');
     }
+
+    public function test_session_expire_on_close_is_enabled(): void
+    {
+        $this->assertTrue((bool) config('session.expire_on_close'));
+    }
+
+    public function test_users_can_authenticate_with_remember_me(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->post('/login', [
+            'email' => $user->email,
+            'password' => 'password',
+            'remember' => true,
+        ]);
+
+        $this->assertAuthenticated();
+        $response->assertRedirect(route('two-factor.challenge.show', absolute: false));
+        $this->assertTrue((bool) session('two_factor.remember'));
+    }
 }

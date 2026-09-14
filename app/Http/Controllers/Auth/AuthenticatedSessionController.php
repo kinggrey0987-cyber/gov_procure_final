@@ -35,7 +35,7 @@ class AuthenticatedSessionController extends Controller
      */
     public function store(LoginRequest $request): RedirectResponse
     {
-        $request->authenticate(false);
+        $request->authenticate($request->boolean('remember'));
 
         $user = $request->user();
 

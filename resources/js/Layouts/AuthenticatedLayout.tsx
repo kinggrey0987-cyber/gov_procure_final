@@ -3,6 +3,7 @@ import BellPanel from '@/Components/Notifications/BellPanel';
 import Dropdown from '@/Components/Dropdown';
 import NavLink from '@/Components/NavLink';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink';
+import SessionTimeoutGuard from '@/Components/SessionTimeoutGuard';
 import { Link, usePage } from '@inertiajs/react';
 import { PropsWithChildren, ReactNode, useState } from 'react';
 
@@ -276,6 +277,7 @@ export default function Authenticated({
                         )}
 
                         <main>{children}</main>
+                        <SessionTimeoutGuard />
                     </div>
                 </div>
             </div>
@@ -448,6 +450,7 @@ export default function Authenticated({
                         )}
 
                         <main>{children}</main>
+                        <SessionTimeoutGuard />
                     </div>
                 </div>
             </div>
@@ -626,6 +629,7 @@ export default function Authenticated({
                         )}
 
                         <main>{children}</main>
+                        <SessionTimeoutGuard />
                     </div>
                 </div>
             </div>
@@ -805,6 +809,7 @@ export default function Authenticated({
                         )}
 
                         <main>{children}</main>
+                        <SessionTimeoutGuard />
                     </div>
                 </div>
             </div>
@@ -1011,6 +1016,7 @@ export default function Authenticated({
                         )}
 
                         <main>{children}</main>
+                        <SessionTimeoutGuard />
                     </div>
                 </div>
             </div>
@@ -1247,10 +1253,7 @@ export default function Authenticated({
             )}
 
             <main>{children}</main>
+            <SessionTimeoutGuard />
         </div>
     );
 }
-
-
-
-
