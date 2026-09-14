@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Document;
 
+use App\Models\PurchaseOrder;
 use App\Services\Documents\DocumentAccessService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -66,10 +67,34 @@ class StoreDocumentRequest extends FormRequest
                 return;
             }
 
+            if ($module === 'purchase_requests') {
+                $validator->errors()->add(
+                    'related_module',
+                    'Procurement supporting documents must be attached to placed or finished purchase orders, not purchase requests.'
+                );
+
+                return;
+            }
+
+            if ($module === 'purchase_orders') {
+                $refId = (int) ($this->route('related_reference_id') ?? $this->input('related_reference_id'));
+                if ($refId > 0) {
+                    $purchaseOrder = PurchaseOrder::query()->find($refId);
+                    if ($purchaseOrder && ! $purchaseOrder->isFinished()) {
+                        $validator->errors()->add(
+                            'related_reference_id',
+                            'Documents can only be uploaded for placed or finished purchase orders.'
+                        );
+
+                        return;
+                    }
+                }
+            }
+
             $documentKind = strtolower(trim((string) $this->input('document_kind')));
 
             if ($documentKind !== '' && ! in_array($documentKind, self::PROCUREMENT_DOCUMENT_KINDS, true)) {
-                $validator->errors()->add('document_kind', 'Select a procurement document type that belongs to a PR or PO.');
+                $validator->errors()->add('document_kind', 'Select a valid procurement document type for this purchase order.');
 
                 return;
             }

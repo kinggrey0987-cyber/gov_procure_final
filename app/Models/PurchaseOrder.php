@@ -13,7 +13,20 @@ class PurchaseOrder extends Model
 {
     use HasFactory;
 
+    public const FINISHED_STATUSES = [
+        'PLACED',
+        'PARTIALLY_DELIVERED',
+        'DELIVERED',
+        'COMPLETED',
+        'CLOSED',
+    ];
+
     protected $primaryKey = 'purchase_order_id';
+
+    public function isFinished(): bool
+    {
+        return in_array((string) $this->status, self::FINISHED_STATUSES, true);
+    }
 
     public function getRouteKeyName(): string
     {

@@ -341,7 +341,7 @@ class DocumentAttachmentFoundationTest extends TestCase
             'created_by' => $procurementUser->id,
             'po_number' => 'PO-DOC-'.uniqid(),
             'procurement_method' => 'SMALL_VALUE_PROCUREMENT',
-            'status' => 'DRAFT',
+            'status' => 'PLACED',
             'expected_delivery_date' => now()->addDays(3)->toDateString(),
             'total_amount' => 1000,
             'terms_notes' => null,

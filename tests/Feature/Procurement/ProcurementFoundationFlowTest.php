@@ -248,7 +248,7 @@ class ProcurementFoundationFlowTest extends TestCase
                 ->where('filters.search', 'PO-DOC-0001')
                 ->where('uploadDefaults.related_module', 'purchase_orders')
                 ->where('uploadDefaults.related_reference_id', $purchaseOrder->purchase_order_id)
-                ->where('relatedRecordOptions.1.label', 'PO-DOC-0001 - Procurement Office (PLACED)')
+                ->where('relatedRecordOptions.0.label', 'PO-DOC-0001 - Procurement Office (PLACED)')
             );
     }
 

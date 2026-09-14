@@ -46,21 +46,21 @@ const MODULE_LABELS: Record<string, string> = {
 };
 
 const DOCUMENT_KIND_LABELS: Record<string, string> = {
-    procurement_record: 'Procurement Record',
-    supplier_quotation: 'Supplier Quotation',
-    canvass_sheet: 'Canvass Sheet',
-    noa: 'Notice of Award',
-    signed_po: 'Signed PO',
-    other_supporting_doc: 'Other Supporting Doc',
+    noa: 'Notice of Award (NOA)',
+    canvass_sheet: 'Abstract of Canvass / Canvass Sheet',
+    supplier_quotation: 'Winning / Bidder Quotation',
+    signed_po: 'Signed PO with Conforme',
+    procurement_record: 'BAC Resolution / Procurement Record',
+    other_supporting_doc: 'Other Supporting Document',
 };
 
 const DOCUMENT_KIND_OPTIONS = [
-    { value: 'procurement_record', label: 'Procurement Record' },
-    { value: 'supplier_quotation', label: 'Supplier Quotation' },
-    { value: 'canvass_sheet', label: 'Canvass Sheet' },
-    { value: 'noa', label: 'Notice of Award' },
-    { value: 'signed_po', label: 'Signed PO' },
-    { value: 'other_supporting_doc', label: 'Other Supporting Doc' },
+    { value: 'noa', label: 'Notice of Award (NOA)' },
+    { value: 'canvass_sheet', label: 'Abstract of Canvass / Canvass Sheet' },
+    { value: 'supplier_quotation', label: 'Winning / Bidder Quotation' },
+    { value: 'signed_po', label: 'Signed PO with Conforme' },
+    { value: 'procurement_record', label: 'BAC Resolution / Procurement Record' },
+    { value: 'other_supporting_doc', label: 'Other Supporting Document' },
 ];
 
 export default function ProcurementDocumentsIndex({
@@ -71,9 +71,8 @@ export default function ProcurementDocumentsIndex({
     uploadEnabled,
     uploadDefaults,
 }: Props) {
-    const defaultRelatedModule = uploadDefaults?.related_module ?? '';
     const defaultRelatedReferenceId = uploadDefaults?.related_reference_id ? String(uploadDefaults.related_reference_id) : '';
-    const [showUpload, setShowUpload] = useState(defaultRelatedModule !== '' && defaultRelatedReferenceId !== '');
+    const [showUpload, setShowUpload] = useState(defaultRelatedReferenceId !== '');
 
     const [moduleFilter, setModuleFilter] = useState(filters.module ?? '');
     const [searchFilter, setSearchFilter] = useState(filters.search ?? '');
@@ -100,33 +99,18 @@ export default function ProcurementDocumentsIndex({
     }, [activeFilters]);
 
     const uploadForm = useForm<{
-        related_module: '' | 'purchase_requests' | 'purchase_orders';
+        related_module: 'purchase_orders';
         related_reference_id: string;
         document_kind: string;
         title: string;
         file: File | null;
     }>({
-        related_module: defaultRelatedModule,
+        related_module: 'purchase_orders',
         related_reference_id: defaultRelatedReferenceId,
         document_kind: '',
         title: '',
         file: null,
     });
-
-    const optionsByModule = useMemo(() => {
-        return relatedRecordOptions.reduce<Record<string, RelatedRecordOption[]>>((accumulator, option) => {
-            const key = option.related_module;
-            if (!accumulator[key]) {
-                accumulator[key] = [];
-            }
-            accumulator[key].push(option);
-            return accumulator;
-        }, {});
-    }, [relatedRecordOptions]);
-
-    const uploadContextOptions = uploadForm.data.related_module
-        ? (optionsByModule[uploadForm.data.related_module] ?? [])
-        : [];
 
     const resetFilters = () => {
         router.get(route('procurement.documents.index'));
@@ -139,17 +123,16 @@ export default function ProcurementDocumentsIndex({
             return;
         }
 
-        const relatedModule = uploadForm.data.related_module;
         const relatedReferenceId = Number(uploadForm.data.related_reference_id);
         const documentKind = uploadForm.data.document_kind;
 
-        if (!relatedModule || !Number.isInteger(relatedReferenceId) || relatedReferenceId <= 0 || !documentKind) {
+        if (!Number.isInteger(relatedReferenceId) || relatedReferenceId <= 0 || !documentKind) {
             return;
         }
 
         uploadForm.post(
             route('documents.store', {
-                related_module: relatedModule,
+                related_module: 'purchase_orders',
                 related_reference_id: relatedReferenceId,
                 document_kind: documentKind,
             }),
@@ -187,16 +170,16 @@ export default function ProcurementDocumentsIndex({
                                     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-100">Procurement Unit Repository</p>
                                     <p className="text-lg font-semibold">Procurement Documents</p>
                                     <p className="text-sm text-red-100">
-                                        Upload and manage internal procurement files for purchase requests and purchase orders.
+                                        Upload and manage official supporting documents (NOA, Canvass Sheets, Signed PO, Supplier Quotations) for finished purchase orders.
                                     </p>
                                 </div>
                                 <button
                                     type="button"
                                     onClick={() => setShowUpload((current) => !current)}
                                     disabled={!uploadEnabled}
-                                    className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                    className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 transition-colors shadow-sm"
                                 >
-                                    Upload Document
+                                    {showUpload ? 'Close Upload Form' : 'Upload Document'}
                                 </button>
                             </div>
                         </div>
@@ -205,15 +188,13 @@ export default function ProcurementDocumentsIndex({
                             <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                                 <p className="font-semibold">Document scope and publishing flow</p>
                                 <p className="mt-1 text-amber-800">
-                                    Use this registry for procurement-record files that belong to a PR or PO. Keep operational and public-release documents in their own workflow screens.
+                                    This repository stores official supporting attachments for placed and finished Purchase Orders. These documents serve as verified procurement records and can be attached to Executive Public Disclosures.
                                 </p>
                                 <ul className="mt-2 list-disc space-y-1 pl-5 text-amber-800">
-                                    <li>Accepted files: PDF, DOC, DOCX, and CSV only.</li>
-                                    <li>Maximum file size: 10 MB per upload.</li>
-                                    <li>Good fits here include supplier quotations, canvass sheets, NOA files, signed PO copies, and other procurement-record attachments.</li>
-                                    <li>Do not store delivery receipts, inspection/verification forms, or distribution records here. Those belong in the delivery workflow.</li>
-                                    <li>This Procurement Unit repository is internal. Uploaded files do not automatically become public disclosures.</li>
-                                    <li>Executive users can later prepare and publish public disclosures through the Executive module, then attach selected disclosure documents for public release.</li>
+                                    <li>Accepted files: PDF, DOC, DOCX, and CSV only (max 10 MB per file).</li>
+                                    <li>Applicable attachments: Notice of Award (NOA), Canvass Sheets / Abstract of Quotations, Winning Supplier Quotations, Signed PO with Conforme, and BAC Resolutions.</li>
+                                    <li>Do not store delivery receipts, inspection reports, or distribution records here (those belong in the Delivery & Inventory workflows).</li>
+                                    <li>This repository is internal. Executive users can select these verified documents when publishing official transparency disclosures on the Public Portal.</li>
                                 </ul>
                             </div>
 
@@ -248,49 +229,55 @@ export default function ProcurementDocumentsIndex({
                             </div>
 
                             {showUpload && (
-                                <form onSubmit={submitUpload} className="grid gap-3 rounded-xl border border-dashed border-red-300 bg-red-50/30 p-4 md:grid-cols-2">
+                                <form onSubmit={submitUpload} className="grid gap-4 rounded-xl border border-dashed border-red-300 bg-red-50/40 p-5 md:grid-cols-2">
                                     <div>
-                                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-700">Related Module</label>
-                                        <select
-                                            className="w-full rounded-lg border-red-200 text-sm"
-                                            value={uploadForm.data.related_module}
-                                            onChange={(event) => {
-                                                uploadForm.setData('related_module', event.target.value as '' | 'purchase_requests' | 'purchase_orders');
-                                                uploadForm.setData('related_reference_id', '');
-                                                uploadForm.setData('document_kind', '');
-                                            }}
-                                        >
-                                            <option value="">Select module</option>
-                                            <option value="purchase_requests">Purchase Requests</option>
-                                            <option value="purchase_orders">Purchase Orders</option>
-                                        </select>
+                                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-700">Target Workflow</label>
+                                        <div className="flex items-center h-[38px] px-3 rounded-lg border border-red-200 bg-white text-sm font-medium text-red-900 shadow-sm">
+                                            <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 mr-2 shrink-0"></span>
+                                            <span className="truncate">Finished Purchase Orders (Official Award / Execution)</span>
+                                        </div>
+                                        <p className="mt-1 text-[11px] text-slate-500">Supporting attachments are restricted to placed and completed purchase orders.</p>
                                     </div>
 
                                     <div>
-                                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-700">Related Record</label>
+                                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-700">
+                                            Purchase Order <span className="text-red-500">*</span>
+                                        </label>
                                         <select
-                                            className="w-full rounded-lg border-red-200 text-sm"
+                                            className="w-full rounded-lg border-red-200 text-sm focus:border-red-500 focus:ring-red-500"
                                             value={uploadForm.data.related_reference_id}
                                             onChange={(event) => uploadForm.setData('related_reference_id', event.target.value)}
-                                            disabled={!uploadForm.data.related_module}
+                                            required
                                         >
-                                            <option value="">Select procurement record</option>
-                                            {uploadContextOptions.map((option) => (
-                                                <option key={`${option.related_module}-${option.related_reference_id}`} value={option.related_reference_id}>
+                                            <option value="">Select placed or finished purchase order...</option>
+                                            {relatedRecordOptions.map((option) => (
+                                                <option key={`po-${option.related_reference_id}`} value={option.related_reference_id}>
                                                     {option.label}
                                                 </option>
                                             ))}
                                         </select>
+                                        {uploadForm.errors.related_reference_id && (
+                                            <p className="mt-1 text-xs text-rose-700">{uploadForm.errors.related_reference_id}</p>
+                                        )}
                                     </div>
 
+                                    {relatedRecordOptions.length === 0 && (
+                                        <div className="md:col-span-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+                                            <strong>Notice:</strong> No placed or completed purchase orders found. Only purchase orders that have completed approval and placement are eligible for official document attachment.
+                                        </div>
+                                    )}
+
                                     <div>
-                                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-700">Document Type</label>
+                                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-700">
+                                            Document Type <span className="text-red-500">*</span>
+                                        </label>
                                         <select
-                                            className="w-full rounded-lg border-red-200 text-sm"
+                                            className="w-full rounded-lg border-red-200 text-sm focus:border-red-500 focus:ring-red-500"
                                             value={uploadForm.data.document_kind}
                                             onChange={(event) => uploadForm.setData('document_kind', event.target.value)}
+                                            required
                                         >
-                                            <option value="">Select document type</option>
+                                            <option value="">Select document type...</option>
                                             {DOCUMENT_KIND_OPTIONS.map((option) => (
                                                 <option key={option.value} value={option.value}>
                                                     {option.label}
@@ -301,40 +288,48 @@ export default function ProcurementDocumentsIndex({
                                     </div>
 
                                     <div>
-                                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-700">Document Title</label>
+                                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-700">
+                                            Document Title <span className="text-red-500">*</span>
+                                        </label>
                                         <input
                                             type="text"
-                                            className="w-full rounded-lg border-red-200 text-sm"
+                                            placeholder="e.g., Notice of Award - National Store Trading"
+                                            className="w-full rounded-lg border-red-200 text-sm focus:border-red-500 focus:ring-red-500"
                                             value={uploadForm.data.title}
                                             onChange={(event) => uploadForm.setData('title', event.target.value)}
                                             maxLength={200}
+                                            required
                                         />
                                         {uploadForm.errors.title && <p className="mt-1 text-xs text-rose-700">{uploadForm.errors.title}</p>}
                                     </div>
 
-                                    <div>
-                                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-700">File</label>
+                                    <div className="md:col-span-2">
+                                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-700">
+                                            File Attachment <span className="text-red-500">*</span>
+                                        </label>
                                         <input
                                             type="file"
                                             accept=".pdf,.doc,.docx,.csv,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/csv"
-                                            className="w-full rounded-lg border-red-200 text-sm"
+                                            className="w-full rounded-lg border border-red-200 bg-white p-2 text-sm text-slate-700 file:mr-4 file:rounded-md file:border-0 file:bg-red-50 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-red-700 hover:file:bg-red-100"
                                             onChange={(event) => uploadForm.setData('file', event.target.files?.[0] ?? null)}
+                                            required
                                         />
+                                        <p className="mt-1 text-xs text-slate-500">PDF, DOC, DOCX, or CSV (max 10 MB). Excludes delivery receipts and inspection reports.</p>
                                         {uploadForm.errors.file && <p className="mt-1 text-xs text-rose-700">{uploadForm.errors.file}</p>}
                                     </div>
 
-                                    <div className="md:col-span-2 flex items-center gap-2">
+                                    <div className="md:col-span-2 flex items-center gap-2 pt-2 border-t border-red-200/60">
                                         <button
                                             type="submit"
-                                            disabled={uploadForm.processing || !uploadEnabled}
-                                            className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60"
+                                            disabled={uploadForm.processing || !uploadEnabled || relatedRecordOptions.length === 0}
+                                            className="rounded-lg bg-red-700 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60 transition-colors"
                                         >
                                             {uploadForm.processing ? 'Uploading...' : 'Upload Document'}
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => setShowUpload(false)}
-                                            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                                            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
                                         >
                                             Cancel
                                         </button>

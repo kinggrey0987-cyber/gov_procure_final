@@ -19,6 +19,8 @@ use App\Services\Office\SupplyRequestService;
 use App\Services\Procurement\PurchaseOrderService;
 use App\Services\Procurement\PurchaseRequestService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class DocumentNumberingStandardizationTest extends TestCase
@@ -226,5 +228,114 @@ class DocumentNumberingStandardizationTest extends TestCase
                 ->where('purchaseOrders.data.1.po_number', $po1->po_number)
                 ->where('purchaseOrders.data.1.purchase_request.pr_number', $pr1->pr_number)
             );
+    }
+
+    public function test_procurement_documents_repository_strictly_accepts_finished_purchase_orders(): void
+    {
+        Storage::fake('public');
+
+        $sr = SupplyRequest::query()->create([
+            'request_code' => 'SR-MPDO-2026-09-0099',
+            'office_id' => $this->office->id,
+            'requested_by' => $this->officeUser->id,
+            'ppmp_id' => $this->ppmp->ppmp_id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(5)->toDateString(),
+            'request_category' => 'Office Supplies',
+            'purpose' => 'Document test',
+            'priority_level' => 'NORMAL',
+            'status' => 'SUBMITTED',
+        ]);
+
+        $pr = PurchaseRequest::query()->create([
+            'pr_number' => 'PR-2026-09-0099',
+            'supply_request_id' => $sr->supply_request_id,
+            'office_id' => $this->office->id,
+            'requested_by' => $this->officeUser->id,
+            'status' => 'PROCESSING',
+        ]);
+
+        $draftPo = PurchaseOrder::query()->create([
+            'purchase_request_id' => $pr->purchase_request_id,
+            'supply_request_id' => $sr->supply_request_id,
+            'supplier_id' => $this->supplier->supplier_id,
+            'created_by' => $this->procurementUser->id,
+            'po_number' => 'PO-2026-09-0098',
+            'procurement_method' => 'SHOPPING',
+            'status' => 'DRAFT',
+            'total_amount' => 5000.00,
+        ]);
+
+        $placedPo = PurchaseOrder::query()->create([
+            'purchase_request_id' => $pr->purchase_request_id,
+            'supply_request_id' => $sr->supply_request_id,
+            'supplier_id' => $this->supplier->supplier_id,
+            'created_by' => $this->procurementUser->id,
+            'po_number' => 'PO-2026-09-0099',
+            'procurement_method' => 'SHOPPING',
+            'status' => 'PLACED',
+            'total_amount' => 12500.00,
+        ]);
+
+        // 1. Index options only list the finished (PLACED) PO, not the DRAFT PO or PR
+        $this->actingAs($this->procurementUser)
+            ->get(route('procurement.documents.index'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Procurement/Documents/Index')
+                ->has('relatedRecordOptions', 1)
+                ->where('relatedRecordOptions.0.related_reference_id', $placedPo->purchase_order_id)
+                ->where('relatedRecordOptions.0.label', 'PO-2026-09-0099 - Municipal Planning and Development Office (PLACED)')
+            );
+
+        // 2. Uploading a document directly to a PR under procurement documents is rejected
+        $this->actingAs($this->procurementUser)
+            ->from(route('procurement.documents.index'))
+            ->post(route('documents.store', [
+                'related_module' => 'purchase_requests',
+                'related_reference_id' => $pr->purchase_request_id,
+            ]), [
+                'title' => 'Direct PR upload test',
+                'document_kind' => 'supplier_quotation',
+                'file' => UploadedFile::fake()->create('pr-quotation.pdf', 10, 'application/pdf'),
+            ])
+            ->assertRedirect(route('procurement.documents.index'))
+            ->assertSessionHasErrors('related_module');
+
+        // 3. Uploading a document to a DRAFT PO is rejected
+        $this->actingAs($this->procurementUser)
+            ->from(route('procurement.documents.index'))
+            ->post(route('documents.store', [
+                'related_module' => 'purchase_orders',
+                'related_reference_id' => $draftPo->purchase_order_id,
+            ]), [
+                'title' => 'Draft PO upload test',
+                'document_kind' => 'noa',
+                'file' => UploadedFile::fake()->create('draft-noa.pdf', 10, 'application/pdf'),
+            ])
+            ->assertRedirect(route('procurement.documents.index'))
+            ->assertSessionHasErrors('related_reference_id');
+
+        // 4. Uploading an official Notice of Award (NOA) to the PLACED PO succeeds
+        $this->actingAs($this->procurementUser)
+            ->from(route('procurement.documents.index'))
+            ->post(route('documents.store', [
+                'related_module' => 'purchase_orders',
+                'related_reference_id' => $placedPo->purchase_order_id,
+            ]), [
+                'title' => 'Notice of Award - National Store Trading',
+                'document_kind' => 'noa',
+                'file' => UploadedFile::fake()->create('noa-national-store.pdf', 50, 'application/pdf'),
+            ])
+            ->assertRedirect(route('procurement.documents.index'))
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('documents', [
+            'related_module' => 'purchase_orders',
+            'related_reference_id' => $placedPo->purchase_order_id,
+            'title' => 'Notice of Award - National Store Trading',
+            'document_kind' => 'noa',
+            'file_name' => 'noa-national-store.pdf',
+        ]);
     }
 }

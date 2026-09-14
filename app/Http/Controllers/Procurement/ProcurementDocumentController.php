@@ -15,7 +15,7 @@ class ProcurementDocumentController extends Controller
     /**
      * @var array<int, string>
      */
-    private const PROCUREMENT_MODULES = ['purchase_requests', 'purchase_orders'];
+    private const PROCUREMENT_MODULES = ['purchase_orders', 'purchase_requests'];
 
     public function index(Request $request): Response
     {
@@ -36,7 +36,7 @@ class ProcurementDocumentController extends Controller
             'relatedRecordOptions' => $this->relatedRecordOptions(),
             'uploadEnabled' => true,
             'uploadDefaults' => [
-                'related_module' => in_array($relatedModule, self::PROCUREMENT_MODULES, true) ? $relatedModule : '',
+                'related_module' => 'purchase_orders',
                 'related_reference_id' => $relatedReferenceId > 0 ? $relatedReferenceId : null,
             ],
         ]);
@@ -79,40 +79,17 @@ class ProcurementDocumentController extends Controller
 
     private function relatedRecordOptions(): array
     {
-        return [
-            ...$this->purchaseRequestOptions(),
-            ...$this->purchaseOrderOptions(),
-        ];
-    }
-
-    private function purchaseRequestOptions()
-    {
-        return PurchaseRequest::query()
-            ->with('office:id,name')
-            ->latest('purchase_request_id')
-            ->limit(200)
-            ->get(['purchase_request_id', 'office_id', 'status'])
-            ->map(fn (PurchaseRequest $purchaseRequest): array => [
-                'related_module' => 'purchase_requests',
-                'related_reference_id' => (int) $purchaseRequest->purchase_request_id,
-                'label' => sprintf(
-                    '%s - %s (%s)',
-                    $this->formatPurchaseRequestReference($purchaseRequest),
-                    (string) ($purchaseRequest->office?->name ?? 'Unknown Office'),
-                    (string) $purchaseRequest->status
-                ),
-            ])
-            ->values()
-            ->all();
+        return $this->purchaseOrderOptions();
     }
 
     private function purchaseOrderOptions()
     {
         return PurchaseOrder::query()
-            ->with('purchaseRequest.office:id,name')
+            ->with(['purchaseRequest.office:id,name', 'supplier:supplier_id,supplier_name'])
+            ->whereIn('status', PurchaseOrder::FINISHED_STATUSES)
             ->latest('purchase_order_id')
             ->limit(200)
-            ->get(['purchase_order_id', 'purchase_request_id', 'po_number', 'status'])
+            ->get(['purchase_order_id', 'purchase_request_id', 'supplier_id', 'po_number', 'status', 'total_amount'])
             ->map(fn (PurchaseOrder $purchaseOrder): array => [
                 'related_module' => 'purchase_orders',
                 'related_reference_id' => (int) $purchaseOrder->purchase_order_id,
@@ -132,7 +109,7 @@ class ProcurementDocumentController extends Controller
         if ((string) $document->related_module === 'purchase_requests') {
             $purchaseRequest = PurchaseRequest::query()
                 ->with('office:id,name')
-                ->find((int) $document->related_reference_id, ['purchase_request_id', 'office_id', 'status']);
+                ->find((int) $document->related_reference_id, ['purchase_request_id', 'office_id', 'status', 'pr_number']);
 
             if ($purchaseRequest instanceof PurchaseRequest) {
                 return sprintf(
@@ -164,7 +141,7 @@ class ProcurementDocumentController extends Controller
 
     private function formatPurchaseRequestReference(PurchaseRequest $purchaseRequest): string
     {
-        return 'PR-'.str_pad((string) $purchaseRequest->purchase_request_id, 6, '0', STR_PAD_LEFT);
+        return (string) ($purchaseRequest->pr_number ?: ('PR-'.str_pad((string) $purchaseRequest->purchase_request_id, 4, '0', STR_PAD_LEFT)));
     }
 
     private function formatPurchaseOrderReference(PurchaseOrder $purchaseOrder): string
@@ -175,6 +152,6 @@ class ProcurementDocumentController extends Controller
             return $poNumber;
         }
 
-        return 'PO-'.str_pad((string) $purchaseOrder->purchase_order_id, 6, '0', STR_PAD_LEFT);
+        return 'PO-'.str_pad((string) $purchaseOrder->purchase_order_id, 4, '0', STR_PAD_LEFT);
     }
 }
