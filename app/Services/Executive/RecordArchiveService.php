@@ -32,8 +32,10 @@ class RecordArchiveService
         $scope = (string) $payload['archive_scope'];
         $baseDir = sprintf('record-archives/%d/%s', $year, Str::lower(Str::random(10)));
 
-        $datasets = [
-            'annual_procurement_summary' => [[
+        $targetKeys = $this->getDatasetKeysForScope($scope);
+
+        $datasetResolvers = [
+            'annual_procurement_summary' => fn (): array => [[
                 'fiscal_year' => $year,
                 'archive_scope' => $scope,
                 'generated_at' => now()->toIso8601String(),
@@ -46,7 +48,7 @@ class RecordArchiveService
                 'anomalies_detected_count' => Anomaly::query()->whereYear('detected_at', $year)->count(),
                 'claims_count' => \App\Models\Claim::query()->whereYear('claim_date', $year)->count(),
             ]],
-            'ppmp_records' => $this->rows(
+            'ppmp_records' => fn (): array => $this->rows(
                 \App\Models\Ppmp::query()
                     ->with(['office:id,name,code', 'items.item:item_id,item_name,default_unit,pieces_per_box,sub_unit'])
                     ->where('fiscal_year', $year)
@@ -54,7 +56,7 @@ class RecordArchiveService
                     ->get()
                     ->toArray()
             ),
-            'supply_requests' => $this->rows(
+            'supply_requests' => fn (): array => $this->rows(
                 \App\Models\SupplyRequest::query()
                     ->with(['office:id,name,code', 'requester:id,name', 'items'])
                     ->whereYear('created_at', $year)
@@ -62,7 +64,7 @@ class RecordArchiveService
                     ->get()
                     ->toArray()
             ),
-            'purchase_requests' => $this->rows(
+            'purchase_requests' => fn (): array => $this->rows(
                 PurchaseRequest::query()
                     ->with(['office:id,name,code', 'requester:id,name', 'items'])
                     ->whereYear('created_at', $year)
@@ -70,7 +72,7 @@ class RecordArchiveService
                     ->get()
                     ->toArray()
             ),
-            'purchase_orders' => $this->rows(
+            'purchase_orders' => fn (): array => $this->rows(
                 PurchaseOrder::query()
                     ->with(['supplier:supplier_id,supplier_name', 'items'])
                     ->whereYear('created_at', $year)
@@ -78,7 +80,7 @@ class RecordArchiveService
                     ->get()
                     ->toArray()
             ),
-            'distribution_records' => $this->rows(
+            'distribution_records' => fn (): array => $this->rows(
                 \App\Models\DistributionRecord::query()
                     ->with(['office:id,name', 'items.item:item_id,item_name'])
                     ->whereYear('created_at', $year)
@@ -86,7 +88,7 @@ class RecordArchiveService
                     ->get()
                     ->toArray()
             ),
-            'claims_and_discrepancies' => $this->rows(
+            'claims_and_discrepancies' => fn (): array => $this->rows(
                 \App\Models\Claim::query()
                     ->with(['office:id,name', 'claimant:id,name'])
                     ->whereYear('claim_date', $year)
@@ -94,13 +96,20 @@ class RecordArchiveService
                     ->get()
                     ->toArray()
             ),
-            'audit_logs' => $this->rows(AuditLog::query()->whereYear('created_at', $year)->orderBy('id')->get()->toArray()),
-            'approval_history' => $this->rows(ApprovalHistory::query()->whereYear('created_at', $year)->orderBy('id')->get()->toArray()),
-            'status_history' => $this->rows(StatusHistory::query()->whereYear('changed_at', $year)->orderBy('id')->get()->toArray()),
-            'anomalies' => $this->rows(Anomaly::query()->whereYear('detected_at', $year)->orderBy('anomaly_id')->get()->toArray()),
-            'alerts' => $this->rows(Alert::query()->whereYear('detected_at', $year)->orderBy('alerts_id')->get()->toArray()),
-            'public_disclosures' => $this->rows(PublicDisclosure::query()->whereYear('created_at', $year)->orderBy('disclosure_id')->get()->toArray()),
+            'audit_logs' => fn (): array => $this->rows(AuditLog::query()->whereYear('created_at', $year)->orderBy('id')->get()->toArray()),
+            'approval_history' => fn (): array => $this->rows(ApprovalHistory::query()->whereYear('created_at', $year)->orderBy('id')->get()->toArray()),
+            'status_history' => fn (): array => $this->rows(StatusHistory::query()->whereYear('changed_at', $year)->orderBy('id')->get()->toArray()),
+            'anomalies' => fn (): array => $this->rows(Anomaly::query()->whereYear('detected_at', $year)->orderBy('anomaly_id')->get()->toArray()),
+            'alerts' => fn (): array => $this->rows(Alert::query()->whereYear('detected_at', $year)->orderBy('alerts_id')->get()->toArray()),
+            'public_disclosures' => fn (): array => $this->rows(PublicDisclosure::query()->whereYear('created_at', $year)->orderBy('disclosure_id')->get()->toArray()),
         ];
+
+        $datasets = [];
+        foreach ($targetKeys as $key) {
+            if (isset($datasetResolvers[$key])) {
+                $datasets[$key] = $datasetResolvers[$key]();
+            }
+        }
 
         $totalRecordCount = 0;
         foreach ($datasets as $name => $rows) {
@@ -239,6 +248,67 @@ class RecordArchiveService
             ],
             logDomain: 'BUSINESS',
         );
+    }
+
+    /**
+     * Get the allowed dataset keys for a given archive scope.
+     *
+     * @return array<int, string>
+     */
+    public function getDatasetKeysForScope(string $scope): array
+    {
+        return match ($scope) {
+            'coa_compliance_package' => [
+                'annual_procurement_summary',
+                'public_disclosures',
+                'purchase_orders',
+                'distribution_records',
+                'claims_and_discrepancies',
+                'approval_history',
+                'audit_logs',
+            ],
+            'financial_contracts' => [
+                'annual_procurement_summary',
+                'ppmp_records',
+                'purchase_requests',
+                'purchase_orders',
+                'claims_and_discrepancies',
+            ],
+            'governance_audit_trail' => [
+                'annual_procurement_summary',
+                'audit_logs',
+                'approval_history',
+                'status_history',
+                'anomalies',
+                'alerts',
+            ],
+            'governance_yearly' => [
+                'annual_procurement_summary',
+                'ppmp_records',
+                'purchase_orders',
+                'public_disclosures',
+                'audit_logs',
+                'approval_history',
+                'status_history',
+                'anomalies',
+                'alerts',
+            ],
+            default => [
+                'annual_procurement_summary',
+                'ppmp_records',
+                'supply_requests',
+                'purchase_requests',
+                'purchase_orders',
+                'distribution_records',
+                'claims_and_discrepancies',
+                'audit_logs',
+                'approval_history',
+                'status_history',
+                'anomalies',
+                'alerts',
+                'public_disclosures',
+            ],
+        };
     }
 
     /**

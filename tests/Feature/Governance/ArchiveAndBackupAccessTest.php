@@ -304,6 +304,61 @@ class ArchiveAndBackupAccessTest extends TestCase
         $this->assertSame(64, strlen($archive->sha256_checksum));
         $this->assertGreaterThanOrEqual(0, $archive->record_count);
         $this->assertIsArray($archive->manifest_summary);
+        $this->assertCount(13, $archive->manifest_summary);
+    }
+
+    public function test_record_archive_modes_generate_only_scoped_datasets(): void
+    {
+        Storage::fake('local');
+
+        // 1. Generate Financial & Purchase Orders archive
+        $this->actingAs($this->executive)
+            ->post(route('executive.record-archives.store'), [
+                'archive_year' => 2026,
+                'archive_scope' => 'financial_contracts',
+                'notes' => 'Financial contracts and PO audit archive.',
+            ])
+            ->assertRedirect(route('executive.record-archives.index'));
+
+        $finArchive = RecordArchive::query()->latest('archive_id')->firstOrFail();
+        $this->assertSame('financial_contracts', $finArchive->archive_scope);
+        $this->assertArrayHasKey('purchase_orders', $finArchive->manifest_summary);
+        $this->assertArrayHasKey('purchase_requests', $finArchive->manifest_summary);
+        $this->assertArrayNotHasKey('audit_logs', $finArchive->manifest_summary);
+        $this->assertArrayNotHasKey('anomalies', $finArchive->manifest_summary);
+        $this->assertArrayNotHasKey('alerts', $finArchive->manifest_summary);
+
+        // 2. Generate Governance & Audit Trail archive
+        $this->actingAs($this->executive)
+            ->post(route('executive.record-archives.store'), [
+                'archive_year' => 2026,
+                'archive_scope' => 'governance_audit_trail',
+                'notes' => 'Governance and audit logs archive.',
+            ])
+            ->assertRedirect(route('executive.record-archives.index'));
+
+        $govArchive = RecordArchive::query()->latest('archive_id')->firstOrFail();
+        $this->assertSame('governance_audit_trail', $govArchive->archive_scope);
+        $this->assertArrayHasKey('audit_logs', $govArchive->manifest_summary);
+        $this->assertArrayHasKey('anomalies', $govArchive->manifest_summary);
+        $this->assertArrayHasKey('alerts', $govArchive->manifest_summary);
+        $this->assertArrayNotHasKey('purchase_orders', $govArchive->manifest_summary);
+        $this->assertArrayNotHasKey('ppmp_records', $govArchive->manifest_summary);
+
+        // 3. Generate COA Compliance & Disclosures archive
+        $this->actingAs($this->executive)
+            ->post(route('executive.record-archives.store'), [
+                'archive_year' => 2026,
+                'archive_scope' => 'coa_compliance_package',
+                'notes' => 'COA compliance archive.',
+            ])
+            ->assertRedirect(route('executive.record-archives.index'));
+
+        $coaArchive = RecordArchive::query()->latest('archive_id')->firstOrFail();
+        $this->assertSame('coa_compliance_package', $coaArchive->archive_scope);
+        $this->assertArrayHasKey('public_disclosures', $coaArchive->manifest_summary);
+        $this->assertArrayHasKey('distribution_records', $coaArchive->manifest_summary);
+        $this->assertArrayNotHasKey('supply_requests', $coaArchive->manifest_summary);
     }
 
     public function test_admin_backup_generation_stores_sha256_checksum_and_table_metrics(): void
