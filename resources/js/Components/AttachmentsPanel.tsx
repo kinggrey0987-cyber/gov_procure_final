@@ -76,9 +76,11 @@ export default function AttachmentsPanel({
                         <label className="mb-1 block text-xs font-medium text-slate-700">File</label>
                         <input
                             type="file"
+                            accept=".pdf,.doc,.docx,.csv,.png,.jpg,.jpeg,.webp,image/*,application/pdf"
                             onChange={(event) => form.setData('file', event.target.files?.[0] ?? null)}
                             className="w-full rounded border-slate-300 text-sm"
                         />
+                        <p className="mt-1 text-xs text-slate-500">PDF, Word, CSV, or Image (PNG/JPG auto-converted to PDF).</p>
                         {form.errors.file && <p className="mt-1 text-xs text-rose-700">{form.errors.file}</p>}
                     </div>
                     <div className="sm:col-span-2">
@@ -113,22 +115,32 @@ export default function AttachmentsPanel({
                         {attachments.map((attachment) => (
                             <tr key={attachment.document_id} className="border-b align-top">
                                 <td className="py-2 pr-3">{attachment.title}</td>
-                                <td className="py-2 pr-3">{attachment.file_name}</td>
+                                <td className="py-2 pr-3 font-mono text-xs text-slate-700">{attachment.file_name}</td>
                                 <td className="py-2 pr-3">{attachment.uploaded_at ? new Date(attachment.uploaded_at).toLocaleString() : '-'}</td>
                                 <td className="py-2 pr-3">{attachment.uploader_name ?? '-'}</td>
                                 <td className="py-2 text-right">
                                     <div className="inline-flex gap-2">
-                                        <Link
+                                        <a
                                             href={downloadRouteFor(attachment.document_id)}
-                                            className="rounded border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700"
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="rounded border border-indigo-300 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-50"
+                                            title="View attachment in browser"
+                                        >
+                                            View
+                                        </a>
+                                        <a
+                                            href={`${downloadRouteFor(attachment.document_id)}${downloadRouteFor(attachment.document_id).includes('?') ? '&' : '?'}download=1`}
+                                            className="rounded border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                            title="Download attachment file"
                                         >
                                             Download
-                                        </Link>
+                                        </a>
                                         {canDelete && (
                                             <button
                                                 type="button"
                                                 onClick={() => onDelete(attachment.document_id)}
-                                                className="rounded border border-rose-300 px-2 py-1 text-xs font-medium text-rose-700"
+                                                className="rounded border border-rose-300 px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50"
                                             >
                                                 Delete
                                             </button>

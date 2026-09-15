@@ -298,14 +298,24 @@ export default function DeliveryShow({ delivery }: Props) {
                                                             <p className="text-[10px] text-slate-400 mt-0.5">Uploaded {new Date(doc.uploaded_at).toLocaleDateString()}</p>
                                                         ) : null}
                                                     </div>
-                                                    <a
-                                                        href={route('documents.show', doc.document_id)}
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                        className="inline-flex flex-shrink-0 items-center gap-1 rounded-md bg-white px-2.5 py-1 text-xs font-bold text-indigo-700 border border-slate-300 shadow-sm hover:bg-slate-50 transition"
-                                                    >
-                                                        View
-                                                    </a>
+                                                    <div className="flex items-center gap-1.5 shrink-0">
+                                                        <a
+                                                            href={route('documents.show', doc.document_id)}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="inline-flex items-center gap-1 rounded-md bg-white px-2.5 py-1 text-xs font-bold text-indigo-700 border border-slate-300 shadow-sm hover:bg-slate-50 transition"
+                                                            title="Preview attachment"
+                                                        >
+                                                            View
+                                                        </a>
+                                                        <a
+                                                            href={`${route('documents.show', doc.document_id)}?download=1`}
+                                                            className="inline-flex items-center gap-1 rounded-md bg-white px-2.5 py-1 text-xs font-bold text-slate-700 border border-slate-300 shadow-sm hover:bg-slate-50 transition"
+                                                            title="Download attachment file"
+                                                        >
+                                                            Download
+                                                        </a>
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
@@ -646,8 +656,16 @@ export default function DeliveryShow({ delivery }: Props) {
                                                             target="_blank"
                                                             rel="noreferrer"
                                                             className="inline-flex items-center rounded bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100"
+                                                            title="Preview document in new tab"
                                                         >
-                                                            View / Download
+                                                            View
+                                                        </a>
+                                                        <a
+                                                            href={`${route('documents.show', doc.document_id)}?download=1`}
+                                                            className="inline-flex items-center rounded bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-slate-200"
+                                                            title="Download document file"
+                                                        >
+                                                            Download
                                                         </a>
                                                         {delivery.permissions?.can_upload_documents && (
                                                             <button

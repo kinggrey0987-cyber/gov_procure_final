@@ -47,15 +47,20 @@ class DocumentController extends Controller
     public function store(StoreDocumentRequest $request, string $related_module, int $related_reference_id): RedirectResponse
     {
         try {
-            $this->service->upload($request->user(), $related_module, $related_reference_id, $request->validated());
+            $uploaded = $this->service->uploadMultiple($request->user(), $related_module, $related_reference_id, $request->validated());
         } catch (ValidationException) {
             abort(403);
         }
 
-        return back()->with('success', 'Attachment uploaded successfully.');
+        $count = $uploaded->count();
+        $message = $count > 1
+            ? "Successfully uploaded and archived {$count} supporting documents (images converted to official PDF)."
+            : 'Attachment uploaded and archived successfully.';
+
+        return back()->with('success', $message);
     }
 
-    public function show(Request $request, Document $document): StreamedResponse
+    public function show(Request $request, Document $document): \Symfony\Component\HttpFoundation\Response
     {
         try {
             $this->service->authorizeViewDocument($document, $request->user());
@@ -63,10 +68,24 @@ class DocumentController extends Controller
             abort(403);
         }
 
-        $path = $this->resolveExistingPublicDiskPath((string) $document->file_path);
-        abort_unless($path !== null, 404);
+        $isDownload = $request->boolean('download') || $request->input('mode') === 'download';
+        $disposition = $isDownload ? 'attachment' : 'inline';
 
-        return $this->streamDiskDownload($path, (string) $document->file_name);
+        $response = $this->tryStreamDocumentFile(
+            (string) $document->file_path,
+            (string) $document->file_name,
+            $disposition,
+            [
+                sprintf('documents/%s/%d/%s', (string) $document->related_module, (int) $document->related_reference_id, (string) $document->file_name),
+                (string) $document->file_name,
+            ]
+        );
+
+        if ($response instanceof \Symfony\Component\HttpFoundation\Response) {
+            return $response;
+        }
+
+        abort(404, 'The requested document file could not be found in storage.');
     }
 
     public function destroy(DeleteDocumentRequest $request, Document $document): RedirectResponse
@@ -89,10 +108,15 @@ class DocumentController extends Controller
         abort_unless($isPublished, 404);
 
         // 1. Try to stream existing file across disks
-        $streamResponse = $this->tryStreamDocumentFile((string) $document->file_path, (string) $document->file_name, [
-            sprintf('documents/public_disclosures/%d/%s', (int) $public_disclosure->disclosure_id, (string) $document->file_name),
-            sprintf('public_disclosures/%s', (string) $document->file_name),
-        ]);
+        $streamResponse = $this->tryStreamDocumentFile(
+            (string) $document->file_path,
+            (string) $document->file_name,
+            'attachment',
+            [
+                sprintf('documents/public_disclosures/%d/%s', (int) $public_disclosure->disclosure_id, (string) $document->file_name),
+                sprintf('public_disclosures/%s', (string) $document->file_name),
+            ]
+        );
 
         if ($streamResponse instanceof \Symfony\Component\HttpFoundation\Response) {
             return $streamResponse;
@@ -134,10 +158,31 @@ class DocumentController extends Controller
         return ltrim(str_replace('\\', '/', trim($path)), '/');
     }
 
+    private function resolveMimeType(string $fileName): string
+    {
+        $ext = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+
+        return match ($ext) {
+            'pdf' => 'application/pdf',
+            'png' => 'image/png',
+            'jpg', 'jpeg' => 'image/jpeg',
+            'webp' => 'image/webp',
+            'gif' => 'image/gif',
+            'svg' => 'image/svg+xml',
+            'txt' => 'text/plain',
+            'csv' => 'text/csv',
+            'doc' => 'application/msword',
+            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'xls' => 'application/vnd.ms-excel',
+            'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            default => 'application/octet-stream',
+        };
+    }
+
     /**
      * @param  array<int, string>  $extraCandidates
      */
-    private function tryStreamDocumentFile(string $rawPath, string $downloadName, array $extraCandidates = []): ?\Symfony\Component\HttpFoundation\Response
+    private function tryStreamDocumentFile(string $rawPath, string $downloadName, string $disposition = 'inline', array $extraCandidates = []): ?\Symfony\Component\HttpFoundation\Response
     {
         $normalized = $this->normalizePublicDiskPath($rawPath);
         $candidates = [];
@@ -163,6 +208,7 @@ class DocumentController extends Controller
 
         $candidates = array_values(array_unique(array_filter($candidates)));
         $disks = array_unique([$this->publicDisk(), 'public', 'local']);
+        $mime = $this->resolveMimeType($downloadName);
 
         foreach ($disks as $diskName) {
             try {
@@ -171,7 +217,26 @@ class DocumentController extends Controller
                     if ($disk->exists($candidate)) {
                         $stream = $disk->readStream($candidate);
                         if (is_resource($stream)) {
-                            $mime = str_ends_with(strtolower($downloadName), '.pdf') ? 'application/pdf' : 'application/octet-stream';
+                            $headers = [
+                                'Content-Type' => $mime,
+                                'Content-Disposition' => sprintf('%s; filename="%s"', $disposition, addslashes($downloadName)),
+                                'Cache-Control' => 'private, no-cache, no-store, must-revalidate',
+                                'Pragma' => 'no-cache',
+                            ];
+
+                            if ($disposition === 'inline') {
+                                return response()->stream(
+                                    static function () use ($stream): void {
+                                        fpassthru($stream);
+                                        if (is_resource($stream)) {
+                                            fclose($stream);
+                                        }
+                                    },
+                                    200,
+                                    $headers
+                                );
+                            }
+
                             return response()->streamDownload(
                                 static function () use ($stream): void {
                                     fpassthru($stream);
@@ -180,22 +245,30 @@ class DocumentController extends Controller
                                     }
                                 },
                                 $downloadName,
-                                ['Content-Type' => $mime]
+                                $headers
                             );
                         }
                     }
                 }
             } catch (\Throwable) {
-                // Ignore cloud disk failure and try next available storage disk
+                // Ignore disk failure and try next available storage disk
                 continue;
             }
         }
 
         // Direct local filesystem check
         foreach ($candidates as $candidate) {
-            $localPath = storage_path('app/public/' . $candidate);
-            if (file_exists($localPath) && is_readable($localPath)) {
-                return response()->download($localPath, $downloadName);
+            foreach ([
+                storage_path('app/public/'.$candidate),
+                storage_path('app/'.$candidate),
+                public_path('storage/'.$candidate),
+            ] as $localPath) {
+                if (file_exists($localPath) && is_readable($localPath)) {
+                    return response()->file($localPath, [
+                        'Content-Type' => $mime,
+                        'Content-Disposition' => sprintf('%s; filename="%s"', $disposition, addslashes($downloadName)),
+                    ]);
+                }
             }
         }
 
