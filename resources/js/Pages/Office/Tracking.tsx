@@ -76,80 +76,133 @@ export default function OfficeTracking({ summary, recentRequests, notificationPr
     }, [recentRequests, requestSearch, requestStatus]);
 
     return (
-        <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Office Dashboard</h2>}>
+        <AuthenticatedLayout
+            header="Office Dashboard"
+            headerActions={
+                <Link
+                    href={route('office.supply-requests.create')}
+                    className="inline-flex h-8 items-center rounded-lg bg-red-600 px-3 text-xs font-semibold text-white hover:bg-red-700 shadow-sm transition"
+                >
+                    <svg className="mr-1.5 h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                    </svg>
+                    New Request
+                </Link>
+            }
+        >
             <Head title="Office Dashboard" />
 
-            <div className="space-y-6 py-4">
+            <div className="space-y-3.5">
                 <DashboardAlertBanner alerts={dashboardAlerts} />
 
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <MetricCard label="Total Requests" value={summary.total_requests} tone="slate" />
-                    <MetricCard label="Pending Requests" value={summary.pending_requests} tone="amber" />
-                    <MetricCard label="Processed Requests" value={summary.processed_requests} tone="emerald" />
-                    <MetricCard label="Supplies Ready for Claim" value={summary.ready_for_claim} tone="sky" />
-                </div>
-
-                <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    <div className="border-b border-slate-200 px-6 py-5">
-                        <h3 className="text-2xl font-semibold text-slate-800">Quick Actions</h3>
-                    </div>
-                    <div className="grid gap-3 p-6 md:grid-cols-3">
-                        <Link
-                            href={route('office.supply-requests.create')}
-                            className="rounded-xl border border-red-500 bg-red-600 px-4 py-5 text-center text-lg font-semibold text-white transition hover:bg-red-700"
-                        >
-                            Create New Request
-                        </Link>
-                        <Link
-                            href={route('office.supply-requests.index')}
-                            className="rounded-xl border border-red-300 bg-white px-4 py-5 text-center text-lg font-semibold text-red-700 transition hover:bg-red-50"
-                        >
-                            Track Request Status
-                        </Link>
-                        <Link
-                            href={route('office.supplies-ready.index')}
-                            className="rounded-xl border border-red-300 bg-white px-4 py-5 text-center text-lg font-semibold text-red-700 transition hover:bg-red-50"
-                        >
-                            Supplies Ready to Claim
-                        </Link>
+                {/* Slim Office Telemetry Strip */}
+                <section className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+                        <div className="flex items-center gap-2.5 px-3 py-1">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-slate-400" />
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Total Requests</p>
+                                <p className="text-lg font-extrabold text-slate-900 leading-tight">{summary.total_requests}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2.5 px-3 py-1">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" />
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-700">Pending Review</p>
+                                <p className="text-lg font-extrabold text-amber-900 leading-tight">{summary.pending_requests}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2.5 px-3 py-1">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-600" />
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">In Processing</p>
+                                <p className="text-lg font-extrabold text-emerald-900 leading-tight">{summary.processed_requests}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2.5 px-3 py-1">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-sky-600" />
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-sky-700">Ready for Claim</p>
+                                <p className="text-lg font-extrabold text-sky-900 leading-tight">{summary.ready_for_claim}</p>
+                            </div>
+                        </div>
                     </div>
                 </section>
 
-                <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
-                        <div>
-                            <h3 className="text-2xl font-semibold text-slate-800">Recent Requests</h3>
-                            <p className="mt-1 text-lg text-slate-500">Your latest supply requests</p>
+                {/* Compact Quick Access Cards */}
+                <div className="grid gap-2.5 sm:grid-cols-3">
+                    <Link
+                        href={route('office.supply-requests.create')}
+                        className="group flex items-center gap-3 rounded-xl border border-red-200 bg-red-50/40 p-3 shadow-sm transition hover:border-red-400 hover:bg-red-50 hover:shadow"
+                    >
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-600 text-white shadow-sm transition group-hover:bg-red-700">
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                            </svg>
+                        </span>
+                        <div className="min-w-0">
+                            <p className="text-xs font-bold text-slate-900 group-hover:text-red-700">Create New Request</p>
+                            <p className="text-[11px] text-slate-500 truncate">Requisition supplies for department</p>
                         </div>
-                        <Link href={route('office.supply-requests.index')} className="rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
-                            View All
-                        </Link>
-                    </div>
+                    </Link>
 
-                    <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
-                        <div className="grid gap-3 md:grid-cols-6">
-                            <div className="md:col-span-3">
-                                <label htmlFor="office-dashboard-request-search" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
-                                    Search requests
-                                </label>
+                    <Link
+                        href={route('office.supply-requests.index')}
+                        className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-slate-300 hover:bg-slate-50/70 hover:shadow"
+                    >
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700 transition group-hover:bg-slate-200">
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                            </svg>
+                        </span>
+                        <div className="min-w-0">
+                            <p className="text-xs font-bold text-slate-900 group-hover:text-red-700">Track Request Status</p>
+                            <p className="text-[11px] text-slate-500 truncate">View approval and delivery timeline</p>
+                        </div>
+                    </Link>
+
+                    <Link
+                        href={route('office.supplies-ready.index')}
+                        className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-slate-300 hover:bg-slate-50/70 hover:shadow"
+                    >
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sky-50 text-sky-700 transition group-hover:bg-sky-100">
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                            </svg>
+                        </span>
+                        <div className="min-w-0">
+                            <p className="text-xs font-bold text-slate-900 group-hover:text-red-700">Supplies Ready to Claim</p>
+                            <p className="text-[11px] text-slate-500 truncate">Pending warehouse pick-up</p>
+                        </div>
+                    </Link>
+                </div>
+
+                <div className="grid gap-3.5 xl:grid-cols-12">
+                    {/* Recent Requests Table (8 cols) */}
+                    <div className="xl:col-span-8 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2.5">
+                            <div>
+                                <h3 className="text-sm font-bold text-slate-900">Recent Supply Requests</h3>
+                                <p className="text-[11px] text-slate-500">Latest office requisitions & lifecycle status</p>
+                            </div>
+                            <Link href={route('office.supply-requests.index')} className="text-xs font-semibold text-red-700 hover:text-red-800 hover:underline">
+                                View All &rarr;
+                            </Link>
+                        </div>
+
+                        <div className="border-b border-slate-100 bg-slate-50/60 p-2.5">
+                            <div className="grid gap-2 grid-cols-1 sm:grid-cols-12">
                                 <input
-                                    id="office-dashboard-request-search"
                                     type="text"
                                     value={requestSearch}
                                     onChange={(event) => setRequestSearch(event.target.value)}
                                     placeholder="Search request ID, date, status"
-                                    className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                                    className="sm:col-span-7 h-8 rounded-lg border border-slate-300 px-2.5 text-xs shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                                 />
-                            </div>
-                            <div className="md:col-span-2">
-                                <label htmlFor="office-dashboard-request-status" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
-                                    Status
-                                </label>
                                 <select
-                                    id="office-dashboard-request-status"
                                     value={requestStatus}
                                     onChange={(event) => setRequestStatus(event.target.value)}
-                                    className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                                    className="sm:col-span-3 h-8 rounded-lg border border-slate-300 px-2 text-xs shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                                 >
                                     {requestStatusOptions.map((status) => (
                                         <option key={status} value={status}>
@@ -157,80 +210,82 @@ export default function OfficeTracking({ summary, recentRequests, notificationPr
                                         </option>
                                     ))}
                                 </select>
-                            </div>
-                            <div className="flex items-end">
                                 <button
                                     type="button"
                                     onClick={() => {
                                         setRequestSearch('');
                                         setRequestStatus('ALL');
                                     }}
-                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                                    className="sm:col-span-2 h-8 rounded-lg border border-slate-300 px-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
                                 >
                                     Clear
                                 </button>
                             </div>
                         </div>
-                        <p className="mt-3 text-xs text-slate-500">
-                            Showing {filteredRecentRequests.length} of {recentRequests.length} request(s).
-                        </p>
-                    </div>
 
-                    {filteredRecentRequests.length === 0 ? (
-                        <div className="px-6 py-10 text-sm text-slate-600">No requests yet. Create your first request.</div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-slate-200 text-sm">
-                                <thead className="bg-slate-50">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Request ID</th>
-                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Date</th>
-                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Items</th>
-                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Status</th>
-                                        <th className="px-4 py-3 text-right font-semibold text-slate-700">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {filteredRecentRequests.map((request) => (
-                                        <tr key={request.supply_request_id}>
-                                            <td className="px-4 py-3 font-semibold text-red-700">{request.request_code}</td>
-                                            <td className="px-4 py-3 text-slate-700">{formatDate(request.request_date)}</td>
-                                            <td className="px-4 py-3 text-slate-700">{request.items_count} item(s)</td>
-                                            <td className="px-4 py-3">
-                                                <StatusBadge status={request.status} />
-                                            </td>
-                                            <td className="px-4 py-3 text-right">
-                                                <Link href={route('office.supply-requests.show', request.supply_request_id)} className="rounded-lg border border-red-300 px-4 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50">
-                                                    View
-                                                </Link>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </section>
-
-                <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    <div className="border-b border-slate-200 px-6 py-5">
-                        <h3 className="text-2xl font-semibold text-slate-800">Recent Updates</h3>
-                        <p className="mt-1 text-lg text-slate-500">Notifications and request updates</p>
-                    </div>
-                    <div className="space-y-3 p-6">
-                        {notificationPreview.length === 0 ? (
-                            <p className="text-sm text-slate-600">No updates yet.</p>
+                        {filteredRecentRequests.length === 0 ? (
+                            <div className="px-4 py-8 text-center text-xs text-slate-500">No requests match your current filters.</div>
                         ) : (
-                            notificationPreview.map((notification) => (
-                                <div key={notification.notification_id} className={`rounded-xl border px-4 py-3 ${notification.is_read ? 'border-slate-200 bg-slate-50' : 'border-emerald-200 bg-emerald-50/60'}`}>
-                                    <p className="text-base font-semibold text-slate-800">{notification.title}</p>
-                                    <p className="mt-1 text-sm text-slate-600">{notification.message}</p>
-                                    <p className="mt-1 text-xs text-slate-500">{formatDateTime(notification.created_at)}</p>
-                                </div>
-                            ))
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-slate-200 text-xs">
+                                    <thead className="bg-slate-50">
+                                        <tr>
+                                            <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-slate-500">Request ID</th>
+                                            <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-slate-500">Date</th>
+                                            <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-slate-500">Items</th>
+                                            <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-slate-500">Status</th>
+                                            <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide text-slate-500">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {filteredRecentRequests.map((request) => (
+                                            <tr key={request.supply_request_id} className="hover:bg-slate-50/50 transition">
+                                                <td className="px-3 py-2 font-bold text-red-700">{request.request_code}</td>
+                                                <td className="px-3 py-2 text-slate-600">{formatDate(request.request_date)}</td>
+                                                <td className="px-3 py-2 text-slate-600">{request.items_count} item(s)</td>
+                                                <td className="px-3 py-2">
+                                                    <StatusBadge status={request.status} />
+                                                </td>
+                                                <td className="px-3 py-2 text-right">
+                                                    <Link
+                                                        href={route('office.supply-requests.show', request.supply_request_id)}
+                                                        className="inline-flex h-6 items-center rounded border border-slate-300 bg-white px-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 hover:text-red-700 transition"
+                                                    >
+                                                        View
+                                                    </Link>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         )}
                     </div>
-                </section>
+
+                    {/* Recent Updates / Notifications (4 cols) */}
+                    <div className="xl:col-span-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                        <div className="border-b border-slate-200 px-4 py-2.5">
+                            <h3 className="text-sm font-bold text-slate-900">Recent Updates</h3>
+                            <p className="text-[11px] text-slate-500">Notifications and status signals</p>
+                        </div>
+                        <div className="p-3 space-y-2">
+                            {notificationPreview.length === 0 ? (
+                                <p className="py-6 text-center text-xs text-slate-500">No recent updates.</p>
+                            ) : (
+                                notificationPreview.map((notification) => (
+                                    <div
+                                        key={notification.notification_id}
+                                        className={`rounded-lg border p-2.5 text-xs transition ${notification.is_read ? 'border-slate-100 bg-slate-50/60' : 'border-emerald-200 bg-emerald-50/40'}`}
+                                    >
+                                        <p className="font-bold text-slate-900 leading-tight">{notification.title}</p>
+                                        <p className="mt-0.5 text-slate-600 text-[11px] line-clamp-2">{notification.message}</p>
+                                        <p className="mt-1 text-[10px] text-slate-400">{formatDateTime(notification.created_at)}</p>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </div>
             </div>
         </AuthenticatedLayout>
     );

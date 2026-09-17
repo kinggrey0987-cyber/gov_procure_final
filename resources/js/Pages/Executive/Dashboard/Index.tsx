@@ -539,31 +539,31 @@ export default function ExecutiveDashboardIndex({
                         >
                             <div className="space-y-3">
                                 <div className="flex items-center gap-3.5 rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
-                                    <div className="relative h-18 w-18 shrink-0">
-                                        <svg viewBox="0 0 100 100" className="h-18 w-18 -rotate-90">
+                                    <div className="relative h-20 w-20 shrink-0">
+                                        <svg viewBox="0 0 100 100" className="h-20 w-20 -rotate-90">
                                             <circle
                                                 cx="50"
                                                 cy="50"
-                                                r="40"
+                                                r="38"
                                                 fill="none"
                                                 stroke="rgb(226 232 240)"
-                                                strokeWidth="10"
+                                                strokeWidth="8"
                                             />
                                             <circle
                                                 cx="50"
                                                 cy="50"
-                                                r="40"
+                                                r="38"
                                                 fill="none"
                                                 stroke={ppmpClearanceRate === 100 ? 'rgb(16 185 129)' : 'rgb(245 158 11)'}
-                                                strokeWidth="10"
-                                                strokeDasharray={2 * Math.PI * 40}
-                                                strokeDashoffset={(2 * Math.PI * 40) * (1 - ppmpClearanceRate / 100)}
+                                                strokeWidth="8"
+                                                strokeDasharray={2 * Math.PI * 38}
+                                                strokeDashoffset={(2 * Math.PI * 38) * (1 - ppmpClearanceRate / 100)}
                                                 strokeLinecap="round"
                                                 className="transition-all duration-700 ease-out"
                                             />
                                         </svg>
-                                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                                            <span className="text-lg font-extrabold text-slate-900 leading-none">{ppmpClearanceRate}%</span>
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+                                            <span className="text-base font-extrabold text-slate-900 leading-none">{ppmpClearanceRate}%</span>
                                             <span className="text-[8px] font-bold uppercase tracking-wider text-slate-500 mt-0.5">Cleared</span>
                                         </div>
                                     </div>

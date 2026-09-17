@@ -152,28 +152,28 @@ export function InfographicVarianceMeter({
     const thresholdPercent = threshold ? Math.min(Math.max(((expVal * 1.25) / maxScaleValue) * 100, basePercent + 10), 85) : null;
 
     return (
-        <div className="space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="space-y-2.5 rounded-xl border border-slate-200 bg-white p-3 sm:p-3.5 shadow-sm">
             {/* Infographic KPI Trio */}
-            <div className="grid gap-4 sm:grid-cols-3">
-                <div className="relative overflow-hidden rounded-xl border border-red-200 bg-gradient-to-br from-red-50 to-white p-4 shadow-sm">
-                    <span className="absolute right-3 top-3 h-2.5 w-2.5 rounded-full bg-red-600 animate-pulse" />
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-red-700">Actual Transaction</p>
-                    <p className="mt-1 text-2xl font-extrabold text-red-950">{formatVal(detected)}</p>
-                    <p className="mt-1 text-xs text-red-800/80 font-medium">Recorded in procurement record</p>
+            <div className="grid gap-2 sm:grid-cols-3">
+                <div className="relative overflow-hidden rounded-lg border border-red-200 bg-gradient-to-br from-red-50 to-white p-2.5 shadow-xs">
+                    <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-red-600 animate-pulse" />
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-red-700">Actual Transaction</p>
+                    <p className="mt-0.5 text-lg font-black text-red-950 leading-tight">{formatVal(detected)}</p>
+                    <p className="mt-0.5 text-[10px] text-red-800/80 font-medium truncate">Recorded in procurement record</p>
                 </div>
 
-                <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 shadow-sm">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Normal Reference</p>
-                    <p className="mt-1 text-2xl font-extrabold text-slate-900">{formatVal(expected)}</p>
-                    <p className="mt-1 text-xs text-slate-500 font-medium">Historical municipal baseline</p>
+                <div className="relative overflow-hidden rounded-lg border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-2.5 shadow-xs">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Normal Reference</p>
+                    <p className="mt-0.5 text-lg font-black text-slate-900 leading-tight">{formatVal(expected)}</p>
+                    <p className="mt-0.5 text-[10px] text-slate-500 font-medium truncate">Historical municipal baseline</p>
                 </div>
 
-                <div className="relative overflow-hidden rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-4 shadow-sm">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-amber-700">Deviation / Variance</p>
-                    <p className="mt-1 text-2xl font-extrabold text-amber-950">
+                <div className="relative overflow-hidden rounded-lg border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-2.5 shadow-xs">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Deviation / Variance</p>
+                    <p className="mt-0.5 text-lg font-black text-amber-950 leading-tight">
                         {deltaPercent !== null ? `${deltaPercent >= 0 ? '+' : ''}${deltaPercent}%` : 'Elevated'}
                     </p>
-                    <p className="mt-1 text-xs text-amber-800/80 font-medium">
+                    <p className="mt-0.5 text-[10px] text-amber-800/80 font-medium truncate">
                         {diffValue !== null
                             ? `${diffValue >= 0 ? '+' : ''}${formatVal(diffValue)} difference`
                             : 'Above allowable boundary'}
@@ -182,23 +182,23 @@ export function InfographicVarianceMeter({
             </div>
 
             {/* Visual Variance Meter Track */}
-            <div className="space-y-3 pt-2">
-                <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
-                    <span className="flex items-center gap-1.5">
-                        <span className="h-2 w-2 rounded-full bg-emerald-500" /> Safe Baseline Zone
+            <div className="space-y-1.5 pt-0.5">
+                <div className="flex items-center justify-between text-[10px] font-semibold text-slate-600">
+                    <span className="flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Safe Baseline
                     </span>
-                    <span className="flex items-center gap-1.5">
-                        <span className="h-2 w-2 rounded-full bg-amber-500" /> Caution Boundary
+                    <span className="flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Caution Boundary
                     </span>
-                    <span className="flex items-center gap-1.5">
-                        <span className="h-2 w-2 rounded-full bg-red-600" /> Anomaly Surge Zone
+                    <span className="flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-red-600" /> Anomaly Surge
                     </span>
                 </div>
 
                 {/* Meter track with gradient & pin markers */}
-                <div className="relative pt-6 pb-8">
+                <div className="relative pt-4 pb-4">
                     {/* Background Bar */}
-                    <div className="h-4 w-full overflow-hidden rounded-full bg-slate-100 p-0.5 border border-slate-200">
+                    <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100 p-0.5 border border-slate-200">
                         <div className="h-full w-full rounded-full bg-gradient-to-r from-emerald-500 via-amber-400 to-red-600 opacity-90" />
                     </div>
 
@@ -208,42 +208,42 @@ export function InfographicVarianceMeter({
                             className="absolute top-0 -translate-x-1/2 flex flex-col items-center pointer-events-none"
                             style={{ left: `${basePercent}%` }}
                         >
-                            <span className="rounded-md bg-slate-900 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm whitespace-nowrap">
+                            <span className="rounded bg-slate-900 px-1.5 py-0.5 text-[9px] font-bold text-white shadow-xs whitespace-nowrap leading-none">
                                 Baseline: {formatVal(expected)}
                             </span>
-                            <div className="h-6 w-0.5 bg-slate-900 mt-0.5" />
+                            <div className="h-4 w-0.5 bg-slate-900 mt-0.5" />
                         </div>
                     )}
 
                     {/* Actual Value Pin */}
                     {hasDetected && (
                         <div
-                            className="absolute top-1 -translate-x-1/2 flex flex-col items-center pointer-events-none z-10"
+                            className="absolute top-0 -translate-x-1/2 flex flex-col items-center pointer-events-none z-10"
                             style={{ left: `${actualPercent}%` }}
                         >
-                            <span className="rounded-md bg-red-600 px-2 py-0.5 text-[10px] font-extrabold text-white shadow-md whitespace-nowrap ring-2 ring-red-200">
+                            <span className="rounded bg-red-600 px-1.5 py-0.5 text-[9px] font-extrabold text-white shadow-sm whitespace-nowrap ring-1 ring-red-200 leading-none">
                                 Actual: {formatVal(detected)}
                             </span>
-                            <div className="h-5 w-1 bg-red-600 rounded-full mt-0.5 shadow-sm" />
-                            <div className="h-3 w-3 rounded-full bg-red-600 ring-4 ring-red-200 animate-ping" />
+                            <div className="h-3.5 w-0.5 bg-red-600 mt-0.5" />
+                            <div className="h-2 w-2 rounded-full bg-red-600 ring-2 ring-red-200 animate-ping" />
                         </div>
                     )}
                 </div>
 
                 {/* Plain-Language Executive Summary Callout */}
-                <div className="rounded-xl border border-red-100 bg-red-50/60 p-3.5 text-xs text-red-900 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-600 text-white font-bold text-[10px]">
+                <div className="rounded-lg border border-red-100 bg-red-50/60 px-2.5 py-1.5 text-[11px] text-red-900 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-red-600 text-white font-bold text-[9px]">
                             !
                         </span>
-                        <span>
+                        <span className="truncate">
                             {hasDetected && hasExpected
-                                ? `The recorded transaction of ${formatVal(detected)} exceeds historical baseline standards (${formatVal(expected)}) by ${deltaPercent !== null ? `+${deltaPercent}%` : 'an elevated margin'}.`
-                                : 'The recorded transaction is operating outside normal procurement threshold tolerances.'}
+                                ? `Recorded ${formatVal(detected)} exceeds baseline (${formatVal(expected)}) by ${deltaPercent !== null ? `+${deltaPercent}%` : 'elevated margin'}.`
+                                : 'Recorded transaction is operating outside normal procurement tolerances.'}
                         </span>
                     </div>
                     {diffValue !== null && (
-                        <span className="shrink-0 font-bold bg-white border border-red-200 rounded-lg px-2.5 py-1 text-red-700 ml-3">
+                        <span className="shrink-0 font-bold bg-white border border-red-200 rounded px-1.5 py-0.5 text-red-700 text-[10px]">
                             {diffValue >= 0 ? '+' : ''}{formatVal(diffValue)} Variance
                         </span>
                     )}
@@ -267,39 +267,39 @@ export function OperationalStockGauge({
     const deficitPercent = Math.max(100 - capacityPercent, 0);
 
     return (
-        <div className="space-y-5 rounded-2xl border border-amber-200 bg-white p-6 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+        <div className="space-y-2.5 rounded-xl border border-amber-200 bg-white p-3 sm:p-3.5 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
                 <div>
-                    <span className="inline-flex rounded-full bg-red-100 border border-red-200 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-800">
+                    <span className="inline-flex rounded-full bg-red-100 border border-red-200 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-red-800">
                         Critical Stockout Risk
                     </span>
-                    <h3 className="text-lg font-bold text-slate-900 mt-1">{itemName} Warehouse Stock Level</h3>
+                    <h3 className="text-sm font-bold text-slate-900 mt-0.5">{itemName} Warehouse Stock</h3>
                 </div>
-                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-right">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-red-700">Depletion Level</p>
-                    <p className="text-base font-extrabold text-red-900">{deficitPercent}% Below Buffer</p>
-                </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-                <div className="rounded-xl border border-red-200 bg-gradient-to-br from-red-50 to-white p-4">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-red-700">Available Stock on Hand</p>
-                    <p className="mt-1 text-3xl font-black text-red-950">{available.toFixed(2)} Units</p>
-                    <p className="mt-1 text-xs text-red-700">Currently in physical municipal warehouse</p>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Minimum Reorder Point</p>
-                    <p className="mt-1 text-3xl font-black text-slate-900">{threshold.toFixed(2)} Units</p>
-                    <p className="mt-1 text-xs text-slate-500">Mandatory GSO safety buffer threshold</p>
+                <div className="rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-right">
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-red-700">Depletion Level</p>
+                    <p className="text-xs font-extrabold text-red-900">{deficitPercent}% Below Buffer</p>
                 </div>
             </div>
 
-            <div className="space-y-2">
-                <div className="flex justify-between text-xs font-semibold text-slate-600">
-                    <span>Current Inventory Capacity ({capacityPercent}%)</span>
-                    <span>Safety Buffer (100% = {threshold.toFixed(2)} Units)</span>
+            <div className="grid gap-2 sm:grid-cols-2">
+                <div className="rounded-lg border border-red-200 bg-gradient-to-br from-red-50 to-white p-2.5">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-red-700">Available Stock on Hand</p>
+                    <p className="mt-0.5 text-xl font-black text-red-950">{available.toFixed(2)} Units</p>
+                    <p className="text-[10px] text-red-700 truncate">In municipal warehouse</p>
                 </div>
-                <div className="h-4 w-full overflow-hidden rounded-full bg-slate-100 p-0.5 border border-slate-200">
+                <div className="rounded-lg border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-2.5">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Minimum Reorder Point</p>
+                    <p className="mt-0.5 text-xl font-black text-slate-900">{threshold.toFixed(2)} Units</p>
+                    <p className="text-[10px] text-slate-500 truncate">Mandatory safety buffer</p>
+                </div>
+            </div>
+
+            <div className="space-y-1">
+                <div className="flex justify-between text-[10px] font-semibold text-slate-600">
+                    <span>Capacity: {capacityPercent}%</span>
+                    <span>Buffer: {threshold.toFixed(2)} Units</span>
+                </div>
+                <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100 p-0.5 border border-slate-200">
                     <div
                         className="h-full rounded-full bg-gradient-to-r from-red-600 to-rose-500 transition-all duration-700"
                         style={{ width: `${Math.max(capacityPercent, 6)}%` }}
@@ -307,8 +307,8 @@ export function OperationalStockGauge({
                 </div>
             </div>
 
-            <div className="rounded-xl border border-amber-100 bg-amber-50/70 p-3.5 text-xs text-amber-900">
-                <strong>Executive Action Required:</strong> Stock level has fallen significantly below the municipal safety threshold. Endorse immediate replenishment to avoid stockout of essential supplies.
+            <div className="rounded-lg border border-amber-100 bg-amber-50/70 p-2 text-[11px] text-amber-900">
+                <strong>Executive Action Required:</strong> Stock is below safety buffer. Immediate replenishment recommended.
             </div>
         </div>
     );

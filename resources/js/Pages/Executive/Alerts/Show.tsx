@@ -57,110 +57,115 @@ export default function ExecutiveAlertShow({ alert, anomaly_evidence }: Props) {
         : interpretOperationalAlert(alert.alert_type, alert.alert_message, stockAvailable, stockThreshold);
 
     return (
-        <AuthenticatedLayout header="Risk & Alerts">
+        <AuthenticatedLayout
+            header="Risk & Alerts"
+            headerActions={
+                <div className="flex items-center gap-2">
+                    <StatusBadge status={alert.status} />
+                    <Link
+                        href={route('executive.anomalies-monitoring')}
+                        className="inline-flex h-8 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50"
+                    >
+                        &larr; Return to Risk & Alerts
+                    </Link>
+                </div>
+            }
+        >
             <Head title={`Alert #${alert.alerts_id} - ${formatAlertLabel(alert.alert_type)}`} />
 
-            <div className="space-y-6 py-8">
-                {/* 1. Executive Finding Header */}
-                <section className={`overflow-hidden rounded-2xl border ${severityTone.shell} p-6 shadow-sm`}>
-                    <div className="flex flex-wrap items-center justify-between gap-4">
-                        <div className="space-y-1.5 max-w-3xl">
+            <div className="space-y-2.5">
+                {/* 1. Executive Finding Header Strip */}
+                <section className={`rounded-xl border ${severityTone.shell} px-4 py-2.5 shadow-xs`}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="space-y-0.5">
                             <div className="flex items-center gap-2">
-                                <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${severityTone.badge}`}>
+                                <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${severityTone.badge}`}>
                                     {severityTone.label} Alert
                                 </span>
-                                <span className="text-xs font-semibold text-slate-400">•</span>
-                                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                <span className="text-xs font-semibold text-slate-300">•</span>
+                                <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
                                     Alert #{alert.alerts_id}
                                 </span>
                                 {alert.office && (
                                     <>
-                                        <span className="text-xs font-semibold text-slate-400">•</span>
-                                        <span className="text-xs font-bold text-slate-700">{alert.office.name}</span>
+                                        <span className="text-xs font-semibold text-slate-300">•</span>
+                                        <span className="text-xs font-bold text-slate-800">{alert.office.name}</span>
                                     </>
                                 )}
                             </div>
-                            <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+                            <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-tight">
                                 {alertInfo.headline}
                             </h2>
-                            <p className="text-sm text-slate-600 leading-relaxed font-medium">
+                            <p className="text-xs text-slate-600 font-medium">
                                 {alertInfo.explanation}
                             </p>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-3">
-                            <StatusBadge status={alert.status} />
-                            <Link
-                                href={route('executive.anomalies-monitoring')}
-                                className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-                            >
-                                &larr; Return to Risk & Alerts
-                            </Link>
                         </div>
                     </div>
                 </section>
 
-                {/* 2. Visual Infographic (Variance Meter OR Stock Gauge OR Operational Card) */}
-                {anomaly_evidence ? (
-                    <InfographicVarianceMeter
-                        detected={detectedMetric}
-                        expected={expectedMetric}
-                        threshold={thresholdMetric}
-                        isCurrency={isCurrency}
-                        unitLabel={alertInfo.unitLabel}
-                        percentDelta={percentDelta}
-                    />
-                ) : stockAvailable !== null && stockThreshold !== null ? (
-                    <OperationalStockGauge
-                        available={stockAvailable}
-                        threshold={stockThreshold}
-                        itemName={itemName}
-                    />
-                ) : (
-                    <section className="rounded-2xl border border-amber-200 bg-white p-6 shadow-sm space-y-4">
-                        <div className="flex items-center gap-3">
-                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white font-black text-lg">
-                                !
-                            </span>
-                            <div>
-                                <p className="text-xs font-bold uppercase tracking-wider text-amber-800">Operational Notice</p>
-                                <h3 className="text-base font-extrabold text-slate-900">{formatAlertLabel(alert.alert_type)}</h3>
-                            </div>
-                        </div>
-                        <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-4 text-xs font-medium text-amber-950 leading-relaxed">
-                            {alert.alert_message}
-                        </div>
-                    </section>
-                )}
+                {/* 2. Cockpit Grid: Visual Evidence & Briefing (7 cols) | Audit Context & Connections (5 cols) */}
+                <div className="grid gap-2.5 xl:grid-cols-12 items-start">
+                    {/* Left: Evidence & Mayor's Governance Briefing (7 cols) */}
+                    <div className="xl:col-span-7 space-y-2.5">
+                        {anomaly_evidence ? (
+                            <InfographicVarianceMeter
+                                detected={detectedMetric}
+                                expected={expectedMetric}
+                                threshold={thresholdMetric}
+                                isCurrency={isCurrency}
+                                unitLabel={alertInfo.unitLabel}
+                                percentDelta={percentDelta}
+                            />
+                        ) : stockAvailable !== null && stockThreshold !== null ? (
+                            <OperationalStockGauge
+                                available={stockAvailable}
+                                threshold={stockThreshold}
+                                itemName={itemName}
+                            />
+                        ) : (
+                            <section className="rounded-xl border border-amber-200 bg-white p-3 shadow-xs space-y-2">
+                                <div className="flex items-center gap-2.5">
+                                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white font-black text-sm">
+                                        !
+                                    </span>
+                                    <div>
+                                        <p className="text-[10px] font-bold uppercase tracking-wider text-amber-800">Operational Notice</p>
+                                        <h3 className="text-sm font-extrabold text-slate-900">{formatAlertLabel(alert.alert_type)}</h3>
+                                    </div>
+                                </div>
+                                <div className="rounded-lg border border-amber-100 bg-amber-50/60 p-2.5 text-xs font-medium text-amber-950 leading-relaxed">
+                                    {alert.alert_message}
+                                </div>
+                            </section>
+                        )}
 
-                {/* 3. Executive Governance Briefing & Office Context */}
-                <div className="grid gap-6 xl:grid-cols-12">
-                    {/* Left: Mayor Governance Briefing (7 cols) */}
-                    <div className="xl:col-span-7 space-y-6">
-                        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                            <div className="border-b border-slate-100 bg-slate-50/70 px-5 py-4">
+                        {/* Mayor's Governance Briefing */}
+                        <section className="rounded-xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+                            <div className="border-b border-slate-100 bg-slate-50/70 px-3.5 py-2 flex items-center justify-between">
+                                <h3 className="text-xs font-bold text-slate-900">Mayor's Governance Briefing</h3>
                                 <span className="text-[10px] font-bold uppercase tracking-wider text-red-700">Executive Analysis</span>
-                                <h3 className="text-base font-bold text-slate-900 mt-0.5">Mayor's Governance Briefing</h3>
                             </div>
 
-                            <div className="p-5 space-y-4 text-sm">
-                                <div className="rounded-xl border border-rose-100 bg-rose-50/50 p-4 space-y-1">
-                                    <p className="text-xs font-bold uppercase tracking-wider text-rose-900">Governance & Service Risk</p>
-                                    <p className="text-xs text-rose-800 leading-relaxed font-medium">
-                                        {alertInfo.governanceRisk}
-                                    </p>
+                            <div className="p-3 space-y-2 text-xs">
+                                <div className="grid gap-2 sm:grid-cols-2">
+                                    <div className="rounded-lg border border-rose-100 bg-rose-50/50 p-2.5 space-y-0.5">
+                                        <p className="text-[10px] font-bold uppercase tracking-wider text-rose-900">Governance & Service Risk</p>
+                                        <p className="text-xs text-rose-800 leading-snug font-medium">
+                                            {alertInfo.governanceRisk}
+                                        </p>
+                                    </div>
+
+                                    <div className="rounded-lg border border-emerald-100 bg-emerald-50/50 p-2.5 space-y-0.5">
+                                        <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-900">Recommended Next Steps</p>
+                                        <p className="text-xs text-emerald-800 leading-snug font-medium">
+                                            {alertInfo.recommendedAction}
+                                        </p>
+                                    </div>
                                 </div>
 
-                                <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4 space-y-1">
-                                    <p className="text-xs font-bold uppercase tracking-wider text-emerald-900">Recommended Executive Action</p>
-                                    <p className="text-xs text-emerald-800 leading-relaxed font-medium">
-                                        {alertInfo.recommendedAction}
-                                    </p>
-                                </div>
-
-                                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-1">
-                                    <p className="text-xs font-bold uppercase tracking-wider text-slate-600">Operational Log Entry</p>
-                                    <p className="text-xs text-slate-800 leading-relaxed">
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 space-y-0.5">
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Operational Log Entry</p>
+                                    <p className="text-xs text-slate-800 leading-snug">
                                         {alert.alert_message}
                                     </p>
                                 </div>
@@ -168,23 +173,23 @@ export default function ExecutiveAlertShow({ alert, anomaly_evidence }: Props) {
                         </section>
                     </div>
 
-                    {/* Right: Context & Connected Records (5 cols) */}
-                    <div className="xl:col-span-5 space-y-6">
-                        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                            <div className="border-b border-slate-100 bg-slate-50/70 px-5 py-4">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Source Audit Trail</span>
-                                <h3 className="text-base font-bold text-slate-900 mt-0.5">Context & Source Entities</h3>
+                    {/* Right: Context & Source Entities (5 cols) */}
+                    <div className="xl:col-span-5 space-y-2.5">
+                        <section className="rounded-xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+                            <div className="border-b border-slate-100 bg-slate-50/70 px-3.5 py-2 flex items-center justify-between">
+                                <h3 className="text-xs font-bold text-slate-900">Context & Source Entities</h3>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Source Audit</span>
                             </div>
 
-                            <div className="p-5 space-y-3 text-xs">
-                                <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5">
-                                    <span className="font-medium text-slate-500">Concerned Office:</span>
-                                    <span className="font-bold text-slate-900">{alert.office?.name ?? 'General Services / Central Store'}</span>
+                            <div className="p-2.5 space-y-1.5 text-xs">
+                                <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5">
+                                    <span className="font-medium text-slate-500">Office:</span>
+                                    <span className="font-bold text-slate-900 truncate max-w-[200px]">{alert.office?.name ?? 'General Services / Central Store'}</span>
                                 </div>
 
                                 {alert.purchase_order && (
-                                    <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5">
-                                        <span className="font-medium text-slate-500">Purchase Order:</span>
+                                    <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5">
+                                        <span className="font-medium text-slate-500">PO:</span>
                                         <Link
                                             href={route('executive.procurement-records.purchase-orders.show', alert.purchase_order.purchase_order_id)}
                                             className="font-bold text-red-700 hover:underline"
@@ -195,24 +200,24 @@ export default function ExecutiveAlertShow({ alert, anomaly_evidence }: Props) {
                                 )}
 
                                 {alert.supply_request && (
-                                    <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5">
-                                        <span className="font-medium text-slate-500">Supply Request:</span>
-                                        <span className="font-bold text-slate-900">
+                                    <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5">
+                                        <span className="font-medium text-slate-500">Request:</span>
+                                        <span className="font-bold text-slate-900 truncate max-w-[200px]">
                                             {alert.supply_request.tracking_code ?? `REQ #${alert.supply_request.supply_request_id}`}
                                         </span>
                                     </div>
                                 )}
 
                                 {alert.supplier && (
-                                    <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5">
+                                    <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5">
                                         <span className="font-medium text-slate-500">Supplier:</span>
-                                        <span className="font-bold text-slate-900">{alert.supplier.business_name}</span>
+                                        <span className="font-bold text-slate-900 truncate max-w-[200px]">{alert.supplier.business_name}</span>
                                     </div>
                                 )}
 
                                 {alert.detected_at && (
-                                    <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5">
-                                        <span className="font-medium text-slate-500">Triggered Timestamp:</span>
+                                    <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5">
+                                        <span className="font-medium text-slate-500">Triggered:</span>
                                         <span className="font-bold text-slate-900">{formatDate(alert.detected_at)}</span>
                                     </div>
                                 )}
@@ -220,49 +225,50 @@ export default function ExecutiveAlertShow({ alert, anomaly_evidence }: Props) {
                         </section>
 
                         {/* Linked Anomaly */}
-                        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                            <div className="border-b border-slate-100 px-5 py-4">
-                                <h3 className="text-sm font-bold text-slate-900">Underlying Anomaly Record</h3>
+                        <section className="rounded-xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+                            <div className="border-b border-slate-100 px-3.5 py-2">
+                                <h3 className="text-xs font-bold text-slate-900">Underlying Anomaly Record</h3>
                             </div>
-                            <div className="p-4">
+                            <div className="p-2.5">
                                 {alert.anomaly_id ? (
                                     <Link
                                         href={route('executive.anomalies.show', alert.anomaly_id)}
-                                        className="flex items-center justify-between rounded-xl border border-red-200 bg-red-50/60 p-3.5 text-xs font-bold text-red-900 hover:bg-red-100 transition"
+                                        className="flex items-center justify-between rounded-lg border border-red-200 bg-red-50/60 p-2 text-xs font-bold text-red-900 hover:bg-red-100 transition"
                                     >
                                         <span>Anomaly #{alert.anomaly_id} Evidence & Details</span>
                                         <span className="text-red-700">&rarr;</span>
                                     </Link>
                                 ) : (
-                                    <p className="rounded-xl border border-dashed border-slate-200 p-3.5 text-center text-xs text-slate-500">
-                                        Generated as an independent operational alert without a parent statistical anomaly.
+                                    <p className="rounded-lg border border-dashed border-slate-200 p-2.5 text-center text-xs text-slate-500">
+                                        Independent operational alert without parent anomaly.
                                     </p>
                                 )}
                             </div>
                         </section>
+
+                        {/* Historical Series (Compact) */}
+                        {trendData.length > 0 ? (
+                            <section className="rounded-xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+                                <div className="border-b border-slate-100 bg-slate-50/70 px-3.5 py-2 flex items-center justify-between">
+                                    <h3 className="text-xs font-bold text-slate-900">Historical Valuation Trajectory</h3>
+                                    <span className="text-[10px] font-semibold text-slate-500">{trendData.length} records</span>
+                                </div>
+                                <div className="p-2.5">
+                                    <TrendLineChart
+                                        data={trendData}
+                                        emptyText="No historical series available"
+                                        showPointCards={false}
+                                        valueFormatter={(val) =>
+                                            isCurrency
+                                                ? `₱${val.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                                : `${val.toLocaleString('en-PH')} ${itemLabel}`
+                                        }
+                                    />
+                                </div>
+                            </section>
+                        ) : null}
                     </div>
                 </div>
-
-                {/* 4. Historical Series Infographic (if linked to anomaly series) */}
-                {trendData.length > 0 ? (
-                    <ExecutiveChartCard
-                        title="Historical Valuation Trajectory"
-                        subtitle={`Linked anomaly historical observations (${trendData.length} recorded data points)`}
-                        eyebrow="Historical Benchmark"
-                        tone="default"
-                    >
-                        <TrendLineChart
-                            data={trendData}
-                            emptyText="No historical series data available"
-                            showPointCards={false}
-                            valueFormatter={(val) =>
-                                isCurrency
-                                    ? `₱${val.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                                    : `${val.toLocaleString('en-PH')} ${itemLabel}`
-                            }
-                        />
-                    </ExecutiveChartCard>
-                ) : null}
             </div>
         </AuthenticatedLayout>
     );

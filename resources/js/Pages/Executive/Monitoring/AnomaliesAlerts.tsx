@@ -274,12 +274,11 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
             <Head title="Risk & Alerts" />
 
             <div id={printSectionId} className="space-y-4">
-
-                <section className="rounded-2xl border border-red-200 bg-white p-5 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
-                    <div className="flex flex-wrap items-end gap-3">
-                        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                        <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
                             <select
-                                className="h-10 rounded-lg border-slate-300 text-sm"
+                                className="h-8 rounded-lg border-slate-300 text-xs shadow-sm focus:border-red-500 focus:ring-1 focus:ring-red-500"
                                 value={form.office_id}
                                 onChange={(event) => setForm((current) => ({ ...current, office_id: event.target.value }))}
                             >
@@ -292,7 +291,7 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                             </select>
 
                             <select
-                                className="h-10 rounded-lg border-slate-300 text-sm"
+                                className="h-8 rounded-lg border-slate-300 text-xs shadow-sm focus:border-red-500 focus:ring-1 focus:ring-red-500"
                                 value={form.status}
                                 onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}
                             >
@@ -305,7 +304,7 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                             </select>
 
                             <MonthFilterSelect
-                                className="h-10 rounded-lg border-slate-300 text-sm"
+                                className="h-8 rounded-lg border-slate-300 text-xs shadow-sm focus:border-red-500 focus:ring-1 focus:ring-red-500"
                                 month={form.month}
                                 year={form.year}
                                 yearOptions={filter_options.years}
@@ -318,7 +317,7 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                             <button
                                 type="button"
                                 onClick={() => router.get(route('executive.anomalies-monitoring'))}
-                                className="h-10 rounded-lg border border-red-300 px-4 text-sm font-semibold text-red-700 transition hover:border-red-500 hover:bg-red-50"
+                                className="h-8 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                             >
                                 Reset
                             </button>
@@ -326,15 +325,42 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                     </div>
                 </section>
 
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <StatCard label="Anomalies" value={totals.anomaly_count} />
-                    <StatCard label="Alerts" value={totals.alert_count} />
-                    <StatCard label="High Severity Anomalies" value={totals.high_severity_anomaly_count} />
-                    <StatCard label="High Severity Alerts" value={totals.high_severity_alert_count} />
-                </div>
+                {/* Slim Executive Telemetry Strip */}
+                <section className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+                        <div className="flex items-center gap-2.5 px-3 py-1">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-red-600" />
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Anomalies</p>
+                                <p className="text-lg font-extrabold text-slate-900 leading-tight">{totals.anomaly_count}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2.5 px-3 py-1">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" />
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Alerts</p>
+                                <p className="text-lg font-extrabold text-slate-900 leading-tight">{totals.alert_count}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2.5 px-3 py-1">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-rose-600" />
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-rose-700">High Severity Anomalies</p>
+                                <p className="text-lg font-extrabold text-rose-900 leading-tight">{totals.high_severity_anomaly_count}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2.5 px-3 py-1">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-rose-600" />
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-rose-700">High Severity Alerts</p>
+                                <p className="text-lg font-extrabold text-rose-900 leading-tight">{totals.high_severity_alert_count}</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
 
-                <div className="grid gap-6 xl:grid-cols-12">
-                    <div className="xl:col-span-7">
+                <div className="grid gap-4 xl:grid-cols-12">
+                    <div className="xl:col-span-6">
                         <ExecutiveChartCard
                             title="Incident Movement & Distribution"
                             subtitle="Anomaly and alert movement across fiscal monitoring periods"
@@ -344,46 +370,19 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                             {trendData.length === 0 ? (
                                 <CompactEmpty text="No incident trend data in current filter scope." />
                             ) : trendData.length === 1 ? (
-                                <div className="space-y-4">
-                                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3">
-                                        <div className="flex items-center gap-2">
-                                            <span className="h-2.5 w-2.5 rounded-full bg-red-600 animate-pulse" />
-                                            <span className="text-xs font-medium text-slate-600">Active Monitored Period:</span>
-                                            <strong className="text-sm font-bold text-slate-900">{trendData[0].label}</strong>
-                                        </div>
-                                        <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-800">
-                                            {trendData[0].first + trendData[0].second} Total Active Signals
-                                        </span>
+                                <div className="space-y-3">
+                                    <div className="grid gap-2 sm:grid-cols-3">
+                                        <MiniStat label="Monitored Period" value={trendData[0].label} />
+                                        <MiniStat label="Anomalies" value={trendData[0].first} />
+                                        <MiniStat label="Alerts" value={trendData[0].second} />
                                     </div>
 
-                                    <div className="grid gap-3 sm:grid-cols-3">
-                                        <div className="rounded-xl border border-red-200 bg-gradient-to-br from-red-50 to-white p-4 shadow-sm">
-                                            <p className="text-xs font-semibold uppercase tracking-wider text-red-700">Flagged Anomalies</p>
-                                            <p className="mt-1 text-2xl font-bold text-red-900">{trendData[0].first}</p>
-                                            <p className="mt-1 text-[11px] text-slate-500">Pattern & threshold irregularities</p>
+                                    <div className="space-y-1 pt-1">
+                                        <div className="flex justify-between text-[11px] font-semibold text-slate-600">
+                                            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-red-600" /> Anomalies ({trendData[0].first})</span>
+                                            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-amber-500" /> Alerts ({trendData[0].second})</span>
                                         </div>
-                                        <div className="rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-4 shadow-sm">
-                                            <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">Workflow Alerts</p>
-                                            <p className="mt-1 text-2xl font-bold text-amber-900">{trendData[0].second}</p>
-                                            <p className="mt-1 text-[11px] text-slate-500">Operational queue notifications</p>
-                                        </div>
-                                        <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 shadow-sm">
-                                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-700">Anomaly Share</p>
-                                            <p className="mt-1 text-2xl font-bold text-slate-900">
-                                                {trendData[0].first + trendData[0].second > 0
-                                                    ? Math.round((trendData[0].first / (trendData[0].first + trendData[0].second)) * 100)
-                                                    : 0}%
-                                            </p>
-                                            <p className="mt-1 text-[11px] text-slate-500">Share of total incident volume</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-1.5 pt-1">
-                                        <div className="flex justify-between text-xs font-semibold text-slate-600">
-                                            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-red-600" /> Pattern Anomalies ({trendData[0].first})</span>
-                                            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> Operational Alerts ({trendData[0].second})</span>
-                                        </div>
-                                        <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+                                        <div className="flex h-2 w-full overflow-hidden rounded-full bg-slate-100">
                                             <div
                                                 className="bg-gradient-to-r from-red-600 to-rose-500 transition-all duration-500"
                                                 style={{
@@ -410,7 +409,7 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                         </ExecutiveChartCard>
                     </div>
 
-                    <div className="xl:col-span-5">
+                    <div className="xl:col-span-6">
                         <ExecutiveChartCard
                             title="Office Incident Ranking"
                             subtitle="Total anomalies & alerts concentrated by municipal department"
@@ -449,9 +448,9 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                             eyebrow="Risk & Velocity"
                             tone="default"
                         >
-                            <div className="grid gap-6 sm:grid-cols-2 items-start">
+                            <div className="grid gap-4 sm:grid-cols-2 items-start">
                                 <div>
-                                    <p className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-600">Severity Distribution</p>
+                                    <p className="mb-2.5 text-xs font-bold uppercase tracking-wider text-slate-600">Severity Distribution</p>
                                     <DonutChart
                                         data={severityMix}
                                         emptyText="No severity data"
@@ -461,7 +460,7 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                                     />
                                 </div>
                                 <div>
-                                    <p className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-600">Resolution Status</p>
+                                    <p className="mb-2.5 text-xs font-bold uppercase tracking-wider text-slate-600">Resolution Status</p>
                                     <HorizontalBarChart
                                         data={statusMix}
                                         palette="severity"
@@ -474,37 +473,42 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                     </div>
                 </div>
 
-                <div className="grid gap-6 xl:grid-cols-2">
-                    <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-                        <div className="border-b border-slate-200 px-5 py-4">
-                            <h3 className="text-lg font-semibold text-slate-900">Recent Anomalies</h3>
-                            <p className="mt-1 text-sm text-slate-600">Top 5 records per page. Open each record to view the full anomaly breakdown.</p>
+                <div className="grid gap-4 xl:grid-cols-2">
+                    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2.5">
+                            <div>
+                                <h3 className="text-sm font-bold text-slate-900">Recent Anomalies</h3>
+                                <p className="text-[11px] text-slate-500">Top 5 records &bull; Select record to view full anomaly breakdown</p>
+                            </div>
                         </div>
                         {recent.anomalies.length === 0 ? (
-                            <p className="px-5 py-6 text-sm text-slate-500">No anomalies found for the selected filters.</p>
+                            <p className="px-4 py-6 text-center text-xs text-slate-500">No anomalies found for the selected filters.</p>
                         ) : (
                             <>
-                                <div>
-                                    <table className="min-w-full table-fixed divide-y divide-slate-200 text-sm">
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full table-fixed divide-y divide-slate-200 text-xs">
                                         <thead className="bg-slate-50">
                                             <tr>
-                                                <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Type</th>
-                                                <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Severity</th>
-                                                <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Office</th>
-                                                <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Detected</th>
-                                                <th className="px-4 py-2 text-right text-xs uppercase tracking-wide text-slate-600">Action</th>
+                                                <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Type</th>
+                                                <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Severity</th>
+                                                <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Office</th>
+                                                <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Detected</th>
+                                                <th className="px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
                                             {visibleAnomalies.map((row) => (
-                                                <tr key={row.anomaly_id}>
-                                                    <td className="px-4 py-2 font-medium text-slate-800 break-words">{formatAnomalyType(row.anomaly_type)}</td>
-                                                    <td className="px-4 py-2">{SeverityBadge(row.severity)}</td>
-                                                    <td className="px-4 py-2 text-slate-700 break-words">{row.office?.name ?? 'N/A'}</td>
-                                                    <td className="px-4 py-2 text-slate-700">{formatDate(row.detected_at)}</td>
-                                                    <td className="px-4 py-2 text-right">
-                                                        <Link href={route('executive.anomalies.show', row.anomaly_id)} className="font-semibold text-red-700 hover:text-red-900">
-                                                            View details
+                                                <tr key={row.anomaly_id} className="hover:bg-slate-50/50">
+                                                    <td className="px-3 py-2 font-medium text-slate-800 break-words">{formatAnomalyType(row.anomaly_type)}</td>
+                                                    <td className="px-3 py-2">{SeverityBadge(row.severity)}</td>
+                                                    <td className="px-3 py-2 text-slate-600 break-words">{row.office?.name ?? 'N/A'}</td>
+                                                    <td className="px-3 py-2 text-slate-500">{formatDate(row.detected_at)}</td>
+                                                    <td className="px-3 py-2 text-right">
+                                                        <Link
+                                                            href={route('executive.anomalies.show', row.anomaly_id)}
+                                                            className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 hover:border-red-300 transition shadow-xs"
+                                                        >
+                                                            Inspect &rarr;
                                                         </Link>
                                                     </td>
                                                 </tr>
@@ -523,36 +527,41 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                         )}
                     </section>
 
-                    <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-                        <div className="border-b border-slate-200 px-5 py-4">
-                            <h3 className="text-lg font-semibold text-slate-900">Recent Alerts</h3>
-                            <p className="mt-1 text-sm text-slate-600">Top 5 records per page. Open each record to view the full alert breakdown.</p>
+                    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2.5">
+                            <div>
+                                <h3 className="text-sm font-bold text-slate-900">Recent Alerts</h3>
+                                <p className="text-[11px] text-slate-500">Top 5 records &bull; Select record to view full alert breakdown</p>
+                            </div>
                         </div>
                         {recent.alerts.length === 0 ? (
-                            <p className="px-5 py-6 text-sm text-slate-500">No alerts found for the selected filters.</p>
+                            <p className="px-4 py-6 text-center text-xs text-slate-500">No alerts found for the selected filters.</p>
                         ) : (
                             <>
-                                <div>
-                                    <table className="min-w-full table-fixed divide-y divide-slate-200 text-sm">
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full table-fixed divide-y divide-slate-200 text-xs">
                                         <thead className="bg-slate-50">
                                             <tr>
-                                                <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Alert Type</th>
-                                                <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Severity</th>
-                                                <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Office</th>
-                                                <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Detected</th>
-                                                <th className="px-4 py-2 text-right text-xs uppercase tracking-wide text-slate-600">Action</th>
+                                                <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Alert Type</th>
+                                                <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Severity</th>
+                                                <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Office</th>
+                                                <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Detected</th>
+                                                <th className="px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
                                             {visibleAlerts.map((row) => (
-                                                <tr key={row.alerts_id}>
-                                                    <td className="px-4 py-2 font-medium text-slate-800 break-words">{formatAlertType(row.alert_type)}</td>
-                                                    <td className="px-4 py-2">{SeverityBadge(row.severity)}</td>
-                                                    <td className="px-4 py-2 text-slate-700 break-words">{row.office?.name ?? 'N/A'}</td>
-                                                    <td className="px-4 py-2 text-slate-700">{formatDate(row.detected_at)}</td>
-                                                    <td className="px-4 py-2 text-right">
-                                                        <Link href={route('executive.alerts.show', row.alerts_id)} className="font-semibold text-red-700 hover:text-red-900">
-                                                            View details
+                                                <tr key={row.alerts_id} className="hover:bg-slate-50/50">
+                                                    <td className="px-3 py-2 font-medium text-slate-800 break-words">{formatAlertType(row.alert_type)}</td>
+                                                    <td className="px-3 py-2">{SeverityBadge(row.severity)}</td>
+                                                    <td className="px-3 py-2 text-slate-600 break-words">{row.office?.name ?? 'N/A'}</td>
+                                                    <td className="px-3 py-2 text-slate-500">{formatDate(row.detected_at)}</td>
+                                                    <td className="px-3 py-2 text-right">
+                                                        <Link
+                                                            href={route('executive.alerts.show', row.alerts_id)}
+                                                            className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 hover:border-red-300 transition shadow-xs"
+                                                        >
+                                                            Inspect &rarr;
                                                         </Link>
                                                     </td>
                                                 </tr>
@@ -781,20 +790,48 @@ function SimplePager({
     const start = totalCount === 0 ? 0 : ((page - 1) * pageSize) + 1;
     const end = Math.min(page * pageSize, totalCount);
 
+    if (totalPages <= 1 && totalCount <= pageSize) {
+        return (
+            <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/50 px-4 py-2 text-xs text-slate-500">
+                <span>Showing {start}-{end} of {totalCount} records</span>
+            </div>
+        );
+    }
+
     return (
-        <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-xs text-slate-600">
-            <p>Showing {start}-{end} of {totalCount}</p>
-            <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/50 px-4 py-2 text-xs text-slate-600">
+            <span>Showing {start}-{end} of {totalCount} records</span>
+            <div className="flex flex-wrap items-center justify-end gap-1.5">
+                <button
+                    type="button"
+                    disabled={page <= 1}
+                    onClick={() => onPageChange(page - 1)}
+                    className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                >
+                    &larr; Prev
+                </button>
                 {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => (
                     <button
                         key={pageNumber}
                         type="button"
                         onClick={() => onPageChange(pageNumber)}
-                        className={`rounded border px-2 py-1 font-semibold ${page === pageNumber ? 'border-red-700 bg-red-700 text-white' : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`}
+                        className={`h-6 min-w-6 rounded-md px-1.5 text-xs font-semibold transition ${
+                            page === pageNumber
+                                ? 'bg-red-600 text-white shadow-xs'
+                                : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                        }`}
                     >
-                        Page {pageNumber}
+                        {pageNumber}
                     </button>
                 ))}
+                <button
+                    type="button"
+                    disabled={page >= totalPages}
+                    onClick={() => onPageChange(page + 1)}
+                    className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                >
+                    Next &rarr;
+                </button>
             </div>
         </div>
     );
@@ -1107,14 +1144,6 @@ function CompactEmpty({ text }: { text: string }) {
     );
 }
 
-function StatCard({ label, value }: { label: string; value: number }) {
-    return (
-        <div className="rounded-2xl border border-red-200 bg-gradient-to-r from-red-50 to-white p-6 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
-            <p className="text-sm font-semibold uppercase tracking-wide text-slate-600">{label}</p>
-            <p className="mt-2 text-4xl font-bold text-red-700">{value}</p>
-        </div>
-    );
-}
 
 function MiniStat({ label, value }: { label: string; value: string | number }) {
     return (
