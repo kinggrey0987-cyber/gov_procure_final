@@ -59,6 +59,12 @@ type Traceability = {
             unit: string;
         }>;
     }>;
+    requisitioning_signatories?: Array<{
+        office_code: string;
+        office_name: string;
+        requester_name: string;
+        request_codes: string[];
+    }>;
     office_allocations?: Array<{
         item_name: string;
         unit: string;
@@ -214,9 +220,24 @@ export default function PurchaseRequestsShow({ purchaseRequest, traceability, re
 
                                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                                     <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Origin Requisitioner(s)</p>
-                                    {traceability?.source_supply_requests && traceability.source_supply_requests.length > 0 ? (
+                                    {traceability?.requisitioning_signatories && traceability.requisitioning_signatories.length > 0 ? (
                                         <div className="mt-1 space-y-1">
-                                            {traceability.source_supply_requests.map((sr) => (
+                                            {traceability.requisitioning_signatories.map((sig) => (
+                                                <p key={`${sig.office_code}:${sig.requester_name}`} className="text-xs text-slate-700">
+                                                    <span className="font-medium text-slate-900">{sig.requester_name}</span> ({sig.office_code})
+                                                </p>
+                                            ))}
+                                        </div>
+                                    ) : traceability?.source_supply_requests && traceability.source_supply_requests.length > 0 ? (
+                                        <div className="mt-1 space-y-1">
+                                            {Array.from(
+                                                new Map(
+                                                    traceability.source_supply_requests.map((sr) => [
+                                                        `${sr.office_code}:${sr.requester_name}`,
+                                                        sr,
+                                                    ])
+                                                ).values()
+                                            ).map((sr) => (
                                                 <p key={sr.supply_request_id} className="text-xs text-slate-700">
                                                     <span className="font-medium text-slate-900">{sr.requester_name}</span> ({sr.office_code})
                                                 </p>

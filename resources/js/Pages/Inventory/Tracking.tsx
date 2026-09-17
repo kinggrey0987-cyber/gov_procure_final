@@ -47,70 +47,102 @@ export default function InventoryTracking({ summary, dashboardAlerts }: Props) {
             <div className="space-y-3.5">
                 <DashboardAlertBanner alerts={dashboardAlerts} />
 
-                {/* Unified High-Density GSO Telemetry Cockpit */}
+                {/* Unified High-Density GSO Telemetry Cockpit - Interactive Drilldown */}
                 <section className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm space-y-2">
                     {/* Stock & Operational Pressure Tier */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
-                        <div className="flex items-center gap-2.5 px-3 py-1">
+                        <Link
+                            href={route('inventory.inventory.index')}
+                            className="flex items-center gap-2.5 px-3 py-1.5 transition rounded-lg group cursor-pointer hover:bg-emerald-50/60"
+                            title="Click to view Inventory Stock Ledger"
+                        >
                             <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-600" />
                             <div className="min-w-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">Available Units</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 group-hover:text-emerald-800">Available Units</p>
                                 <p className="text-lg font-extrabold text-emerald-900 leading-tight">{formatQuantity(summary.total_available_stock)}</p>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-2.5 px-3 py-1">
+                        </Link>
+                        <Link
+                            href={route('inventory.inventory.index')}
+                            className="flex items-center gap-2.5 px-3 py-1.5 transition rounded-lg group cursor-pointer hover:bg-amber-50/60"
+                            title="Click to view Low Stock items"
+                        >
                             <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" />
                             <div className="min-w-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-700">Low Stock</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-700 group-hover:text-amber-800">Low Stock</p>
                                 <p className="text-lg font-extrabold text-amber-900 leading-tight">{summary.low_stock_count}</p>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-2.5 px-3 py-1">
+                        </Link>
+                        <Link
+                            href={route('inventory.deliveries.index')}
+                            className="flex items-center gap-2.5 px-3 py-1.5 transition rounded-lg group cursor-pointer hover:bg-blue-50/60"
+                            title="Click to view Deliveries queue"
+                        >
                             <span className="h-2 w-2 shrink-0 rounded-full bg-blue-600" />
                             <div className="min-w-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-700">Pending Deliveries</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-700 group-hover:text-blue-800">Pending Deliveries</p>
                                 <p className="text-lg font-extrabold text-blue-900 leading-tight">{summary.pending_delivery_count}</p>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-2.5 px-3 py-1">
+                        </Link>
+                        <Link
+                            href={route('inventory.claims.index')}
+                            className="flex items-center gap-2.5 px-3 py-1.5 transition rounded-lg group cursor-pointer hover:bg-rose-50/60"
+                            title="Click to review Pending Claims"
+                        >
                             <span className="h-2 w-2 shrink-0 rounded-full bg-rose-600" />
                             <div className="min-w-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-rose-700">Pending Claims</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-rose-700 group-hover:text-rose-800">Pending Claims</p>
                                 <p className="text-lg font-extrabold text-rose-900 leading-tight">{summary.open_claim_count}</p>
                             </div>
-                        </div>
+                        </Link>
                     </div>
 
                     {/* Ledger Volume Tier */}
                     <div className="border-t border-slate-100 pt-2 grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
-                        <div className="flex items-center gap-2.5 px-3 py-1">
+                        <Link
+                            href={route('inventory.inventory.index')}
+                            className="flex items-center gap-2.5 px-3 py-1 transition rounded-lg group cursor-pointer hover:bg-slate-50"
+                            title="Click to view Item Catalog & Stock"
+                        >
                             <span className="h-2 w-2 shrink-0 rounded-full bg-slate-400" />
                             <div className="min-w-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Inventory Items</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 group-hover:text-slate-700">Inventory Items</p>
                                 <p className="text-base font-extrabold text-slate-900 leading-tight">{summary.inventory_count}</p>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-2.5 px-3 py-1">
+                        </Link>
+                        <Link
+                            href={route('inventory.inventory-movements.index')}
+                            className="flex items-center gap-2.5 px-3 py-1 transition rounded-lg group cursor-pointer hover:bg-indigo-50/60"
+                            title="Click to view Movement Logs"
+                        >
                             <span className="h-2 w-2 shrink-0 rounded-full bg-indigo-600" />
                             <div className="min-w-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-indigo-700">Movement Logs</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-indigo-700 group-hover:text-indigo-800">Movement Logs</p>
                                 <p className="text-base font-extrabold text-indigo-900 leading-tight">{summary.movement_count}</p>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-2.5 px-3 py-1">
+                        </Link>
+                        <Link
+                            href={route('inventory.distribution-records.index')}
+                            className="flex items-center gap-2.5 px-3 py-1 transition rounded-lg group cursor-pointer hover:bg-emerald-50/60"
+                            title="Click to view Distribution Records"
+                        >
                             <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-600" />
                             <div className="min-w-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">Released Records</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 group-hover:text-emerald-800">Released Records</p>
                                 <p className="text-base font-extrabold text-emerald-900 leading-tight">{summary.released_distribution_count}</p>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-2.5 px-3 py-1">
+                        </Link>
+                        <Link
+                            href={route('inventory.distribution-records.index')}
+                            className="flex items-center gap-2.5 px-3 py-1 transition rounded-lg group cursor-pointer hover:bg-teal-50/60"
+                            title="Click to view Received Records"
+                        >
                             <span className="h-2 w-2 shrink-0 rounded-full bg-teal-600" />
                             <div className="min-w-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-teal-700">Received Records</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-teal-700 group-hover:text-teal-800">Received Records</p>
                                 <p className="text-base font-extrabold text-teal-900 leading-tight">{summary.received_distribution_count}</p>
                             </div>
-                        </div>
+                        </Link>
                     </div>
                 </section>
 

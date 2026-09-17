@@ -156,29 +156,29 @@ export default function ExecutiveAnomalyShow({ anomaly, evidence }: Props) {
                             </div>
 
                             <div className="p-2.5 space-y-1.5 text-xs">
-                                <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5">
-                                    <span className="font-medium text-slate-500">Office:</span>
-                                    <span className="font-bold text-slate-900 truncate max-w-[200px]">{anomaly.office?.name ?? 'General Services / Central'}</span>
+                                <div className="flex items-start justify-between gap-2.5 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5">
+                                    <span className="shrink-0 font-medium text-slate-500">Office:</span>
+                                    <span className="font-bold text-slate-900 text-right leading-tight break-words">{anomaly.office?.name ?? 'General Services / Central'}</span>
                                 </div>
 
                                 {anomaly.item && (
-                                    <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5">
-                                        <span className="font-medium text-slate-500">Item:</span>
-                                        <span className="font-bold text-slate-900 truncate max-w-[200px]" title={anomaly.item.name}>
+                                    <div className="flex items-start justify-between gap-2.5 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5">
+                                        <span className="shrink-0 font-medium text-slate-500">Item:</span>
+                                        <span className="font-bold text-slate-900 text-right leading-tight break-words" title={anomaly.item.name}>
                                             {anomaly.item.name} {anomaly.item.item_code ? `(${anomaly.item.item_code})` : ''}
                                         </span>
                                     </div>
                                 )}
 
-                                <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5">
-                                    <span className="font-medium text-slate-500">Method:</span>
-                                    <span className="font-bold text-slate-900 truncate max-w-[200px]">{anomaly.detection_method ?? 'Statistical Baseline'}</span>
+                                <div className="flex items-start justify-between gap-2.5 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5">
+                                    <span className="shrink-0 font-medium text-slate-500">Method:</span>
+                                    <span className="font-bold text-slate-900 text-right leading-tight break-words">{anomaly.detection_method ?? 'Statistical Baseline'}</span>
                                 </div>
 
                                 {anomaly.detected_at && (
-                                    <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5">
-                                        <span className="font-medium text-slate-500">Detected:</span>
-                                        <span className="font-bold text-slate-900">{formatDate(anomaly.detected_at)}</span>
+                                    <div className="flex items-start justify-between gap-2.5 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5">
+                                        <span className="shrink-0 font-medium text-slate-500">Detected:</span>
+                                        <span className="font-bold text-slate-900 text-right leading-tight">{formatDate(anomaly.detected_at)}</span>
                                     </div>
                                 )}
                             </div>

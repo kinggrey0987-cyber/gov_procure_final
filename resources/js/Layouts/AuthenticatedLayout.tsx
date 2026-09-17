@@ -163,13 +163,13 @@ export default function Authenticated({
             <div className="min-h-screen bg-slate-100 md:flex md:h-screen md:overflow-hidden">
                 <aside className="hidden h-screen w-64 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white md:flex">
                     <div className="border-b border-slate-200 px-5 py-4">
-                        <div className="flex items-center gap-3">
-                            <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover" />
+                        <Link href={route('dashboard')} className="flex items-center gap-3 transition hover:opacity-85 group">
+                            <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover group-hover:ring-2 group-hover:ring-red-500/30 transition" />
                             <div>
-                                <p className="text-3 font-bold leading-tight text-red-700">GovSupply Connect</p>
-                                <p className="text-sm text-slate-500">Municipality of E.B. Magalona</p>
+                                <p className="text-base font-bold leading-tight text-red-700 group-hover:text-red-800 transition">GovSupply Connect</p>
+                                <p className="text-xs text-slate-500">Municipality of E.B. Magalona</p>
                             </div>
-                        </div>
+                        </Link>
                     </div>
 
                     <nav className="space-y-2 px-3 py-4">
@@ -203,10 +203,10 @@ export default function Authenticated({
                 <div className="flex min-h-screen flex-1 flex-col md:min-h-0">
                     <header className="shrink-0 border-b border-slate-200 bg-white">
                         <div className="mx-auto flex min-h-16 w-full max-w-[1300px] items-center justify-between gap-3 px-4 py-3 sm:min-h-20 sm:px-6">
-                            <div className="flex items-center gap-3 md:hidden">
+                            <Link href={route('dashboard')} className="flex items-center gap-3 transition hover:opacity-85 md:hidden">
                                 <img src="/logo.jpg" alt="GovSupply Connect" className="h-9 w-9 rounded-full border border-slate-300 bg-white object-cover sm:h-10 sm:w-10" />
                                 <p className="text-sm font-bold leading-tight text-red-700 sm:text-base">GovSupply Connect</p>
-                            </div>
+                            </Link>
                             <div className="ms-auto flex shrink-0 items-center gap-3 sm:gap-5">
                                 <BellPanel unreadCount={notifications.unread_count} recent={notifications.recent} />
 
@@ -342,13 +342,13 @@ export default function Authenticated({
             <div className="min-h-screen bg-slate-100 md:flex md:h-screen md:overflow-hidden">
                 <aside className="hidden h-screen w-72 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white md:flex">
                     <div className="border-b border-slate-200 px-5 py-4">
-                        <div className="flex items-center gap-3">
-                            <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover" />
+                        <Link href={route('dashboard')} className="flex items-center gap-3 transition hover:opacity-85 group">
+                            <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover group-hover:ring-2 group-hover:ring-red-500/30 transition" />
                             <div>
-                                <p className="text-3 font-bold leading-tight text-red-700">GovSupply Connect</p>
-                                <p className="text-sm text-slate-500">Municipality of E.B. Magalona</p>
+                                <p className="text-base font-bold leading-tight text-red-700 group-hover:text-red-800 transition">GovSupply Connect</p>
+                                <p className="text-xs text-slate-500">Municipality of E.B. Magalona</p>
                             </div>
-                        </div>
+                        </Link>
                     </div>
 
                     <nav className="space-y-2 px-3 py-4">
@@ -381,13 +381,13 @@ export default function Authenticated({
                 <div className="flex min-h-screen flex-1 flex-col md:min-h-0">
                     <header className="shrink-0 border-b border-slate-200 bg-white">
                         <div className="mx-auto flex min-h-16 w-full max-w-[1400px] items-center justify-between gap-3 px-4 py-3 sm:min-h-20 sm:px-6">
-                            <div className="flex items-center gap-3 md:hidden">
+                            <Link href={route('dashboard')} className="flex items-center gap-3 transition hover:opacity-85 md:hidden">
                                 <img src="/logo.jpg" alt="GovSupply Connect" className="h-9 w-9 rounded-full border border-slate-300 bg-white object-cover sm:h-11 sm:w-11" />
                                 <div className="min-w-0">
                                     <p className="truncate text-sm font-bold leading-tight text-red-700 sm:text-2xl">GovSupply Connect</p>
                                     <p className="hidden text-sm text-slate-500 sm:block">Municipality of E.B. Magalona</p>
                                 </div>
-                            </div>
+                            </Link>
 
                             <div className="ms-auto flex shrink-0 items-center gap-3 sm:gap-5">
                                 <BellPanel unreadCount={notifications.unread_count} recent={notifications.recent} />
@@ -505,11 +505,6 @@ export default function Authenticated({
                 active: route().current('office.claims.*'),
             },
             {
-                label: 'Notifications',
-                href: route('notifications.index'),
-                active: route().current('notifications.*'),
-            },
-            {
                 label: 'Profile',
                 href: route('profile.edit'),
                 active: route().current('profile.*'),
@@ -528,13 +523,13 @@ export default function Authenticated({
             <div className="min-h-screen bg-slate-100 md:flex md:h-screen md:overflow-hidden">
                 <aside className="hidden h-screen w-72 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white md:flex">
                     <div className="border-b border-slate-200 px-5 py-4">
-                        <div className="flex items-center gap-3">
-                            <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover" />
+                        <Link href={route('dashboard')} className="flex items-center gap-3 transition hover:opacity-85 group">
+                            <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover group-hover:ring-2 group-hover:ring-red-500/30 transition" />
                             <div>
-                                <p className="text-3 font-bold leading-tight text-red-700">GovSupply Connect</p>
-                                <p className="text-sm text-slate-500">Municipality of E.B. Magalona</p>
+                                <p className="text-base font-bold leading-tight text-red-700 group-hover:text-red-800 transition">GovSupply Connect</p>
+                                <p className="text-xs text-slate-500">Municipality of E.B. Magalona</p>
                             </div>
-                        </div>
+                        </Link>
                     </div>
 
                     <nav className="space-y-2 px-3 py-4">
@@ -567,13 +562,13 @@ export default function Authenticated({
                 <div className="flex min-h-screen flex-1 flex-col md:min-h-0">
                     <header className="shrink-0 border-b border-slate-200 bg-white">
                         <div className="mx-auto flex min-h-16 w-full max-w-[1400px] items-center justify-between gap-3 px-4 py-3 sm:min-h-20 sm:px-6">
-                            <div className="flex items-center gap-3 md:hidden">
+                            <Link href={route('dashboard')} className="flex items-center gap-3 transition hover:opacity-85 md:hidden">
                                 <img src="/logo.jpg" alt="GovSupply Connect" className="h-9 w-9 rounded-full border border-slate-300 bg-white object-cover sm:h-11 sm:w-11" />
                                 <div className="min-w-0">
                                     <p className="truncate text-sm font-bold leading-tight text-red-700 sm:text-2xl">GovSupply Connect</p>
                                     <p className="hidden text-sm text-slate-500 sm:block">Municipality of E.B. Magalona</p>
                                 </div>
-                            </div>
+                            </Link>
 
                             <div className="ms-auto flex shrink-0 items-center gap-3 sm:gap-5">
                                 <BellPanel unreadCount={notifications.unread_count} recent={notifications.recent} />
@@ -715,13 +710,13 @@ export default function Authenticated({
             <div className="min-h-screen bg-slate-100 md:flex md:h-screen md:overflow-hidden">
                 <aside className="hidden h-screen w-72 shrink-0 flex-col overflow-y-auto border-r border-red-200 bg-white md:flex">
                     <div className="border-b border-slate-200 px-5 py-4">
-                        <div className="flex items-center gap-3">
-                            <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover" />
+                        <Link href={route('dashboard')} className="flex items-center gap-3 transition hover:opacity-85 group">
+                            <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover group-hover:ring-2 group-hover:ring-red-500/30 transition" />
                             <div>
-                                <p className="text-3 font-bold leading-tight text-red-700">GovSupply Connect</p>
-                                <p className="text-sm text-slate-500">Municipality of E.B. Magalona</p>
+                                <p className="text-base font-bold leading-tight text-red-700 group-hover:text-red-800 transition">GovSupply Connect</p>
+                                <p className="text-xs text-slate-500">Municipality of E.B. Magalona</p>
                             </div>
-                        </div>
+                        </Link>
                     </div>
 
                     <nav className="space-y-2 px-3 py-4">
@@ -754,13 +749,13 @@ export default function Authenticated({
                 <div className="flex min-h-screen flex-1 flex-col md:min-h-0">
                     <header className="shrink-0 border-b border-slate-200 bg-white">
                         <div className="mx-auto flex min-h-16 w-full max-w-[1400px] items-center justify-between gap-3 px-4 py-3 sm:min-h-20 sm:px-6">
-                            <div className="flex items-center gap-3 md:hidden">
+                            <Link href={route('dashboard')} className="flex items-center gap-3 transition hover:opacity-85 md:hidden">
                                 <img src="/logo.jpg" alt="GovSupply Connect" className="h-9 w-9 rounded-full border border-slate-300 bg-white object-cover sm:h-11 sm:w-11" />
                                 <div className="min-w-0">
                                     <p className="truncate text-sm font-bold leading-tight text-red-700 sm:text-2xl">GovSupply Connect</p>
                                     <p className="hidden text-sm text-slate-500 sm:block">Municipality of E.B. Magalona</p>
                                 </div>
-                            </div>
+                            </Link>
 
                             <div className="ms-auto flex shrink-0 items-center gap-3 sm:gap-5">
                                 <BellPanel unreadCount={notifications.unread_count} recent={notifications.recent} />
@@ -929,13 +924,13 @@ export default function Authenticated({
             <div className="min-h-screen bg-slate-100 md:flex md:h-screen md:overflow-hidden">
                 <aside className="hidden h-screen w-72 shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white md:flex">
                     <div className="shrink-0 border-b border-slate-200 px-5 py-4">
-                        <div className="flex items-center gap-3">
-                            <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover" />
+                        <Link href={route('dashboard')} className="flex items-center gap-3 transition hover:opacity-85 group">
+                            <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover group-hover:ring-2 group-hover:ring-red-500/30 transition" />
                             <div>
-                                <p className="text-3 font-bold leading-tight text-red-700">GovSupply Connect</p>
-                                <p className="text-sm text-slate-500">Municipality of E.B. Magalona</p>
+                                <p className="text-base font-bold leading-tight text-red-700 group-hover:text-red-800 transition">GovSupply Connect</p>
+                                <p className="text-xs text-slate-500">Municipality of E.B. Magalona</p>
                             </div>
-                        </div>
+                        </Link>
                     </div>
 
                     <nav className="sidebar-scroll min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-4">
@@ -968,13 +963,13 @@ export default function Authenticated({
                 <div className="flex min-h-screen flex-1 flex-col md:min-h-0">
                     <header className="shrink-0 border-b border-slate-200 bg-white">
                         <div className="mx-auto flex min-h-16 w-full max-w-[1400px] items-center justify-between gap-3 px-4 py-3 sm:min-h-20 sm:px-6">
-                            <div className="flex items-center gap-3 md:hidden">
+                            <Link href={route('dashboard')} className="flex items-center gap-3 transition hover:opacity-85 md:hidden">
                                 <img src="/logo.jpg" alt="GovSupply Connect" className="h-9 w-9 rounded-full border border-slate-300 bg-white object-cover sm:h-11 sm:w-11" />
                                 <div className="min-w-0">
                                     <p className="truncate text-sm font-bold leading-tight text-red-700 sm:text-2xl">GovSupply Connect</p>
                                     <p className="hidden text-sm text-slate-500 sm:block">Municipality of E.B. Magalona</p>
                                 </div>
-                            </div>
+                            </Link>
 
                             <div className="ms-auto flex shrink-0 items-center gap-3 sm:gap-5">
                                 <BellPanel unreadCount={notifications.unread_count} recent={notifications.recent} />
@@ -1128,11 +1123,6 @@ export default function Authenticated({
                                         Business Audit
                                     </NavLink>
                                 )}
-                                {auth.can.notifications && (
-                                    <NavLink href={route('notifications.index')} active={route().current('notifications.*')}>
-                                        Notifications{notifications.unread_count > 0 ? ` (${notifications.unread_count})` : ''}
-                                    </NavLink>
-                                )}
                             </div>
                         </div>
 
@@ -1257,11 +1247,6 @@ export default function Authenticated({
                                 active={route().current('executive.audit.*')}
                             >
                                 Business Audit
-                            </ResponsiveNavLink>
-                        )}
-                        {auth.can.notifications && (
-                            <ResponsiveNavLink href={route('notifications.index')} active={route().current('notifications.*')}>
-                                Notifications{notifications.unread_count > 0 ? ` (${notifications.unread_count})` : ''}
                             </ResponsiveNavLink>
                         )}
                     </div>

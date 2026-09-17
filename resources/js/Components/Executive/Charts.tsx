@@ -26,28 +26,31 @@ export function TrendGroupedBarChart({
         return <EmptyState text={emptyText} />;
     }
 
-    const width = Math.max(620, data.length * 70 + 120);
-    const height = 230;
-    const chartTop = 24;
+    const width = 580;
+    const height = 220;
+    const chartTop = 22;
     const chartBottom = 180;
     const plotHeight = chartBottom - chartTop;
     const max = Math.max(1, ...data.map((item) => Math.max(item.first, item.second)));
-    const groupWidth = (width - 90) / data.length;
-    const barWidth = Math.max(10, Math.min(20, groupWidth * 0.24));
+    const paddingLeft = 45;
+    const paddingRight = 15;
+    const plotWidth = width - paddingLeft - paddingRight;
+    const groupWidth = plotWidth / data.length;
+    const barWidth = Math.max(8, Math.min(18, groupWidth * 0.28));
 
     return (
-        <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-4 text-xs font-semibold text-slate-600">
+        <div className="space-y-3 flex-1 flex flex-col justify-between">
+            <div className="flex flex-wrap items-center gap-4 text-xs font-semibold text-slate-600 shrink-0">
                 <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-red-600" />{firstLabel}</span>
                 <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" />{secondLabel}</span>
             </div>
 
-            <div className="overflow-x-auto">
-                <svg viewBox={`0 0 ${width} ${height}`} className="h-56 w-full min-w-[520px]">
-                    <line x1="50" y1={chartBottom} x2={width - 20} y2={chartBottom} stroke="rgb(203 213 225)" strokeWidth="1.5" />
+            <div className="w-full flex-1 flex items-center justify-center pt-2">
+                <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto max-h-[220px] overflow-visible">
+                    <line x1={paddingLeft} y1={chartBottom} x2={width - paddingRight} y2={chartBottom} stroke="rgb(203 213 225)" strokeWidth="1.5" />
 
                     {data.map((item, index) => {
-                        const x = 58 + index * groupWidth;
+                        const x = paddingLeft + index * groupWidth + (groupWidth - (barWidth * 2 + 4)) / 2;
                         const firstHeight = (item.first / max) * plotHeight;
                         const secondHeight = (item.second / max) * plotHeight;
 
@@ -58,20 +61,23 @@ export function TrendGroupedBarChart({
                                     y={chartBottom - firstHeight}
                                     width={barWidth}
                                     height={Math.max(firstHeight, item.first > 0 ? 3 : 0)}
-                                    rx="3"
+                                    rx="2"
                                     fill="rgb(220 38 38)"
+                                    className="transition-opacity hover:opacity-80"
                                 />
                                 <rect
-                                    x={x + barWidth + 6}
+                                    x={x + barWidth + 4}
                                     y={chartBottom - secondHeight}
                                     width={barWidth}
                                     height={Math.max(secondHeight, item.second > 0 ? 3 : 0)}
-                                    rx="3"
+                                    rx="2"
                                     fill="rgb(245 158 11)"
+                                    className="transition-opacity hover:opacity-80"
                                 />
-                                <text x={x + barWidth} y={chartBottom + 14} textAnchor="middle" className="fill-slate-600 text-[10px]">
+                                <text x={x + barWidth + 2} y={chartBottom + 15} textAnchor="middle" className="fill-slate-600 text-[9px] font-semibold">
                                     {item.label.length > 11 ? `${item.label.slice(0, 11)}...` : item.label}
                                 </text>
+                                <title>{`${item.label} - ${firstLabel}: ${item.first} | ${secondLabel}: ${item.second}`}</title>
                             </g>
                         );
                     })}
@@ -87,6 +93,7 @@ export function ExecutiveChartCard({
     eyebrow,
     tone = 'default',
     action,
+    className = '',
     children,
 }: PropsWithChildren<{
     title: string;
@@ -94,6 +101,7 @@ export function ExecutiveChartCard({
     eyebrow?: string;
     tone?: 'default' | 'critical' | 'warning' | 'neutral' | 'emerald' | 'indigo';
     action?: React.ReactNode;
+    className?: string;
 }>) {
     const toneClass: Record<NonNullable<typeof tone>, { shell: string; badge: string }> = {
         default: {
@@ -123,8 +131,8 @@ export function ExecutiveChartCard({
     };
 
     return (
-        <section className={`overflow-hidden rounded-xl border ${toneClass[tone].shell} transition hover:shadow-md`}>
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 sm:px-4 sm:py-3">
+        <section className={`overflow-hidden rounded-xl border ${toneClass[tone].shell} transition hover:shadow-md h-full flex flex-col ${className}`}>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 sm:px-4 sm:py-3 shrink-0">
                 <div>
                     {eyebrow ? (
                         <div className="mb-0.5">
@@ -138,7 +146,7 @@ export function ExecutiveChartCard({
                 </div>
                 {action ? <div className="flex items-center gap-2">{action}</div> : null}
             </div>
-            <div className="p-3.5 sm:p-4">{children}</div>
+            <div className="p-3.5 sm:p-4 flex-1 flex flex-col">{children}</div>
         </section>
     );
 }
@@ -631,47 +639,47 @@ export function SpendTrendBarChart({
         return `${currencySymbol}${val.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
 
-    const width = Math.max(680, data.length * 75 + 100);
-    const height = 250;
-    const paddingLeft = 65;
-    const paddingRight = 30;
-    const chartTop = 32;
-    const chartBottom = 195;
+    const width = 580;
+    const height = 220;
+    const paddingLeft = 48;
+    const paddingRight = 16;
+    const chartTop = 22;
+    const chartBottom = 180;
     const plotWidth = width - paddingLeft - paddingRight;
     const plotHeight = chartBottom - chartTop;
 
     const groupWidth = plotWidth / data.length;
-    const barWidth = Math.max(16, Math.min(36, groupWidth * 0.45));
+    const barWidth = Math.max(10, Math.min(28, groupWidth * 0.44));
 
     const ySteps = [1, 0.75, 0.5, 0.25, 0];
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-3 flex-1 flex flex-col justify-between">
             {/* Executive Spend KPI Header */}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 rounded-xl border border-red-100 bg-gradient-to-r from-red-50/70 via-white to-slate-50 p-3 text-xs shadow-sm">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 rounded-xl border border-red-100 bg-gradient-to-r from-red-50/70 via-white to-slate-50 p-2.5 text-xs shadow-xs shrink-0">
                 <div>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Expenditure</p>
-                    <p className="mt-0.5 text-sm font-extrabold text-red-900">{formatFull(totalSpend)}</p>
+                    <p className="mt-0.5 text-xs sm:text-sm font-extrabold text-red-900 truncate">{formatFull(totalSpend)}</p>
                 </div>
                 <div>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Peak Period</p>
-                    <p className="mt-0.5 text-sm font-extrabold text-slate-900 truncate" title={`${peak?.label}: ${formatFull(peak?.value ?? 0)}`}>
-                        {peak?.label ?? '—'} <span className="text-xs font-semibold text-red-700">({formatShort(peak?.value ?? 0)})</span>
+                    <p className="mt-0.5 text-xs sm:text-sm font-extrabold text-slate-900 truncate" title={`${peak?.label}: ${formatFull(peak?.value ?? 0)}`}>
+                        {peak?.label ?? '—'} <span className="text-[10px] font-semibold text-red-700">({formatShort(peak?.value ?? 0)})</span>
                     </p>
                 </div>
                 <div>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Monthly Average</p>
-                    <p className="mt-0.5 text-sm font-extrabold text-slate-900">{formatFull(average)}</p>
+                    <p className="mt-0.5 text-xs sm:text-sm font-extrabold text-slate-900 truncate">{formatFull(average)}</p>
                 </div>
                 <div>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Orders Processed</p>
-                    <p className="mt-0.5 text-sm font-extrabold text-slate-900">{totalOrders} <span className="text-[11px] font-medium text-slate-500">POs</span></p>
+                    <p className="mt-0.5 text-xs sm:text-sm font-extrabold text-slate-900">{totalOrders} <span className="text-[11px] font-medium text-slate-500">POs</span></p>
                 </div>
             </div>
 
-            {/* SVG Bar Chart */}
-            <div className="overflow-x-auto">
-                <svg viewBox={`0 0 ${width} ${height}`} className="h-60 w-full min-w-[560px]">
+            {/* SVG Bar Chart - 100% Fluid & Responsive, Zero Scrollbars */}
+            <div className="w-full flex-1 flex items-center justify-center pt-2">
+                <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto max-h-[220px] overflow-visible">
                     <defs>
                         <linearGradient id="spendBarGradient" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="0%" stopColor="rgb(220 38 38)" />
@@ -705,7 +713,7 @@ export function SpendTrendBarChart({
                                     x={paddingLeft - 8}
                                     y={y + 3}
                                     textAnchor="end"
-                                    className="fill-slate-400 text-[10px] font-semibold"
+                                    className="fill-slate-400 text-[9px] font-semibold"
                                 >
                                     {formatShort(val)}
                                 </text>
@@ -728,19 +736,19 @@ export function SpendTrendBarChart({
                                     y={y}
                                     width={barWidth}
                                     height={barHeight}
-                                    rx="4"
+                                    rx="3"
                                     fill={isPeak ? 'url(#peakBarGradient)' : 'url(#spendBarGradient)'}
                                     filter="url(#spendBarShadow)"
                                     className="transition-all duration-300 group-hover:opacity-85"
                                 />
 
                                 {/* Value label above bar */}
-                                {barHeight > 14 ? (
+                                {barHeight > 12 ? (
                                     <text
                                         x={x + barWidth / 2}
-                                        y={y - 6}
+                                        y={y - 5}
                                         textAnchor="middle"
-                                        className="fill-slate-700 text-[10px] font-bold"
+                                        className="fill-slate-700 text-[9px] font-bold"
                                     >
                                         {formatShort(item.value)}
                                     </text>
@@ -749,9 +757,9 @@ export function SpendTrendBarChart({
                                 {/* Month label on X axis */}
                                 <text
                                     x={x + barWidth / 2}
-                                    y={chartBottom + 16}
+                                    y={chartBottom + 15}
                                     textAnchor="middle"
-                                    className={`text-[10px] font-semibold ${isPeak ? 'fill-red-800 font-bold' : 'fill-slate-600'}`}
+                                    className={`text-[9px] font-semibold ${isPeak ? 'fill-red-800 font-bold' : 'fill-slate-600'}`}
                                 >
                                     {item.label}
                                 </text>
@@ -760,9 +768,9 @@ export function SpendTrendBarChart({
                                 {item.orderCount !== undefined ? (
                                     <text
                                         x={x + barWidth / 2}
-                                        y={chartBottom + 28}
+                                        y={chartBottom + 26}
                                         textAnchor="middle"
-                                        className="fill-slate-400 text-[9px] font-medium"
+                                        className="fill-slate-400 text-[8px] font-medium"
                                     >
                                         {item.orderCount} PO{item.orderCount === 1 ? '' : 's'}
                                     </text>

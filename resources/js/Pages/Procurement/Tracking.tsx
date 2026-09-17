@@ -117,38 +117,78 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
             <div className="space-y-3.5">
                 <DashboardAlertBanner alerts={dashboardAlerts} />
 
-                {/* Unified High-Density Telemetry Cockpit */}
+                {/* Unified High-Density Telemetry Cockpit - Interactive Drilldown */}
                 <section className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm space-y-2">
                     {/* Requisition Pipeline Tier */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
-                        <div className="flex items-center gap-2.5 px-3 py-1">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setRequestStatus('PENDING');
+                                document.getElementById('recent-prs-table')?.scrollIntoView({ behavior: 'smooth' });
+                            }}
+                            className={`flex items-center gap-2.5 px-3 py-1.5 text-left transition rounded-lg group cursor-pointer hover:bg-amber-50/60 ${
+                                requestStatus === 'PENDING' ? 'bg-amber-50 ring-1 ring-amber-300' : ''
+                            }`}
+                            title="Click to filter by Pending PRs"
+                        >
                             <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" />
                             <div className="min-w-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-700">Pending PRs</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-700 group-hover:text-amber-800">Pending PRs</p>
                                 <p className="text-lg font-extrabold text-amber-900 leading-tight">{summary.pending_requests}</p>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-2.5 px-3 py-1">
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setRequestStatus('APPROVED');
+                                document.getElementById('recent-prs-table')?.scrollIntoView({ behavior: 'smooth' });
+                            }}
+                            className={`flex items-center gap-2.5 px-3 py-1.5 text-left transition rounded-lg group cursor-pointer hover:bg-blue-50/60 ${
+                                requestStatus === 'APPROVED' ? 'bg-blue-50 ring-1 ring-blue-300' : ''
+                            }`}
+                            title="Click to filter by In Processing PRs"
+                        >
                             <span className="h-2 w-2 shrink-0 rounded-full bg-blue-600" />
                             <div className="min-w-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-700">In Processing</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-700 group-hover:text-blue-800">In Processing</p>
                                 <p className="text-lg font-extrabold text-blue-900 leading-tight">{summary.processing_requests}</p>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-2.5 px-3 py-1">
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setOrderStatus('ALL');
+                                document.getElementById('recent-pos-table')?.scrollIntoView({ behavior: 'smooth' });
+                            }}
+                            className={`flex items-center gap-2.5 px-3 py-1.5 text-left transition rounded-lg group cursor-pointer hover:bg-emerald-50/60 ${
+                                orderStatus === 'ALL' ? 'bg-emerald-50/40' : ''
+                            }`}
+                            title="Click to view Ongoing POs"
+                        >
                             <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-600" />
                             <div className="min-w-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">Ongoing POs</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 group-hover:text-emerald-800">Ongoing POs</p>
                                 <p className="text-lg font-extrabold text-emerald-900 leading-tight">{summary.ongoing_procurement}</p>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-2.5 px-3 py-1">
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setOrderStatus('COMPLETED');
+                                document.getElementById('recent-pos-table')?.scrollIntoView({ behavior: 'smooth' });
+                            }}
+                            className={`flex items-center gap-2.5 px-3 py-1.5 text-left transition rounded-lg group cursor-pointer hover:bg-slate-50 ${
+                                orderStatus === 'COMPLETED' ? 'bg-slate-100 ring-1 ring-slate-300' : ''
+                            }`}
+                            title="Click to filter by Completed Procurements"
+                        >
                             <span className="h-2 w-2 shrink-0 rounded-full bg-slate-400" />
                             <div className="min-w-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Completed</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 group-hover:text-slate-700">Completed</p>
                                 <p className="text-lg font-extrabold text-slate-900 leading-tight">{summary.completed_procurements}</p>
                             </div>
-                        </div>
+                        </button>
                     </div>
 
                     {/* Financial Portfolio Tier */}
@@ -160,27 +200,51 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
                                 <p className="text-base font-extrabold text-red-900 leading-tight truncate">{formatMoney(summary.total_purchase_order_amount)}</p>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2.5 px-3 py-1">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setOrderStatus('DRAFT');
+                                document.getElementById('recent-pos-table')?.scrollIntoView({ behavior: 'smooth' });
+                            }}
+                            className={`flex items-center gap-2.5 px-3 py-1 text-left transition rounded-lg group cursor-pointer hover:bg-slate-50 ${
+                                orderStatus === 'DRAFT' ? 'bg-slate-100 ring-1 ring-slate-300' : ''
+                            }`}
+                            title="Click to filter by Draft POs"
+                        >
                             <span className="h-2 w-2 shrink-0 rounded-full bg-slate-400" />
                             <div className="min-w-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Draft POs</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 group-hover:text-slate-700">Draft POs</p>
                                 <p className="text-base font-extrabold text-slate-900 leading-tight">{summary.draft_purchase_orders}</p>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-2.5 px-3 py-1">
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setOrderStatus('PLACED');
+                                document.getElementById('recent-pos-table')?.scrollIntoView({ behavior: 'smooth' });
+                            }}
+                            className={`flex items-center gap-2.5 px-3 py-1 text-left transition rounded-lg group cursor-pointer hover:bg-indigo-50/60 ${
+                                orderStatus === 'PLACED' ? 'bg-indigo-50 ring-1 ring-indigo-300' : ''
+                            }`}
+                            title="Click to filter by Placed POs"
+                        >
                             <span className="h-2 w-2 shrink-0 rounded-full bg-indigo-600" />
                             <div className="min-w-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-indigo-700">Placed POs</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-indigo-700 group-hover:text-indigo-800">Placed POs</p>
                                 <p className="text-base font-extrabold text-indigo-900 leading-tight">{summary.placed_purchase_orders}</p>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-2.5 px-3 py-1">
+                        </button>
+                        <Link
+                            href={route('procurement.suppliers.index')}
+                            className="flex items-center gap-2.5 px-3 py-1 text-left transition rounded-lg group cursor-pointer hover:bg-teal-50/60"
+                            title="Click to view Active Suppliers"
+                        >
                             <span className="h-2 w-2 shrink-0 rounded-full bg-teal-600" />
                             <div className="min-w-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-teal-700">Active Suppliers</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-teal-700 group-hover:text-teal-800">Active Suppliers</p>
                                 <p className="text-base font-extrabold text-teal-900 leading-tight">{summary.active_supplier_count}</p>
                             </div>
-                        </div>
+                        </Link>
                     </div>
                 </section>
 
@@ -234,7 +298,7 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
 
                 <section className="grid gap-3.5 lg:grid-cols-2">
                     {/* Recent Purchase Requests */}
-                    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                    <div id="recent-prs-table" className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm scroll-mt-6">
                         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2.5">
                             <div>
                                 <h3 className="text-sm font-bold text-slate-900">Recent Purchase Requests</h3>
@@ -299,7 +363,7 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
                     </div>
 
                     {/* Recent Purchase Orders */}
-                    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                    <div id="recent-pos-table" className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm scroll-mt-6">
                         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2.5">
                             <div>
                                 <h3 className="text-sm font-bold text-slate-900">Recent Purchase Orders</h3>

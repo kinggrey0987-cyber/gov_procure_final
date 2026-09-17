@@ -102,6 +102,7 @@ export default function AdminDashboard({ summary, activities, pagination, filter
             label: 'Total Users',
             value: summary.total_users,
             accent: 'bg-blue-600',
+            href: route('admin-tech.users.index'),
             icon: (
                 <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <circle cx="8" cy="8" r="3" />
@@ -115,6 +116,7 @@ export default function AdminDashboard({ summary, activities, pagination, filter
             label: 'Municipal Offices',
             value: summary.office_count,
             accent: 'bg-green-700',
+            href: route('admin-tech.offices.index'),
             icon: (
                 <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <rect x="4" y="3" width="10" height="18" rx="2" />
@@ -126,6 +128,7 @@ export default function AdminDashboard({ summary, activities, pagination, filter
             label: 'Active System Roles',
             value: summary.active_role_count,
             accent: 'bg-amber-500',
+            href: route('admin-tech.roles.index'),
             icon: (
                 <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M12 3l7 4v6c0 4.4-3.5 7.8-7 8-3.5-.2-7-3.6-7-8V7l7-4z" />
@@ -136,6 +139,7 @@ export default function AdminDashboard({ summary, activities, pagination, filter
             label: 'Unread Notifications',
             value: summary.unread_notification_count,
             accent: 'bg-red-600',
+            href: route('notifications.index'),
             icon: (
                 <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
@@ -153,15 +157,19 @@ export default function AdminDashboard({ summary, activities, pagination, filter
                 {/* Compact KPI Stat Cards */}
                 <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                     {statCards.map((card) => (
-                        <article key={card.label} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-sm transition hover:shadow">
+                        <Link
+                            key={card.label}
+                            href={card.href}
+                            className="group flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-sm transition hover:border-slate-300 hover:shadow-md cursor-pointer"
+                        >
                             <div>
-                                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{card.label}</p>
-                                <p className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{card.value}</p>
+                                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 group-hover:text-slate-700 transition">{card.label}</p>
+                                <p className="mt-1 text-2xl font-bold tracking-tight text-slate-900 group-hover:text-red-700 transition sm:text-3xl">{card.value}</p>
                             </div>
-                            <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white shadow-sm ${card.accent}`}>
+                            <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white shadow-sm transition group-hover:scale-105 ${card.accent}`}>
                                 {card.icon}
                             </div>
-                        </article>
+                        </Link>
                     ))}
                 </section>
 

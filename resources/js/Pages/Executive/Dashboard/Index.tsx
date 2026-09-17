@@ -391,51 +391,75 @@ export default function ExecutiveDashboardIndex({
             <Head title="Executive Dashboard" />
 
             <div id={printSectionId} className="space-y-3.5">
-                {/* Slim Executive Telemetry Strip - Zero Truncation, High Density */}
+                {/* Slim Executive Telemetry Strip - Interactive Drill-Downs */}
                 <section className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm">
                     <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
-                        <div className="flex items-center gap-2.5 px-3 py-1">
-                            <span className="h-2 w-2 shrink-0 rounded-full bg-red-600" />
+                        <Link
+                            href={route('executive.procurement-analytics', { record_type: 'pr' })}
+                            className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition hover:bg-slate-50 group cursor-pointer"
+                            title="View Purchase Requests Analytics"
+                        >
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-red-600 group-hover:scale-125 transition" />
                             <div className="min-w-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Requests</p>
-                                <p className="text-lg font-extrabold text-slate-900 leading-tight">{procurement.purchase_request_count}</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 group-hover:text-slate-700">Requests</p>
+                                <p className="text-lg font-extrabold text-slate-900 leading-tight group-hover:text-red-700">{procurement.purchase_request_count}</p>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-2.5 px-3 py-1">
-                            <span className="h-2 w-2 shrink-0 rounded-full bg-red-600" />
+                        </Link>
+                        <Link
+                            href={route('executive.procurement-analytics', { record_type: 'po' })}
+                            className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition hover:bg-slate-50 group cursor-pointer"
+                            title="View Purchase Orders Analytics"
+                        >
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-red-600 group-hover:scale-125 transition" />
                             <div className="min-w-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Orders</p>
-                                <p className="text-lg font-extrabold text-slate-900 leading-tight">{procurement.purchase_order_count}</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 group-hover:text-slate-700">Orders</p>
+                                <p className="text-lg font-extrabold text-slate-900 leading-tight group-hover:text-red-700">{procurement.purchase_order_count}</p>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-2.5 px-3 py-1">
-                            <span className="h-2 w-2 shrink-0 rounded-full bg-red-600" />
+                        </Link>
+                        <Link
+                            href={route('executive.procurement-analytics')}
+                            className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition hover:bg-slate-50 group cursor-pointer"
+                            title="View Procurement Spend Analytics"
+                        >
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-red-600 group-hover:scale-125 transition" />
                             <div className="min-w-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Total Spend</p>
-                                <p className="text-lg font-extrabold text-slate-900 leading-tight truncate">{formatCurrency(procurement.total_purchase_order_amount)}</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 group-hover:text-slate-700">Total Spend</p>
+                                <p className="text-lg font-extrabold text-slate-900 leading-tight truncate group-hover:text-red-700">{formatCurrency(procurement.total_purchase_order_amount)}</p>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-2.5 px-3 py-1">
-                            <span className="h-2 w-2 shrink-0 rounded-full bg-rose-600" />
+                        </Link>
+                        <Link
+                            href={route('executive.anomalies-monitoring')}
+                            className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition hover:bg-rose-50/50 group cursor-pointer"
+                            title="View Anomaly Monitoring"
+                        >
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-rose-600 group-hover:scale-125 transition" />
                             <div className="min-w-0">
                                 <p className="text-[10px] font-semibold uppercase tracking-wider text-rose-700">Anomalies</p>
-                                <p className="text-lg font-extrabold text-rose-700 leading-tight">{activeAnomalies}</p>
+                                <p className="text-lg font-extrabold text-rose-700 leading-tight group-hover:text-rose-900">{activeAnomalies}</p>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-2.5 px-3 py-1">
-                            <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" />
+                        </Link>
+                        <Link
+                            href={route('executive.anomalies-monitoring')}
+                            className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition hover:bg-amber-50/50 group cursor-pointer"
+                            title="View Active Alerts"
+                        >
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500 group-hover:scale-125 transition" />
                             <div className="min-w-0">
                                 <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-700">Active Alerts</p>
-                                <p className="text-lg font-extrabold text-amber-700 leading-tight">{activeAlerts}</p>
+                                <p className="text-lg font-extrabold text-amber-700 leading-tight group-hover:text-amber-900">{activeAlerts}</p>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-2.5 px-3 py-1">
-                            <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-600" />
+                        </Link>
+                        <Link
+                            href={route('executive.transparency-monitoring')}
+                            className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition hover:bg-emerald-50/50 group cursor-pointer"
+                            title="View Transparency Disclosures"
+                        >
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-600 group-hover:scale-125 transition" />
                             <div className="min-w-0">
                                 <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">Disclosures</p>
-                                <p className="text-lg font-extrabold text-emerald-700 leading-tight">{transparency.published_disclosure_count}</p>
+                                <p className="text-lg font-extrabold text-emerald-700 leading-tight group-hover:text-emerald-900">{transparency.published_disclosure_count}</p>
                             </div>
-                        </div>
+                        </Link>
                     </div>
                 </section>
 

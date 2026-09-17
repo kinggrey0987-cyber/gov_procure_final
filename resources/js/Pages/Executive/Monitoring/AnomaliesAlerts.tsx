@@ -325,37 +325,65 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                     </div>
                 </section>
 
-                {/* Slim Executive Telemetry Strip */}
+                {/* Slim Executive Telemetry Strip - Interactive Scroll Drill-Downs */}
                 <section className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm">
                     <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
-                        <div className="flex items-center gap-2.5 px-3 py-1">
-                            <span className="h-2 w-2 shrink-0 rounded-full bg-red-600" />
+                        <button
+                            type="button"
+                            onClick={() => {
+                                document.getElementById('recent-anomalies-table')?.scrollIntoView({ behavior: 'smooth' });
+                            }}
+                            className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-left transition hover:bg-slate-50 group cursor-pointer"
+                            title="Jump to Recent Anomalies"
+                        >
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-red-600 group-hover:scale-125 transition" />
                             <div className="min-w-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Anomalies</p>
-                                <p className="text-lg font-extrabold text-slate-900 leading-tight">{totals.anomaly_count}</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 group-hover:text-slate-700">Anomalies</p>
+                                <p className="text-lg font-extrabold text-slate-900 leading-tight group-hover:text-red-700">{totals.anomaly_count}</p>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-2.5 px-3 py-1">
-                            <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                document.getElementById('recent-alerts-table')?.scrollIntoView({ behavior: 'smooth' });
+                            }}
+                            className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-left transition hover:bg-slate-50 group cursor-pointer"
+                            title="Jump to Recent Alerts"
+                        >
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500 group-hover:scale-125 transition" />
                             <div className="min-w-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Alerts</p>
-                                <p className="text-lg font-extrabold text-slate-900 leading-tight">{totals.alert_count}</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 group-hover:text-slate-700">Alerts</p>
+                                <p className="text-lg font-extrabold text-slate-900 leading-tight group-hover:text-amber-700">{totals.alert_count}</p>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-2.5 px-3 py-1">
-                            <span className="h-2 w-2 shrink-0 rounded-full bg-rose-600" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                document.getElementById('recent-anomalies-table')?.scrollIntoView({ behavior: 'smooth' });
+                            }}
+                            className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-left transition hover:bg-rose-50/50 group cursor-pointer"
+                            title="Jump to Recent Anomalies"
+                        >
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-rose-600 group-hover:scale-125 transition" />
                             <div className="min-w-0">
                                 <p className="text-[10px] font-semibold uppercase tracking-wider text-rose-700">High Severity Anomalies</p>
                                 <p className="text-lg font-extrabold text-rose-900 leading-tight">{totals.high_severity_anomaly_count}</p>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-2.5 px-3 py-1">
-                            <span className="h-2 w-2 shrink-0 rounded-full bg-rose-600" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                document.getElementById('recent-alerts-table')?.scrollIntoView({ behavior: 'smooth' });
+                            }}
+                            className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-left transition hover:bg-rose-50/50 group cursor-pointer"
+                            title="Jump to Recent Alerts"
+                        >
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-rose-600 group-hover:scale-125 transition" />
                             <div className="min-w-0">
                                 <p className="text-[10px] font-semibold uppercase tracking-wider text-rose-700">High Severity Alerts</p>
                                 <p className="text-lg font-extrabold text-rose-900 leading-tight">{totals.high_severity_alert_count}</p>
                             </div>
-                        </div>
+                        </button>
                     </div>
                 </section>
 
@@ -474,7 +502,7 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                 </div>
 
                 <div className="grid gap-4 xl:grid-cols-2">
-                    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                    <section id="recent-anomalies-table" className="scroll-mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2.5">
                             <div>
                                 <h3 className="text-sm font-bold text-slate-900">Recent Anomalies</h3>
@@ -527,7 +555,7 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                         )}
                     </section>
 
-                    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                    <section id="recent-alerts-table" className="scroll-mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2.5">
                             <div>
                                 <h3 className="text-sm font-bold text-slate-900">Recent Alerts</h3>

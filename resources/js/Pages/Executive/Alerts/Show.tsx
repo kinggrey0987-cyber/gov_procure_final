@@ -182,17 +182,17 @@ export default function ExecutiveAlertShow({ alert, anomaly_evidence }: Props) {
                             </div>
 
                             <div className="p-2.5 space-y-1.5 text-xs">
-                                <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5">
-                                    <span className="font-medium text-slate-500">Office:</span>
-                                    <span className="font-bold text-slate-900 truncate max-w-[200px]">{alert.office?.name ?? 'General Services / Central Store'}</span>
+                                <div className="flex items-start justify-between gap-2.5 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5">
+                                    <span className="shrink-0 font-medium text-slate-500">Office:</span>
+                                    <span className="font-bold text-slate-900 text-right leading-tight break-words">{alert.office?.name ?? 'General Services / Central Store'}</span>
                                 </div>
 
                                 {alert.purchase_order && (
-                                    <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5">
-                                        <span className="font-medium text-slate-500">PO:</span>
+                                    <div className="flex items-start justify-between gap-2.5 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5">
+                                        <span className="shrink-0 font-medium text-slate-500">PO:</span>
                                         <Link
                                             href={route('executive.procurement-records.purchase-orders.show', alert.purchase_order.purchase_order_id)}
-                                            className="font-bold text-red-700 hover:underline"
+                                            className="font-bold text-red-700 hover:underline text-right"
                                         >
                                             {alert.purchase_order.po_number ?? `PO #${alert.purchase_order.purchase_order_id}`} &rarr;
                                         </Link>
@@ -200,25 +200,25 @@ export default function ExecutiveAlertShow({ alert, anomaly_evidence }: Props) {
                                 )}
 
                                 {alert.supply_request && (
-                                    <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5">
-                                        <span className="font-medium text-slate-500">Request:</span>
-                                        <span className="font-bold text-slate-900 truncate max-w-[200px]">
+                                    <div className="flex items-start justify-between gap-2.5 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5">
+                                        <span className="shrink-0 font-medium text-slate-500">Request:</span>
+                                        <span className="font-bold text-slate-900 text-right leading-tight break-words">
                                             {alert.supply_request.tracking_code ?? `REQ #${alert.supply_request.supply_request_id}`}
                                         </span>
                                     </div>
                                 )}
 
                                 {alert.supplier && (
-                                    <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5">
-                                        <span className="font-medium text-slate-500">Supplier:</span>
-                                        <span className="font-bold text-slate-900 truncate max-w-[200px]">{alert.supplier.business_name}</span>
+                                    <div className="flex items-start justify-between gap-2.5 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5">
+                                        <span className="shrink-0 font-medium text-slate-500">Supplier:</span>
+                                        <span className="font-bold text-slate-900 text-right leading-tight break-words">{alert.supplier.business_name}</span>
                                     </div>
                                 )}
 
                                 {alert.detected_at && (
-                                    <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5">
-                                        <span className="font-medium text-slate-500">Triggered:</span>
-                                        <span className="font-bold text-slate-900">{formatDate(alert.detected_at)}</span>
+                                    <div className="flex items-start justify-between gap-2.5 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5">
+                                        <span className="shrink-0 font-medium text-slate-500">Triggered:</span>
+                                        <span className="font-bold text-slate-900 text-right leading-tight">{formatDate(alert.detected_at)}</span>
                                     </div>
                                 )}
                             </div>

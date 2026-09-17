@@ -95,37 +95,73 @@ export default function OfficeTracking({ summary, recentRequests, notificationPr
             <div className="space-y-3.5">
                 <DashboardAlertBanner alerts={dashboardAlerts} />
 
-                {/* Slim Office Telemetry Strip */}
+                {/* Slim Office Telemetry Strip - Interactive Filter Controls */}
                 <section className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm">
                     <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
-                        <div className="flex items-center gap-2.5 px-3 py-1">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setRequestStatus('ALL');
+                                setRequestSearch('');
+                            }}
+                            className={`flex items-center gap-2.5 px-3 py-1.5 text-left transition rounded-lg group cursor-pointer hover:bg-slate-50 ${
+                                requestStatus === 'ALL' && !requestSearch ? 'bg-slate-50/80' : ''
+                            }`}
+                            title="Click to show all requests"
+                        >
                             <span className="h-2 w-2 shrink-0 rounded-full bg-slate-400" />
                             <div className="min-w-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Total Requests</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 group-hover:text-slate-700">Total Requests</p>
                                 <p className="text-lg font-extrabold text-slate-900 leading-tight">{summary.total_requests}</p>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-2.5 px-3 py-1">
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const pending = requestStatusOptions.find((s) => s.includes('PENDING')) ?? 'PENDING';
+                                setRequestStatus(pending);
+                                document.getElementById('recent-requests-table')?.scrollIntoView({ behavior: 'smooth' });
+                            }}
+                            className={`flex items-center gap-2.5 px-3 py-1.5 text-left transition rounded-lg group cursor-pointer hover:bg-amber-50/60 ${
+                                requestStatus.includes('PENDING') ? 'bg-amber-50 ring-1 ring-amber-300' : ''
+                            }`}
+                            title="Click to filter by Pending Review requests"
+                        >
                             <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" />
                             <div className="min-w-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-700">Pending Review</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-700 group-hover:text-amber-800">Pending Review</p>
                                 <p className="text-lg font-extrabold text-amber-900 leading-tight">{summary.pending_requests}</p>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-2.5 px-3 py-1">
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const proc = requestStatusOptions.find((s) => s.includes('PROCESS') || s.includes('APPROVED')) ?? 'APPROVED';
+                                setRequestStatus(proc);
+                                document.getElementById('recent-requests-table')?.scrollIntoView({ behavior: 'smooth' });
+                            }}
+                            className={`flex items-center gap-2.5 px-3 py-1.5 text-left transition rounded-lg group cursor-pointer hover:bg-emerald-50/60 ${
+                                requestStatus.includes('PROCESS') || requestStatus.includes('APPROVED') ? 'bg-emerald-50 ring-1 ring-emerald-300' : ''
+                            }`}
+                            title="Click to filter by In Processing requests"
+                        >
                             <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-600" />
                             <div className="min-w-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">In Processing</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 group-hover:text-emerald-800">In Processing</p>
                                 <p className="text-lg font-extrabold text-emerald-900 leading-tight">{summary.processed_requests}</p>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-2.5 px-3 py-1">
+                        </button>
+                        <Link
+                            href={route('office.supplies-ready.index')}
+                            className="flex items-center gap-2.5 px-3 py-1.5 text-left transition rounded-lg group cursor-pointer hover:bg-sky-50/60"
+                            title="Click to view Supplies Ready to Claim"
+                        >
                             <span className="h-2 w-2 shrink-0 rounded-full bg-sky-600" />
                             <div className="min-w-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-sky-700">Ready for Claim</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-sky-700 group-hover:text-sky-800">Ready for Claim</p>
                                 <p className="text-lg font-extrabold text-sky-900 leading-tight">{summary.ready_for_claim}</p>
                             </div>
-                        </div>
+                        </Link>
                     </div>
                 </section>
 
@@ -179,7 +215,7 @@ export default function OfficeTracking({ summary, recentRequests, notificationPr
 
                 <div className="grid gap-3.5 xl:grid-cols-12">
                     {/* Recent Requests Table (8 cols) */}
-                    <div className="xl:col-span-8 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                    <div id="recent-requests-table" className="xl:col-span-8 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm scroll-mt-6">
                         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2.5">
                             <div>
                                 <h3 className="text-sm font-bold text-slate-900">Recent Supply Requests</h3>
