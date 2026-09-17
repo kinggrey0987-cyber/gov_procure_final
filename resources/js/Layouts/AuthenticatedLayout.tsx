@@ -37,8 +37,9 @@ type NotificationState = {
 
 export default function Authenticated({
     header,
+    headerActions,
     children,
-}: PropsWithChildren<{ header?: ReactNode }>) {
+}: PropsWithChildren<{ header?: ReactNode; headerActions?: ReactNode }>) {
     const pageProps = usePage().props as unknown as {
         auth: {
             user: AuthUser;
@@ -268,11 +269,18 @@ export default function Authenticated({
                         </div>
                     </nav>
 
-                    <div className="mx-auto w-full max-w-[1300px] flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 md:h-0">
+                    <div className="mx-auto w-full max-w-[1300px] flex-1 overflow-y-auto px-3 py-3 sm:px-6 sm:py-4 md:h-0">
                         {header && (
-                            <header className="mb-6">
-                                <p className="mt-1 text-sm text-slate-500 sm:text-xl">Municipality of E.B. Magalona - {roleLabel}</p>
-                                <div className="mt-2 text-2xl font-bold text-slate-800 sm:mt-3 sm:text-4xl">{header}</div>
+                            <header className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                                <div>
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Municipality of E.B. Magalona &bull; {roleLabel}</p>
+                                    <h1 className="mt-0.5 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{header}</h1>
+                                </div>
+                                {headerActions && (
+                                    <div className="flex items-center gap-2">
+                                        {headerActions}
+                                    </div>
+                                )}
                             </header>
                         )}
 
@@ -441,11 +449,18 @@ export default function Authenticated({
                         </div>
                     </nav>
 
-                    <div className="mx-auto w-full max-w-[1400px] flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 md:h-0">
+                    <div className="mx-auto w-full max-w-[1400px] flex-1 overflow-y-auto px-3 py-3 sm:px-6 sm:py-4 md:h-0">
                         {header && (
-                            <header className="mb-6 border-b border-slate-200 pb-4">
-                                <p className="mt-1 text-sm text-slate-500 sm:text-xl">Municipality of E.B. Magalona - Procurement Unit Staff</p>
-                                <div className="mt-2 text-2xl font-bold text-slate-800 sm:mt-3 sm:text-4xl">{header}</div>
+                            <header className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                                <div>
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Municipality of E.B. Magalona &bull; Procurement Unit Staff</p>
+                                    <h1 className="mt-0.5 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{header}</h1>
+                                </div>
+                                {headerActions && (
+                                    <div className="flex items-center gap-2">
+                                        {headerActions}
+                                    </div>
+                                )}
                             </header>
                         )}
 
@@ -620,11 +635,18 @@ export default function Authenticated({
                         </div>
                     </nav>
 
-                    <div className="mx-auto w-full max-w-[1400px] flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 md:h-0">
+                    <div className="mx-auto w-full max-w-[1400px] flex-1 overflow-y-auto px-3 py-3 sm:px-6 sm:py-4 md:h-0">
                         {header && (
-                            <header className="mb-6 border-b border-slate-200 pb-4">
-                                <p className="mt-1 text-sm text-slate-500 sm:text-xl">Municipality of E.B. Magalona - {officeLabel}</p>
-                                <div className="mt-2 text-2xl font-bold text-slate-800 sm:mt-3 sm:text-4xl">{header}</div>
+                            <header className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                                <div>
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Municipality of E.B. Magalona &bull; {officeLabel}</p>
+                                    <h1 className="mt-0.5 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{header}</h1>
+                                </div>
+                                {headerActions && (
+                                    <div className="flex items-center gap-2">
+                                        {headerActions}
+                                    </div>
+                                )}
                             </header>
                         )}
 
@@ -800,11 +822,18 @@ export default function Authenticated({
                         </div>
                     </nav>
 
-                    <div className="mx-auto w-full max-w-[1400px] flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 md:h-0">
+                    <div className="mx-auto w-full max-w-[1400px] flex-1 overflow-y-auto px-3 py-3 sm:px-6 sm:py-4 md:h-0">
                         {header && (
-                            <header className="mb-6 border-b border-slate-200 pb-4">
-                                <p className="mt-1 text-sm text-slate-500 sm:text-xl">Municipality of E.B. Magalona - Executive Oversight</p>
-                                <div className="mt-2 text-2xl font-bold text-slate-800 sm:mt-3 sm:text-4xl">{header}</div>
+                            <header className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                                <div>
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Municipality of E.B. Magalona &bull; Executive Oversight</p>
+                                    <h1 className="mt-0.5 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{header}</h1>
+                                </div>
+                                {headerActions && (
+                                    <div className="flex items-center gap-2">
+                                        {headerActions}
+                                    </div>
+                                )}
                             </header>
                         )}
 
@@ -1007,11 +1036,18 @@ export default function Authenticated({
                         </div>
                     </nav>
 
-                    <div className="mx-auto w-full max-w-[1400px] flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 md:h-0">
+                    <div className="mx-auto w-full max-w-[1400px] flex-1 overflow-y-auto px-3 py-3 sm:px-6 sm:py-4 md:h-0">
                         {header && (
-                            <header className="mb-6 border-b border-slate-200 pb-4">
-                                <p className="mt-1 text-sm text-slate-500 sm:text-xl">Municipality of E.B. Magalona - Inventory and Logistics</p>
-                                <div className="mt-2 text-2xl font-bold text-slate-800 sm:mt-3 sm:text-4xl">{header}</div>
+                            <header className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                                <div>
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Municipality of E.B. Magalona &bull; Inventory and Logistics</p>
+                                    <h1 className="mt-0.5 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{header}</h1>
+                                </div>
+                                {headerActions && (
+                                    <div className="flex items-center gap-2">
+                                        {headerActions}
+                                    </div>
+                                )}
                             </header>
                         )}
 

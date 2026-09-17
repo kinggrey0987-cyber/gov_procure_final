@@ -360,35 +360,38 @@ export default function ExecutiveDashboardIndex({
     };
 
     return (
-        <AuthenticatedLayout header="Executive Dashboard">
+        <AuthenticatedLayout
+            header="Executive Dashboard"
+            headerActions={
+                <div className="print-hide flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={exportPdf}
+                        disabled={isExportingPdf}
+                        className="inline-flex h-8 items-center rounded-lg border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 shadow-sm transition"
+                    >
+                        <svg className="mr-1.5 h-3.5 w-3.5 text-red-600" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                        </svg>
+                        {isExportingPdf ? 'Generating PDF...' : 'Export PDF'}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={exportCsv}
+                        className="inline-flex h-8 items-center rounded-lg bg-red-600 px-3 text-xs font-semibold text-white hover:bg-red-700 shadow-sm transition"
+                    >
+                        <svg className="mr-1.5 h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                        Export CSV
+                    </button>
+                </div>
+            }
+        >
             <Head title="Executive Dashboard" />
 
-            <div id={printSectionId} className="space-y-6 py-8">
-                <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-200 bg-white px-5 py-4 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
-                    <div>
-                        <h2 className="text-2xl font-semibold text-slate-900">Executive Oversight Overview</h2>
-                        <p className="text-sm text-slate-600">Summary first, trend signals second, risk concentration third, supporting evidence last.</p>
-                    </div>
-                    <div className="print-hide flex items-center gap-2">
-                        <button
-                            type="button"
-                            onClick={exportPdf}
-                            disabled={isExportingPdf}
-                            className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {isExportingPdf ? 'Generating PDF...' : 'Export PDF'}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={exportCsv}
-                            className="rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white hover:bg-red-800"
-                        >
-                            Export CSV
-                        </button>
-                    </div>
-                </section>
-
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+            <div id={printSectionId} className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
                     <MetricCard label="Purchase Requests" value={procurement.purchase_request_count} helper="Office requests routed for procurement review" />
                     <MetricCard label="Purchase Orders" value={procurement.purchase_order_count} helper="Issued and draft supplier-backed PO records" />
                     <MetricCard label="Procurement Spend" value={formatCurrency(procurement.total_purchase_order_amount)} helper="Total value of seeded PO portfolio" />
@@ -1229,11 +1232,13 @@ function MetricCard({
     const currentTone = toneClasses[tone];
 
     return (
-        <div className={`relative overflow-hidden rounded-2xl border ${currentTone.border} bg-gradient-to-r ${currentTone.gradient} p-6 shadow-[0_8px_18px_rgba(15,23,42,0.06)]`}>
-            <span className={`absolute right-4 top-4 h-2.5 w-2.5 rounded-full ${currentTone.accent}`} aria-hidden="true" />
-            <p className="pr-5 text-sm font-semibold uppercase tracking-wide text-slate-600">{label}</p>
-            <p className={`mt-2 text-4xl font-bold ${currentTone.value}`}>{value}</p>
-            {helper ? <p className="mt-3 min-h-10 text-xs leading-5 text-slate-600">{helper}</p> : null}
+        <div className={`relative overflow-hidden rounded-xl border ${currentTone.border} bg-gradient-to-r ${currentTone.gradient} p-3.5 shadow-sm transition hover:shadow`}>
+            <div className="flex items-center justify-between">
+                <p className="pr-4 text-[11px] font-semibold uppercase tracking-wider text-slate-500 truncate" title={label}>{label}</p>
+                <span className={`h-2 w-2 shrink-0 rounded-full ${currentTone.accent}`} aria-hidden="true" />
+            </div>
+            <p className={`mt-1 text-2xl font-bold tracking-tight ${currentTone.value}`}>{value}</p>
+            {helper ? <p className="mt-1 text-[11px] text-slate-500 truncate" title={helper}>{helper}</p> : null}
         </div>
     );
 }

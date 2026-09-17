@@ -107,22 +107,23 @@ export default function OfficeIndex({ offices, filters }: Props) {
     };
 
     return (
-        <AuthenticatedLayout header="Office Management">
+        <AuthenticatedLayout
+            header="Office Management"
+            headerActions={
+                <Link
+                    href={route('admin-tech.offices.create')}
+                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-red-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700"
+                >
+                    <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
+                    </svg>
+                    Add Office
+                </Link>
+            }
+        >
             <Head title="Office Management" />
 
             <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <header className="flex flex-col gap-4 border-b border-slate-200 px-4 py-5 sm:px-6 md:flex-row md:items-center md:justify-between">
-                    <div>
-                        <h3 className="text-2xl font-semibold text-slate-800 sm:text-3xl"></h3>
-                        <p className="mt-1 text-sm text-slate-500 sm:text-base">Manage municipal offices and departmental access context</p>
-                    </div>
-                    <Link
-                        href={route('admin-tech.offices.create')}
-                        className="inline-flex h-10 w-full items-center justify-center rounded-xl border border-red-300 bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700 sm:w-auto shadow-sm transition"
-                    >
-                        Add Office
-                    </Link>
-                </header>
 
                 {successMessage && (
                     <div className="flex items-center gap-2 border-b border-emerald-200 bg-emerald-50 px-6 py-3 text-sm font-medium text-emerald-700">
