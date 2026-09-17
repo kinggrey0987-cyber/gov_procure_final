@@ -282,7 +282,7 @@ export default function InventoryTracking({ summary, dashboardAlerts }: Props) {
                     </div>
                     <div className="flex items-center gap-2">
                         <Link
-                            href={route('inventory.office-requests.index')}
+                            href={route('inventory.office-supply-requests.index')}
                             className="text-xs font-medium text-red-600 hover:text-red-700 transition flex items-center gap-1"
                         >
                             <span>Office Supply Requests</span>
