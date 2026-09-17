@@ -20,7 +20,7 @@ export default function PaginationNav({ links, preserveState = true, preserveScr
     }
 
     return (
-        <nav className="flex flex-wrap items-center gap-2" aria-label="Pagination Navigation">
+        <nav className="flex flex-wrap items-center gap-1.5" aria-label="Pagination Navigation">
             {links.map((link, index) => {
                 const text = normalizePaginationLabel(link.label);
                 const isArrow = text === 'Previous' || text === 'Next';
@@ -33,12 +33,12 @@ export default function PaginationNav({ links, preserveState = true, preserveScr
                         preserveScroll={preserveScroll}
                         aria-disabled={!link.url}
                         className={[
-                            'inline-flex min-h-9 min-w-9 items-center justify-center rounded-md border px-3 py-1.5 text-sm font-semibold transition',
+                            'inline-flex min-h-8 min-w-8 items-center justify-center rounded-lg border px-2.5 py-1 text-xs font-semibold transition shadow-2xs',
                             link.active
-                                ? 'border-red-700 bg-red-700 text-white'
+                                ? 'border-red-600 bg-red-600 text-white shadow-xs'
                                 : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
                             !link.url ? 'pointer-events-none opacity-40' : '',
-                            isArrow ? 'text-xs' : '',
+                            isArrow ? 'text-[11px]' : '',
                         ].join(' ')}
                     >
                         {text}

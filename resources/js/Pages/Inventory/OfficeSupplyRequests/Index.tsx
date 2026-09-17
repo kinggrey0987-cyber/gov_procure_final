@@ -257,73 +257,78 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
 
     return (
         <AuthenticatedLayout
-            header={
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <h2 className="text-xl font-semibold leading-tight text-gray-800">Office Supply Requests</h2>
-                    <Link href={route('inventory.distribution-records.create')} className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
-                        Open Supply Distribution
-                    </Link>
-                </div>
+            header="Office Supply Requests"
+            headerActions={
+                <Link
+                    href={route('inventory.distribution-records.create')}
+                    className="inline-flex h-8 items-center rounded-lg bg-red-600 px-3 text-xs font-semibold text-white hover:bg-red-700 shadow-2xs transition"
+                >
+                    Open Supply Distribution &rarr;
+                </Link>
             }
         >
             <Head title="Office Supply Requests" />
 
-            <div className="space-y-4 py-8">
+            <div className="space-y-3">
                 {flash?.success ? (
-                    <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
                         {flash.success}
                     </div>
                 ) : null}
                 {flash?.error ? (
-                    <div className="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+                    <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700">
                         {flash.error}
                     </div>
                 ) : null}
 
-                <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-5">
-                    <input
-                        value={q}
-                        onChange={(event) => setQ(event.target.value)}
-                        placeholder="Search request code, purpose, or office"
-                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm md:col-span-2"
-                    />
-                    <select value={officeId} onChange={(event) => setOfficeId(event.target.value)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
-                        <option value="">All offices</option>
-                        {offices.map((office) => (
-                            <option key={office.id} value={office.id}>
-                                {office.name}
-                            </option>
-                        ))}
-                    </select>
-                    <select value={workflowBucket} onChange={(event) => setWorkflowBucket(event.target.value)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
-                        <option value="">All workflow buckets</option>
-                        <option value="READY_FOR_DISTRIBUTION">Ready for Distribution</option>
-                        <option value="STOCK_READY_AWAITING_RELEASE_CONTEXT">Stock Ready Awaiting Release Context</option>
-                        <option value="QUEUED_FOR_PROCUREMENT">Queued for Procurement</option>
-                        <option value="UNDER_VALIDATION">Submitted or Under Validation</option>
-                    </select>
-                    <select value={stockAssessment} onChange={(event) => setStockAssessment(event.target.value)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
-                        <option value="">All stock assessments</option>
-                        <option value="STOCK_READY">Stock Ready</option>
-                        <option value="SHORTAGE_REQUIRES_PROCUREMENT">Needs Procurement</option>
-                    </select>
-                    <Link href={route('inventory.office-supply-requests.index')} className="rounded-lg border border-slate-300 px-4 py-2 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                        Reset
-                    </Link>
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <p className="text-sm text-slate-600">
-                        Review submitted office requests against current stock. Requests with shortages are forwarded to the procurement initiation queue; stock-ready
-                        requests proceed to distribution.
-                    </p>
-                    <p className="mt-2 text-xs text-slate-500">
-                        {isRefreshing
-                            ? 'Refreshing queue...'
-                            : lastRefreshedAt
-                                ? `Updated ${lastRefreshedAt.toLocaleTimeString()}`
-                                : 'Refreshes when you return to this tab or manually reload the page'}
-                    </p>
+                {/* Compact Single-Row Filter Bar */}
+                <div className="shrink-0 rounded-xl border border-slate-200 bg-white p-2 shadow-xs">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <input
+                            value={q}
+                            onChange={(event) => setQ(event.target.value)}
+                            placeholder="Search request code, purpose, or office..."
+                            className="h-8 flex-1 min-w-[180px] rounded-lg border border-slate-300 px-2.5 text-xs focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                        />
+                        <select
+                            value={officeId}
+                            onChange={(event) => setOfficeId(event.target.value)}
+                            className="h-8 rounded-lg border border-slate-300 pl-2.5 pr-8 text-xs text-slate-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                        >
+                            <option value="">All offices</option>
+                            {offices.map((office) => (
+                                <option key={office.id} value={office.id}>
+                                    {office.name}
+                                </option>
+                            ))}
+                        </select>
+                        <select
+                            value={workflowBucket}
+                            onChange={(event) => setWorkflowBucket(event.target.value)}
+                            className="h-8 rounded-lg border border-slate-300 pl-2.5 pr-8 text-xs text-slate-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                        >
+                            <option value="">All workflow buckets</option>
+                            <option value="READY_FOR_DISTRIBUTION">Ready for Distribution</option>
+                            <option value="STOCK_READY_AWAITING_RELEASE_CONTEXT">Stock Ready Awaiting Release Context</option>
+                            <option value="QUEUED_FOR_PROCUREMENT">Queued for Procurement</option>
+                            <option value="UNDER_VALIDATION">Submitted or Under Validation</option>
+                        </select>
+                        <select
+                            value={stockAssessment}
+                            onChange={(event) => setStockAssessment(event.target.value)}
+                            className="h-8 rounded-lg border border-slate-300 pl-2.5 pr-8 text-xs text-slate-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                        >
+                            <option value="">All stock assessments</option>
+                            <option value="STOCK_READY">Stock Ready</option>
+                            <option value="SHORTAGE_REQUIRES_PROCUREMENT">Needs Procurement</option>
+                        </select>
+                        <Link
+                            href={route('inventory.office-supply-requests.index')}
+                            className="inline-flex h-8 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs"
+                        >
+                            Reset
+                        </Link>
+                    </div>
                 </div>
 
                 {officeShortageGroups.length > 0 && activeConsolidationOffice && (
@@ -542,9 +547,10 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
                     </div>
                 )}
 
-                <div className="responsive-table-wrap rounded-xl border border-slate-200 bg-white shadow-sm">
-                    <table className="min-w-full divide-y divide-slate-200 text-sm">
-                        <thead className="bg-slate-50">
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-slate-200 text-xs">
+                            <thead className="bg-slate-50">
                             <tr>
                                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Request</th>
                                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Office</th>
@@ -682,10 +688,21 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
                     </table>
                 </div>
 
-                <div>
+                <div className="border-t border-slate-200 bg-slate-50/70 px-3.5 py-2 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-3">
+                        <p className="text-xs text-slate-500 font-medium">
+                            Showing <span className="font-semibold text-slate-700">{requests.data.length}</span> office requests
+                        </p>
+                        {lastRefreshedAt && (
+                            <span className="hidden sm:inline text-[11px] text-slate-400">
+                                &bull; {isRefreshing ? 'Refreshing...' : `Updated ${lastRefreshedAt.toLocaleTimeString()}`}
+                            </span>
+                        )}
+                    </div>
                     <PaginationNav links={requests.links} preserveState={false} />
                 </div>
             </div>
+        </div>
 
             {/* Consolidated PR Preview & Forwarding Modal */}
             <Modal show={showPreviewModal} onClose={() => setShowPreviewModal(false)} maxWidth="2xl">

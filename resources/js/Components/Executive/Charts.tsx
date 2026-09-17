@@ -132,8 +132,8 @@ export function ExecutiveChartCard({
 
     return (
         <section className={`overflow-hidden rounded-xl border ${toneClass[tone].shell} transition hover:shadow-md h-full flex flex-col ${className}`}>
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 sm:px-4 sm:py-3 shrink-0">
-                <div>
+            <div className="flex flex-wrap items-center justify-between gap-1.5 border-b border-slate-100 px-3 py-1.5 shrink-0">
+                <div className="min-w-0">
                     {eyebrow ? (
                         <div className="mb-0.5">
                             <span className={`inline-flex rounded-full border px-2 py-0.2 text-[9px] font-bold uppercase tracking-wider ${toneClass[tone].badge}`}>
@@ -141,12 +141,12 @@ export function ExecutiveChartCard({
                             </span>
                         </div>
                     ) : null}
-                    <h3 className="text-sm font-bold text-slate-900 leading-snug">{title}</h3>
-                    {subtitle && <p className="mt-0.5 text-xs text-slate-500 font-medium line-clamp-1">{subtitle}</p>}
+                    <h3 className="text-xs font-bold text-slate-900 leading-tight truncate">{title}</h3>
+                    {subtitle && <p className="text-[10px] text-slate-500 font-medium line-clamp-1">{subtitle}</p>}
                 </div>
-                {action ? <div className="flex items-center gap-2">{action}</div> : null}
+                {action ? <div className="shrink-0">{action}</div> : null}
             </div>
-            <div className="p-3.5 sm:p-4 flex-1 flex flex-col">{children}</div>
+            <div className="p-2 sm:p-2.5 flex-1 flex flex-col min-h-0 overflow-hidden">{children}</div>
         </section>
     );
 }
@@ -210,30 +210,30 @@ export function HorizontalBarChart({
     };
 
     return (
-        <div className="space-y-3 py-1">
+        <div className="space-y-1.5 py-0.5 flex-1 overflow-y-auto min-h-0">
             {data.map((item, index) => {
                 const widthPercent = Math.max((item.value / max) * 100, item.value > 0 ? 5 : 0);
                 const sharePercent = total > 0 ? Math.round((item.value / total) * 100) : 0;
                 const gradientClass = getBarGradient(item.label, index);
 
                 return (
-                    <div key={item.label} className="group min-w-0 space-y-1.5">
+                    <div key={item.label} className="group min-w-0 space-y-0.5">
                         <div className="flex items-center justify-between text-xs">
-                            <span className="truncate font-semibold text-slate-700 pr-2 group-hover:text-slate-900 transition" title={item.label}>
+                            <span className="truncate text-xs font-semibold text-slate-700 pr-2 group-hover:text-slate-900 transition" title={item.label}>
                                 {item.label}
                             </span>
                             <div className="flex items-center gap-1.5 shrink-0">
                                 {showPercentage && total > 0 ? (
-                                    <span className="text-[11px] font-medium text-slate-600">
+                                    <span className="text-[10px] font-medium text-slate-500">
                                         ({sharePercent}%)
                                     </span>
                                 ) : null}
-                                <span className="font-bold text-slate-900">
+                                <span className="text-xs font-bold text-slate-900">
                                     {valueFormatter ? valueFormatter(item.value) : item.value.toLocaleString()}
                                 </span>
                             </div>
                         </div>
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
                             <div
                                 className={`h-full rounded-full ${gradientClass} transition-all duration-500`}
                                 style={{ width: `${widthPercent}%` }}

@@ -66,7 +66,7 @@ export default function MovementIndex({ movements }: Props) {
         <AuthenticatedLayout header="Inventory Movement Logs">
             <Head title="Inventory Movements" />
 
-            <div className="space-y-2 lg:h-[calc(100vh-8.5rem)] flex flex-col justify-between overflow-y-auto lg:overflow-hidden">
+            <div className="space-y-3">
                 {/* Compact Filter Bar */}
                 <div className="shrink-0 rounded-xl border border-slate-200 bg-white p-2 shadow-xs">
                     <div className="flex flex-wrap items-center gap-2">
@@ -80,7 +80,7 @@ export default function MovementIndex({ movements }: Props) {
                         <select
                             value={movementTypeFilter}
                             onChange={(event) => setMovementTypeFilter(event.target.value)}
-                            className="h-8 rounded-lg border border-slate-300 px-2.5 text-xs text-slate-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                            className="h-8 rounded-lg border border-slate-300 pl-2.5 pr-8 text-xs text-slate-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
                         >
                             {movementTypeOptions.map((status) => (
                                 <option key={status} value={status}>
@@ -94,18 +94,18 @@ export default function MovementIndex({ movements }: Props) {
                                 setSearch('');
                                 setMovementTypeFilter('ALL');
                             }}
-                            className="inline-flex h-8 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                            className="inline-flex h-8 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs"
                         >
                             Clear
                         </button>
                     </div>
                 </div>
 
-                {/* High-Density Movements Table with Sticky Headers and Internal Scroll */}
-                <div className="flex-1 min-h-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs flex flex-col">
-                    <div className="flex-1 overflow-y-auto min-h-0">
+                {/* Snug Movements Table with Pagination Attached Directly Below Records */}
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+                    <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-slate-200 text-xs">
-                            <thead className="sticky top-0 z-10 bg-slate-50 shadow-xs">
+                            <thead className="bg-slate-50 shadow-xs">
                                 <tr>
                                     <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Movement Type</th>
                                     <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Item / Inventory</th>
@@ -147,7 +147,10 @@ export default function MovementIndex({ movements }: Props) {
                         </table>
                     </div>
 
-                    <div className="shrink-0 border-t border-slate-200 bg-slate-50/70 px-3 py-1.5">
+                    <div className="border-t border-slate-200 bg-slate-50/70 px-3.5 py-2 flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs text-slate-500 font-medium">
+                            Showing <span className="font-semibold text-slate-700">{filteredRows.length}</span> movement logs
+                        </p>
                         <PaginationNav links={movements.links} preserveState={false} />
                     </div>
                 </div>

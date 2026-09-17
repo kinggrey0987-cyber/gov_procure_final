@@ -23,7 +23,7 @@ export default function InventoryTracking({ summary, dashboardAlerts }: Props) {
         <AuthenticatedLayout header="GSO Dashboard">
             <Head title="GSO Dashboard" />
 
-            <div className="space-y-2.5 lg:h-[calc(100vh-8.5rem)] flex flex-col justify-between overflow-y-auto lg:overflow-hidden">
+            <div className="space-y-3">
                 <DashboardAlertBanner alerts={dashboardAlerts} />
 
                 {/* Unified High-Density GSO Telemetry Cockpit - Interactive Drilldown */}
@@ -126,7 +126,7 @@ export default function InventoryTracking({ summary, dashboardAlerts }: Props) {
                 </section>
 
                 {/* Primary Dual Operational Command Hubs */}
-                <div className="grid gap-2.5 lg:grid-cols-2 flex-1 min-h-0">
+                <div className="grid gap-3 lg:grid-cols-2">
                     {/* Delivery & Distribution Hub */}
                     <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs flex flex-col justify-between">
                         <div>

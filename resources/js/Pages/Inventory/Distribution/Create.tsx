@@ -58,24 +58,28 @@ export default function DistributionCreate({ eligibleRows, focusSupplyRequestId 
 
     return (
         <AuthenticatedLayout
-            header={
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <h2 className="text-xl font-semibold leading-tight text-gray-800">Supply Distribution</h2>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Link href={route('inventory.office-supply-requests.index')} className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
-                            Back to Office Supply Requests
-                        </Link>
-                        <Link href={route('inventory.distribution-records.index')} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                            Distribution Records
-                        </Link>
-                    </div>
+            header="Supply Distribution"
+            headerActions={
+                <div className="flex items-center gap-2">
+                    <Link
+                        href={route('inventory.office-supply-requests.index')}
+                        className="inline-flex h-8 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs"
+                    >
+                        &larr; Office Supply Requests
+                    </Link>
+                    <Link
+                        href={route('inventory.distribution-records.index')}
+                        className="inline-flex h-8 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs"
+                    >
+                        Distribution Records
+                    </Link>
                 </div>
             }
         >
             <Head title="Supply Distribution" />
-            <div className="space-y-6 py-8">
+            <div className="space-y-3">
                 {focusSupplyRequestId ? (
-                    <div className={`rounded-xl border p-4 text-sm shadow-sm ${focusedRowExists ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
+                    <div className={`rounded-xl border p-3 text-xs shadow-xs ${focusedRowExists ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
                         {focusedRowExists
                             ? `Focused release context loaded for request #${focusSupplyRequestId}. Continue with Process Release below.`
                             : focusReleasableReason
@@ -84,16 +88,18 @@ export default function DistributionCreate({ eligibleRows, focusSupplyRequestId 
                     </div>
                 ) : null}
 
-                <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    <div className="border-b border-slate-200 px-6 py-5">
-                        <h3 className="text-2xl font-semibold text-slate-900">Supply Distribution</h3>
-                        <p className="mt-1 text-lg text-slate-500">
-                            Process stock-ready office requests and release supplies to offices - {eligibleRows.total} request(s) ready
-                        </p>
-                        <p className="mt-2 text-sm text-slate-500">Use Claims and Adjustments only for post-release discrepancies, losses, or damages.</p>
+                <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+                    <div className="border-b border-slate-200 bg-slate-50/60 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                            <h3 className="text-xs font-bold text-slate-900">Stock-Ready Releasable Requests</h3>
+                            <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
+                                {eligibleRows.total} ready
+                            </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500">Release office supplies directly from warehouse stock</p>
                     </div>
                     <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-slate-200 text-sm">
+                        <table className="min-w-full divide-y divide-slate-200 text-xs">
                             <thead className="bg-slate-50">
                                 <tr>
                                     <th className="px-4 py-3 text-left font-semibold text-slate-700">Request ID</th>
@@ -147,11 +153,12 @@ export default function DistributionCreate({ eligibleRows, focusSupplyRequestId 
                             </tbody>
                         </table>
                     </div>
-                    {eligibleRows.total > rows.length ? (
-                        <div className="border-t border-slate-200 px-6 py-4">
-                            <PaginationNav links={eligibleRows.links} preserveState={false} />
-                        </div>
-                    ) : null}
+                    <div className="border-t border-slate-200 bg-slate-50/70 px-3.5 py-2 flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs text-slate-500 font-medium">
+                            Showing <span className="font-semibold text-slate-700">{rows.length}</span> of <span className="font-semibold text-slate-700">{eligibleRows.total}</span> releasable requests
+                        </p>
+                        <PaginationNav links={eligibleRows.links} preserveState={false} />
+                    </div>
                 </section>
             </div>
         </AuthenticatedLayout>

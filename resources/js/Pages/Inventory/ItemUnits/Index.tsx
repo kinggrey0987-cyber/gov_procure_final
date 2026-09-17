@@ -35,7 +35,7 @@ export default function ItemUnitIndex({ units, canManage }: Props) {
         <AuthenticatedLayout header="Item Units">
             <Head title="Item Units" />
 
-            <div className="space-y-2 lg:h-[calc(100vh-8.5rem)] flex flex-col justify-between overflow-y-auto lg:overflow-hidden">
+            <div className="space-y-3">
                 {/* Compact Unit Creation Bar */}
                 <section className="shrink-0 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 shadow-xs flex flex-wrap items-center justify-between gap-3">
                     <div>
@@ -59,7 +59,7 @@ export default function ItemUnitIndex({ units, canManage }: Props) {
                             <button
                                 type="submit"
                                 disabled={form.processing}
-                                className="inline-flex h-8 items-center rounded-lg bg-red-600 px-3 text-xs font-semibold text-white hover:bg-red-700 transition shadow-xs disabled:opacity-60"
+                                className="inline-flex h-8 items-center rounded-lg bg-red-600 px-3 text-xs font-semibold text-white hover:bg-red-700 transition shadow-2xs disabled:opacity-60"
                             >
                                 Add Unit
                             </button>
@@ -67,11 +67,11 @@ export default function ItemUnitIndex({ units, canManage }: Props) {
                     ) : null}
                 </section>
 
-                {/* High-Density Units Table with Sticky Headers and Internal Scroll */}
-                <div className="flex-1 min-h-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs flex flex-col">
-                    <div className="flex-1 overflow-y-auto min-h-0">
+                {/* Snug Units Table */}
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+                    <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-slate-200 text-xs">
-                            <thead className="sticky top-0 z-10 bg-slate-50 shadow-xs">
+                            <thead className="bg-slate-50 shadow-xs">
                                 <tr>
                                     <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Unit</th>
                                     <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Status</th>
@@ -111,6 +111,12 @@ export default function ItemUnitIndex({ units, canManage }: Props) {
                                 ) : null}
                             </tbody>
                         </table>
+                    </div>
+
+                    <div className="border-t border-slate-200 bg-slate-50/70 px-3.5 py-2">
+                        <p className="text-xs text-slate-500 font-medium">
+                            Total allowed units: <span className="font-semibold text-slate-700">{units.length}</span>
+                        </p>
                     </div>
                 </div>
             </div>

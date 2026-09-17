@@ -109,7 +109,7 @@ export default function ItemCatalogIndex({ items, categories, filters, canManage
         >
             <Head title="Item Catalog" />
 
-            <div className="space-y-2 lg:h-[calc(100vh-8.5rem)] flex flex-col justify-between overflow-y-auto lg:overflow-hidden">
+            <div className="space-y-3">
                 {flash?.success ? (
                     <div className="shrink-0 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
                         {flash.success}
@@ -134,7 +134,7 @@ export default function ItemCatalogIndex({ items, categories, filters, canManage
                         <select
                             value={categoryId}
                             onChange={(event) => setCategoryId(event.target.value)}
-                            className="h-8 rounded-lg border border-slate-300 px-2.5 text-xs text-slate-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                            className="h-8 rounded-lg border border-slate-300 pl-2.5 pr-8 text-xs text-slate-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
                         >
                             <option value="">All categories</option>
                             {categories.map((category) => (
@@ -146,7 +146,7 @@ export default function ItemCatalogIndex({ items, categories, filters, canManage
                         <select
                             value={status}
                             onChange={(event) => setStatus(event.target.value)}
-                            className="h-8 rounded-lg border border-slate-300 px-2.5 text-xs text-slate-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                            className="h-8 rounded-lg border border-slate-300 pl-2.5 pr-8 text-xs text-slate-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
                         >
                             <option value="">All status</option>
                             <option value="active">Active</option>
@@ -154,7 +154,7 @@ export default function ItemCatalogIndex({ items, categories, filters, canManage
                         </select>
                         <Link
                             href={route('inventory.items.index')}
-                            className="inline-flex h-8 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                            className="inline-flex h-8 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs"
                         >
                             Reset
                         </Link>
@@ -162,18 +162,18 @@ export default function ItemCatalogIndex({ items, categories, filters, canManage
                             type="button"
                             onClick={() => void refreshNow()}
                             disabled={isRefreshing}
-                            className="inline-flex h-8 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition disabled:opacity-60"
+                            className="inline-flex h-8 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs disabled:opacity-60"
                         >
                             {isRefreshing ? 'Refreshing...' : 'Refresh List'}
                         </button>
                     </div>
                 </div>
 
-                {/* High-Density Catalog Table with Sticky Headers and Internal Scroll */}
-                <div className="flex-1 min-h-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs flex flex-col">
-                    <div className="flex-1 overflow-y-auto min-h-0">
+                {/* Snug Catalog Table with Pagination Attached Directly Below Records */}
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+                    <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-slate-200 text-xs">
-                            <thead className="sticky top-0 z-10 bg-slate-50 shadow-xs">
+                            <thead className="bg-slate-50 shadow-xs">
                                 <tr>
                                     <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Item Name</th>
                                     <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Category</th>
@@ -234,7 +234,10 @@ export default function ItemCatalogIndex({ items, categories, filters, canManage
                         </table>
                     </div>
 
-                    <div className="shrink-0 border-t border-slate-200 bg-slate-50/70 px-3 py-1.5">
+                    <div className="border-t border-slate-200 bg-slate-50/70 px-3.5 py-2 flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs text-slate-500 font-medium">
+                            Showing <span className="font-semibold text-slate-700">{items.data.length}</span> catalog items
+                        </p>
                         <PaginationNav links={items.links} />
                     </div>
                 </div>
