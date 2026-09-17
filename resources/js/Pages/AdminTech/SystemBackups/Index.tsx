@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import ConfirmationModal from '@/Components/ConfirmationModal';
 import PaginationNav from '@/Components/PaginationNav';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import React, { useState } from 'react';
@@ -79,12 +80,22 @@ export default function AdminSystemBackupsIndex({ records, telemetry, backupType
         post(route('admin-tech.system-backups.store'));
     };
 
-    const deleteBackup = (backupId: number) => {
-        if (!window.confirm('Delete this backup record? This action cannot be undone.')) {
+    const [backupToDelete, setBackupToDelete] = useState<{ id: number; title: string } | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const confirmDeleteBackup = () => {
+        if (!backupToDelete) {
             return;
         }
 
-        router.delete(route('admin-tech.system-backups.destroy', backupId));
+        setIsDeleting(true);
+        router.delete(route('admin-tech.system-backups.destroy', backupToDelete.id), {
+            preserveScroll: true,
+            onFinish: () => {
+                setIsDeleting(false);
+                setBackupToDelete(null);
+            },
+        });
     };
 
     const copyChecksum = (backupId: number, hash: string) => {
@@ -308,7 +319,7 @@ export default function AdminSystemBackupsIndex({ records, telemetry, backupType
                                                     {row.can_delete ? (
                                                         <button
                                                             type="button"
-                                                            onClick={() => deleteBackup(row.backup_id)}
+                                                            onClick={() => setBackupToDelete({ id: row.backup_id, title: row.file_name || `Backup #${row.backup_id}` })}
                                                             className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
                                                             title="Delete Backup"
                                                         >
@@ -336,6 +347,26 @@ export default function AdminSystemBackupsIndex({ records, telemetry, backupType
 
                 <PaginationNav links={records.links} preserveState={false} />
             </div>
+
+            <ConfirmationModal
+                show={backupToDelete !== null}
+                title="Delete System Backup"
+                message={
+                    <span>
+                        Are you sure you want to permanently delete the backup{' '}
+                        <strong className="font-semibold text-slate-900">{backupToDelete?.title}</strong>?
+                        This action cannot be undone and will permanently remove the snapshot file from server storage.
+                    </span>
+                }
+                confirmText="Delete Backup"
+                cancelText="Cancel"
+                variant="danger"
+                processing={isDeleting}
+                onConfirm={confirmDeleteBackup}
+                onClose={() => {
+                    if (!isDeleting) setBackupToDelete(null);
+                }}
+            />
         </AuthenticatedLayout>
     );
 }

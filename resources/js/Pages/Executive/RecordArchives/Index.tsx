@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import ConfirmationModal from '@/Components/ConfirmationModal';
 import PaginationNav from '@/Components/PaginationNav';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import React, { useState } from 'react';
@@ -96,12 +97,22 @@ export default function ExecutiveRecordArchivesIndex({ records, telemetry, archi
         post(route('executive.record-archives.store'));
     };
 
-    const deleteArchive = (archiveId: number) => {
-        if (!window.confirm('Delete this record archive? This action cannot be undone.')) {
+    const [archiveToDelete, setArchiveToDelete] = useState<{ id: number; title: string } | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const confirmDeleteArchive = () => {
+        if (!archiveToDelete) {
             return;
         }
 
-        router.delete(route('executive.record-archives.destroy', archiveId));
+        setIsDeleting(true);
+        router.delete(route('executive.record-archives.destroy', archiveToDelete.id), {
+            preserveScroll: true,
+            onFinish: () => {
+                setIsDeleting(false);
+                setArchiveToDelete(null);
+            },
+        });
     };
 
     const copyChecksum = (archiveId: number, hash: string) => {
@@ -348,7 +359,13 @@ export default function ExecutiveRecordArchivesIndex({ records, telemetry, archi
                                                     {row.can_delete ? (
                                                         <button
                                                             type="button"
-                                                            onClick={() => deleteArchive(row.archive_id)}
+                                                            onClick={() => {
+                                                                const scopeLabel = scopeDescriptions[row.archive_scope]?.label ?? row.archive_scope.replaceAll('_', ' ');
+                                                                setArchiveToDelete({
+                                                                    id: row.archive_id,
+                                                                    title: `${scopeLabel} (FY ${row.archive_year})`,
+                                                                });
+                                                            }}
                                                             className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
                                                             title="Delete Archive"
                                                         >
@@ -376,6 +393,26 @@ export default function ExecutiveRecordArchivesIndex({ records, telemetry, archi
 
                 <PaginationNav links={records.links} preserveState={false} />
             </div>
+
+            <ConfirmationModal
+                show={archiveToDelete !== null}
+                title="Delete Certified Record Archive"
+                message={
+                    <span>
+                        Are you sure you want to permanently delete the certified archive{' '}
+                        <strong className="font-semibold text-slate-900">{archiveToDelete?.title}</strong>?
+                        This action cannot be undone and will permanently remove the dossier package and manifest from server storage.
+                    </span>
+                }
+                confirmText="Delete Archive"
+                cancelText="Cancel"
+                variant="danger"
+                processing={isDeleting}
+                onConfirm={confirmDeleteArchive}
+                onClose={() => {
+                    if (!isDeleting) setArchiveToDelete(null);
+                }}
+            />
         </AuthenticatedLayout>
     );
 }
