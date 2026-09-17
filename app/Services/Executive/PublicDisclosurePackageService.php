@@ -342,6 +342,127 @@ class PublicDisclosurePackageService
     }
 
     /**
+     * @param  array<string, \Illuminate\Support\Collection<int, array<string, mixed>>>  $eligibleSources
+     * @return array<string, array<int, array<string, mixed>>>
+     */
+    public function availableProcurementDocumentsForEligibleSources(array $eligibleSources): array
+    {
+        $allSources = collect($eligibleSources)->flatten(1);
+        if ($allSources->isEmpty()) {
+            return [];
+        }
+
+        $sourceToRefMap = [];
+        $allReferencePairs = [];
+
+        $poIds = $allSources
+            ->where('reference_type', PurchaseOrder::class)
+            ->pluck('reference_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $poToPrMap = [];
+        if (! empty($poIds)) {
+            $poToPrMap = PurchaseOrder::query()
+                ->whereIn('purchase_order_id', $poIds)
+                ->whereNotNull('purchase_request_id')
+                ->pluck('purchase_request_id', 'purchase_order_id')
+                ->all();
+        }
+
+        foreach ($allSources as $src) {
+            $refType = (string) ($src['reference_type'] ?? '');
+            $refId = (int) ($src['reference_id'] ?? 0);
+            if ($refId <= 0) {
+                continue;
+            }
+
+            $key = "{$refType}:{$refId}";
+            $refs = [];
+
+            if ($refType === PurchaseOrder::class) {
+                // Strictly documents uploaded for this specific referenced PO
+                $refs[] = ['module' => 'purchase_orders', 'id' => $refId];
+
+                // And documents uploaded for this specific PO's linked PR (if any)
+                if (isset($poToPrMap[$refId]) && (int) $poToPrMap[$refId] > 0) {
+                    $refs[] = ['module' => 'purchase_requests', 'id' => (int) $poToPrMap[$refId]];
+                }
+            } elseif ($refType === PurchaseRequest::class) {
+                $refs[] = ['module' => 'purchase_requests', 'id' => $refId];
+            } elseif ($refType === Ppmp::class) {
+                $refs[] = ['module' => 'ppmps', 'id' => $refId];
+            } elseif ($refType === DistributionRecord::class) {
+                $refs[] = ['module' => 'distribution_records', 'id' => $refId];
+            }
+
+            $sourceToRefMap[$key] = $refs;
+            foreach ($refs as $r) {
+                $allReferencePairs[] = $r;
+            }
+        }
+
+        $uniquePairs = collect($allReferencePairs)
+            ->unique(fn ($p) => $p['module'].'-'.$p['id'])
+            ->values();
+
+        if ($uniquePairs->isEmpty()) {
+            return [];
+        }
+
+        $documents = Document::query()
+            ->with('uploader:id,name')
+            ->whereNotIn('document_kind', ['OFFICIAL_DISCLOSURE_PACKAGE', 'SOURCE_PROCUREMENT_DOCUMENT'])
+            ->where(function ($query) use ($uniquePairs): void {
+                foreach ($uniquePairs as $pair) {
+                    $query->orWhere(function ($nested) use ($pair): void {
+                        $nested->where('related_module', $pair['module'])
+                            ->where('related_reference_id', $pair['id']);
+                    });
+                }
+            })
+            ->orderByDesc('uploaded_at')
+            ->orderByDesc('document_id')
+            ->get();
+
+        $docsByModuleId = [];
+        foreach ($documents as $doc) {
+            $k = $doc->related_module.'-'.$doc->related_reference_id;
+            $docsByModuleId[$k][] = [
+                'document_id' => (int) $doc->document_id,
+                'title' => (string) $doc->title,
+                'file_name' => (string) $doc->file_name,
+                'document_kind' => (string) ($doc->document_kind ?? ''),
+                'related_module' => (string) $doc->related_module,
+                'related_reference_id' => (int) $doc->related_reference_id,
+                'uploaded_at' => optional($doc->uploaded_at)?->toIso8601String(),
+                'uploader_name' => $doc->uploader?->name ?? 'Procurement Unit',
+                'view_url' => route('documents.show', $doc->document_id),
+            ];
+        }
+
+        $result = [];
+        foreach ($sourceToRefMap as $sourceKey => $refs) {
+            $mapped = [];
+            $seenDocIds = [];
+            foreach ($refs as $r) {
+                $k = $r['module'].'-'.$r['id'];
+                foreach ($docsByModuleId[$k] ?? [] as $docData) {
+                    if (! isset($seenDocIds[$docData['document_id']])) {
+                        $seenDocIds[$docData['document_id']] = true;
+                        $mapped[] = $docData;
+                    }
+                }
+            }
+            $result[$sourceKey] = $mapped;
+        }
+
+        return $result;
+    }
+
+    /**
      * @return array<int, array{module: string, id: int}>
      */
     private function procurementDocumentReferences(PublicDisclosure $disclosure): array
@@ -364,15 +485,18 @@ class PublicDisclosurePackageService
                     $references[] = ['module' => 'purchase_requests', 'id' => (int) $purchaseOrder->purchase_request_id];
                 }
             }
+
+            if ($sourceType === Ppmp::class) {
+                $references[] = ['module' => 'ppmps', 'id' => $sourceId];
+            }
+
+            if ($sourceType === DistributionRecord::class) {
+                $references[] = ['module' => 'distribution_records', 'id' => $sourceId];
+            }
         };
 
+        // Strictly reference the designated source record so documents only belong to that referenced record
         $addReference((string) ($disclosure->reference_type ?? ''), (int) ($disclosure->reference_id ?? 0));
-
-        $this->syncSources($disclosure);
-        $disclosure->loadMissing('sources');
-        foreach ($disclosure->sources as $source) {
-            $addReference((string) $source->source_type, (int) $source->source_id);
-        }
 
         return collect($references)
             ->unique(fn (array $reference): string => $reference['module'].'-'.$reference['id'])

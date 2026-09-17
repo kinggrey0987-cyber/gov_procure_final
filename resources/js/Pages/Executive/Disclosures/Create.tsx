@@ -14,6 +14,18 @@ type EligibleSource = {
     suggested_title: string;
 };
 
+type ProcurementDocument = {
+    document_id: number;
+    title: string;
+    file_name: string;
+    document_kind: string;
+    related_module: string;
+    related_reference_id: number;
+    uploaded_at: string | null;
+    uploader_name: string | null;
+    view_url: string;
+};
+
 type Props = {
     eligibleSources: {
         approved_ppmps: EligibleSource[];
@@ -21,11 +33,42 @@ type Props = {
         recent_purchase_requests: EligibleSource[];
         distribution_summaries: EligibleSource[];
     };
+    procurementDocumentsBySource?: Record<string, ProcurementDocument[]>;
 };
 
 type PublicationAction = 'DRAFT' | 'PUBLISHED';
 
-export default function DisclosureCreate({ eligibleSources }: Props) {
+const DOCUMENT_KIND_LABELS: Record<string, string> = {
+    noa: 'Notice of Award (NOA)',
+    canvass_sheet: 'Abstract of Canvass / Canvass Sheet',
+    supplier_quotation: 'Winning / Bidder Quotation',
+    signed_po: 'Signed PO with Conforme',
+    procurement_record: 'BAC Resolution / Procurement Record',
+    other_supporting_doc: 'Other Supporting Document',
+    OFFICIAL_DISCLOSURE_PACKAGE: 'Official Disclosure Package',
+    SOURCE_PROCUREMENT_DOCUMENT: 'Procurement Attachment Copy',
+};
+
+function getKindBadge(kind?: string) {
+    const rawKind = (kind || 'other_supporting_doc').toLowerCase();
+    const label = DOCUMENT_KIND_LABELS[kind || ''] || DOCUMENT_KIND_LABELS[rawKind] || (kind ? kind.replaceAll('_', ' ') : 'Supporting Document');
+
+    if (rawKind.includes('noa') || rawKind.includes('award')) {
+        return { label, className: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+    }
+    if (rawKind.includes('canvass')) {
+        return { label, className: 'bg-blue-50 text-blue-700 border-blue-200' };
+    }
+    if (rawKind.includes('quotation') || rawKind.includes('bid')) {
+        return { label, className: 'bg-purple-50 text-purple-700 border-purple-200' };
+    }
+    if (rawKind.includes('po') || rawKind.includes('conforme')) {
+        return { label, className: 'bg-amber-50 text-amber-800 border-amber-200' };
+    }
+    return { label, className: 'bg-slate-100 text-slate-700 border-slate-200' };
+}
+
+export default function DisclosureCreate({ eligibleSources, procurementDocumentsBySource = {} }: Props) {
     const form = useForm({
         title: '',
         type: '',
@@ -34,6 +77,7 @@ export default function DisclosureCreate({ eligibleSources }: Props) {
         description: '',
         file_path: '',
         main_file: null as File | null,
+        procurement_document_ids: [] as number[],
         supporting_files: [] as File[],
         status: 'DRAFT',
         remarks: '',
@@ -42,18 +86,30 @@ export default function DisclosureCreate({ eligibleSources }: Props) {
     const [publicationAction, setPublicationAction] = useState<PublicationAction>('DRAFT');
     const [selectedSourceKey, setSelectedSourceKey] = useState<string>('');
     const [sourceSearch, setSourceSearch] = useState<string>('');
+    const [showCustomMainUpload, setShowCustomMainUpload] = useState<boolean>(false);
 
-    const sourceOptions = [
-        ...eligibleSources.approved_ppmps,
-        ...eligibleSources.completed_purchase_orders,
-        ...eligibleSources.recent_purchase_requests,
-        ...eligibleSources.distribution_summaries,
-    ];
+    const sourceOptions = useMemo(
+        () => [
+            ...eligibleSources.approved_ppmps,
+            ...eligibleSources.completed_purchase_orders,
+            ...eligibleSources.recent_purchase_requests,
+            ...eligibleSources.distribution_summaries,
+        ],
+        [eligibleSources],
+    );
 
     const selectedSource = useMemo(
         () => sourceOptions.find((item) => `${item.reference_type}:${item.reference_id}` === selectedSourceKey) ?? null,
         [selectedSourceKey, sourceOptions],
     );
+
+    // Strictly resolve documents belonging only to the selected source
+    const availableProcurementDocs = useMemo(() => {
+        if (!selectedSourceKey || !procurementDocumentsBySource) {
+            return [];
+        }
+        return procurementDocumentsBySource[selectedSourceKey] ?? [];
+    }, [selectedSourceKey, procurementDocumentsBySource]);
 
     const filteredSourceOptions = useMemo(() => {
         const query = sourceSearch.trim().toLowerCase();
@@ -86,6 +142,32 @@ export default function DisclosureCreate({ eligibleSources }: Props) {
         form.setData('reference_id', String(source.reference_id));
         form.setData('title', source.suggested_title);
         form.setData('type', source.suggested_type);
+
+        // Pre-select all procurement registry documents that belong strictly to this referenced record
+        const sourceDocs = procurementDocumentsBySource[key] ?? [];
+        form.setData('procurement_document_ids', sourceDocs.map((doc) => doc.document_id));
+    };
+
+    const toggleProcurementDoc = (id: number) => {
+        if (form.data.procurement_document_ids.includes(id)) {
+            form.setData(
+                'procurement_document_ids',
+                form.data.procurement_document_ids.filter((currentId) => currentId !== id),
+            );
+        } else {
+            form.setData('procurement_document_ids', [...form.data.procurement_document_ids, id]);
+        }
+    };
+
+    const selectAllProcurementDocs = () => {
+        form.setData(
+            'procurement_document_ids',
+            availableProcurementDocs.map((doc) => doc.document_id),
+        );
+    };
+
+    const clearAllProcurementDocs = () => {
+        form.setData('procurement_document_ids', []);
     };
 
     const onMainFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -241,39 +323,281 @@ export default function DisclosureCreate({ eligibleSources }: Props) {
                         </Field>
                     </StepCard>
 
-                    <StepCard step="3" title="Files & Attachments" subtitle="Upload the report and supporting files">
-                        <div className="grid gap-4 lg:grid-cols-2">
-                            <div className="rounded-xl border border-red-200 bg-red-50/50 p-4">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Main Disclosure File</p>
-                                <p className="mt-1 text-sm text-slate-600">This file becomes the primary downloadable disclosure report.</p>
-                                <input type="file" className="mt-3 block w-full text-sm" onChange={onMainFileChange} />
-                                <p className="mt-2 text-sm font-semibold text-slate-800 break-words">
-                                    {form.data.main_file ? form.data.main_file.name : 'No main file selected'}
-                                </p>
-                            </div>
+                    <StepCard
+                        step="3"
+                        title="Files & Attachments"
+                        subtitle="Configure official publication report and supporting public attachments"
+                    >
+                        <div className="space-y-6">
+                            {/* Card 1: Official Main Disclosure Report */}
+                            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <h4 className="text-sm font-bold uppercase tracking-wider text-slate-900">
+                                                Official Disclosure Report
+                                            </h4>
+                                            <p className="text-xs text-slate-500">
+                                                Primary downloadable transparency document for public release
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                        Automatic PDF Generation Active
+                                    </span>
+                                </div>
 
-                            <div className="rounded-xl border border-red-200 bg-red-50/50 p-4">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Supporting Attachments</p>
-                                <p className="mt-1 text-sm text-slate-600">Upload additional public supporting files (multiple allowed).</p>
-                                <input type="file" multiple className="mt-3 block w-full text-sm" onChange={onSupportingFilesChange} />
-                                <ul className="mt-3 space-y-2">
-                                    {form.data.supporting_files.length === 0 ? (
-                                        <li className="text-sm text-slate-600">No supporting attachments selected.</li>
+                                <div className="mt-4 rounded-xl border border-emerald-200/80 bg-emerald-50/40 p-4">
+                                    <div className="flex items-start gap-3">
+                                        <div className="mt-0.5 text-emerald-600">
+                                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                        </div>
+                                        <div className="text-xs leading-relaxed text-slate-700">
+                                            <p className="font-semibold text-slate-900">
+                                                The system automatically compiles and certifies this report upon saving or publishing.
+                                            </p>
+                                            <p className="mt-1 text-slate-600">
+                                                In accordance with RA 9184 and DILG Full Disclosure Policy guidelines, the generated document (<code className="font-mono text-emerald-800 bg-emerald-100/70 px-1 py-0.5 rounded">disclosure-package.pdf</code>) bundles:
+                                            </p>
+                                            <ul className="mt-2 grid gap-1.5 sm:grid-cols-2 text-slate-600">
+                                                <li className="flex items-center gap-1.5">
+                                                    <svg className="h-4 w-4 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                    <span>Official LGU Letterhead & Tracking Barcode</span>
+                                                </li>
+                                                <li className="flex items-center gap-1.5">
+                                                    <svg className="h-4 w-4 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                    <span>Itemized Procurement Schedule & Costs</span>
+                                                </li>
+                                                <li className="flex items-center gap-1.5">
+                                                    <svg className="h-4 w-4 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                    <span>Winning Supplier Awards & Conforme</span>
+                                                </li>
+                                                <li className="flex items-center gap-1.5">
+                                                    <svg className="h-4 w-4 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                    <span>Executive Digital Seal & Authenticity Block</span>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="mt-4">
+                                    {!showCustomMainUpload && !form.data.main_file ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowCustomMainUpload(true)}
+                                            className="text-xs font-semibold text-red-700 hover:text-red-800 underline underline-offset-2 flex items-center gap-1"
+                                        >
+                                            <span>+ Attach external pre-signed ordinance or scanned municipal order instead (Optional)</span>
+                                        </button>
                                     ) : (
-                                        form.data.supporting_files.map((file, index) => (
-                                            <li key={`${file.name}-${index}`} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
-                                                <span className="min-w-0 break-words text-slate-800">{file.name}</span>
+                                        <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs font-bold uppercase tracking-wide text-amber-800">
+                                                    Custom Replacement Document
+                                                </span>
                                                 <button
                                                     type="button"
-                                                    onClick={() => removeSupportingFile(index)}
-                                                    className="shrink-0 rounded border border-red-200 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50"
+                                                    onClick={() => {
+                                                        form.setData('main_file', null);
+                                                        setShowCustomMainUpload(false);
+                                                    }}
+                                                    className="text-xs font-semibold text-slate-500 hover:text-red-700"
                                                 >
-                                                    Remove
+                                                    Cancel & Revert to Auto-Generated PDF
                                                 </button>
-                                            </li>
-                                        ))
+                                            </div>
+                                            <p className="text-xs text-slate-600">
+                                                Choose an external PDF file to use in place of the system-generated disclosure package:
+                                            </p>
+                                            <input type="file" accept=".pdf,.doc,.docx" className="block w-full text-xs text-slate-700" onChange={onMainFileChange} />
+                                            {form.data.main_file && (
+                                                <p className="text-xs font-semibold text-emerald-700 flex items-center gap-1.5">
+                                                    <span>Selected replacement: {form.data.main_file.name}</span>
+                                                </p>
+                                            )}
+                                        </div>
                                     )}
-                                </ul>
+                                </div>
+                            </div>
+
+                            {/* Card 2: Procurement Unit Document Registry */}
+                            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-red-700">
+                                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <h4 className="text-sm font-bold uppercase tracking-wider text-slate-900">
+                                                Procurement Unit Document Registry
+                                            </h4>
+                                            <p className="text-xs text-slate-500">
+                                                Verified attachments uploaded by the Procurement Unit strictly for this referenced record
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {availableProcurementDocs.length > 0 && (
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={selectAllProcurementDocs}
+                                                className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
+                                            >
+                                                Select All
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={clearAllProcurementDocs}
+                                                className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
+                                            >
+                                                Clear All
+                                            </button>
+                                            <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-bold text-red-800">
+                                                {form.data.procurement_document_ids.length} of {availableProcurementDocs.length} selected
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="mt-4">
+                                    {!selectedSource ? (
+                                        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-6 text-center">
+                                            <svg className="mx-auto h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+                                            </svg>
+                                            <p className="mt-2 text-sm font-medium text-slate-700">Please select an eligible source in Step 1 first</p>
+                                            <p className="mt-0.5 text-xs text-slate-500">
+                                                Once you pick a Purchase Order or Request, its registered procurement files (NOA, Canvass Sheet, Quotations) will be displayed here.
+                                            </p>
+                                        </div>
+                                    ) : availableProcurementDocs.length === 0 ? (
+                                        <div className="rounded-xl border border-dashed border-amber-200 bg-amber-50/50 p-5 text-center">
+                                            <p className="text-sm font-medium text-amber-800">
+                                                No procurement files registered for {selectedSource.source_code ?? selectedSource.label}
+                                            </p>
+                                            <p className="mt-1 text-xs text-amber-700">
+                                                The Procurement Unit has not archived supporting uploads (NOA, Quotations, Canvass) for this record yet. You can still upload additional municipal files below.
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2.5">
+                                            {availableProcurementDocs.map((doc) => {
+                                                const isChecked = form.data.procurement_document_ids.includes(doc.document_id);
+                                                const badge = getKindBadge(doc.document_kind);
+
+                                                return (
+                                                    <div
+                                                        key={doc.document_id}
+                                                        className={`flex items-start gap-3 rounded-xl border p-3.5 transition ${
+                                                            isChecked
+                                                                ? 'border-red-300 bg-red-50/40 shadow-[0_2px_8px_rgba(185,28,28,0.06)]'
+                                                                : 'border-slate-200 bg-white hover:bg-slate-50'
+                                                        }`}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            id={`proc-doc-${doc.document_id}`}
+                                                            checked={isChecked}
+                                                            onChange={() => toggleProcurementDoc(doc.document_id)}
+                                                            className="mt-1 h-4 w-4 rounded border-slate-300 text-red-700 focus:ring-red-600"
+                                                        />
+                                                        <label
+                                                            htmlFor={`proc-doc-${doc.document_id}`}
+                                                            className="min-w-0 flex-1 cursor-pointer"
+                                                        >
+                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                <span className="font-semibold text-slate-900 text-sm">{doc.title}</span>
+                                                                <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${badge.className}`}>
+                                                                    {badge.label}
+                                                                </span>
+                                                            </div>
+                                                            <p className="mt-1 text-xs text-slate-500 font-mono break-all">
+                                                                {doc.file_name} • {doc.related_module.replaceAll('_', ' ')} #{doc.related_reference_id}
+                                                            </p>
+                                                            <p className="mt-1 text-[11px] text-slate-400">
+                                                                Uploaded {doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleString() : 'N/A'} by {doc.uploader_name || 'Procurement Unit'}
+                                                            </p>
+                                                        </label>
+
+                                                        <a
+                                                            href={doc.view_url}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-red-300 hover:text-red-700 hover:bg-red-50 transition"
+                                                        >
+                                                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                            </svg>
+                                                            <span>View</span>
+                                                        </a>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Card 3: Additional Supplementary Municipal Attachments */}
+                            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                                <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+                                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-sm font-bold uppercase tracking-wider text-slate-900">
+                                            Additional Municipal Attachments (Optional)
+                                        </h4>
+                                        <p className="text-xs text-slate-500">
+                                            Upload extra municipal files not present in the Procurement Unit registry (e.g. resolutions, executive memos)
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="mt-4">
+                                    <input type="file" multiple className="block w-full text-xs text-slate-700" onChange={onSupportingFilesChange} />
+                                    <ul className="mt-3 space-y-2">
+                                        {form.data.supporting_files.length === 0 ? (
+                                            <li className="text-xs text-slate-500 italic">No additional municipal attachments selected.</li>
+                                        ) : (
+                                            form.data.supporting_files.map((file, index) => (
+                                                <li key={`${file.name}-${index}`} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
+                                                    <span className="min-w-0 break-words font-medium text-slate-800">{file.name}</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeSupportingFile(index)}
+                                                        className="shrink-0 rounded border border-red-200 px-2 py-1 text-[11px] font-semibold text-red-700 hover:bg-red-50"
+                                                    >
+                                                        Remove
+                                                    </button>
+                                                </li>
+                                            ))
+                                        )}
+                                    </ul>
+                                </div>
                             </div>
                         </div>
                     </StepCard>
@@ -324,13 +648,31 @@ export default function DisclosureCreate({ eligibleSources }: Props) {
 
                             <div className="mt-4 grid gap-3 md:grid-cols-2">
                                 <PreviewList
-                                    title="Main File"
-                                    items={form.data.main_file ? [form.data.main_file.name] : ['No main file selected']}
+                                    title="Primary Disclosure Report"
+                                    items={[
+                                        form.data.main_file
+                                            ? `Custom Replacement: ${form.data.main_file.name}`
+                                            : '⚡ Auto-Generated Official Disclosure Package (PDF with LGU Letterhead & Digital Seal)'
+                                    ]}
                                 />
                                 <PreviewList
-                                    title="Supporting Attachments"
-                                    items={form.data.supporting_files.length > 0 ? form.data.supporting_files.map((file) => file.name) : ['No attachments selected']}
+                                    title={`Procurement Unit Registry Attachments (${form.data.procurement_document_ids.length})`}
+                                    items={
+                                        form.data.procurement_document_ids.length > 0
+                                            ? availableProcurementDocs
+                                                .filter((doc) => form.data.procurement_document_ids.includes(doc.document_id))
+                                                .map((doc) => `${doc.title} (${doc.file_name})`)
+                                            : ['No procurement registry attachments selected']
+                                    }
                                 />
+                                {form.data.supporting_files.length > 0 && (
+                                    <div className="md:col-span-2">
+                                        <PreviewList
+                                            title={`Additional Municipal Attachments (${form.data.supporting_files.length})`}
+                                            items={form.data.supporting_files.map((file) => file.name)}
+                                        />
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </StepCard>
@@ -441,7 +783,3 @@ function formatTypeLabel(value: string): string {
         .replaceAll('_', ' ')
         .replace(/\b\w/g, (char) => char.toUpperCase());
 }
-
-
-
-

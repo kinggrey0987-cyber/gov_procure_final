@@ -55,8 +55,12 @@ class PublicDisclosureController
         $user = Auth::user();
         abort_unless($user && $user->can('public-disclosure.manage'), 403);
 
+        $eligibleSources = $this->eligibilityService->listEligibleRecords();
+        $procurementDocumentsBySource = $this->packageService->availableProcurementDocumentsForEligibleSources($eligibleSources);
+
         return Inertia::render('Executive/Disclosures/Create', [
-            'eligibleSources' => $this->eligibilityService->listEligibleRecords(),
+            'eligibleSources' => $eligibleSources,
+            'procurementDocumentsBySource' => $procurementDocumentsBySource,
         ]);
     }
 
@@ -79,6 +83,7 @@ class PublicDisclosureController
         abort_unless($user && $user->can('public-disclosure.manage'), 403);
 
         $payload = $request->validated();
+        $isPublishRequested = strtoupper((string) ($payload['status'] ?? 'DRAFT')) === 'PUBLISHED';
 
         if ($request->hasFile('main_file')) {
             /** @var UploadedFile $mainFile */
@@ -87,8 +92,17 @@ class PublicDisclosureController
             $payload['file_path'] = $this->storeUploadedFileSafely($mainFile, 'public_disclosures', $storedFileName);
         }
 
+        // Always create as DRAFT first so selected procurement documents and attachments can be copied
+        $payload['status'] = 'DRAFT';
         $disclosure = $this->disclosureService->createFromPayload($user, $payload);
 
+        // Attach selected procurement documents strictly belonging to this referenced source record
+        $procurementDocIds = $request->input('procurement_document_ids', []);
+        if (is_array($procurementDocIds) && count($procurementDocIds) > 0) {
+            $this->packageService->attachProcurementDocuments($disclosure, $user, array_map('intval', $procurementDocIds));
+        }
+
+        // Upload any extra municipal supporting files
         $supportingFiles = $request->file('supporting_files', []);
         foreach ($supportingFiles as $supportingFile) {
             if (! $supportingFile instanceof UploadedFile) {
@@ -101,12 +115,20 @@ class PublicDisclosureController
             ]);
         }
 
-        if (! $request->hasFile('main_file') && count($supportingFiles) === 0) {
+        // If user requested immediate publishing, publish now (which generates the official certified package PDF)
+        if ($isPublishRequested) {
+            $disclosure = $this->disclosureService->publish(
+                disclosure: $disclosure,
+                actor: $user,
+                remarks: $payload['remarks'] ?? null,
+            );
+        } elseif (! $request->hasFile('main_file')) {
+            // In draft mode without custom main file, ensure the official package PDF exists so user can preview it
             $this->packageService->ensureOfficialPackageAttachment($disclosure, $user);
         }
 
         return Redirect::route('executive.disclosures.show', $disclosure->disclosure_id)
-            ->with('success', (string) $disclosure->status === 'PUBLISHED' ? 'Disclosure published successfully.' : 'Disclosure draft created successfully.');
+            ->with('success', (string) $disclosure->status === 'PUBLISHED' ? 'Disclosure published successfully with selected attachments.' : 'Disclosure draft created successfully with selected attachments.');
     }
 
     public function update(UpdatePublicDisclosureRequest $request, PublicDisclosure $public_disclosure): RedirectResponse
