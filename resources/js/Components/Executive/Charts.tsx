@@ -595,6 +595,190 @@ function CompactTrendBars({
     );
 }
 
+export type SpendPoint = {
+    label: string;
+    value: number;
+    orderCount?: number;
+    rawMonth?: string;
+};
+
+export function SpendTrendBarChart({
+    data,
+    emptyText = 'No expenditure data in current filter scope',
+    currencySymbol = '₱',
+}: {
+    data: SpendPoint[];
+    emptyText?: string;
+    currencySymbol?: string;
+}) {
+    if (!data || data.length === 0) {
+        return <EmptyState text={emptyText} />;
+    }
+
+    const totalSpend = data.reduce((sum, item) => sum + item.value, 0);
+    const totalOrders = data.reduce((sum, item) => sum + (item.orderCount ?? 0), 0);
+    const max = Math.max(...data.map((item) => item.value), 1);
+    const average = totalSpend / data.length;
+    const peak = [...data].sort((a, b) => b.value - a.value)[0];
+
+    const formatShort = (val: number): string => {
+        if (val >= 1_000_000) return `${currencySymbol}${(val / 1_000_000).toFixed(1)}M`;
+        if (val >= 1_000) return `${currencySymbol}${(val / 1_000).toFixed(1)}k`;
+        return `${currencySymbol}${val.toLocaleString('en-PH', { maximumFractionDigits: 0 })}`;
+    };
+
+    const formatFull = (val: number): string => {
+        return `${currencySymbol}${val.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    };
+
+    const width = Math.max(680, data.length * 75 + 100);
+    const height = 250;
+    const paddingLeft = 65;
+    const paddingRight = 30;
+    const chartTop = 32;
+    const chartBottom = 195;
+    const plotWidth = width - paddingLeft - paddingRight;
+    const plotHeight = chartBottom - chartTop;
+
+    const groupWidth = plotWidth / data.length;
+    const barWidth = Math.max(16, Math.min(36, groupWidth * 0.45));
+
+    const ySteps = [1, 0.75, 0.5, 0.25, 0];
+
+    return (
+        <div className="space-y-4">
+            {/* Executive Spend KPI Header */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 rounded-xl border border-red-100 bg-gradient-to-r from-red-50/70 via-white to-slate-50 p-3 text-xs shadow-sm">
+                <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Expenditure</p>
+                    <p className="mt-0.5 text-sm font-extrabold text-red-900">{formatFull(totalSpend)}</p>
+                </div>
+                <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Peak Period</p>
+                    <p className="mt-0.5 text-sm font-extrabold text-slate-900 truncate" title={`${peak?.label}: ${formatFull(peak?.value ?? 0)}`}>
+                        {peak?.label ?? '—'} <span className="text-xs font-semibold text-red-700">({formatShort(peak?.value ?? 0)})</span>
+                    </p>
+                </div>
+                <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Monthly Average</p>
+                    <p className="mt-0.5 text-sm font-extrabold text-slate-900">{formatFull(average)}</p>
+                </div>
+                <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Orders Processed</p>
+                    <p className="mt-0.5 text-sm font-extrabold text-slate-900">{totalOrders} <span className="text-[11px] font-medium text-slate-500">POs</span></p>
+                </div>
+            </div>
+
+            {/* SVG Bar Chart */}
+            <div className="overflow-x-auto">
+                <svg viewBox={`0 0 ${width} ${height}`} className="h-60 w-full min-w-[560px]">
+                    <defs>
+                        <linearGradient id="spendBarGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="rgb(220 38 38)" />
+                            <stop offset="100%" stopColor="rgb(185 28 28)" />
+                        </linearGradient>
+                        <linearGradient id="peakBarGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="rgb(239 68 68)" />
+                            <stop offset="100%" stopColor="rgb(153 27 27)" />
+                        </linearGradient>
+                        <filter id="spendBarShadow" x="-10%" y="-10%" width="120%" height="120%">
+                            <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="rgb(185 28 28)" floodOpacity="0.2" />
+                        </filter>
+                    </defs>
+
+                    {/* Y-Axis Guidelines & Labels */}
+                    {ySteps.map((ratio) => {
+                        const y = chartBottom - ratio * plotHeight;
+                        const val = ratio * max;
+                        return (
+                            <g key={ratio}>
+                                <line
+                                    x1={paddingLeft}
+                                    y1={y}
+                                    x2={width - paddingRight}
+                                    y2={y}
+                                    stroke={ratio === 0 ? 'rgb(203 213 225)' : 'rgb(241 245 249)'}
+                                    strokeWidth={ratio === 0 ? '1.5' : '1'}
+                                    strokeDasharray={ratio === 0 ? undefined : '4 4'}
+                                />
+                                <text
+                                    x={paddingLeft - 8}
+                                    y={y + 3}
+                                    textAnchor="end"
+                                    className="fill-slate-400 text-[10px] font-semibold"
+                                >
+                                    {formatShort(val)}
+                                </text>
+                            </g>
+                        );
+                    })}
+
+                    {/* Bars and Month Labels */}
+                    {data.map((item, index) => {
+                        const x = paddingLeft + index * groupWidth + (groupWidth - barWidth) / 2;
+                        const barHeight = Math.max((item.value / max) * plotHeight, item.value > 0 ? 4 : 0);
+                        const y = chartBottom - barHeight;
+                        const isPeak = item.value === peak?.value && item.value > 0;
+
+                        return (
+                            <g key={item.label} className="group cursor-pointer">
+                                {/* Bar */}
+                                <rect
+                                    x={x}
+                                    y={y}
+                                    width={barWidth}
+                                    height={barHeight}
+                                    rx="4"
+                                    fill={isPeak ? 'url(#peakBarGradient)' : 'url(#spendBarGradient)'}
+                                    filter="url(#spendBarShadow)"
+                                    className="transition-all duration-300 group-hover:opacity-85"
+                                />
+
+                                {/* Value label above bar */}
+                                {barHeight > 14 ? (
+                                    <text
+                                        x={x + barWidth / 2}
+                                        y={y - 6}
+                                        textAnchor="middle"
+                                        className="fill-slate-700 text-[10px] font-bold"
+                                    >
+                                        {formatShort(item.value)}
+                                    </text>
+                                ) : null}
+
+                                {/* Month label on X axis */}
+                                <text
+                                    x={x + barWidth / 2}
+                                    y={chartBottom + 16}
+                                    textAnchor="middle"
+                                    className={`text-[10px] font-semibold ${isPeak ? 'fill-red-800 font-bold' : 'fill-slate-600'}`}
+                                >
+                                    {item.label}
+                                </text>
+
+                                {/* Order Count Badge below Month */}
+                                {item.orderCount !== undefined ? (
+                                    <text
+                                        x={x + barWidth / 2}
+                                        y={chartBottom + 28}
+                                        textAnchor="middle"
+                                        className="fill-slate-400 text-[9px] font-medium"
+                                    >
+                                        {item.orderCount} PO{item.orderCount === 1 ? '' : 's'}
+                                    </text>
+                                ) : null}
+
+                                <title>{`${item.label}: ${formatFull(item.value)} (${item.orderCount ?? 0} orders)`}</title>
+                            </g>
+                        );
+                    })}
+                </svg>
+            </div>
+        </div>
+    );
+}
+
+
 
 
 

@@ -1,4 +1,4 @@
-import { DonutChart, ExecutiveChartCard, HorizontalBarChart, TrendGroupedBarChart } from '@/Components/Executive/Charts';
+import { DonutChart, ExecutiveChartCard, HorizontalBarChart, SpendPoint, SpendTrendBarChart, TrendGroupedBarChart } from '@/Components/Executive/Charts';
 import { GovDocumentPage, GovDocumentMetadata } from '@/Components/Executive/GovDocumentLayout';
 import MonthFilterSelect from '@/Components/MonthFilterSelect';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
@@ -90,6 +90,7 @@ type Props = {
     monthly_trends: {
         purchase_requests: TrendRow[];
         purchase_orders: TrendRow[];
+        spending?: Array<{ month: string; total: number; order_count?: number }>;
     };
     office_comparison: Array<{
         office_id: number;
@@ -97,6 +98,7 @@ type Props = {
         purchase_request_count: number;
         purchase_order_count: number;
         purchase_order_total_amount: number;
+        spending_share_percentage?: number;
     }>;
     recent: {
         purchase_requests: PurchaseRequestRow[];
@@ -186,6 +188,30 @@ export default function ProcurementAnalyticsIndex({
         });
     }, [activeFilters, activeFiltersKey, currentFiltersKey]);
 
+    const [trendView, setTrendView] = useState<'spending' | 'volume'>('spending');
+
+    const spendTrendPoints: SpendPoint[] = useMemo(() => {
+        if (monthly_trends.spending && monthly_trends.spending.length > 0) {
+            return monthly_trends.spending.map((row) => ({
+                label: formatMonth(row.month),
+                value: row.total,
+                orderCount: row.order_count,
+                rawMonth: row.month,
+            }));
+        }
+        return [];
+    }, [monthly_trends.spending]);
+
+    const totalProcurementSpend = useMemo(
+        () => office_comparison.reduce((sum, o) => sum + o.purchase_order_total_amount, 0),
+        [office_comparison],
+    );
+
+    const maxOfficeSpend = useMemo(
+        () => Math.max(...office_comparison.map((o) => o.purchase_order_total_amount), 1),
+        [office_comparison],
+    );
+
     const monthlyMerged = mergeTrend(monthly_trends.purchase_requests, monthly_trends.purchase_orders);
     const officeValueBreakdown = office_comparison
         .map((row) => ({
@@ -214,8 +240,22 @@ export default function ProcurementAnalyticsIndex({
             ['purchase_order_total_amount', String(totals.purchase_order_total_amount)],
             ['active_offices', String(crossOfficeActivity)],
             [''],
-            ['office', 'po_amount'],
-            ...officeValueBreakdown.map((row) => [row.label, String(row.value)]),
+            ['rank', 'office', 'po_amount', 'spending_share_percent', 'po_count', 'pr_count'],
+            ...office_comparison.map((row, idx) => [
+                String(idx + 1),
+                row.office_name,
+                String(row.purchase_order_total_amount),
+                String(row.spending_share_percentage ?? ''),
+                String(row.purchase_order_count),
+                String(row.purchase_request_count),
+            ]),
+            [''],
+            ['month', 'procurement_spend_php', 'po_count'],
+            ...spendTrendPoints.map((row) => [
+                row.label,
+                String(row.value),
+                String(row.orderCount ?? 0),
+            ]),
         ];
 
         downloadCsv(lines, 'procurement-insights.csv');
@@ -356,49 +396,159 @@ export default function ProcurementAnalyticsIndex({
                 </div>
 
                 <div className="grid gap-6 xl:grid-cols-12">
-                    <div className="xl:col-span-8">
+                    {/* Prioritized Procurement Spending Concentration */}
+                    <div className="xl:col-span-6">
                         <ExecutiveChartCard
-                            title="PR vs PO Trend"
-                            subtitle="Monthly movement"
+                            title="Top Procurement Concentration"
+                            subtitle="Departmental budget utilization and expenditure ranking"
+                            eyebrow="Budget Priority"
                             tone="critical"
                         >
-                            <TrendGroupedBarChart
-                                data={monthlyMerged}
-                                firstLabel="Purchase Requests"
-                                secondLabel="Purchase Orders"
+                            {office_comparison.length === 0 ? (
+                                <p className="py-8 text-center text-sm text-slate-500">No office spending data in current filter scope</p>
+                            ) : (
+                                <div className="space-y-3">
+                                    {office_comparison.map((office, idx) => {
+                                        const percent = office.spending_share_percentage ?? (totalProcurementSpend > 0 ? Math.round((office.purchase_order_total_amount / totalProcurementSpend) * 100) : 0);
+                                        const barWidth = Math.max((office.purchase_order_total_amount / maxOfficeSpend) * 100, office.purchase_order_total_amount > 0 ? 6 : 0);
+
+                                        const gradients = [
+                                            'from-red-600 to-rose-500',
+                                            'from-amber-600 to-amber-500',
+                                            'from-indigo-600 to-blue-500',
+                                            'from-teal-600 to-emerald-500',
+                                            'from-purple-600 to-pink-500',
+                                            'from-slate-600 to-slate-500',
+                                        ];
+                                        const barGradient = gradients[idx % gradients.length];
+
+                                        const rankMedals = ['#1', '#2', '#3', '#4', '#5'];
+                                        const rankBadgeStyle = idx === 0
+                                            ? 'bg-amber-100 text-amber-900 border-amber-300 ring-1 ring-amber-200'
+                                            : idx === 1
+                                            ? 'bg-slate-100 text-slate-700 border-slate-300'
+                                            : idx === 2
+                                            ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                            : 'bg-slate-50 text-slate-600 border-slate-200';
+
+                                        return (
+                                            <div
+                                                key={office.office_id}
+                                                className="group rounded-xl border border-slate-200 bg-white p-3.5 transition hover:border-red-300 hover:shadow-sm"
+                                            >
+                                                <div className="flex flex-wrap items-start justify-between gap-2">
+                                                    <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                                                        <span className={`inline-flex items-center justify-center rounded-lg border px-2 py-0.5 text-xs font-black shrink-0 ${rankBadgeStyle}`}>
+                                                            {rankMedals[idx] ?? `#${idx + 1}`}
+                                                        </span>
+                                                        <div className="min-w-0">
+                                                            <h4 className="font-bold text-slate-900 group-hover:text-red-700 transition leading-snug break-words">
+                                                                {office.office_name}
+                                                            </h4>
+                                                            <p className="mt-0.5 text-xs text-slate-500 flex items-center gap-2">
+                                                                <span>{office.purchase_order_count} POs</span>
+                                                                <span className="text-slate-300">·</span>
+                                                                <span>{office.purchase_request_count} PRs</span>
+                                                            </p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="text-right shrink-0">
+                                                        <p className="text-base font-extrabold text-slate-900">
+                                                            {formatCurrency(office.purchase_order_total_amount)}
+                                                        </p>
+                                                        <span className="inline-flex items-center rounded-full bg-red-50 border border-red-200 px-2 py-0.5 text-[11px] font-bold text-red-700 mt-0.5">
+                                                            {percent}% of spend
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                                                    <div
+                                                        className={`h-full rounded-full bg-gradient-to-r ${barGradient} transition-all duration-700`}
+                                                        style={{ width: `${barWidth}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </ExecutiveChartCard>
+                    </div>
+
+                    {/* Dedicated Procurement Spending & Velocity Trend */}
+                    <div className="xl:col-span-6">
+                        <ExecutiveChartCard
+                            title={trendView === 'spending' ? 'Procurement Spending Trend' : 'PR vs PO Movement Trend'}
+                            subtitle={
+                                trendView === 'spending'
+                                    ? 'Monthly financial procurement expenditure across fiscal periods'
+                                    : 'Monthly document requisition and order fulfillment velocity'
+                            }
+                            eyebrow={trendView === 'spending' ? 'Financial Signal' : 'Operational Signal'}
+                            tone="default"
+                            action={
+                                <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-xs font-semibold">
+                                    <button
+                                        type="button"
+                                        onClick={() => setTrendView('spending')}
+                                        className={`rounded-md px-2.5 py-1 transition ${
+                                            trendView === 'spending'
+                                                ? 'bg-white text-red-700 shadow-sm font-bold'
+                                                : 'text-slate-600 hover:text-slate-900'
+                                        }`}
+                                    >
+                                        ₱ Expenditure (PHP)
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setTrendView('volume')}
+                                        className={`rounded-md px-2.5 py-1 transition ${
+                                            trendView === 'volume'
+                                                ? 'bg-white text-red-700 shadow-sm font-bold'
+                                                : 'text-slate-600 hover:text-slate-900'
+                                        }`}
+                                    >
+                                        📊 Document Volume
+                                    </button>
+                                </div>
+                            }
+                        >
+                            {trendView === 'spending' ? (
+                                <SpendTrendBarChart
+                                    data={spendTrendPoints}
+                                    emptyText="No procurement expenditure recorded in current filter scope"
+                                />
+                            ) : (
+                                <TrendGroupedBarChart
+                                    data={monthlyMerged}
+                                    firstLabel="Purchase Requests"
+                                    secondLabel="Purchase Orders"
+                                    emptyText="No data in current filter scope"
+                                />
+                            )}
+                        </ExecutiveChartCard>
+                    </div>
+
+                    <div className="xl:col-span-6">
+                        <ExecutiveChartCard title="PR Status Mix" subtitle="Request lifecycle" tone="default">
+                            <DonutChart
+                                data={statusMixPr}
+                                centerLabel="PR"
                                 emptyText="No data in current filter scope"
                             />
                         </ExecutiveChartCard>
                     </div>
 
-                    <div className="xl:col-span-4">
-                    <ExecutiveChartCard title="Top Procurement Concentration" subtitle="Office spending ranking" tone="neutral">
-                        <HorizontalBarChart
-                            data={officeValueBreakdown}
-                            valueFormatter={formatCurrency}
-                            emptyText="No data in current filter scope"
-                        />
-                    </ExecutiveChartCard>
-                    </div>
-
                     <div className="xl:col-span-6">
-                    <ExecutiveChartCard title="PR Status Mix" subtitle="Request lifecycle" tone="default">
-                        <DonutChart
-                            data={statusMixPr}
-                            centerLabel="PR"
-                            emptyText="No data in current filter scope"
-                        />
-                    </ExecutiveChartCard>
-                    </div>
-
-                    <div className="xl:col-span-6">
-                    <ExecutiveChartCard title="PO Status Mix" subtitle="Order progression" tone="default">
-                        <DonutChart
-                            data={statusMixPo}
-                            centerLabel="PO"
-                            emptyText="No data in current filter scope"
-                        />
-                    </ExecutiveChartCard>
+                        <ExecutiveChartCard title="PO Status Mix" subtitle="Order progression" tone="default">
+                            <DonutChart
+                                data={statusMixPo}
+                                centerLabel="PO"
+                                emptyText="No data in current filter scope"
+                            />
+                        </ExecutiveChartCard>
                     </div>
                 </div>
 
@@ -485,25 +635,35 @@ export default function ProcurementAnalyticsIndex({
                         <div className="grid grid-cols-2 gap-4">
                             <section className="rounded-lg border border-slate-300 bg-white p-3.5">
                                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2.5">
-                                    PR vs PO Monthly Volume Trend
+                                    Monthly Procurement Expenditure Trend
                                 </h3>
-                                <TrendGroupedBarChart
-                                    data={monthlyMerged}
-                                    firstLabel="Purchase Requests"
-                                    secondLabel="Purchase Orders"
+                                <SpendTrendBarChart
+                                    data={spendTrendPoints}
                                     emptyText="No data in current filter scope"
                                 />
                             </section>
 
                             <section className="rounded-lg border border-slate-300 bg-white p-3.5">
                                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2.5">
-                                    Office Procurement Spending Ranking
+                                    Office Procurement Spending Concentration
                                 </h3>
-                                <HorizontalBarChart
-                                    data={officeValueBreakdown}
-                                    valueFormatter={formatCurrency}
-                                    emptyText="No data in current filter scope"
-                                />
+                                <div className="space-y-2">
+                                    {office_comparison.map((office, idx) => {
+                                        const percent = office.spending_share_percentage ?? (totalProcurementSpend > 0 ? Math.round((office.purchase_order_total_amount / totalProcurementSpend) * 100) : 0);
+                                        const barWidth = Math.max((office.purchase_order_total_amount / maxOfficeSpend) * 100, office.purchase_order_total_amount > 0 ? 6 : 0);
+                                        return (
+                                            <div key={office.office_id} className="text-[11px] border-b border-slate-100 pb-1.5 last:border-b-0">
+                                                <div className="flex justify-between font-semibold">
+                                                    <span className="text-slate-800">#{idx + 1} {office.office_name}</span>
+                                                    <span className="text-slate-900">{formatCurrency(office.purchase_order_total_amount)} ({percent}%)</span>
+                                                </div>
+                                                <div className="mt-1 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                                                    <div className="h-full bg-red-600 rounded-full" style={{ width: `${barWidth}%` }} />
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </section>
                         </div>
                     </GovDocumentPage>

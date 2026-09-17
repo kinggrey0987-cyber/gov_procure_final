@@ -61,6 +61,7 @@ class ExecutiveMonitoringService
                     'monthly_trends' => [
                         'purchase_requests' => $this->buildMonthlyTrend(PurchaseRequest::query()->get(['created_at'])),
                         'purchase_orders' => $this->buildMonthlyTrend(PurchaseOrder::query()->get(['created_at'])),
+                        'spending' => $this->buildMonthlySpendTrend(PurchaseOrder::query()->get(['created_at', 'total_amount'])),
                     ],
                 ],
                 'transparency' => [
@@ -325,6 +326,7 @@ class ExecutiveMonitoringService
             'monthly_trends' => [
                 'purchase_requests' => $this->buildMonthlyTrend((clone $purchaseRequestBase)->get(['created_at'])),
                 'purchase_orders' => $this->buildMonthlyTrend((clone $purchaseOrderBase)->get(['created_at'])),
+                'spending' => $this->buildMonthlySpendTrend((clone $purchaseOrderBase)->get(['created_at', 'total_amount'])),
             ],
             'office_comparison' => $this->buildProcurementOfficeComparison($purchaseRequestBase, $purchaseOrderBase),
             'recent' => [
@@ -837,6 +839,23 @@ class ExecutiveMonitoringService
      * @param  Collection<int, mixed>  $rows
      * @return Collection<int, array<string, mixed>>
      */
+    private function buildMonthlySpendTrend(Collection $rows): Collection
+    {
+        return $rows
+            ->groupBy(static fn ($row) => Carbon::parse($row->created_at)->format('Y-m'))
+            ->map(static fn (Collection $group, string $month) => [
+                'month' => $month,
+                'total' => (float) $group->sum(static fn ($row) => (float) ($row->total_amount ?? 0)),
+                'order_count' => $group->count(),
+            ])
+            ->sortBy('month')
+            ->values();
+    }
+
+    /**
+     * @param  Collection<int, mixed>  $rows
+     * @return Collection<int, array<string, mixed>>
+     */
     private function buildMonthlyTrendByColumn(Collection $rows, string $column): Collection
     {
         return $rows
@@ -908,7 +927,7 @@ class ExecutiveMonitoringService
             ->get()
             ->keyBy('office_id');
 
-        return Office::query()
+        $rows = Office::query()
             ->select(['id', 'name'])
             ->orderBy('name')
             ->get()
@@ -924,6 +943,18 @@ class ExecutiveMonitoringService
                 ];
             })
             ->filter(static fn (array $row): bool => ($row['purchase_request_count'] + $row['purchase_order_count']) > 0)
+            ->values();
+
+        $totalSpend = (float) $rows->sum('purchase_order_total_amount');
+
+        return $rows
+            ->map(static function (array $row) use ($totalSpend): array {
+                $amount = (float) ($row['purchase_order_total_amount'] ?? 0);
+                $row['spending_share_percentage'] = $totalSpend > 0 ? round(($amount / $totalSpend) * 100, 1) : 0.0;
+
+                return $row;
+            })
+            ->sortByDesc('purchase_order_total_amount')
             ->values();
     }
 
