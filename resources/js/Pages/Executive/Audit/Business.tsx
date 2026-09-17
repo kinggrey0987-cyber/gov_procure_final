@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { HorizontalBarChart } from '@/Components/Executive/Charts';
+import { ExecutiveChartCard, HorizontalBarChart } from '@/Components/Executive/Charts';
 import { GovDocumentPage, GovDocumentMetadata } from '@/Components/Executive/GovDocumentLayout';
 import PaginationNav from '@/Components/PaginationNav';
 import { downloadSectionAsPdfById } from '@/lib/printSection';
@@ -214,40 +214,74 @@ export default function BusinessAudit({ auditLogs, auditLogsExport, filters, ana
     };
 
     return (
-        <AuthenticatedLayout header="Governance Logs">
+        <AuthenticatedLayout
+            header="Governance Logs"
+            headerActions={
+                <div className="print-hide flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={exportPdf}
+                        disabled={isExportingPdf}
+                        className="inline-flex h-8 items-center rounded-lg border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 shadow-sm transition"
+                    >
+                        <svg className="mr-1.5 h-3.5 w-3.5 text-red-600" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                        </svg>
+                        {isExportingPdf ? 'Generating PDF...' : 'Export PDF'}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={exportCsv}
+                        className="inline-flex h-8 items-center rounded-lg bg-red-600 px-3 text-xs font-semibold text-white hover:bg-red-700 shadow-sm transition"
+                    >
+                        <svg className="mr-1.5 h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                        Export CSV
+                    </button>
+                </div>
+            }
+        >
             <Head title="Governance Logs" />
-            <div id={printSectionId} className="space-y-6 py-8">
-                <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-200 bg-white px-5 py-4 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
-                    <div>
-                        <h2 className="text-2xl font-semibold text-slate-900">Governance Logs</h2>
-                        <p className="text-sm text-slate-600">Evidence-first business activity tracking for executive oversight.</p>
-                    </div>
-                    <div className="print-hide flex items-center gap-2">
-                        <button
-                            type="button"
-                            onClick={exportPdf}
-                            disabled={isExportingPdf}
-                            className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {isExportingPdf ? 'Generating PDF...' : 'Export PDF'}
-                        </button>
-                        <button type="button" onClick={exportCsv} className="rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white hover:bg-red-800">
-                            Export CSV
-                        </button>
+            <div id={printSectionId} className="space-y-3.5">
+                {/* Slim Telemetry Strip */}
+                <section className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+                        <div className="flex items-center gap-2.5 px-3 py-1">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-red-600" />
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Events in Scope</p>
+                                <p className="text-lg font-extrabold text-slate-900 leading-tight">{totalEvents}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2.5 px-3 py-1">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-indigo-600" />
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-indigo-700">Modules Involved</p>
+                                <p className="text-lg font-extrabold text-indigo-900 leading-tight">{activeModules}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2.5 px-3 py-1">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-600" />
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">Action Types</p>
+                                <p className="text-lg font-extrabold text-emerald-900 leading-tight">{activeActions}</p>
+                            </div>
+                        </div>
                     </div>
                 </section>
 
-                <section className="rounded-2xl border border-red-200 bg-white p-5 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
-                    <div className="flex flex-wrap items-end gap-3">
-                        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                            <select className="h-10 rounded-lg border-slate-300 text-sm" value={form.module_name} onChange={(e) => setForm((v) => ({ ...v, module_name: e.target.value }))}>
+                <section className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="grid min-w-0 flex-1 gap-2 grid-cols-1 sm:grid-cols-2 xl:grid-cols-5">
+                            <select className="h-8 rounded-lg border-slate-300 px-2 text-xs shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500" value={form.module_name} onChange={(e) => setForm((v) => ({ ...v, module_name: e.target.value }))}>
                                 <option value="">All modules</option>
                                 {filter_options.modules.map((moduleName) => (
                                     <option key={moduleName} value={moduleName}>{formatModuleLabel(moduleName)}</option>
                                 ))}
                             </select>
 
-                            <select className="h-10 rounded-lg border-slate-300 text-sm" value={form.action_type} onChange={(e) => setForm((v) => ({ ...v, action_type: e.target.value }))}>
+                            <select className="h-8 rounded-lg border-slate-300 px-2 text-xs shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500" value={form.action_type} onChange={(e) => setForm((v) => ({ ...v, action_type: e.target.value }))}>
                                 <option value="">All actions</option>
                                 {filter_options.actions.map((actionName) => (
                                     <option key={actionName} value={actionName}>{formatActionLabel(actionName)}</option>
@@ -256,7 +290,7 @@ export default function BusinessAudit({ auditLogs, auditLogsExport, filters, ana
 
                             <input
                                 list="governance-users"
-                                className="h-10 rounded-lg border-slate-300 text-sm"
+                                className="h-8 rounded-lg border-slate-300 px-2.5 text-xs shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                                 placeholder="Search user"
                                 value={form.user_query}
                                 onChange={(e) => setForm((v) => ({ ...v, user_query: e.target.value }))}
@@ -268,7 +302,7 @@ export default function BusinessAudit({ auditLogs, auditLogsExport, filters, ana
                             </datalist>
 
                             <select
-                                className="h-10 rounded-lg border-slate-300 text-sm xl:col-span-2"
+                                className="h-8 rounded-lg border-slate-300 px-2 text-xs shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 xl:col-span-2"
                                 value={resolveDateRangeKey(form.from_date, form.to_date)}
                                 onChange={(event) => updateDateRange(event.target.value)}
                             >
@@ -286,7 +320,7 @@ export default function BusinessAudit({ auditLogs, auditLogsExport, filters, ana
                             <button
                                 type="button"
                                 onClick={() => router.get(route('executive.audit.business'))}
-                                className="h-10 rounded-lg border border-red-300 px-4 text-sm font-semibold text-red-700 hover:bg-red-50"
+                                className="h-8 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
                             >
                                 Reset
                             </button>
@@ -294,34 +328,28 @@ export default function BusinessAudit({ auditLogs, auditLogsExport, filters, ana
                     </div>
                 </section>
 
-                <div className="grid gap-4 sm:grid-cols-3">
-                    <KpiCard label="Events in Scope" value={totalEvents} />
-                    <KpiCard label="Modules Involved" value={activeModules} />
-                    <KpiCard label="Action Types" value={activeActions} />
-                </div>
+                <div className="grid gap-4 xl:grid-cols-2">
+                    <ExecutiveChartCard
+                        title="Module Summary"
+                        subtitle="Most active governance modules in current filters"
+                        tone="neutral"
+                    >
+                        <HorizontalBarChart
+                            data={moduleSummary}
+                            emptyText="No data in current filter scope"
+                        />
+                    </ExecutiveChartCard>
 
-                <div className="grid gap-6 xl:grid-cols-2">
-                    <section className="rounded-2xl border border-red-100 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-                        <h3 className="text-base font-semibold text-slate-900">Module Summary</h3>
-                        <p className="mt-1 text-sm text-slate-600">Most active governance modules in current filters.</p>
-                        <div className="mt-4">
-                            <HorizontalBarChart
-                                data={moduleSummary}
-                                emptyText="No data in current filter scope"
-                            />
-                        </div>
-                    </section>
-
-                    <section className="rounded-2xl border border-red-100 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-                        <h3 className="text-base font-semibold text-slate-900">Action Summary</h3>
-                        <p className="mt-1 text-sm text-slate-600">Most common governance actions in current filters.</p>
-                        <div className="mt-4">
-                            <HorizontalBarChart
-                                data={actionSummary}
-                                emptyText="No data in current filter scope"
-                            />
-                        </div>
-                    </section>
+                    <ExecutiveChartCard
+                        title="Action Summary"
+                        subtitle="Most common governance actions in current filters"
+                        tone="critical"
+                    >
+                        <HorizontalBarChart
+                            data={actionSummary}
+                            emptyText="No data in current filter scope"
+                        />
+                    </ExecutiveChartCard>
                 </div>
 
                 <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">

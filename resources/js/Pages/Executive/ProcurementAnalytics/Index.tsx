@@ -335,11 +335,11 @@ export default function ProcurementAnalyticsIndex({
 
             <div id={printSectionId} className="space-y-4">
 
-                <section className="rounded-2xl border border-red-200 bg-white p-5 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
-                    <div className="flex flex-wrap items-end gap-3">
-                        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                        <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
                             <select
-                                className="h-10 rounded-lg border-slate-300 text-sm"
+                                className="h-8 rounded-lg border-slate-300 text-xs shadow-sm focus:border-red-500 focus:ring-1 focus:ring-red-500"
                                 value={form.office_id}
                                 onChange={(event) => setForm((current) => ({ ...current, office_id: event.target.value, records_page: '' }))}
                             >
@@ -352,7 +352,7 @@ export default function ProcurementAnalyticsIndex({
                             </select>
 
                             <select
-                                className="h-10 rounded-lg border-slate-300 text-sm"
+                                className="h-8 rounded-lg border-slate-300 text-xs shadow-sm focus:border-red-500 focus:ring-1 focus:ring-red-500"
                                 value={form.status}
                                 onChange={(event) => setForm((current) => ({ ...current, status: event.target.value, records_page: '' }))}
                             >
@@ -365,7 +365,7 @@ export default function ProcurementAnalyticsIndex({
                             </select>
 
                             <MonthFilterSelect
-                                className="h-10 rounded-lg border-slate-300 text-sm"
+                                className="h-8 rounded-lg border-slate-300 text-xs shadow-sm focus:border-red-500 focus:ring-1 focus:ring-red-500"
                                 month={form.month}
                                 year={form.year}
                                 yearOptions={filter_options.years}
@@ -374,7 +374,7 @@ export default function ProcurementAnalyticsIndex({
                             />
 
                             <select
-                                className="h-10 rounded-lg border-slate-300 text-sm"
+                                className="h-8 rounded-lg border-slate-300 text-xs shadow-sm focus:border-red-500 focus:ring-1 focus:ring-red-500"
                                 value={form.record_type}
                                 onChange={(event) => setForm((current) => ({ ...current, record_type: event.target.value as 'all' | 'pr' | 'po', records_page: '' }))}
                             >
@@ -388,7 +388,7 @@ export default function ProcurementAnalyticsIndex({
                             <button
                                 type="button"
                                 onClick={() => router.get(route('executive.procurement-analytics'))}
-                                className="h-10 rounded-lg border border-red-300 px-4 text-sm font-semibold text-red-700 transition hover:border-red-500 hover:bg-red-50"
+                                className="h-8 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                             >
                                 Reset
                             </button>
@@ -396,12 +396,39 @@ export default function ProcurementAnalyticsIndex({
                     </div>
                 </section>
 
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <Card label="Filtered PR Records" value={totals.purchase_request_count} tone="sky" />
-                    <Card label="Filtered PO Records" value={totals.purchase_order_count} tone="emerald" />
-                    <Card label="PO Total Amount" value={formatCurrency(totals.purchase_order_total_amount)} tone="amber" />
-                    <Card label="PR/PO Line Items" value={totals.purchase_request_item_count + totals.purchase_order_item_count} tone="sky" />
-                </div>
+                {/* Slim Executive Telemetry Strip */}
+                <section className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+                        <div className="flex items-center gap-2.5 px-3 py-1">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-red-600" />
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Filtered PRs</p>
+                                <p className="text-lg font-extrabold text-slate-900 leading-tight">{totals.purchase_request_count}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2.5 px-3 py-1">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-red-600" />
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Filtered POs</p>
+                                <p className="text-lg font-extrabold text-slate-900 leading-tight">{totals.purchase_order_count}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2.5 px-3 py-1">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-red-600" />
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Total Spend</p>
+                                <p className="text-lg font-extrabold text-slate-900 leading-tight truncate">{formatCurrency(totals.purchase_order_total_amount)}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2.5 px-3 py-1">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-red-600" />
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Line Items</p>
+                                <p className="text-lg font-extrabold text-slate-900 leading-tight">{totals.purchase_request_item_count + totals.purchase_order_item_count}</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
 
                 <div className="grid gap-6 xl:grid-cols-12">
                     {/* Prioritized Procurement Spending Concentration */}

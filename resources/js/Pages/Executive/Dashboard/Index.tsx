@@ -390,22 +390,110 @@ export default function ExecutiveDashboardIndex({
         >
             <Head title="Executive Dashboard" />
 
-            <div id={printSectionId} className="space-y-4">
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-                    <MetricCard label="Purchase Requests" value={procurement.purchase_request_count} helper="Office requests routed for procurement review" />
-                    <MetricCard label="Purchase Orders" value={procurement.purchase_order_count} helper="Issued and draft supplier-backed PO records" />
-                    <MetricCard label="Procurement Spend" value={formatCurrency(procurement.total_purchase_order_amount)} helper="Total value of seeded PO portfolio" />
-                    <MetricCard label="Active Anomalies" value={activeAnomalies} helper="Open or under-review risk signals" tone="risk" />
-                    <MetricCard label="Active Alerts" value={activeAlerts} helper="Executive attention queue" tone="warning" />
-                    <MetricCard label="Published Disclosures" value={transparency.published_disclosure_count} helper="Citizen-facing transparency records" tone="success" />
+            <div id={printSectionId} className="space-y-3.5">
+                {/* Slim Executive Telemetry Strip - Zero Truncation, High Density */}
+                <section className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+                        <div className="flex items-center gap-2.5 px-3 py-1">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-red-600" />
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Requests</p>
+                                <p className="text-lg font-extrabold text-slate-900 leading-tight">{procurement.purchase_request_count}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2.5 px-3 py-1">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-red-600" />
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Orders</p>
+                                <p className="text-lg font-extrabold text-slate-900 leading-tight">{procurement.purchase_order_count}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2.5 px-3 py-1">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-red-600" />
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Total Spend</p>
+                                <p className="text-lg font-extrabold text-slate-900 leading-tight truncate">{formatCurrency(procurement.total_purchase_order_amount)}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2.5 px-3 py-1">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-rose-600" />
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-rose-700">Anomalies</p>
+                                <p className="text-lg font-extrabold text-rose-700 leading-tight">{activeAnomalies}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2.5 px-3 py-1">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" />
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-700">Active Alerts</p>
+                                <p className="text-lg font-extrabold text-amber-700 leading-tight">{activeAlerts}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2.5 px-3 py-1">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-600" />
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">Disclosures</p>
+                                <p className="text-lg font-extrabold text-emerald-700 leading-tight">{transparency.published_disclosure_count}</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                {/* Executive Signal & Compliance Strip */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    <div className="flex items-center justify-between rounded-lg border border-red-200 bg-red-50/50 px-3 py-2 text-xs">
+                        <div className="flex items-center gap-2 min-w-0">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-red-600" />
+                            <p className="truncate text-slate-700">
+                                <span className="font-bold text-red-800">{highSeverityTotal} High-Severity</span> &bull; {activeAnomalies + activeAlerts} Risk Signals
+                            </p>
+                        </div>
+                        <Link
+                            href={route('executive.anomalies-monitoring')}
+                            className="shrink-0 ml-2 font-semibold text-red-700 hover:text-red-900 hover:underline"
+                        >
+                            Monitor &rarr;
+                        </Link>
+                    </div>
+
+                    <div className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50/50 px-3 py-2 text-xs">
+                        <div className="flex items-center gap-2 min-w-0">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-600" />
+                            <p className="truncate text-slate-700">
+                                <span className="font-bold text-emerald-800">{ppmpClearanceRate}% Cleared</span> &bull; {approvals.pending_ppmp_approvals} Pending Signoff
+                            </p>
+                        </div>
+                        <Link
+                            href={route('executive.ppmp-approvals.index')}
+                            className="shrink-0 ml-2 font-semibold text-emerald-700 hover:text-emerald-900 hover:underline"
+                        >
+                            PPMP &rarr;
+                        </Link>
+                    </div>
+
+                    <div className="flex items-center justify-between rounded-lg border border-sky-200 bg-sky-50/50 px-3 py-2 text-xs">
+                        <div className="flex items-center gap-2 min-w-0">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-sky-600" />
+                            <p className="truncate text-slate-700">
+                                <span className="font-bold text-sky-800">SGLG Compliant</span> &bull; {transparency.published_disclosure_count} Published ({transparency.draft_disclosure_count} Drafts)
+                            </p>
+                        </div>
+                        <Link
+                            href={route('executive.transparency-monitoring')}
+                            className="shrink-0 ml-2 font-semibold text-sky-700 hover:text-sky-900 hover:underline"
+                        >
+                            Portal &rarr;
+                        </Link>
+                    </div>
                 </div>
 
-                <div className="grid gap-6 xl:grid-cols-12">
-                    {/* Row 2: Trend & Velocity (8 cols) + PPMP Budget Clearance Gauge (4 cols) */}
-                    <div className="xl:col-span-8">
+                {/* Primary Visual Cockpit: Graphs Emphasized */}
+                <div className="grid gap-3.5 xl:grid-cols-12">
+                    {/* Row 1: Activity Trend (7 cols) + PPMP Budget Clearance Gauge (5 cols) */}
+                    <div className="xl:col-span-7">
                         <ExecutiveChartCard
                             title="Procurement Velocity & Trend"
-                            subtitle="Monthly requisition and purchase order movement across fiscal periods"
+                            subtitle="Requisition and purchase order movement across fiscal periods"
                             eyebrow="Activity Signal"
                             tone="critical"
                         >
@@ -434,7 +522,7 @@ export default function ExecutiveDashboardIndex({
                         </ExecutiveChartCard>
                     </div>
 
-                    <div className="xl:col-span-4">
+                    <div className="xl:col-span-5">
                         <ExecutiveChartCard
                             title="Annual PPMP & Budget Clearance"
                             subtitle="Departmental annual procurement plan clearance status"
@@ -449,10 +537,10 @@ export default function ExecutiveDashboardIndex({
                                 </Link>
                             }
                         >
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-4 rounded-xl border border-emerald-100 bg-emerald-50/40 p-4">
-                                    <div className="relative h-24 w-24 shrink-0">
-                                        <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
+                            <div className="space-y-3">
+                                <div className="flex items-center gap-3.5 rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
+                                    <div className="relative h-18 w-18 shrink-0">
+                                        <svg viewBox="0 0 100 100" className="h-18 w-18 -rotate-90">
                                             <circle
                                                 cx="50"
                                                 cy="50"
@@ -475,40 +563,36 @@ export default function ExecutiveDashboardIndex({
                                             />
                                         </svg>
                                         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                                            <span className="text-xl font-extrabold text-slate-900 leading-none">{ppmpClearanceRate}%</span>
-                                            <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 mt-0.5">Cleared</span>
+                                            <span className="text-lg font-extrabold text-slate-900 leading-none">{ppmpClearanceRate}%</span>
+                                            <span className="text-[8px] font-bold uppercase tracking-wider text-slate-500 mt-0.5">Cleared</span>
                                         </div>
                                     </div>
                                     <div className="min-w-0 flex-1">
-                                        <p className="text-xs font-bold uppercase tracking-wider text-emerald-800">
+                                        <p className="text-xs font-bold uppercase tracking-wider text-emerald-900">
                                             {approvals.ppmp_workflow_total} Municipal Submissions
                                         </p>
-                                        <p className="mt-1 text-xs text-slate-600 leading-relaxed">
+                                        <p className="mt-0.5 text-xs text-slate-600 leading-tight">
                                             {approvals.pending_ppmp_approvals === 0
-                                                ? 'All departmental annual procurement plans have been cleared for budget execution.'
-                                                : `${approvals.pending_ppmp_approvals} plan(s) currently awaiting executive authorization.`}
+                                                ? 'All departmental plans cleared for budget execution.'
+                                                : `${approvals.pending_ppmp_approvals} plan awaiting executive authorization.`}
                                         </p>
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-3 gap-2 text-center">
-                                    <div className="rounded-xl border border-emerald-200 bg-white p-2.5 shadow-sm">
-                                        <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Approved</p>
-                                        <p className="mt-0.5 text-base font-extrabold text-emerald-900">{approvals.recently_approved}</p>
-                                    </div>
-                                    <div className="rounded-xl border border-amber-200 bg-white p-2.5 shadow-sm">
-                                        <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Pending</p>
-                                        <p className="mt-0.5 text-base font-extrabold text-amber-900">{approvals.pending_ppmp_approvals}</p>
-                                    </div>
-                                    <div className="rounded-xl border border-rose-200 bg-white p-2.5 shadow-sm">
-                                        <p className="text-[10px] font-bold uppercase tracking-wider text-rose-700">Returned</p>
-                                        <p className="mt-0.5 text-base font-extrabold text-rose-900">{approvals.returned_for_revision}</p>
+                                        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] font-semibold">
+                                            <span className="rounded-md border border-emerald-200 bg-white px-2 py-0.5 text-emerald-800">
+                                                {approvals.recently_approved} Approved
+                                            </span>
+                                            <span className="rounded-md border border-amber-200 bg-white px-2 py-0.5 text-amber-800">
+                                                {approvals.pending_ppmp_approvals} Pending
+                                            </span>
+                                            <span className="rounded-md border border-rose-200 bg-white px-2 py-0.5 text-rose-800">
+                                                {approvals.returned_for_revision} Returned
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
 
                                 <Link
                                     href={route('executive.ppmp-approvals.index')}
-                                    className="inline-flex w-full items-center justify-center rounded-xl bg-slate-900 px-3.5 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800"
+                                    className="inline-flex w-full items-center justify-center rounded-xl bg-slate-900 py-2 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800"
                                 >
                                     Review PPMP Submissions &rarr;
                                 </Link>
@@ -516,89 +600,21 @@ export default function ExecutiveDashboardIndex({
                         </ExecutiveChartCard>
                     </div>
 
-                    {/* Row 3: Municipal Risk Scorecard (5 cols) + Detected Anomaly Patterns (7 cols) */}
-                    <div className="xl:col-span-5">
-                        <ExecutiveChartCard
-                            title="Municipal Risk & Integrity Scorecard"
-                            subtitle="Active risk exposure & governance threshold signals"
-                            eyebrow="Integrity Radar"
-                            tone="critical"
-                            action={
-                                <Link
-                                    href={route('executive.anomalies-monitoring')}
-                                    className="text-xs font-semibold text-rose-700 hover:text-rose-800 hover:underline"
-                                >
-                                    Monitor All &rarr;
-                                </Link>
-                            }
-                        >
-                            <div className="space-y-3.5">
-                                <div className="flex items-center justify-between rounded-xl border border-red-200 bg-gradient-to-r from-red-50 to-rose-50/50 p-3.5">
-                                    <div className="flex items-center gap-3">
-                                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-600 text-base font-extrabold text-white shadow-sm">
-                                            {activeAnomalies + activeAlerts}
-                                        </span>
-                                        <div>
-                                            <p className="text-xs font-bold uppercase tracking-wider text-red-900">Active Risk Signals</p>
-                                            <p className="text-[11px] text-red-700 font-medium">Requiring executive oversight or review</p>
-                                        </div>
-                                    </div>
-                                    <span className="rounded-full bg-red-200/80 px-2.5 py-1 text-[11px] font-bold text-red-900">
-                                        {highSeverityTotal} High-Severity
-                                    </span>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-2.5 transition hover:border-slate-300">
-                                        <div className="flex items-center gap-2.5">
-                                            <span className="h-2.5 w-2.5 rounded-full bg-red-600" />
-                                            <div>
-                                                <p className="text-xs font-bold text-slate-800">Critical / High Severity</p>
-                                                <p className="text-[11px] text-slate-500">Exceeds municipal risk threshold limits</p>
-                                            </div>
-                                        </div>
-                                        <span className="rounded-lg bg-red-100 px-2.5 py-0.5 text-xs font-bold text-red-800">{highSeverityTotal}</span>
-                                    </div>
-
-                                    <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-2.5 transition hover:border-slate-300">
-                                        <div className="flex items-center gap-2.5">
-                                            <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-                                            <div>
-                                                <p className="text-xs font-bold text-slate-800">Pattern Anomalies</p>
-                                                <p className="text-[11px] text-slate-500">Price variance, frequent spikes, quantity jumps</p>
-                                            </div>
-                                        </div>
-                                        <span className="rounded-lg bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-800">{activeAnomalies}</span>
-                                    </div>
-
-                                    <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-2.5 transition hover:border-slate-300">
-                                        <div className="flex items-center gap-2.5">
-                                            <span className="h-2.5 w-2.5 rounded-full bg-indigo-500" />
-                                            <div>
-                                                <p className="text-xs font-bold text-slate-800">Operational Alerts</p>
-                                                <p className="text-[11px] text-slate-500">Workflow bottlenecks and threshold notifications</p>
-                                            </div>
-                                        </div>
-                                        <span className="rounded-lg bg-indigo-100 px-2.5 py-0.5 text-xs font-bold text-indigo-800">{activeAlerts}</span>
-                                    </div>
-                                </div>
-
-                                <Link
-                                    href={route('executive.anomalies-monitoring')}
-                                    className="inline-flex w-full items-center justify-center rounded-xl bg-red-700 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-red-800"
-                                >
-                                    Investigate Risk Signals &rarr;
-                                </Link>
-                            </div>
-                        </ExecutiveChartCard>
-                    </div>
-
-                    <div className="xl:col-span-7">
+                    {/* Row 2: Detected Anomaly Patterns (6 cols) + Departmental Concentration (6 cols) */}
+                    <div className="xl:col-span-6">
                         <ExecutiveChartCard
                             title="Detected Anomaly Patterns"
                             subtitle="Distribution of flagged irregularities across municipal procurement"
                             eyebrow="Pattern Breakdown"
                             tone="warning"
+                            action={
+                                <Link
+                                    href={route('executive.anomalies-monitoring')}
+                                    className="text-xs font-semibold text-amber-700 hover:text-amber-800 hover:underline"
+                                >
+                                    View Signals &rarr;
+                                </Link>
+                            }
                         >
                             <HorizontalBarChart
                                 data={topAnomalyCategories}
@@ -609,10 +625,9 @@ export default function ExecutiveDashboardIndex({
                         </ExecutiveChartCard>
                     </div>
 
-                    {/* Row 4: Departmental Concentration (7 cols) + SGLG Citizen Transparency (5 cols) */}
-                    <div className="xl:col-span-7">
+                    <div className="xl:col-span-6">
                         <ExecutiveChartCard
-                            title="Departmental Risk & Requisition Concentration"
+                            title="Departmental Incident Concentration"
                             subtitle="Combined anomaly & alert incidents concentrated by municipal office"
                             eyebrow="Office Oversight"
                             tone="neutral"
@@ -633,89 +648,30 @@ export default function ExecutiveDashboardIndex({
                             />
                         </ExecutiveChartCard>
                     </div>
-
-                    <div className="xl:col-span-5">
-                        <ExecutiveChartCard
-                            title="Citizen Transparency & SGLG Full Disclosure"
-                            subtitle="DILG Full Disclosure Policy (FDP) compliance board"
-                            eyebrow="Public Accountability"
-                            tone="emerald"
-                            action={
-                                <Link
-                                    href={route('executive.transparency-monitoring')}
-                                    className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:underline"
-                                >
-                                    Full Portal &rarr;
-                                </Link>
-                            }
-                        >
-                            <div className="space-y-3.5">
-                                <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50/50 p-3.5">
-                                    <div className="flex items-center gap-3">
-                                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-base font-extrabold text-white shadow-sm">
-                                            {transparency.published_disclosure_count}
-                                        </span>
-                                        <div>
-                                            <p className="text-xs font-bold uppercase tracking-wider text-emerald-900">Published Records</p>
-                                            <p className="text-[11px] text-emerald-700 font-medium">Citizen-accessible transparency postings</p>
-                                        </div>
-                                    </div>
-                                    <span className="rounded-full bg-emerald-200/80 px-2.5 py-1 text-[11px] font-bold text-emerald-900">
-                                        SGLG Compliant
-                                    </span>
-                                </div>
-
-                                <div className="grid grid-cols-3 gap-2 text-center">
-                                    <div className="rounded-xl border border-emerald-200 bg-white p-2.5 shadow-sm">
-                                        <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Published</p>
-                                        <p className="mt-0.5 text-base font-extrabold text-emerald-900">{transparency.published_disclosure_count}</p>
-                                    </div>
-                                    <div className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm">
-                                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Draft</p>
-                                        <p className="mt-0.5 text-base font-extrabold text-slate-800">{transparency.draft_disclosure_count}</p>
-                                    </div>
-                                    <div className="rounded-xl border border-amber-200 bg-white p-2.5 shadow-sm">
-                                        <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Pending</p>
-                                        <p className="mt-0.5 text-base font-extrabold text-amber-900">{pendingOrReviewDisclosures}</p>
-                                    </div>
-                                </div>
-
-                                <p className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-xs leading-relaxed text-slate-600">
-                                    Compliant with DILG Full Disclosure Policy standards and mandatory procurement transparency postings for Seal of Good Local Governance (SGLG) eligibility.
-                                </p>
-
-                                <Link
-                                    href={route('executive.disclosures.index')}
-                                    className="inline-flex w-full items-center justify-center rounded-xl bg-emerald-700 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-800"
-                                >
-                                    Manage Public Disclosures &rarr;
-                                </Link>
-                            </div>
-                        </ExecutiveChartCard>
-                    </div>
                 </div>
 
-                <div className="grid gap-6 xl:grid-cols-2">
-                    <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-                        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-                            <h3 className="text-lg font-semibold text-slate-900">Recent Anomaly Signals</h3>
-                            <Link href={route('executive.anomalies-monitoring')} className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50">
-                                Open Risk & Alerts
+                {/* Bottom Tables: Recent Signals with Compact Filters */}
+                <div className="grid gap-4 xl:grid-cols-2">
+                    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2.5">
+                            <h3 className="text-sm font-bold text-slate-900">Recent Anomaly Signals</h3>
+                            <Link href={route('executive.anomalies-monitoring')} className="text-xs font-semibold text-red-700 hover:text-red-800 hover:underline">
+                                Open Monitoring &rarr;
                             </Link>
                         </div>
-                        <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
-                            <div className="grid gap-2 md:grid-cols-12">
+                        <div className="border-b border-slate-100 bg-slate-50/60 p-2.5">
+                            <div className="grid gap-2 grid-cols-1 sm:grid-cols-12">
                                 <input
                                     type="text"
                                     value={anomalySearch}
                                     onChange={(event) => setAnomalySearch(event.target.value)}
-                                    placeholder="Search anomaly type or office"
-                                    className="md:col-span-7 rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                                    placeholder="Search anomaly or office"
+                                    className="sm:col-span-7 h-8 rounded-lg border border-slate-300 px-2.5 text-xs shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                                 />
                                 <select
                                     value={anomalySeverity}
                                     onChange={(event) => setAnomalySeverity(event.target.value)}
-                                    className="md:col-span-3 rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                                    className="sm:col-span-3 h-8 rounded-lg border border-slate-300 px-2 text-xs shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                                 >
                                     {anomalySeverityOptions.map((value) => (
                                         <option key={value} value={value}>{value === 'ALL' ? 'All severities' : formatStatusLabel(value)}</option>
@@ -727,33 +683,32 @@ export default function ExecutiveDashboardIndex({
                                         setAnomalySearch('');
                                         setAnomalySeverity('ALL');
                                     }}
-                                    className="md:col-span-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                                    className="sm:col-span-2 h-8 rounded-lg border border-slate-300 px-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
                                 >
                                     Clear
                                 </button>
                             </div>
-                            <p className="mt-2 text-xs text-slate-500">Showing {anomalyPreviewRows.length} of {filteredAnomalyGroups.length} anomaly group(s).</p>
                         </div>
                         {anomalyPreviewRows.length === 0 ? (
-                            <p className="px-5 py-6 text-sm text-slate-500">No data in current filter scope</p>
+                            <p className="px-4 py-5 text-center text-xs text-slate-500">No data in current filter scope</p>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-slate-200 text-sm">
+                                <table className="min-w-full divide-y divide-slate-200 text-xs">
                                     <thead className="bg-slate-50">
                                         <tr>
-                                            <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Type</th>
-                                            <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Related Records</th>
-                                            <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Severity</th>
-                                            <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Office</th>
+                                            <th className="px-3 py-1.5 text-left font-semibold uppercase tracking-wide text-slate-500">Type</th>
+                                            <th className="px-3 py-1.5 text-left font-semibold uppercase tracking-wide text-slate-500">Records</th>
+                                            <th className="px-3 py-1.5 text-left font-semibold uppercase tracking-wide text-slate-500">Severity</th>
+                                            <th className="px-3 py-1.5 text-left font-semibold uppercase tracking-wide text-slate-500">Office</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
                                         {anomalyPreviewRows.map((group) => (
-                                            <tr key={group.key}>
-                                                <td className="px-4 py-2 text-slate-700">{group.label}</td>
-                                                <td className="px-4 py-2 text-slate-700">{group.count}</td>
-                                                <td className="px-4 py-2">{SeverityBadge(group.representative.severity)}</td>
-                                                <td className="px-4 py-2 text-slate-700">{group.office}</td>
+                                            <tr key={group.key} className="hover:bg-slate-50/50">
+                                                <td className="px-3 py-1.5 text-slate-700 font-medium">{group.label}</td>
+                                                <td className="px-3 py-1.5 text-slate-700">{group.count}</td>
+                                                <td className="px-3 py-1.5">{SeverityBadge(group.representative.severity)}</td>
+                                                <td className="px-3 py-1.5 text-slate-700">{group.office}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -762,26 +717,26 @@ export default function ExecutiveDashboardIndex({
                         )}
                     </section>
 
-                    <section className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-                        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-                            <h3 className="text-lg font-semibold text-slate-900">Recent Alert Signals</h3>
-                            <Link href={route('executive.anomalies-monitoring')} className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50">
-                                Open Risk & Alerts
+                    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2.5">
+                            <h3 className="text-sm font-bold text-slate-900">Recent Operational Alerts</h3>
+                            <Link href={route('executive.anomalies-monitoring')} className="text-xs font-semibold text-red-700 hover:text-red-800 hover:underline">
+                                Open Monitoring &rarr;
                             </Link>
                         </div>
-                        <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
-                            <div className="grid gap-2 md:grid-cols-12">
+                        <div className="border-b border-slate-100 bg-slate-50/60 p-2.5">
+                            <div className="grid gap-2 grid-cols-1 sm:grid-cols-12">
                                 <input
                                     type="text"
                                     value={alertSearch}
                                     onChange={(event) => setAlertSearch(event.target.value)}
-                                    placeholder="Search alert type or office"
-                                    className="md:col-span-7 rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                                    placeholder="Search alert or office"
+                                    className="sm:col-span-7 h-8 rounded-lg border border-slate-300 px-2.5 text-xs shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                                 />
                                 <select
                                     value={alertSeverity}
                                     onChange={(event) => setAlertSeverity(event.target.value)}
-                                    className="md:col-span-3 rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                                    className="sm:col-span-3 h-8 rounded-lg border border-slate-300 px-2 text-xs shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                                 >
                                     {alertSeverityOptions.map((value) => (
                                         <option key={value} value={value}>{value === 'ALL' ? 'All severities' : formatStatusLabel(value)}</option>
@@ -793,31 +748,30 @@ export default function ExecutiveDashboardIndex({
                                         setAlertSearch('');
                                         setAlertSeverity('ALL');
                                     }}
-                                    className="md:col-span-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                                    className="sm:col-span-2 h-8 rounded-lg border border-slate-300 px-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
                                 >
                                     Clear
                                 </button>
                             </div>
-                            <p className="mt-2 text-xs text-slate-500">Showing {alertPreviewRows.length} of {filteredAlerts.length} alert(s).</p>
                         </div>
                         {alertPreviewRows.length === 0 ? (
-                            <p className="px-5 py-6 text-sm text-slate-500">No data in current filter scope</p>
+                            <p className="px-4 py-5 text-center text-xs text-slate-500">No data in current filter scope</p>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-slate-200 text-sm">
+                                <table className="min-w-full divide-y divide-slate-200 text-xs">
                                     <thead className="bg-slate-50">
                                         <tr>
-                                            <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Type</th>
-                                            <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Severity</th>
-                                            <th className="px-4 py-2 text-left text-xs uppercase tracking-wide text-slate-600">Office</th>
+                                            <th className="px-3 py-1.5 text-left font-semibold uppercase tracking-wide text-slate-500">Type</th>
+                                            <th className="px-3 py-1.5 text-left font-semibold uppercase tracking-wide text-slate-500">Severity</th>
+                                            <th className="px-3 py-1.5 text-left font-semibold uppercase tracking-wide text-slate-500">Office</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
                                         {alertPreviewRows.map((row) => (
-                                            <tr key={row.alerts_id}>
-                                                <td className="px-4 py-2 text-slate-700">{formatStatusLabel(row.alert_type)}</td>
-                                                <td className="px-4 py-2">{SeverityBadge(row.severity)}</td>
-                                                <td className="px-4 py-2 text-slate-700">{row.office?.name ?? 'N/A'}</td>
+                                            <tr key={row.alerts_id} className="hover:bg-slate-50/50">
+                                                <td className="px-3 py-1.5 text-slate-700 font-medium">{formatStatusLabel(row.alert_type)}</td>
+                                                <td className="px-3 py-1.5">{SeverityBadge(row.severity)}</td>
+                                                <td className="px-3 py-1.5 text-slate-700">{row.office?.name ?? 'N/A'}</td>
                                             </tr>
                                         ))}
                                     </tbody>

@@ -123,22 +123,22 @@ export function ExecutiveChartCard({
     };
 
     return (
-        <section className={`overflow-hidden rounded-2xl border ${toneClass[tone].shell} transition hover:shadow-md`}>
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+        <section className={`overflow-hidden rounded-xl border ${toneClass[tone].shell} transition hover:shadow-md`}>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 sm:px-4 sm:py-3">
                 <div>
                     {eyebrow ? (
-                        <div className="mb-1">
-                            <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${toneClass[tone].badge}`}>
+                        <div className="mb-0.5">
+                            <span className={`inline-flex rounded-full border px-2 py-0.2 text-[9px] font-bold uppercase tracking-wider ${toneClass[tone].badge}`}>
                                 {eyebrow}
                             </span>
                         </div>
                     ) : null}
-                    <h3 className="text-base font-bold text-slate-900">{title}</h3>
-                    {subtitle && <p className="mt-0.5 text-xs text-slate-500 font-medium">{subtitle}</p>}
+                    <h3 className="text-sm font-bold text-slate-900 leading-snug">{title}</h3>
+                    {subtitle && <p className="mt-0.5 text-xs text-slate-500 font-medium line-clamp-1">{subtitle}</p>}
                 </div>
                 {action ? <div className="flex items-center gap-2">{action}</div> : null}
             </div>
-            <div className="p-5">{children}</div>
+            <div className="p-3.5 sm:p-4">{children}</div>
         </section>
     );
 }

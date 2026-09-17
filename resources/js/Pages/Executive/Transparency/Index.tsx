@@ -244,13 +244,39 @@ export default function TransparencyMonitoringIndex({
         >
             <Head title="Transparency & Disclosures" />
 
-            <div id={printSectionId} className="space-y-4">
+            <div id={printSectionId} className="space-y-3.5">
+                {/* Slim Telemetry Strip */}
+                <section className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+                        <div className="flex items-center gap-2.5 px-3 py-1">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-600" />
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">Published Disclosures</p>
+                                <p className="text-lg font-extrabold text-emerald-900 leading-tight">{totals.published_count}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2.5 px-3 py-1">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-slate-400" />
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Drafts</p>
+                                <p className="text-lg font-extrabold text-slate-900 leading-tight">{totals.draft_count}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2.5 px-3 py-1">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" />
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-700">Pending / In Review</p>
+                                <p className="text-lg font-extrabold text-amber-900 leading-tight">{pendingOrOtherCount}</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
 
-                <section className="rounded-2xl border border-red-200 bg-white p-5 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
-                    <div className="flex flex-wrap items-end gap-3">
-                        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <section className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="grid min-w-0 flex-1 gap-2 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
                             <select
-                                className="h-10 rounded-lg border-slate-300 text-sm"
+                                className="h-8 rounded-lg border-slate-300 px-2 text-xs shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                                 value={form.office_id}
                                 onChange={(event) => setForm((current) => ({ ...current, office_id: event.target.value }))}
                             >
@@ -263,7 +289,7 @@ export default function TransparencyMonitoringIndex({
                             </select>
 
                             <select
-                                className="h-10 rounded-lg border-slate-300 text-sm"
+                                className="h-8 rounded-lg border-slate-300 px-2 text-xs shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                                 value={form.status}
                                 onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}
                             >
@@ -276,7 +302,7 @@ export default function TransparencyMonitoringIndex({
                             </select>
 
                             <MonthFilterSelect
-                                className="h-10 rounded-lg border-slate-300 text-sm"
+                                className="h-8 rounded-lg border-slate-300 px-2 text-xs shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 xl:col-span-2"
                                 month={form.month}
                                 year={form.year}
                                 yearOptions={filter_options.years}
@@ -289,7 +315,7 @@ export default function TransparencyMonitoringIndex({
                             <button
                                 type="button"
                                 onClick={() => router.get(route('executive.transparency-monitoring'))}
-                                className="h-10 rounded-lg border border-red-300 px-4 text-sm font-semibold text-red-700 hover:bg-red-50"
+                                className="h-8 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
                             >
                                 Reset
                             </button>
@@ -297,32 +323,26 @@ export default function TransparencyMonitoringIndex({
                     </div>
                 </section>
 
-                <div className="grid gap-4 sm:grid-cols-3">
-                    <Card label="Published" value={totals.published_count} />
-                    <Card label="Drafts" value={totals.draft_count} />
-                    <Card label="Pending / Review" value={pendingOrOtherCount} />
-                </div>
-
-                <section className="rounded-2xl border border-red-200 bg-white p-2 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
-                    <div className="grid grid-cols-3 gap-2">
+                <section className="rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm">
+                    <div className="grid grid-cols-3 gap-1.5">
                         <button
                             type="button"
                             onClick={() => switchTab('overview')}
-                            className={`rounded-lg px-3 py-2.5 text-sm font-semibold ${activeTab === 'overview' ? 'bg-red-700 text-white' : 'bg-red-50 text-red-700'}`}
+                            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${activeTab === 'overview' ? 'bg-red-700 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}
                         >
                             Overview
                         </button>
                         <button
                             type="button"
                             onClick={() => switchTab('published')}
-                            className={`rounded-lg px-3 py-2.5 text-sm font-semibold ${activeTab === 'published' ? 'bg-red-700 text-white' : 'bg-red-50 text-red-700'}`}
+                            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${activeTab === 'published' ? 'bg-red-700 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}
                         >
                             Published
                         </button>
                         <button
                             type="button"
                             onClick={() => switchTab('drafts')}
-                            className={`rounded-lg px-3 py-2.5 text-sm font-semibold ${activeTab === 'drafts' ? 'bg-red-700 text-white' : 'bg-red-50 text-red-700'}`}
+                            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${activeTab === 'drafts' ? 'bg-red-700 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}
                         >
                             Drafts / Review
                         </button>
