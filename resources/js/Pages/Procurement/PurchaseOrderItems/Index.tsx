@@ -218,9 +218,9 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                         </div>
                         </div>
                         {isDuplicateSelection ? (
-                            <button type="button" className="rounded border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700">
+                            <span className="inline-flex rounded border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700">
                                 Duplicate Not Allowed
-                            </button>
+                            </span>
                         ) : null}
                         {selectedSource ? (
                             <p className="text-xs text-slate-500 md:col-span-4">
