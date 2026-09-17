@@ -63,103 +63,93 @@ export default function MovementIndex({ movements }: Props) {
     }, [movements.data, movementTypeFilter, search]);
 
     return (
-        <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Inventory Movement Logs</h2>}>
+        <AuthenticatedLayout header="Inventory Movement Logs">
             <Head title="Inventory Movements" />
-            <div className="py-8">
-                <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div className="grid gap-3 md:grid-cols-6">
-                        <div className="md:col-span-4">
-                            <label htmlFor="movement-log-search" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
-                                Search logs
-                            </label>
-                            <input
-                                id="movement-log-search"
-                                type="text"
-                                value={search}
-                                onChange={(event) => setSearch(event.target.value)}
-                                placeholder="Search item, source reference, date"
-                                className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                            />
-                        </div>
-                        <div>
-                            <label htmlFor="movement-log-type" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
-                                Type
-                            </label>
-                            <select
-                                id="movement-log-type"
-                                value={movementTypeFilter}
-                                onChange={(event) => setMovementTypeFilter(event.target.value)}
-                                className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                            >
-                                {movementTypeOptions.map((status) => (
-                                    <option key={status} value={status}>
-                                        {status === 'ALL' ? 'All types' : status.replaceAll('_', ' ')}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="flex items-end">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setSearch('');
-                                    setMovementTypeFilter('ALL');
-                                }}
-                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-                            >
-                                Clear
-                            </button>
-                        </div>
-                    </div>
-                    <p className="mt-3 text-xs text-slate-500">Showing {filteredRows.length} of {movements.data.length} recent movement log(s) on this page.</p>
-                </div>
 
-                <div className="responsive-table-wrap rounded-xl border border-slate-200 bg-white shadow-sm">
-                    <table className="min-w-full divide-y divide-slate-200 text-sm">
-                        <thead className="bg-slate-50">
-                            <tr>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Movement Type</th>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Item / Inventory</th>
-                                <th className="px-4 py-3 text-right font-semibold text-slate-700">Quantity</th>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Date</th>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Reference Source</th>
-                                <th className="px-4 py-3 text-right font-semibold text-slate-700">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {filteredRows.map((row) => (
-                                <tr key={row.movement_id} className="hover:bg-slate-50/60">
-                                    <td className="px-4 py-3 text-slate-700">{humanizeEnum(row.movement_type)}</td>
-                                    <td className="px-4 py-3 text-slate-700">
-                                        <p>{row.item_name}</p>
-                                        <p className="text-xs text-slate-500">Inventory #{row.inventory_id}</p>
-                                    </td>
-                                    <td className="px-4 py-3 text-right font-semibold text-slate-700">{row.quantity.toFixed(2)}</td>
-                                    <td className="px-4 py-3 text-slate-600">{row.movement_date}</td>
-                                    <td className="px-4 py-3 text-slate-600">{row.reference_label}</td>
-                                    <td className="px-4 py-3 text-right">
-                                        <Link
-                                            href={route('inventory.inventory-movements.show', row.movement_id)}
-                                            className="text-sm font-semibold text-blue-600 hover:text-blue-800"
-                                        >
-                                            View
-                                        </Link>
-                                    </td>
-                                </tr>
+            <div className="space-y-2 lg:h-[calc(100vh-8.5rem)] flex flex-col justify-between overflow-y-auto lg:overflow-hidden">
+                {/* Compact Filter Bar */}
+                <div className="shrink-0 rounded-xl border border-slate-200 bg-white p-2 shadow-xs">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                            placeholder="Search item, source reference, date..."
+                            className="h-8 flex-1 min-w-[200px] rounded-lg border border-slate-300 px-2.5 text-xs focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                        />
+                        <select
+                            value={movementTypeFilter}
+                            onChange={(event) => setMovementTypeFilter(event.target.value)}
+                            className="h-8 rounded-lg border border-slate-300 px-2.5 text-xs text-slate-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                        >
+                            {movementTypeOptions.map((status) => (
+                                <option key={status} value={status}>
+                                    {status === 'ALL' ? 'All types' : status.replaceAll('_', ' ')}
+                                </option>
                             ))}
-                            {filteredRows.length === 0 ? (
-                                <tr>
-                                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-500">
-                                        No movement logs matched the selected filters.
-                                    </td>
-                                </tr>
-                            ) : null}
-                        </tbody>
-                    </table>
+                        </select>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setSearch('');
+                                setMovementTypeFilter('ALL');
+                            }}
+                            className="inline-flex h-8 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                        >
+                            Clear
+                        </button>
+                    </div>
                 </div>
 
-                <div className="mt-4">
-                    <PaginationNav links={movements.links} preserveState={false} />
+                {/* High-Density Movements Table with Sticky Headers and Internal Scroll */}
+                <div className="flex-1 min-h-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs flex flex-col">
+                    <div className="flex-1 overflow-y-auto min-h-0">
+                        <table className="min-w-full divide-y divide-slate-200 text-xs">
+                            <thead className="sticky top-0 z-10 bg-slate-50 shadow-xs">
+                                <tr>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Movement Type</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Item / Inventory</th>
+                                    <th className="px-3.5 py-2 text-right font-semibold text-slate-700">Quantity</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Date</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Reference Source</th>
+                                    <th className="px-3.5 py-2 text-right font-semibold text-slate-700">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {filteredRows.map((row) => (
+                                    <tr key={row.movement_id} className="hover:bg-slate-50/60">
+                                        <td className="px-3.5 py-2 font-medium text-slate-700">{humanizeEnum(row.movement_type)}</td>
+                                        <td className="px-3.5 py-2 text-slate-800">
+                                            <p className="font-semibold text-slate-900">{row.item_name}</p>
+                                            <p className="text-[10px] text-slate-500">Inventory #{row.inventory_id}</p>
+                                        </td>
+                                        <td className="px-3.5 py-2 text-right font-bold text-slate-900">{row.quantity.toFixed(2)}</td>
+                                        <td className="px-3.5 py-2 text-slate-500">{row.movement_date}</td>
+                                        <td className="px-3.5 py-2 text-slate-600">{row.reference_label}</td>
+                                        <td className="px-3.5 py-2 text-right">
+                                            <Link
+                                                href={route('inventory.inventory-movements.show', row.movement_id)}
+                                                className="font-semibold text-xs text-red-600 hover:text-red-800"
+                                            >
+                                                View
+                                            </Link>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {filteredRows.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={6} className="px-4 py-8 text-center text-xs text-slate-500">
+                                            No movement logs matched the selected filters.
+                                        </td>
+                                    </tr>
+                                ) : null}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div className="shrink-0 border-t border-slate-200 bg-slate-50/70 px-3 py-1.5">
+                        <PaginationNav links={movements.links} preserveState={false} />
+                    </div>
                 </div>
             </div>
         </AuthenticatedLayout>

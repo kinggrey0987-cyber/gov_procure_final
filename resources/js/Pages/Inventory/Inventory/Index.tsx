@@ -83,188 +83,189 @@ export default function InventoryIndex({ inventories, categories, filters }: Pro
 
     return (
         <AuthenticatedLayout
-            header={
-                <div className="flex items-center justify-between gap-3">
-                    <h2 className="text-xl font-semibold leading-tight text-gray-800">Inventory Monitoring</h2>
-                    <Link href={route('inventory.inventory.index')} className="rounded-lg bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200">
-                        Refresh
-                    </Link>
-                </div>
+            header="Inventory Monitoring"
+            headerActions={
+                <Link
+                    href={route('inventory.inventory.index')}
+                    className="inline-flex h-8 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-xs transition"
+                >
+                    Refresh
+                </Link>
             }
         >
             <Head title="Inventory" />
 
-            <div className="space-y-4 py-8">
-                <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-5">
-                    <input
-                        value={q}
-                        onChange={(event) => setQ(event.target.value)}
-                        placeholder="Search item name"
-                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm md:col-span-2"
-                    />
-                    <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
-                        <option value="">All categories</option>
-                        {categories.map((category) => (
-                            <option key={category.item_category_id} value={category.item_category_id}>
-                                {category.category_name}
-                            </option>
-                        ))}
-                    </select>
-                    <select value={stockStatus} onChange={(event) => setStockStatus(event.target.value)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
-                        <option value="">All stock statuses</option>
-                        <option value="HEALTHY">Healthy Stock</option>
-                        <option value="AT_REORDER_POINT">At Reorder Point</option>
-                        <option value="LOW">Low Stock</option>
-                        <option value="CRITICAL">Critical Stock</option>
-                    </select>
-                    <Link href={route('inventory.inventory.index')} className="rounded-lg border border-slate-300 px-4 py-2 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                        Reset
-                    </Link>
+            <div className="space-y-2 lg:h-[calc(100vh-8.5rem)] flex flex-col justify-between overflow-y-auto lg:overflow-hidden">
+                {/* Compact Filter Bar */}
+                <div className="shrink-0 rounded-xl border border-slate-200 bg-white p-2 shadow-xs">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <input
+                            value={q}
+                            onChange={(event) => setQ(event.target.value)}
+                            placeholder="Search item name or code..."
+                            className="h-8 flex-1 min-w-[180px] rounded-lg border border-slate-300 px-2.5 text-xs focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                        />
+                        <select
+                            value={categoryId}
+                            onChange={(event) => setCategoryId(event.target.value)}
+                            className="h-8 rounded-lg border border-slate-300 px-2.5 text-xs text-slate-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                        >
+                            <option value="">All categories</option>
+                            {categories.map((category) => (
+                                <option key={category.item_category_id} value={category.item_category_id}>
+                                    {category.category_name}
+                                </option>
+                            ))}
+                        </select>
+                        <select
+                            value={stockStatus}
+                            onChange={(event) => setStockStatus(event.target.value)}
+                            className="h-8 rounded-lg border border-slate-300 px-2.5 text-xs text-slate-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                        >
+                            <option value="">All stock statuses</option>
+                            <option value="HEALTHY">Healthy Stock</option>
+                            <option value="AT_REORDER_POINT">At Reorder Point</option>
+                            <option value="LOW">Low Stock</option>
+                            <option value="CRITICAL">Critical Stock</option>
+                        </select>
+                        <Link
+                            href={route('inventory.inventory.index')}
+                            className="inline-flex h-8 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                        >
+                            Reset
+                        </Link>
+                    </div>
                 </div>
 
-                <div className="rounded-xl border border-slate-200 bg-white p-4 text-xs leading-5 text-slate-600 shadow-sm">
-                    <p>Available is the quantity ready for new office releases. On Hand is total stock still controlled by GSO. Reserved is computed as On Hand minus Available, representing stock already set aside or not currently releasable.</p>
-                    <p className="mt-1">Low Stock Threshold is the reorder point. Items strictly below this level are active low-stock cases for procurement initiation; items equal to threshold are advisory only.</p>
-                </div>
+                {/* High-Density Stock Ledger Table with Sticky Headers and Internal Scroll */}
+                <div className="flex-1 min-h-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs flex flex-col">
+                    <div className="flex-1 overflow-y-auto min-h-0">
+                        <table className="min-w-full divide-y divide-slate-200 text-xs">
+                            <thead className="sticky top-0 z-10 bg-slate-50 shadow-xs">
+                                <tr>
+                                    <th className="px-3 py-2 text-left font-semibold text-slate-700">Item</th>
+                                    <th className="px-3 py-2 text-left font-semibold text-slate-700">Category</th>
+                                    <th className="px-3 py-2 text-right font-semibold text-slate-700">Available</th>
+                                    <th className="px-3 py-2 text-right font-semibold text-slate-700">On Hand</th>
+                                    <th className="px-3 py-2 text-right font-semibold text-slate-700">Reserved</th>
+                                    <th className="px-3 py-2 text-right font-semibold text-slate-700">Released</th>
+                                    <th className="px-3 py-2 text-right font-semibold text-slate-700">Reorder Point</th>
+                                    <th className="px-3 py-2 text-left font-semibold text-slate-700">Stock Signal</th>
+                                    <th className="px-3 py-2 text-right font-semibold text-slate-700">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {inventories.data.map((row) => {
+                                    const available = Number(row.available_stock);
+                                    const onHand = Number(row.stock_on_hand);
+                                    const reserved = Number(row.reserved_quantity);
+                                    const released = Number(row.released_quantity);
+                                    const threshold = Number(row.low_stock_threshold);
+                                    const deficit = Math.max(threshold - available, 0);
+                                    const isCritical = available <= 0;
+                                    const isLow = available < threshold && available > 0;
+                                    const isAtReorder = available === threshold;
+                                    const piecesPerBox = row.item?.pieces_per_box ?? 1;
+                                    const unit = row.item?.default_unit || 'box';
+                                    const subUnit = row.item?.sub_unit || 'piece';
 
-                <div className="responsive-table-wrap rounded-xl border border-slate-200 bg-white shadow-sm">
-                    <table className="min-w-full divide-y divide-slate-200 text-sm">
-                        <thead className="bg-slate-50">
-                            <tr>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Item</th>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Category</th>
-                                <th className="px-4 py-3 text-right font-semibold text-slate-700">Available</th>
-                                <th className="px-4 py-3 text-right font-semibold text-slate-700">On Hand</th>
-                                <th className="px-4 py-3 text-right font-semibold text-slate-700">Reserved</th>
-                                <th className="px-4 py-3 text-right font-semibold text-slate-700">Released</th>
-                                <th className="px-4 py-3 text-right font-semibold text-slate-700">Reorder Point</th>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Stock Signal</th>
-                                <th className="px-4 py-3 text-right font-semibold text-slate-700">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {inventories.data.map((row) => {
-                                const available = Number(row.available_stock);
-                                const onHand = Number(row.stock_on_hand);
-                                const reserved = Number(row.reserved_quantity);
-                                const released = Number(row.released_quantity);
-                                const threshold = Number(row.low_stock_threshold);
-                                const deficit = Math.max(threshold - available, 0);
-                                const isCritical = available <= 0;
-                                const isLow = available < threshold && available > 0;
-                                const isAtReorder = available === threshold;
-                                const piecesPerBox = row.item?.pieces_per_box ?? 1;
-                                const unit = row.item?.default_unit || 'box';
-                                const subUnit = row.item?.sub_unit || 'piece';
+                                    const signalClass = isCritical
+                                        ? 'bg-rose-100 text-rose-700'
+                                        : isLow
+                                        ? 'bg-amber-100 text-amber-700'
+                                        : isAtReorder
+                                        ? 'bg-blue-100 text-blue-700'
+                                        : 'bg-emerald-100 text-emerald-700';
 
-                                const signalClass = isCritical
-                                    ? 'bg-rose-100 text-rose-700'
-                                    : isLow
-                                    ? 'bg-amber-100 text-amber-700'
-                                    : isAtReorder
-                                    ? 'bg-blue-100 text-blue-700'
-                                    : 'bg-emerald-100 text-emerald-700';
-                                const signalLabel = isCritical
-                                    ? 'Critical Stock'
-                                    : isLow
-                                    ? 'Low Stock'
-                                    : isAtReorder
-                                    ? 'At Reorder Point'
-                                    : 'Healthy Stock';
+                                    const signalLabel = isCritical
+                                        ? 'Critical Stock'
+                                        : isLow
+                                        ? 'Low Stock'
+                                        : isAtReorder
+                                        ? 'At Reorder Point'
+                                        : 'Healthy Stock';
 
-                                return (
-                                    <tr key={row.inventory_id} className="hover:bg-slate-50/60">
-                                        <td className="px-4 py-3 text-slate-700">
-                                            <p className="font-semibold text-slate-800">{row.item?.item_name ?? `Item #${row.item_id}`}</p>
-                                            <p className="text-xs text-slate-500">
-                                                ID: {row.item_id}
+                                    return (
+                                        <tr key={row.inventory_id} className="hover:bg-slate-50/60">
+                                            <td className="px-3 py-2 font-medium text-slate-900">{row.item?.item_name || `Item #${row.item_id}`}</td>
+                                            <td className="px-3 py-2 text-slate-600">{row.item?.category?.category_name || '-'}</td>
+                                            <td className="px-3 py-2 text-right font-semibold text-slate-900">
+                                                <span>{available.toFixed(2)} {unit}s</span>
                                                 {piecesPerBox > 1 ? (
-                                                    <span className="ml-1.5 font-medium text-indigo-700">
-                                                        [{unit} ({piecesPerBox} {subUnit}s/{unit})]
+                                                    <span className="block text-[11px] text-slate-500">
+                                                        ({(available * piecesPerBox).toLocaleString()} {subUnit}s)
                                                     </span>
                                                 ) : null}
-                                            </p>
-                                        </td>
-                                        <td className="px-4 py-3 text-slate-600">{row.item?.category?.category_name ?? '-'}</td>
-                                        <td className={`px-4 py-3 text-right font-semibold ${isCritical || isLow ? 'text-amber-700' : 'text-slate-700'}`}>
-                                            <span>{available.toFixed(2)} {unit}s</span>
-                                            {piecesPerBox > 1 ? (
-                                                <span className="block text-xs font-semibold text-indigo-700">
-                                                    ({(available * piecesPerBox).toLocaleString()} {subUnit}s)
+                                            </td>
+                                            <td className="px-3 py-2 text-right text-slate-700">
+                                                <span>{onHand.toFixed(2)} {unit}s</span>
+                                                {piecesPerBox > 1 ? (
+                                                    <span className="block text-[11px] text-slate-500">
+                                                        ({(onHand * piecesPerBox).toLocaleString()} {subUnit}s)
+                                                    </span>
+                                                ) : null}
+                                            </td>
+                                            <td className="px-3 py-2 text-right text-slate-700">
+                                                <span>{reserved.toFixed(2)} {unit}s</span>
+                                                {piecesPerBox > 1 ? (
+                                                    <span className="block text-[11px] text-slate-500">
+                                                        ({(reserved * piecesPerBox).toLocaleString()} {subUnit}s)
+                                                    </span>
+                                                ) : null}
+                                            </td>
+                                            <td className="px-3 py-2 text-right text-slate-700">
+                                                <span>{released.toFixed(2)} {unit}s</span>
+                                                {piecesPerBox > 1 ? (
+                                                    <span className="block text-[11px] text-slate-500">
+                                                        ({(released * piecesPerBox).toLocaleString()} {subUnit}s)
+                                                    </span>
+                                                ) : null}
+                                            </td>
+                                            <td className="px-3 py-2 text-right text-slate-700">
+                                                <span>{threshold.toFixed(2)} {unit}s</span>
+                                                {piecesPerBox > 1 ? (
+                                                    <span className="block text-[11px] text-slate-500">
+                                                        ({(threshold * piecesPerBox).toLocaleString()} {subUnit}s)
+                                                    </span>
+                                                ) : null}
+                                            </td>
+                                            <td className="px-3 py-2 text-slate-700">
+                                                <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${signalClass}`}>
+                                                    {signalLabel}
                                                 </span>
-                                            ) : null}
-                                        </td>
-                                        <td className="px-4 py-3 text-right text-slate-700">
-                                            <span>{onHand.toFixed(2)} {unit}s</span>
-                                            {piecesPerBox > 1 ? (
-                                                <span className="block text-xs text-slate-500">
-                                                    ({(onHand * piecesPerBox).toLocaleString()} {subUnit}s)
-                                                </span>
-                                            ) : null}
-                                        </td>
-                                        <td className="px-4 py-3 text-right text-slate-700">
-                                            <span>{reserved.toFixed(2)} {unit}s</span>
-                                            {piecesPerBox > 1 ? (
-                                                <span className="block text-xs text-slate-500">
-                                                    ({(reserved * piecesPerBox).toLocaleString()} {subUnit}s)
-                                                </span>
-                                            ) : null}
-                                        </td>
-                                        <td className="px-4 py-3 text-right text-slate-700">
-                                            <span>{released.toFixed(2)} {unit}s</span>
-                                            {piecesPerBox > 1 ? (
-                                                <span className="block text-xs text-slate-500">
-                                                    ({(released * piecesPerBox).toLocaleString()} {subUnit}s)
-                                                </span>
-                                            ) : null}
-                                        </td>
-                                        <td className="px-4 py-3 text-right text-slate-700">
-                                            <span>{threshold.toFixed(2)} {unit}s</span>
-                                            {piecesPerBox > 1 ? (
-                                                <span className="block text-xs text-slate-500">
-                                                    ({(threshold * piecesPerBox).toLocaleString()} {subUnit}s)
-                                                </span>
-                                            ) : null}
-                                        </td>
-                                        <td className="px-4 py-3 text-slate-700">
-                                            <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${signalClass}`}>
-                                                {signalLabel}
-                                            </span>
-                                            {deficit > 0 ? (
-                                                <p className="mt-1 text-xs text-rose-600 font-medium">
-                                                    Deficit: {deficit.toFixed(2)} {unit}s
-                                                    {piecesPerBox > 1 ? ` (${(deficit * piecesPerBox).toLocaleString()} ${subUnit}s)` : ''}
-                                                </p>
-                                            ) : null}
-                                        </td>
-                                        <td className="px-4 py-3 text-right">
-                                            <div className="space-y-1">
-                                                <Link href={route('inventory.inventory.show', row.inventory_id)} className="block text-sm font-semibold text-blue-600 hover:text-blue-800">
+                                                {deficit > 0 ? (
+                                                    <p className="mt-0.5 text-[11px] text-rose-600 font-medium">
+                                                        Deficit: {deficit.toFixed(2)} {unit}s
+                                                    </p>
+                                                ) : null}
+                                            </td>
+                                            <td className="px-3 py-2 text-right">
+                                                <Link href={route('inventory.inventory.show', row.inventory_id)} className="font-semibold text-xs text-red-600 hover:text-red-800">
                                                     View
                                                 </Link>
-                                            </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                                {inventories.data.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={9} className="px-4 py-8 text-center text-xs text-slate-500">
+                                            No inventory records available.
                                         </td>
                                     </tr>
-                                );
-                            })}
-                            {inventories.data.length === 0 ? (
-                                <tr>
-                                    <td colSpan={9} className="px-4 py-8 text-center text-sm text-slate-500">
-                                        No inventory records available.
-                                    </td>
-                                </tr>
-                            ) : null}
-                        </tbody>
-                    </table>
-                </div>
+                                ) : null}
+                            </tbody>
+                        </table>
+                    </div>
 
-                <PaginationNav links={inventories.links} preserveState={false} />
+                    <div className="shrink-0 border-t border-slate-200 bg-slate-50/70 px-3 py-1.5">
+                        <PaginationNav links={inventories.links} preserveState={false} />
+                    </div>
+                </div>
             </div>
         </AuthenticatedLayout>
     );
 }
-
-
 
 
 

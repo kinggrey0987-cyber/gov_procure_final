@@ -101,162 +101,158 @@ export default function SupplyRequestsIndex({ supplyRequests, filters, filter_op
 
     return (
         <AuthenticatedLayout
-            header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Request Tracking</h2>}
+            header="Request Tracking"
+            headerActions={
+                <Link
+                    href={route('office.supply-requests.create')}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-red-600 px-3 text-xs font-semibold text-white shadow-sm hover:bg-red-700 transition"
+                >
+                    <span className="text-sm leading-none">＋</span>
+                    <span>Create New Request</span>
+                </Link>
+            }
         >
             <Head title="Request Tracking" />
 
-            <div className="space-y-5 py-4">
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                            <h3 className="text-2xl font-semibold text-slate-800">Track Your Requests</h3>
-                            <p className="text-sm text-slate-600">Single tracking view for all office supply requests.</p>
-                            <Link
-                                href={route('office.tracking')}
-                                className="mt-3 inline-flex items-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                            >
-                                Back to Dashboard
-                            </Link>
+            <div className="space-y-2 lg:h-[calc(100vh-8.5rem)] flex flex-col justify-between overflow-y-auto lg:overflow-hidden">
+                {/* Compact Control & Filter Header */}
+                <section className="shrink-0 rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                            <h3 className="text-xs font-bold text-slate-800">Filter Supply Requests</h3>
+                            <span className="hidden text-[11px] text-slate-500 sm:inline">• Track requisition lifecycle, approval stages, and fulfillment status</span>
                         </div>
                         <div className="flex items-center gap-2">
-                            <Link
-                                href={route('office.supply-requests.create')}
-                                className="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
-                            >
-                                Create New Request
-                            </Link>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    <div className="border-b border-slate-200 px-6 py-4">
-                        <h4 className="text-lg font-semibold text-slate-800">Request List</h4>
-                        <div className="mt-3 grid gap-2 md:grid-cols-5">
-                            <select
-                                value={status}
-                                onChange={(event) => setStatus(event.target.value)}
-                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                            >
-                                <option value="">All statuses</option>
-                                {['DRAFT', 'SUBMITTED', 'IN_REVIEW', 'PROCUREMENT_PLACED', 'PROCESSING', 'PARTIALLY_RELEASED', 'PARTIALLY_RECEIVED', 'RELEASED', 'RECEIVED', 'COMPLETED', 'REJECTED', 'RETURNED_FOR_REVISION'].map((option) => (
-                                    <option key={option} value={option}>{option.replaceAll('_', ' ')}</option>
-                                ))}
-                            </select>
-                            <select
-                                value={year}
-                                onChange={(event) => setYear(event.target.value)}
-                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                            >
-                                <option value="">All years</option>
-                                {(filter_options?.years ?? []).map((option) => (
-                                    <option key={option} value={option}>
-                                        {option}
-                                    </option>
-                                ))}
-                            </select>
-                            <select
-                                value={month}
-                                onChange={(event) => setMonth(event.target.value)}
-                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                            >
-                                <option value="">All months</option>
-                                {[
-                                    ['01', 'January'],
-                                    ['02', 'February'],
-                                    ['03', 'March'],
-                                    ['04', 'April'],
-                                    ['05', 'May'],
-                                    ['06', 'June'],
-                                    ['07', 'July'],
-                                    ['08', 'August'],
-                                    ['09', 'September'],
-                                    ['10', 'October'],
-                                    ['11', 'November'],
-                                    ['12', 'December'],
-                                ].map(([value, label]) => (
-                                    <option key={value} value={value}>
-                                        {label}
-                                    </option>
-                                ))}
-                            </select>
-                            <input
-                                value={search}
-                                onChange={(event) => setSearch(event.target.value)}
-                                placeholder="Search request code, purpose, status"
-                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                            />
+                            <span className="text-[11px] text-slate-500">Showing {supplyRequests.data.length} records</span>
                             <button
                                 type="button"
                                 onClick={() => router.get(route('office.supply-requests.index'))}
-                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                                className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
                             >
                                 Reset
                             </button>
                         </div>
                     </div>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-[10rem_7rem_7rem_minmax(0,1fr)]">
+                        <select
+                            value={status}
+                            onChange={(event) => setStatus(event.target.value)}
+                            className="h-8 rounded-lg border-slate-300 py-1 text-xs"
+                        >
+                            <option value="">All statuses</option>
+                            {['DRAFT', 'SUBMITTED', 'IN_REVIEW', 'PROCUREMENT_PLACED', 'PROCESSING', 'PARTIALLY_RELEASED', 'PARTIALLY_RECEIVED', 'RELEASED', 'RECEIVED', 'COMPLETED', 'REJECTED', 'RETURNED_FOR_REVISION'].map((option) => (
+                                <option key={option} value={option}>{option.replaceAll('_', ' ')}</option>
+                            ))}
+                        </select>
+                        <select
+                            value={year}
+                            onChange={(event) => setYear(event.target.value)}
+                            className="h-8 rounded-lg border-slate-300 py-1 text-xs"
+                        >
+                            <option value="">All years</option>
+                            {(filter_options?.years ?? []).map((option) => (
+                                <option key={option} value={option}>
+                                    {option}
+                                </option>
+                            ))}
+                        </select>
+                        <select
+                            value={month}
+                            onChange={(event) => setMonth(event.target.value)}
+                            className="h-8 rounded-lg border-slate-300 py-1 text-xs"
+                        >
+                            <option value="">All months</option>
+                            {[
+                                ['01', 'January'],
+                                ['02', 'February'],
+                                ['03', 'March'],
+                                ['04', 'April'],
+                                ['05', 'May'],
+                                ['06', 'June'],
+                                ['07', 'July'],
+                                ['08', 'August'],
+                                ['09', 'September'],
+                                ['10', 'October'],
+                                ['11', 'November'],
+                                ['12', 'December'],
+                            ].map(([value, label]) => (
+                                <option key={value} value={value}>
+                                    {label}
+                                </option>
+                            ))}
+                        </select>
+                        <input
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                            placeholder="Search request code, purpose, status..."
+                            className="h-8 rounded-lg border-slate-300 py-1 text-xs"
+                        />
+                    </div>
+                </section>
 
+                {/* Table Container with Internal Scroll */}
+                <section className="flex-1 min-h-0 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-sm">
                     {supplyRequests.data.length === 0 ? (
-                        <div className="px-6 py-10 text-sm text-slate-600">No requests found. Create your first supply request.</div>
+                        <div className="px-4 py-8 text-center text-sm text-slate-500">No requests found. Create your first supply request.</div>
                     ) : (
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-slate-200 text-sm">
-                                <thead className="bg-slate-50">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Request ID</th>
-                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Date Submitted</th>
-                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Status</th>
-                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Items</th>
-                                        <th className="px-4 py-3 text-right font-semibold text-slate-700">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 bg-white">
-                                    {supplyRequests.data.map((row) => (
-                                        <tr key={row.supply_request_id}>
-                                            <td className="px-4 py-3 font-semibold text-red-700">{row.request_code}</td>
-                                            <td className="px-4 py-3 text-slate-700">{formatDate(row.request_date)}</td>
-                                            <td className="px-4 py-3">
-                                                <StatusBadge status={row.status} />
-                                            </td>
-                                            <td className="px-4 py-3 text-slate-700">{row.items_count ?? 0} item(s)</td>
-                                            <td className="px-4 py-3 text-right">
-                                                <div className="inline-flex flex-wrap justify-end gap-2">
+                        <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
+                            <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+                                <tr>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Request ID</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Date Submitted</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Status</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Items</th>
+                                    <th className="px-3.5 py-2 text-right font-semibold text-slate-700">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 bg-white">
+                                {supplyRequests.data.map((row) => (
+                                    <tr key={row.supply_request_id} className="hover:bg-slate-50/60 transition-colors">
+                                        <td className="px-3.5 py-2 font-semibold text-red-700">{row.request_code}</td>
+                                        <td className="px-3.5 py-2 text-slate-700">{formatDate(row.request_date)}</td>
+                                        <td className="px-3.5 py-2">
+                                            <StatusBadge status={row.status} />
+                                        </td>
+                                        <td className="px-3.5 py-2 text-slate-700">{row.items_count ?? 0} item(s)</td>
+                                        <td className="px-3.5 py-2 text-right">
+                                            <div className="inline-flex flex-wrap justify-end gap-1.5">
                                                 <Link
                                                     href={route('office.supply-requests.show', row.supply_request_id)}
-                                                    className="inline-flex items-center rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
+                                                    className="inline-flex items-center rounded border border-red-200 bg-red-50/50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 transition"
                                                 >
                                                     View Details
                                                 </Link>
-                                                    {(row.raw_status ?? row.status) === 'DRAFT' && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => submitDraft(row)}
-                                                            disabled={submittingDraftId === row.supply_request_id}
-                                                            className="inline-flex items-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60"
-                                                        >
-                                                            {submittingDraftId === row.supply_request_id ? 'Submitting...' : 'Submit'}
-                                                        </button>
-                                                    )}
-                                                    {(row.raw_status ?? row.status) === 'DRAFT' && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setDraftToDelete(row)}
-                                                            className="inline-flex items-center rounded-lg border border-rose-300 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50"
-                                                        >
-                                                            Delete
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                                {(row.raw_status ?? row.status) === 'DRAFT' && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => submitDraft(row)}
+                                                        disabled={submittingDraftId === row.supply_request_id}
+                                                        className="inline-flex items-center rounded bg-red-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60 transition"
+                                                    >
+                                                        {submittingDraftId === row.supply_request_id ? 'Submitting...' : 'Submit'}
+                                                    </button>
+                                                )}
+                                                {(row.raw_status ?? row.status) === 'DRAFT' && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setDraftToDelete(row)}
+                                                        className="inline-flex items-center rounded border border-rose-200 bg-rose-50/50 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition"
+                                                    >
+                                                        Delete
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     )}
-                </div>
+                </section>
 
-                <PaginationNav links={supplyRequests.links} preserveState={false} />
+                <div className="shrink-0 pt-0.5">
+                    <PaginationNav links={supplyRequests.links} preserveState={false} />
+                </div>
             </div>
 
             <Modal show={draftToDelete !== null} maxWidth="md" onClose={() => setDraftToDelete(null)}>

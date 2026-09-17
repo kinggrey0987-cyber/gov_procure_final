@@ -98,20 +98,7 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
     }, [recentPurchaseOrders, orderSearch, orderStatus]);
 
     return (
-        <AuthenticatedLayout
-            header="Procurement Dashboard"
-            headerActions={
-                <Link
-                    href={route('procurement.purchase-orders.create')}
-                    className="inline-flex h-8 items-center rounded-lg bg-red-600 px-3 text-xs font-semibold text-white hover:bg-red-700 shadow-sm transition"
-                >
-                    <svg className="mr-1.5 h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                    </svg>
-                    New Purchase Order
-                </Link>
-            }
-        >
+        <AuthenticatedLayout header="Procurement Dashboard">
             <Head title="Procurement Dashboard" />
 
             <div className="space-y-2 lg:h-[calc(100vh-8.5rem)] flex flex-col justify-between overflow-y-auto lg:overflow-hidden">

@@ -66,138 +66,145 @@ export default function PpmpIndex({ ppmps, filters, filter_options }: Props) {
     };
 
     return (
-        <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">PPMP</h2>}>
+        <AuthenticatedLayout
+            header="Project Procurement Management Plan (PPMP)"
+            headerActions={
+                <Link
+                    href={route('office.ppmp.create')}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-red-600 px-3 text-xs font-semibold text-white shadow-sm hover:bg-red-700 transition"
+                >
+                    <span className="text-sm leading-none">＋</span>
+                    <span>Create PPMP</span>
+                </Link>
+            }
+        >
             <Head title="PPMP" />
 
-            <div className="space-y-5 py-4">
-                <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                            <h3 className="text-2xl font-semibold text-slate-800">Project Procurement Management Plan</h3>
-                            <p className="text-sm text-slate-600">Prepare and submit annual PPMP plans for your office.</p>
-                            <Link href={route('office.tracking')} className="mt-3 inline-flex rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                                Back to Dashboard
-                            </Link>
+            <div className="space-y-2 lg:h-[calc(100vh-8.5rem)] flex flex-col justify-between overflow-y-auto lg:overflow-hidden">
+                {/* Compact Control & Filter Header */}
+                <section className="shrink-0 rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                            <h3 className="text-xs font-bold text-slate-800">Filter PPMP Plans</h3>
+                            <span className="hidden text-[11px] text-slate-500 sm:inline">• Prepare, submit, and track annual procurement management plans</span>
                         </div>
-                        <Link href={route('office.ppmp.create')} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">
-                            Create PPMP
-                        </Link>
-                    </div>
-                </section>
-
-                <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    <div className="border-b border-slate-200 px-6 py-4">
-                        <h4 className="text-lg font-semibold text-slate-800">PPMP List</h4>
-                        <div className="mt-3 grid gap-2 md:grid-cols-4">
-                            <select
-                                value={status}
-                                onChange={(event) => setStatus(event.target.value)}
-                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                            >
-                                <option value="">All statuses</option>
-                                {['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'RETURNED_FOR_REVISION'].map((option) => (
-                                    <option key={option} value={option}>{option.replaceAll('_', ' ')}</option>
-                                ))}
-                            </select>
-                            <select
-                                value={year}
-                                onChange={(event) => setYear(event.target.value)}
-                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                            >
-                                <option value="">All years</option>
-                                {(filter_options?.years ?? []).map((option) => (
-                                    <option key={option} value={option}>
-                                        {option}
-                                    </option>
-                                ))}
-                            </select>
-                            <select
-                                value={month}
-                                onChange={(event) => setMonth(event.target.value)}
-                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                            >
-                                <option value="">All months</option>
-                                {[
-                                    ['01', 'January'],
-                                    ['02', 'February'],
-                                    ['03', 'March'],
-                                    ['04', 'April'],
-                                    ['05', 'May'],
-                                    ['06', 'June'],
-                                    ['07', 'July'],
-                                    ['08', 'August'],
-                                    ['09', 'September'],
-                                    ['10', 'October'],
-                                    ['11', 'November'],
-                                    ['12', 'December'],
-                                ].map(([value, label]) => (
-                                    <option key={value} value={value}>
-                                        {label}
-                                    </option>
-                                ))}
-                            </select>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-slate-500">Showing {ppmps.data.length} records</span>
                             <button
                                 type="button"
                                 onClick={() => router.get(route('office.ppmp.index'))}
-                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                                className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
                             >
                                 Reset
                             </button>
                         </div>
                     </div>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                        <select
+                            value={status}
+                            onChange={(event) => setStatus(event.target.value)}
+                            className="h-8 rounded-lg border-slate-300 py-1 text-xs"
+                        >
+                            <option value="">All statuses</option>
+                            {['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'RETURNED_FOR_REVISION'].map((option) => (
+                                <option key={option} value={option}>{option.replaceAll('_', ' ')}</option>
+                            ))}
+                        </select>
+                        <select
+                            value={year}
+                            onChange={(event) => setYear(event.target.value)}
+                            className="h-8 rounded-lg border-slate-300 py-1 text-xs"
+                        >
+                            <option value="">All years</option>
+                            {(filter_options?.years ?? []).map((option) => (
+                                <option key={option} value={option}>
+                                    {option}
+                                </option>
+                            ))}
+                        </select>
+                        <select
+                            value={month}
+                            onChange={(event) => setMonth(event.target.value)}
+                            className="h-8 rounded-lg border-slate-300 py-1 text-xs"
+                        >
+                            <option value="">All months</option>
+                            {[
+                                ['01', 'January'],
+                                ['02', 'February'],
+                                ['03', 'March'],
+                                ['04', 'April'],
+                                ['05', 'May'],
+                                ['06', 'June'],
+                                ['07', 'July'],
+                                ['08', 'August'],
+                                ['09', 'September'],
+                                ['10', 'October'],
+                                ['11', 'November'],
+                                ['12', 'December'],
+                            ].map(([value, label]) => (
+                                <option key={value} value={value}>
+                                    {label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                </section>
+
+                {/* Table Container with Internal Scroll */}
+                <section className="flex-1 min-h-0 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-sm">
                     {ppmps.data.length === 0 ? (
-                        <div className="px-6 py-10 text-sm text-slate-600">No PPMP entries yet.</div>
+                        <div className="px-4 py-8 text-center text-sm text-slate-500">No PPMP entries yet.</div>
                     ) : (
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-slate-200 text-sm">
-                                <thead className="bg-slate-50">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">PPMP ID</th>
-                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Fiscal Year</th>
-                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Date Prepared</th>
-                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Status</th>
-                                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Last Updated</th>
-                                        <th className="px-4 py-3 text-right font-semibold text-slate-700">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {ppmps.data.map((ppmp) => (
-                                        <tr key={ppmp.ppmp_id}>
-                                            <td className="px-4 py-3 font-semibold text-red-700">{ppmp.ppmp_code}</td>
-                                            <td className="px-4 py-3 text-slate-700">{ppmp.fiscal_year}</td>
-                                            <td className="px-4 py-3 text-slate-700">{ppmp.date_prepared ?? '-'}</td>
-                                            <td className="px-4 py-3">
-                                                <StatusBadge status={ppmp.status} />
-                                            </td>
-                                            <td className="px-4 py-3 text-slate-700">{formatDateTime(ppmp.last_updated)}</td>
-                                            <td className="px-4 py-3 text-right">
-                                                <div className="inline-flex flex-wrap justify-end gap-2">
+                        <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
+                            <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+                                <tr>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">PPMP ID</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Fiscal Year</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Date Prepared</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Status</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Last Updated</th>
+                                    <th className="px-3.5 py-2 text-right font-semibold text-slate-700">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {ppmps.data.map((ppmp) => (
+                                    <tr key={ppmp.ppmp_id} className="hover:bg-slate-50/60 transition-colors">
+                                        <td className="px-3.5 py-2 font-semibold text-red-700">{ppmp.ppmp_code}</td>
+                                        <td className="px-3.5 py-2 text-slate-700 font-medium">{ppmp.fiscal_year}</td>
+                                        <td className="px-3.5 py-2 text-slate-700">{ppmp.date_prepared ?? '-'}</td>
+                                        <td className="px-3.5 py-2">
+                                            <StatusBadge status={ppmp.status} />
+                                        </td>
+                                        <td className="px-3.5 py-2 text-slate-700 text-xs">{formatDateTime(ppmp.last_updated)}</td>
+                                        <td className="px-3.5 py-2 text-right">
+                                            <div className="inline-flex flex-wrap justify-end gap-1.5">
                                                 <Link
                                                     href={route('office.ppmp.show', ppmp.ppmp_id)}
-                                                    className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
+                                                    className="rounded border border-red-200 bg-red-50/50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 transition"
                                                 >
                                                     View Details
                                                 </Link>
-                                                    {ppmp.status === 'DRAFT' && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setDraftToDelete(ppmp)}
-                                                            className="rounded-lg border border-rose-300 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50"
-                                                        >
-                                                            Delete
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                                {ppmp.status === 'DRAFT' && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setDraftToDelete(ppmp)}
+                                                        className="rounded border border-rose-200 bg-rose-50/50 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition"
+                                                    >
+                                                        Delete
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     )}
                 </section>
 
-                <PaginationNav links={ppmps.links} preserveState={false} />
+                <div className="shrink-0 pt-0.5">
+                    <PaginationNav links={ppmps.links} preserveState={false} />
+                </div>
             </div>
 
             <Modal show={draftToDelete !== null} maxWidth="md" onClose={() => setDraftToDelete(null)}>

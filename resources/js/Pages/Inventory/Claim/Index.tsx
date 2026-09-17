@@ -88,124 +88,131 @@ export default function ClaimIndex({ claims, filters, filter_options, routes, pe
 
     return (
         <AuthenticatedLayout
-            header={
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h2 className="text-xl font-semibold leading-tight text-gray-800">{canProcess ? 'Claims Review' : 'Claims and Adjustments'}</h2>
-                        <p className="mt-1 text-xs font-normal text-slate-500">
-                            {canProcess ? 'GSO reviews and resolves claims filed by offices.' : 'Office users file claims for issues found after distribution release or receipt.'}
-                        </p>
-                    </div>
-                    {canCreate ? (
-                        <Link href={route(routeNames.create)} className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
-                            File Claim
-                        </Link>
-                    ) : null}
-                </div>
+            header={canProcess ? 'Claims Review' : 'Claims and Adjustments'}
+            headerActions={
+                canCreate ? (
+                    <Link
+                        href={route(routeNames.create)}
+                        className="inline-flex h-8 items-center rounded-lg bg-red-600 px-3 text-xs font-semibold text-white hover:bg-red-700 shadow-sm transition"
+                    >
+                        <svg className="mr-1.5 h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                        </svg>
+                        File Claim
+                    </Link>
+                ) : undefined
             }
         >
             <Head title="Claims" />
-            <div className="py-8">
-                <div className="mb-4 grid gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm md:grid-cols-5">
-                    <select
-                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                        value={status}
-                        onChange={(event) => setStatus(event.target.value)}
-                    >
-                        <option value="">All statuses</option>
-                        {statusOptions.map((option) => <option key={option} value={option}>{displayClaimStatus(option)}</option>)}
-                    </select>
-                    <select
-                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                        value={year}
-                        onChange={(event) => setYear(event.target.value)}
-                    >
-                        <option value="">All years</option>
-                        {(filter_options?.years ?? []).map((option) => (
-                            <option key={option} value={option}>
-                                {option}
-                            </option>
-                        ))}
-                    </select>
-                    <select
-                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                        value={month}
-                        onChange={(event) => setMonth(event.target.value)}
-                    >
-                        <option value="">All months</option>
-                        {[
-                            ['01', 'January'],
-                            ['02', 'February'],
-                            ['03', 'March'],
-                            ['04', 'April'],
-                            ['05', 'May'],
-                            ['06', 'June'],
-                            ['07', 'July'],
-                            ['08', 'August'],
-                            ['09', 'September'],
-                            ['10', 'October'],
-                            ['11', 'November'],
-                            ['12', 'December'],
-                        ].map(([value, label]) => (
-                            <option key={value} value={value}>{label}</option>
-                        ))}
-                    </select>
-                    <input
-                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                        value={search}
-                        placeholder="Search claim code, type, office"
-                        onChange={(event) => setSearch(event.target.value)}
-                    />
-                    <button
-                        type="button"
-                        onClick={() => router.get(route(routeNames.index))}
-                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                    >
-                        Reset
-                    </button>
-                </div>
 
-                <div className="mb-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <p className="text-sm text-slate-600">
-                        {canProcess
-                            ? 'Review office-filed post-distribution claims and record GSO resolution decisions.'
-                            : 'Use this page to file and track post-distribution issues for supplies released or received by your office.'}
-                    </p>
-                </div>
-
-                <div className="responsive-table-wrap rounded-xl border border-slate-200 bg-white shadow-sm">
-                    <table className="min-w-full divide-y divide-slate-200 text-sm">
-                        <thead className="bg-slate-50">
-                            <tr>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Code</th>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Type</th>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Status</th>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Office</th>
-                                <th className="px-4 py-3 text-right font-semibold text-slate-700">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {claims.data.map((row) => (
-                                <tr key={row.claims_id} className="hover:bg-slate-50/60">
-                                    <td className="px-4 py-3 font-mono text-xs text-slate-700">{row.claim_code}</td>
-                                    <td className="px-4 py-3 text-slate-700">{row.claim_type}</td>
-                                    <td className="px-4 py-3">
-                                        <span className={statusClass(row.status)}>{displayClaimStatus(row.status)}</span>
-                                    </td>
-                                    <td className="px-4 py-3 text-slate-600">{row.office?.name ?? row.office_id ?? '-'}</td>
-                                    <td className="px-4 py-3 text-right">
-                                        <Link href={route(routeNames.show, row.claims_id)} className="text-sm font-semibold text-red-700 hover:text-red-900">
-                                            {canProcess && ['OPEN', 'IN_REVIEW', 'PENDING_REPLACEMENT', 'PARTIALLY_RESOLVED'].includes(row.status) ? 'Review' : 'View'}
-                                        </Link>
-                                    </td>
-                                </tr>
+            <div className="space-y-2 lg:h-[calc(100vh-8.5rem)] flex flex-col justify-between overflow-y-auto lg:overflow-hidden">
+                {/* Compact Filter Bar */}
+                <div className="shrink-0 rounded-xl border border-slate-200 bg-white p-2 shadow-xs">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <input
+                            className="h-8 flex-1 min-w-[180px] rounded-lg border border-slate-300 px-2.5 text-xs focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                            value={search}
+                            placeholder="Search claim code, type, office..."
+                            onChange={(event) => setSearch(event.target.value)}
+                        />
+                        <select
+                            className="h-8 rounded-lg border border-slate-300 px-2.5 text-xs text-slate-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                            value={status}
+                            onChange={(event) => setStatus(event.target.value)}
+                        >
+                            <option value="">All statuses</option>
+                            {statusOptions.map((option) => (
+                                <option key={option} value={option}>{displayClaimStatus(option)}</option>
                             ))}
-                        </tbody>
-                    </table>
+                        </select>
+                        <select
+                            className="h-8 rounded-lg border border-slate-300 px-2.5 text-xs text-slate-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                            value={year}
+                            onChange={(event) => setYear(event.target.value)}
+                        >
+                            <option value="">All years</option>
+                            {(filter_options?.years ?? []).map((option) => (
+                                <option key={option} value={option}>
+                                    {option}
+                                </option>
+                            ))}
+                        </select>
+                        <select
+                            className="h-8 rounded-lg border border-slate-300 px-2.5 text-xs text-slate-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                            value={month}
+                            onChange={(event) => setMonth(event.target.value)}
+                        >
+                            <option value="">All months</option>
+                            {[
+                                ['01', 'January'],
+                                ['02', 'February'],
+                                ['03', 'March'],
+                                ['04', 'April'],
+                                ['05', 'May'],
+                                ['06', 'June'],
+                                ['07', 'July'],
+                                ['08', 'August'],
+                                ['09', 'September'],
+                                ['10', 'October'],
+                                ['11', 'November'],
+                                ['12', 'December'],
+                            ].map(([value, label]) => (
+                                <option key={value} value={value}>{label}</option>
+                            ))}
+                        </select>
+                        <button
+                            type="button"
+                            onClick={() => router.get(route(routeNames.index))}
+                            className="inline-flex h-8 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                        >
+                            Reset
+                        </button>
+                    </div>
                 </div>
 
-                <div className="mt-4">
-                    <PaginationNav links={claims.links} preserveState={false} />
+                {/* High-Density Claims Table with Sticky Headers and Internal Scroll */}
+                <div className="flex-1 min-h-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs flex flex-col">
+                    <div className="flex-1 overflow-y-auto min-h-0">
+                        <table className="min-w-full divide-y divide-slate-200 text-xs">
+                            <thead className="sticky top-0 z-10 bg-slate-50 shadow-xs">
+                                <tr>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Code</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Type</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Status</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Office</th>
+                                    <th className="px-3.5 py-2 text-right font-semibold text-slate-700">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {claims.data.map((row) => (
+                                    <tr key={row.claims_id} className="hover:bg-slate-50/60">
+                                        <td className="px-3.5 py-2 font-mono text-[11px] font-semibold text-slate-700">{row.claim_code}</td>
+                                        <td className="px-3.5 py-2 text-slate-700">{row.claim_type}</td>
+                                        <td className="px-3.5 py-2">
+                                            <span className={statusClass(row.status)}>{displayClaimStatus(row.status)}</span>
+                                        </td>
+                                        <td className="px-3.5 py-2 text-slate-600">{row.office?.name ?? row.office_id ?? '-'}</td>
+                                        <td className="px-3.5 py-2 text-right">
+                                            <Link href={route(routeNames.show, row.claims_id)} className="font-semibold text-xs text-red-600 hover:text-red-800">
+                                                {canProcess && ['OPEN', 'IN_REVIEW', 'PENDING_REPLACEMENT', 'PARTIALLY_RESOLVED'].includes(row.status) ? 'Review' : 'View'}
+                                            </Link>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {claims.data.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={5} className="px-4 py-8 text-center text-xs text-slate-500">
+                                            No claim records found.
+                                        </td>
+                                    </tr>
+                                ) : null}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div className="shrink-0 border-t border-slate-200 bg-slate-50/70 px-3 py-1.5">
+                        <PaginationNav links={claims.links} preserveState={false} />
+                    </div>
                 </div>
             </div>
         </AuthenticatedLayout>

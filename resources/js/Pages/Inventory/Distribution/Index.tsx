@@ -101,105 +101,77 @@ export default function DistributionIndex({ records, filters, filter_options }: 
 
     return (
         <AuthenticatedLayout
-            header={
-                <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-semibold leading-tight text-gray-800">Distribution Records</h2>
-                    <Link href={route('inventory.distribution-records.create')} className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
-                        New Distribution
-                    </Link>
-                </div>
+            header="Distribution Records"
+            headerActions={
+                <Link
+                    href={route('inventory.distribution-records.create')}
+                    className="inline-flex h-8 items-center rounded-lg bg-red-600 px-3 text-xs font-semibold text-white hover:bg-red-700 shadow-sm transition"
+                >
+                    <svg className="mr-1.5 h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                    </svg>
+                    New Distribution
+                </Link>
             }
         >
             <Head title="Distribution Records" />
-            <div className="py-8">
-                <div className="mb-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <p className="text-sm text-slate-600">
-                        This page is for historical distribution records and audit viewing only. Operational release processing is done in Supply Distribution.
-                    </p>
-                </div>
 
-                <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div className="grid gap-3 md:grid-cols-[1fr_220px_180px_180px_auto] md:items-end">
-                        <div>
-                            <label htmlFor="distribution-search" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                Search
-                            </label>
-                                <input
-                                    id="distribution-search"
-                                    type="text"
-                                    value={search}
-                                onChange={(event) => setSearch(event.target.value)}
-                                placeholder="Code, office request, office, status"
-                                className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                            />
-                        </div>
-
-                        <div>
-                            <label htmlFor="distribution-year" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                Year
-                            </label>
-                            <select
-                                id="distribution-year"
-                                value={year}
-                                onChange={(event) => setYear(event.target.value)}
-                                className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                            >
-                                <option value="">All years</option>
-                                {(filter_options?.years ?? []).map((option) => (
-                                    <option key={option} value={option}>
-                                        {option}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div>
-                            <label htmlFor="distribution-month" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                Month
-                            </label>
-                            <select
-                                id="distribution-month"
-                                value={month}
-                                onChange={(event) => setMonth(event.target.value)}
-                                className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                            >
-                                <option value="">All months</option>
-                                {[
-                                    ['01', 'January'],
-                                    ['02', 'February'],
-                                    ['03', 'March'],
-                                    ['04', 'April'],
-                                    ['05', 'May'],
-                                    ['06', 'June'],
-                                    ['07', 'July'],
-                                    ['08', 'August'],
-                                    ['09', 'September'],
-                                    ['10', 'October'],
-                                    ['11', 'November'],
-                                    ['12', 'December'],
-                                ].map(([value, label]) => (
-                                    <option key={value} value={value}>{label}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div>
-                            <label htmlFor="distribution-status" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                Status
-                            </label>
-                            <select
-                                id="distribution-status"
-                                value={statusFilter}
-                                onChange={(event) => setStatusFilter(event.target.value)}
-                                className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                            >
-                                <option value="">All statuses</option>
-                                <option value="DRAFT">Draft</option>
-                                <option value="RELEASED">Released</option>
-                                <option value="RECEIVED">Received</option>
-                            </select>
-                        </div>
-
+            <div className="space-y-2 lg:h-[calc(100vh-8.5rem)] flex flex-col justify-between overflow-y-auto lg:overflow-hidden">
+                {/* Compact Filter Bar */}
+                <div className="shrink-0 rounded-xl border border-slate-200 bg-white p-2 shadow-xs">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                            placeholder="Search code, office request, office..."
+                            className="h-8 flex-1 min-w-[180px] rounded-lg border border-slate-300 px-2.5 text-xs focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                        />
+                        <select
+                            value={year}
+                            onChange={(event) => setYear(event.target.value)}
+                            className="h-8 rounded-lg border border-slate-300 px-2.5 text-xs text-slate-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                        >
+                            <option value="">All years</option>
+                            {(filter_options?.years ?? []).map((option) => (
+                                <option key={option} value={option}>
+                                    {option}
+                                </option>
+                            ))}
+                        </select>
+                        <select
+                            value={month}
+                            onChange={(event) => setMonth(event.target.value)}
+                            className="h-8 rounded-lg border border-slate-300 px-2.5 text-xs text-slate-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                        >
+                            <option value="">All months</option>
+                            {[
+                                ['01', 'January'],
+                                ['02', 'February'],
+                                ['03', 'March'],
+                                ['04', 'April'],
+                                ['05', 'May'],
+                                ['06', 'June'],
+                                ['07', 'July'],
+                                ['08', 'August'],
+                                ['09', 'September'],
+                                ['10', 'October'],
+                                ['11', 'November'],
+                                ['12', 'December'],
+                            ].map(([value, label]) => (
+                                <option key={value} value={value}>{label}</option>
+                            ))}
+                        </select>
+                        <select
+                            value={statusFilter}
+                            onChange={(event) => setStatusFilter(event.target.value)}
+                            className="h-8 rounded-lg border border-slate-300 px-2.5 text-xs text-slate-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                        >
+                            <option value="">All statuses</option>
+                            <option value="DRAFT">Draft</option>
+                            <option value="RELEASED">Released</option>
+                            <option value="RECEIVED">Received</option>
+                        </select>
                         <button
                             type="button"
                             onClick={() => {
@@ -207,63 +179,64 @@ export default function DistributionIndex({ records, filters, filter_options }: 
                                 setStatusFilter('');
                                 setMonth('');
                             }}
-                            className="inline-flex h-[42px] items-center justify-center rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                            className="inline-flex h-8 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
                         >
-                            Reset Filters
+                            Reset
                         </button>
                     </div>
-
-                    <p className="mt-3 text-xs text-slate-500">
-                        Showing {filteredRecords.length} of {records.data.length} record(s) on this page.
-                    </p>
                 </div>
 
-                <div className="responsive-table-wrap rounded-xl border border-slate-200 bg-white shadow-sm">
-                    <table className="min-w-full divide-y divide-slate-200 text-sm">
-                        <thead className="bg-slate-50">
-                            <tr>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Code</th>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Linked Office Request</th>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Office</th>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Status</th>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Release Date</th>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Items / Claims</th>
-                                <th className="px-4 py-3 text-right font-semibold text-slate-700">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {filteredRecords.map((row) => (
-                                <tr key={row.distribution_record_id} className="hover:bg-slate-50/60">
-                                    <td className="px-4 py-3 font-mono text-xs text-slate-700">{row.distribution_code}</td>
-                                    <td className="px-4 py-3 font-mono text-xs text-slate-700">{row.supply_request?.request_code ?? '-'}</td>
-                                    <td className="px-4 py-3 text-slate-700">{row.office?.name ?? row.office_id ?? '-'}</td>
-                                    <td className="px-4 py-3">
-                                        <span className={statusClass(row.status)}>{displayDistributionStatus(row.status)}</span>
-                                    </td>
-                                    <td className="px-4 py-3 text-slate-600">{formatDate(row.release_date)}</td>
-                                    <td className="px-4 py-3 text-slate-600">{row.items_count} released / {row.claims_count} claim(s)</td>
-                                    <td className="px-4 py-3 text-right">
-                                        <Link
-                                            href={route('inventory.distribution-records.show', row.distribution_record_id)}
-                                            className="text-sm font-semibold text-red-700 hover:text-red-900"
-                                        >
-                                            View
-                                        </Link>
-                                    </td>
-                                </tr>
-                            ))}
-                            {filteredRecords.length === 0 && (
+                {/* High-Density Distribution Table with Sticky Headers and Internal Scroll */}
+                <div className="flex-1 min-h-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs flex flex-col">
+                    <div className="flex-1 overflow-y-auto min-h-0">
+                        <table className="min-w-full divide-y divide-slate-200 text-xs">
+                            <thead className="sticky top-0 z-10 bg-slate-50 shadow-xs">
                                 <tr>
-                                    <td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-500">
-                                        No records matched the selected filters.
-                                    </td>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Code</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Linked Office Request</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Office</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Status</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Release Date</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Items / Claims</th>
+                                    <th className="px-3.5 py-2 text-right font-semibold text-slate-700">Action</th>
                                 </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {filteredRecords.map((row) => (
+                                    <tr key={row.distribution_record_id} className="hover:bg-slate-50/60">
+                                        <td className="px-3.5 py-2 font-mono text-[11px] font-semibold text-slate-700">{row.distribution_code}</td>
+                                        <td className="px-3.5 py-2 font-mono text-[11px] text-slate-600">{row.supply_request?.request_code ?? '-'}</td>
+                                        <td className="px-3.5 py-2 text-slate-700">{row.office?.name ?? row.office_id ?? '-'}</td>
+                                        <td className="px-3.5 py-2">
+                                            <span className={statusClass(row.status)}>{displayDistributionStatus(row.status)}</span>
+                                        </td>
+                                        <td className="px-3.5 py-2 text-slate-500">{formatDate(row.release_date)}</td>
+                                        <td className="px-3.5 py-2 text-slate-600">{row.items_count} released / {row.claims_count} claim(s)</td>
+                                        <td className="px-3.5 py-2 text-right">
+                                            <Link
+                                                href={route('inventory.distribution-records.show', row.distribution_record_id)}
+                                                className="font-semibold text-xs text-red-600 hover:text-red-800"
+                                            >
+                                                View
+                                            </Link>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {filteredRecords.length === 0 && (
+                                    <tr>
+                                        <td colSpan={7} className="px-4 py-8 text-center text-xs text-slate-500">
+                                            No records matched the selected filters.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
 
-                <PaginationNav links={records.links} preserveState={false} />
+                    <div className="shrink-0 border-t border-slate-200 bg-slate-50/70 px-3 py-1.5">
+                        <PaginationNav links={records.links} preserveState={false} />
+                    </div>
+                </div>
             </div>
         </AuthenticatedLayout>
     );

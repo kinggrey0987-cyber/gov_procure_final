@@ -105,7 +105,7 @@ class DomainDashboardController extends Controller
             ->forOffice($officeId)
             ->withCount('items')
             ->latest('supply_request_id')
-            ->limit(5)
+            ->limit(15)
             ->get(['supply_request_id', 'request_code', 'request_date', 'status'])
             ->map(fn (SupplyRequest $supplyRequest): array => [
                 'supply_request_id' => (int) $supplyRequest->supply_request_id,

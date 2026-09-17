@@ -37,6 +37,19 @@ type Props = {
     dashboardAlerts: DashboardAlert[];
 };
 
+const PENDING_STATUS_LIST = ['DRAFT', 'SUBMITTED', 'IN_REVIEW', 'PENDING', 'OPEN'];
+const PROCESSING_STATUS_LIST = [
+    'FOR_PROCUREMENT',
+    'PROCESSING',
+    'APPROVED',
+    'QUEUED_FOR_PROCUREMENT',
+    'IN_PROCESSING',
+    'PARTIALLY_RELEASED',
+    'RELEASED',
+    'PARTIALLY_RECEIVED',
+    'RECEIVED',
+];
+
 export default function OfficeTracking({ summary, recentRequests, notificationPreview, dashboardAlerts }: Props) {
     const [requestSearch, setRequestSearch] = useState('');
     const [requestStatus, setRequestStatus] = useState('ALL');
@@ -50,8 +63,21 @@ export default function OfficeTracking({ summary, recentRequests, notificationPr
         const keyword = requestSearch.trim().toLowerCase();
 
         return recentRequests.filter((request) => {
-            const normalizedStatus = request.status.toUpperCase();
-            const matchesStatus = requestStatus === 'ALL' || normalizedStatus === requestStatus;
+            const normalizedStatus = request.status.toUpperCase().replace(/\s+/g, '_');
+            let matchesStatus = false;
+
+            if (requestStatus === 'ALL') {
+                matchesStatus = true;
+            } else if (requestStatus === 'PENDING_GROUP') {
+                matchesStatus = PENDING_STATUS_LIST.includes(normalizedStatus);
+            } else if (requestStatus === 'PROCESSING_GROUP') {
+                matchesStatus =
+                    PROCESSING_STATUS_LIST.includes(normalizedStatus) ||
+                    (!PENDING_STATUS_LIST.includes(normalizedStatus) &&
+                        !['REJECTED', 'CANCELLED'].includes(normalizedStatus));
+            } else {
+                matchesStatus = normalizedStatus === requestStatus.toUpperCase().replace(/\s+/g, '_');
+            }
 
             if (!matchesStatus) {
                 return false;
@@ -76,20 +102,7 @@ export default function OfficeTracking({ summary, recentRequests, notificationPr
     }, [recentRequests, requestSearch, requestStatus]);
 
     return (
-        <AuthenticatedLayout
-            header="Office Dashboard"
-            headerActions={
-                <Link
-                    href={route('office.supply-requests.create')}
-                    className="inline-flex h-8 items-center rounded-lg bg-red-600 px-3 text-xs font-semibold text-white hover:bg-red-700 shadow-sm transition"
-                >
-                    <svg className="mr-1.5 h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                    </svg>
-                    New Request
-                </Link>
-            }
-        >
+        <AuthenticatedLayout header="Office Dashboard">
             <Head title="Office Dashboard" />
 
             <div className="space-y-2 lg:h-[calc(100vh-8.5rem)] flex flex-col justify-between overflow-y-auto lg:overflow-hidden">
@@ -119,12 +132,11 @@ export default function OfficeTracking({ summary, recentRequests, notificationPr
                         <button
                             type="button"
                             onClick={() => {
-                                const pending = requestStatusOptions.find((s) => s.includes('PENDING')) ?? 'PENDING';
-                                setRequestStatus(pending);
+                                setRequestStatus('PENDING_GROUP');
                                 document.getElementById('recent-requests-table')?.scrollIntoView({ behavior: 'smooth' });
                             }}
                             className={`flex items-center gap-2.5 px-3 py-1.5 text-left transition rounded-lg group cursor-pointer hover:bg-amber-50/60 ${
-                                requestStatus.includes('PENDING') ? 'bg-amber-50 ring-1 ring-amber-300' : ''
+                                requestStatus === 'PENDING_GROUP' ? 'bg-amber-50 ring-1 ring-amber-300' : ''
                             }`}
                             title="Click to filter by Pending Review requests"
                         >
@@ -137,12 +149,11 @@ export default function OfficeTracking({ summary, recentRequests, notificationPr
                         <button
                             type="button"
                             onClick={() => {
-                                const proc = requestStatusOptions.find((s) => s.includes('PROCESS') || s.includes('APPROVED')) ?? 'APPROVED';
-                                setRequestStatus(proc);
+                                setRequestStatus('PROCESSING_GROUP');
                                 document.getElementById('recent-requests-table')?.scrollIntoView({ behavior: 'smooth' });
                             }}
                             className={`flex items-center gap-2.5 px-3 py-1.5 text-left transition rounded-lg group cursor-pointer hover:bg-emerald-50/60 ${
-                                requestStatus.includes('PROCESS') || requestStatus.includes('APPROVED') ? 'bg-emerald-50 ring-1 ring-emerald-300' : ''
+                                requestStatus === 'PROCESSING_GROUP' ? 'bg-emerald-50 ring-1 ring-emerald-300' : ''
                             }`}
                             title="Click to filter by In Processing requests"
                         >
@@ -241,11 +252,16 @@ export default function OfficeTracking({ summary, recentRequests, notificationPr
                                     onChange={(event) => setRequestStatus(event.target.value)}
                                     className="sm:col-span-3 h-7 rounded-lg border border-slate-300 px-2 text-xs shadow-xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                                 >
-                                    {requestStatusOptions.map((status) => (
-                                        <option key={status} value={status}>
-                                            {status === 'ALL' ? 'All statuses' : displayOfficeRequestStatus(status)}
-                                        </option>
-                                    ))}
+                                    <option value="ALL">All statuses</option>
+                                    <option value="PENDING_GROUP">Pending Review</option>
+                                    <option value="PROCESSING_GROUP">In Processing</option>
+                                    {requestStatusOptions
+                                        .filter((status) => status !== 'ALL')
+                                        .map((status) => (
+                                            <option key={status} value={status}>
+                                                {displayOfficeRequestStatus(status)}
+                                            </option>
+                                        ))}
                                 </select>
                                 <button
                                     type="button"
@@ -262,7 +278,15 @@ export default function OfficeTracking({ summary, recentRequests, notificationPr
 
                         <div className="overflow-x-auto flex-1 overflow-y-auto min-h-0">
                             {filteredRecentRequests.length === 0 ? (
-                                <div className="px-4 py-6 text-center text-xs text-slate-500">No requests match your current filters.</div>
+                                <div className="px-4 py-8 text-center text-xs text-slate-500">
+                                    <p>No recent requests match your current filters.</p>
+                                    <Link
+                                        href={route('office.supply-requests.index')}
+                                        className="mt-2 inline-flex items-center gap-1 font-semibold text-red-600 hover:text-red-700 hover:underline"
+                                    >
+                                        View all requests in Request Tracking &rarr;
+                                    </Link>
+                                </div>
                             ) : (
                                 <table className="min-w-full divide-y divide-slate-200 text-xs">
                                     <thead className="bg-slate-50 sticky top-0 z-10">

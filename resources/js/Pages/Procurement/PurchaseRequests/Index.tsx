@@ -92,41 +92,37 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
     };
 
     return (
-        <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Request Review</h2>}>
+        <AuthenticatedLayout header="Request Review">
             <Head title="Request Review" />
 
-            <div className="space-y-4 py-8">
-                <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <p className="text-sm text-slate-600">Review procurement requests forwarded from office supply demand and move eligible ones to processing.</p>
-                    <p className="mt-2 text-xs text-slate-500">
-                        {isRefreshing
-                            ? 'Refreshing request queue...'
-                            : lastRefreshedAt
-                            ? `Updated ${lastRefreshedAt.toLocaleTimeString()}`
-                            : 'Auto-refresh every 30 seconds while this page is open'}
-                    </p>
-                </section>
-
-                <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                            <h3 className="text-sm font-semibold text-slate-900">Filter request review queue</h3>
-                            <p className="text-xs text-slate-500">Filters update automatically; no apply button required.</p>
+            <div className="space-y-2 lg:h-[calc(100vh-8.5rem)] flex flex-col justify-between overflow-y-auto lg:overflow-hidden">
+                {/* Compact Control & Filter Header */}
+                <section className="shrink-0 rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                            <h3 className="text-xs font-bold text-slate-800">Filter Review Queue</h3>
+                            <span className="hidden text-[11px] text-slate-500 sm:inline">• Review procurement requests and move eligible ones to processing</span>
+                            <span className="text-[11px] text-slate-400">
+                                ({isRefreshing ? 'Refreshing queue…' : lastRefreshedAt ? `Updated ${lastRefreshedAt.toLocaleTimeString()}` : 'Auto-refresh 30s'})
+                            </span>
                         </div>
-                        <button
-                            type="button"
-                            onClick={resetFilters}
-                            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                        >
-                            Reset
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-slate-500">Showing {purchaseRequests.data.length} records</span>
+                            <button
+                                type="button"
+                                onClick={resetFilters}
+                                className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
+                            >
+                                Reset
+                            </button>
+                        </div>
                     </div>
-                    <div className="grid gap-3 lg:grid-cols-[12rem_minmax(0,1fr)_minmax(14rem,auto)]">
+                    <div className="mt-2 grid gap-2 sm:grid-cols-[13rem_minmax(0,1fr)]">
                         <select
                             value={status}
                             onChange={(event) => setStatus(event.target.value)}
                             aria-label="Filter request review queue by status"
-                            className="w-full rounded-lg border-slate-300 text-sm"
+                            className="h-8 rounded-lg border-slate-300 py-1 text-xs"
                         >
                             <option value="">All PR statuses</option>
                             <option value="OPEN">Pending Review</option>
@@ -140,25 +136,24 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                             type="text"
                             value={search}
                             onChange={(event) => setSearch(event.target.value)}
-                            placeholder="Search request code, office, or PR ID"
-                            className="w-full rounded-lg border-slate-300 text-sm"
+                            placeholder="Search request code, office, or PR ID..."
+                            className="h-8 rounded-lg border-slate-300 py-1 text-xs"
                         />
-
-                        <p className="flex items-center text-xs text-slate-500">Showing 5 records per page. Use pagination for the next 5.</p>
                     </div>
                 </section>
 
-                <section className="responsive-table-wrap rounded-xl border border-slate-200 bg-white shadow-sm">
-                    <table className="min-w-full divide-y divide-slate-200 text-sm">
-                        <thead className="bg-slate-50">
+                {/* Table Container with Internal Scroll */}
+                <section className="flex-1 min-h-0 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+                    <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
+                        <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
                             <tr>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Request ID</th>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Office</th>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Item / Category</th>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Quantity</th>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Status</th>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Date</th>
-                                <th className="px-4 py-3 text-right font-semibold text-slate-700">Actions</th>
+                                <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Request ID</th>
+                                <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Office</th>
+                                <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Item / Category</th>
+                                <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Quantity</th>
+                                <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Status</th>
+                                <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Date</th>
+                                <th className="px-3.5 py-2 text-right font-semibold text-slate-700">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -167,8 +162,8 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                                 const quantity = Number(row.items_sum_quantity_requested ?? 0);
 
                                 return (
-                                    <tr key={row.purchase_request_id} className="hover:bg-slate-50/60">
-                                        <td className="px-4 py-3 font-semibold text-red-700">
+                                    <tr key={row.purchase_request_id} className="hover:bg-slate-50/60 transition-colors">
+                                        <td className="px-3.5 py-2 font-semibold text-red-700">
                                             {(() => {
                                                 const isConsolidated = Boolean(row.remarks && (row.remarks.includes('Consolidated PR') || /from \d+ supply requests/i.test(row.remarks)));
                                                 const prNumber = row.pr_number || `PR-${String(row.purchase_request_id).padStart(6, '0')}`;
@@ -177,13 +172,13 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                                                         <div className="flex items-center gap-1.5 flex-wrap">
                                                             <span>{prNumber}</span>
                                                             {isConsolidated ? (
-                                                                <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-800">
+                                                                <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-800">
                                                                     📦 Consolidated
                                                                 </span>
                                                             ) : null}
                                                         </div>
                                                         {row.supply_request?.request_code ? (
-                                                            <p className="text-xs font-normal text-slate-500">
+                                                            <p className="text-[11px] font-normal text-slate-500">
                                                                 {isConsolidated ? `Source: ${row.supply_request.request_code}` : row.supply_request.request_code}
                                                             </p>
                                                         ) : null}
@@ -191,25 +186,25 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                                                 );
                                             })()}
                                         </td>
-                                        <td className="px-4 py-3 text-slate-700">{row.office?.name ?? '-'}</td>
-                                        <td className="px-4 py-3 text-slate-700">
-                                            {firstCategory}
-                                            <p className="text-xs text-slate-500">{row.items_count ?? 0} item(s)</p>
+                                        <td className="px-3.5 py-2 text-slate-700 font-medium">{row.office?.name ?? '-'}</td>
+                                        <td className="px-3.5 py-2 text-slate-700">
+                                            <div className="font-medium">{firstCategory}</div>
+                                            <p className="text-[11px] text-slate-500">{row.items_count ?? 0} item(s)</p>
                                         </td>
-                                        <td className="px-4 py-3 text-slate-700">{quantity.toFixed(2)}</td>
-                                        <td className="px-4 py-3">
+                                        <td className="px-3.5 py-2 text-slate-700 font-semibold">{quantity.toFixed(2)}</td>
+                                        <td className="px-3.5 py-2">
                                             <span className={statusClass(row.status)}>{displayPurchaseRequestStatus(row.status)}</span>
                                         </td>
-                                        <td className="px-4 py-3 text-slate-600">{formatDate(row.created_at)}</td>
-                                        <td className="px-4 py-3 text-right">
-                                            <div className="flex justify-end gap-3">
+                                        <td className="px-3.5 py-2 text-slate-600 text-xs">{formatDate(row.created_at)}</td>
+                                        <td className="px-3.5 py-2 text-right">
+                                            <div className="flex justify-end gap-2">
                                                 <Link
                                                     href={route('procurement.purchase-requests.show', {
                                                         purchase_request: row.purchase_request_id,
                                                         status: status || undefined,
                                                         search: search || undefined,
                                                     })}
-                                                    className="text-sm font-semibold text-red-700 hover:text-red-900"
+                                                    className="inline-flex items-center rounded border border-red-200 bg-red-50/50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 transition"
                                                 >
                                                     View
                                                 </Link>
@@ -220,7 +215,7 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                                                         status: status || undefined,
                                                         search: search || undefined,
                                                     })}
-                                                    className="text-sm font-semibold text-slate-700 hover:text-slate-900"
+                                                    className="inline-flex items-center rounded border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
                                                 >
                                                     Review
                                                 </Link>
@@ -231,7 +226,7 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                             })}
                             {purchaseRequests.data.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-500">
+                                    <td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-500">
                                         No purchase requests available for review.
                                     </td>
                                 </tr>
@@ -240,7 +235,9 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                     </table>
                 </section>
 
-                <PaginationNav links={purchaseRequests.links} preserveState={false} />
+                <div className="shrink-0 pt-0.5">
+                    <PaginationNav links={purchaseRequests.links} preserveState={false} />
+                </div>
             </div>
         </AuthenticatedLayout>
     );

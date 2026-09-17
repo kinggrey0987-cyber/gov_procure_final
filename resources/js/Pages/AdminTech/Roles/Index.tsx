@@ -24,66 +24,80 @@ export default function RoleIndex({ roles }: Props) {
         <AuthenticatedLayout header="System Monitoring">
             <Head title="System Monitoring" />
 
-            <div className="space-y-6">
-                <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    <header className="border-b border-slate-200 px-6 py-5">
-                        <h3 className="text-3xl font-semibold text-slate-800">System Health Monitor</h3>
-                        <p className="mt-1 text-lg text-slate-500">Technical access-control health snapshot based on live role assignments</p>
-                    </header>
-                    <div className="grid gap-4 p-6 md:grid-cols-2 xl:grid-cols-4">
-                        <article className="rounded-xl border border-slate-200 p-4">
-                            <p className="text-lg text-slate-500">Total Roles</p>
-                            <p className="mt-2 text-4xl font-bold text-slate-800">{totalRoles}</p>
-                        </article>
-                        <article className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-                            <p className="text-lg text-emerald-700">Active Roles</p>
-                            <p className="mt-2 text-4xl font-bold text-emerald-700">{activeRoles}</p>
-                        </article>
-                        <article className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-                            <p className="text-lg text-blue-700">Assigned Users</p>
-                            <p className="mt-2 text-4xl font-bold text-blue-700">{assignedUsers}</p>
-                        </article>
-                        <article className="rounded-xl border border-slate-200 p-4">
-                            <p className="text-lg text-slate-500">Inactive Roles</p>
-                            <p className="mt-2 text-4xl font-bold text-slate-700">{inactiveRoles}</p>
-                        </article>
+            <div className="space-y-2 lg:h-[calc(100vh-8.5rem)] flex flex-col justify-between overflow-y-auto lg:overflow-hidden">
+                {/* High-Density System Health Telemetry Cockpit */}
+                <section className="shrink-0 rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+                        <div className="flex items-center gap-2.5 px-3 py-1.5">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-slate-400" />
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Total Roles</p>
+                                <p className="text-lg font-extrabold text-slate-900 leading-tight">{totalRoles}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2.5 px-3 py-1.5">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">Active Roles</p>
+                                <p className="text-lg font-extrabold text-emerald-900 leading-tight">{activeRoles}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2.5 px-3 py-1.5">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-700">Assigned Users</p>
+                                <p className="text-lg font-extrabold text-blue-900 leading-tight">{assignedUsers}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2.5 px-3 py-1.5">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-slate-300" />
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Inactive Roles</p>
+                                <p className="text-lg font-extrabold text-slate-700 leading-tight">{inactiveRoles}</p>
+                            </div>
+                        </div>
                     </div>
                 </section>
 
-                <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    <header className="border-b border-slate-200 px-6 py-5">
-                        <h3 className="text-3xl font-semibold text-slate-800">Access Control Registry</h3>
-                    </header>
+                {/* Access Control Registry with Sticky Header & Internal Scroll */}
+                <section className="flex-1 min-h-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm flex flex-col">
+                    <div className="shrink-0 flex items-center justify-between border-b border-slate-200 bg-slate-50/70 px-3.5 py-2">
+                        <div>
+                            <h3 className="text-xs font-bold text-slate-800">Access Control Registry</h3>
+                            <p className="text-[10px] text-slate-500">Live role definitions, access permissions, and user allocation</p>
+                        </div>
+                        <span className="text-[11px] text-slate-500 font-medium">Showing {roles.length} roles</span>
+                    </div>
 
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-slate-200 text-sm">
-                            <thead className="bg-slate-50">
+                    <div className="flex-1 min-h-0 overflow-y-auto">
+                        <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
+                            <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
                                 <tr>
-                                    <th className="px-5 py-3 text-left text-sm font-semibold text-slate-700">Role</th>
-                                    <th className="px-5 py-3 text-left text-sm font-semibold text-slate-700">Code</th>
-                                    <th className="px-5 py-3 text-left text-sm font-semibold text-slate-700">Assigned Users</th>
-                                    <th className="px-5 py-3 text-left text-sm font-semibold text-slate-700">Status</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Role</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Code</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Assigned Users</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Status</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 bg-white">
                                 {roles.length === 0 && (
                                     <tr>
-                                        <td colSpan={4} className="px-5 py-10 text-center text-slate-500">
+                                        <td colSpan={4} className="px-4 py-8 text-center text-xs text-slate-500">
                                             No role records available.
                                         </td>
                                     </tr>
                                 )}
                                 {roles.map((role) => (
-                                    <tr key={role.id} className="hover:bg-slate-50/80">
-                                        <td className="px-5 py-4 text-base font-semibold text-slate-800">{role.name}</td>
-                                        <td className="px-5 py-4">
-                                            <span className="inline-flex rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                                    <tr key={role.id} className="hover:bg-slate-50/80 transition-colors">
+                                        <td className="px-3.5 py-2.5 font-semibold text-slate-800">{role.name}</td>
+                                        <td className="px-3.5 py-2.5">
+                                            <span className="inline-flex rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-700 font-mono">
                                                 {role.code}
                                             </span>
                                         </td>
-                                        <td className="px-5 py-4 text-slate-700">{role.users_count}</td>
-                                        <td className="px-5 py-4">
-                                            <span className={`inline-flex rounded-lg px-2.5 py-1 text-xs font-semibold ${role.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700'}`}>
+                                        <td className="px-3.5 py-2.5 text-slate-700 font-medium">{role.users_count}</td>
+                                        <td className="px-3.5 py-2.5">
+                                            <span className={`inline-flex rounded px-2 py-0.5 text-xs font-semibold ${role.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
                                                 {role.is_active ? 'Active' : 'Inactive'}
                                             </span>
                                         </td>

@@ -32,86 +32,87 @@ export default function ItemUnitIndex({ units, canManage }: Props) {
     };
 
     return (
-        <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Item Units</h2>}>
+        <AuthenticatedLayout header="Item Units">
             <Head title="Item Units" />
 
-            <div className="space-y-5 py-8">
-                <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="max-w-2xl">
-                        <h3 className="text-lg font-semibold text-slate-900">Allowed Default Units</h3>
-                        <p className="mt-1 text-sm text-slate-600">
-                            Maintain the controlled unit list used by item catalog, PPMP planning, requests, delivery, and reports.
+            <div className="space-y-2 lg:h-[calc(100vh-8.5rem)] flex flex-col justify-between overflow-y-auto lg:overflow-hidden">
+                {/* Compact Unit Creation Bar */}
+                <section className="shrink-0 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 shadow-xs flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h3 className="text-xs font-bold text-slate-900">Allowed Default Units</h3>
+                        <p className="text-[11px] text-slate-500">
+                            Controlled measurement units for item catalog, PPMP planning, requests, and delivery.
                         </p>
                     </div>
 
                     {canManage ? (
-                        <form onSubmit={submit} className="mt-5 grid gap-3 md:grid-cols-[1fr_auto]">
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-slate-700">New Unit</label>
+                        <form onSubmit={submit} className="flex items-center gap-2">
+                            <div className="relative">
                                 <input
                                     value={form.data.name}
                                     onChange={(event) => form.setData('name', event.target.value)}
-                                    placeholder="Example: bundle"
-                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                    placeholder="New unit (e.g., bundle, box)..."
+                                    className="h-8 w-56 rounded-lg border border-slate-300 px-2.5 text-xs focus:border-red-500 focus:ring-1 focus:ring-red-500"
                                 />
-                                <InputError message={form.errors.name} className="mt-1" />
+                                {form.errors.name ? <InputError message={form.errors.name} className="absolute -bottom-4 left-0 text-[10px]" /> : null}
                             </div>
-                            <div className="flex items-end">
-                                <button
-                                    type="submit"
-                                    disabled={form.processing}
-                                    className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-60"
-                                >
-                                    Add Unit
-                                </button>
-                            </div>
+                            <button
+                                type="submit"
+                                disabled={form.processing}
+                                className="inline-flex h-8 items-center rounded-lg bg-red-600 px-3 text-xs font-semibold text-white hover:bg-red-700 transition shadow-xs disabled:opacity-60"
+                            >
+                                Add Unit
+                            </button>
                         </form>
                     ) : null}
                 </section>
 
-                <section className="responsive-table-wrap rounded-xl border border-slate-200 bg-white shadow-sm">
-                    <table className="min-w-full divide-y divide-slate-200 text-sm">
-                        <thead className="bg-slate-50">
-                            <tr>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Unit</th>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Status</th>
-                                <th className="px-4 py-3 text-right font-semibold text-slate-700">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {units.map((unit) => (
-                                <tr key={unit.item_unit_id} className="hover:bg-slate-50/60">
-                                    <td className="px-4 py-3 font-semibold text-slate-800">{unit.name}</td>
-                                    <td className="px-4 py-3">
-                                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${unit.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700'}`}>
-                                            {unit.status === 'active' ? 'Active' : 'Inactive'}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3 text-right">
-                                        {canManage ? (
-                                            <button
-                                                type="button"
-                                                onClick={() => toggleStatus(unit.item_unit_id)}
-                                                className="text-sm font-semibold text-amber-700 hover:text-amber-900"
-                                            >
-                                                {unit.status === 'active' ? 'Deactivate' : 'Activate'}
-                                            </button>
-                                        ) : (
-                                            <span className="text-slate-400">-</span>
-                                        )}
-                                    </td>
-                                </tr>
-                            ))}
-                            {units.length === 0 ? (
+                {/* High-Density Units Table with Sticky Headers and Internal Scroll */}
+                <div className="flex-1 min-h-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs flex flex-col">
+                    <div className="flex-1 overflow-y-auto min-h-0">
+                        <table className="min-w-full divide-y divide-slate-200 text-xs">
+                            <thead className="sticky top-0 z-10 bg-slate-50 shadow-xs">
                                 <tr>
-                                    <td colSpan={3} className="px-4 py-10 text-center text-sm text-slate-500">
-                                        No units are configured yet.
-                                    </td>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Unit</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Status</th>
+                                    <th className="px-3.5 py-2 text-right font-semibold text-slate-700">Actions</th>
                                 </tr>
-                            ) : null}
-                        </tbody>
-                    </table>
-                </section>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {units.map((unit) => (
+                                    <tr key={unit.item_unit_id} className="hover:bg-slate-50/60">
+                                        <td className="px-3.5 py-2 font-semibold text-slate-800 capitalize">{unit.name}</td>
+                                        <td className="px-3.5 py-2">
+                                            <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${unit.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700'}`}>
+                                                {unit.status === 'active' ? 'Active' : 'Inactive'}
+                                            </span>
+                                        </td>
+                                        <td className="px-3.5 py-2 text-right">
+                                            {canManage ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => toggleStatus(unit.item_unit_id)}
+                                                    className="font-semibold text-xs text-amber-600 hover:text-amber-800"
+                                                >
+                                                    {unit.status === 'active' ? 'Deactivate' : 'Activate'}
+                                                </button>
+                                            ) : (
+                                                <span className="text-slate-400">-</span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                                {units.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={3} className="px-4 py-8 text-center text-xs text-slate-500">
+                                            No units are configured yet.
+                                        </td>
+                                    </tr>
+                                ) : null}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </AuthenticatedLayout>
     );

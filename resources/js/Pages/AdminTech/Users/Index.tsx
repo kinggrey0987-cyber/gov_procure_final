@@ -168,50 +168,44 @@ export default function UserIndex({ users, filters, roles }: Props) {
         >
             <Head title="User Management" />
 
-            <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="space-y-2 lg:h-[calc(100vh-8.5rem)] flex flex-col justify-between overflow-y-auto lg:overflow-hidden">
+                {/* Compact Filter Card */}
+                <section className="shrink-0 rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm">
+                    {successMessage && (
+                        <div className="mb-2 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700">
+                            <svg className="h-4 w-4 shrink-0 text-emerald-600" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
+                            </svg>
+                            <span>{successMessage}</span>
+                        </div>
+                    )}
 
-                {successMessage && (
-                    <div className="flex items-center gap-2 border-b border-emerald-200 bg-emerald-50 px-6 py-3 text-sm font-medium text-emerald-700">
-                        <svg className="h-5 w-5 shrink-0 text-emerald-600" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
-                        </svg>
-                        <span>{successMessage}</span>
-                    </div>
-                )}
+                    {(deleteError || toggleError || flashErrorMessage) && (
+                        <div className="mb-2 flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700">
+                            <svg className="h-4 w-4 shrink-0 text-rose-600" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                            </svg>
+                            <span>{deleteError || toggleError || flashErrorMessage}</span>
+                        </div>
+                    )}
 
-                {(deleteError || toggleError || flashErrorMessage) && (
-                    <div className="flex items-center gap-2 border-b border-rose-200 bg-rose-50 px-6 py-3 text-sm font-medium text-rose-700">
-                        <svg className="h-5 w-5 shrink-0 text-rose-600" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-                        </svg>
-                        <span>{deleteError || toggleError || flashErrorMessage}</span>
-                    </div>
-                )}
-
-                <div className="border-b border-slate-200 bg-slate-50 px-4 py-4 sm:px-6">
-                    <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem_11rem_auto] md:items-end">
+                    <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_12rem_11rem_auto] md:items-center">
                         <div>
-                            <label htmlFor="search-input" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
-                                Search
-                            </label>
                             <input
                                 id="search-input"
                                 type="text"
                                 value={formData.search}
                                 onChange={(e) => setFormData(prev => ({ ...prev, search: e.target.value }))}
                                 placeholder="Search by name, email, or EMP ID..."
-                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                                className="h-8 w-full rounded-lg border border-slate-300 px-2.5 text-xs shadow-xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                             />
                         </div>
                         <div>
-                            <label htmlFor="role-select" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
-                                Role
-                            </label>
                             <select
                                 id="role-select"
                                 value={formData.role_id}
                                 onChange={(e) => setFormData(prev => ({ ...prev, role_id: e.target.value }))}
-                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                                className="h-8 w-full rounded-lg border border-slate-300 px-2.5 text-xs shadow-xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                             >
                                 <option value="">All Roles</option>
                                 {roles.map(role => (
@@ -222,91 +216,90 @@ export default function UserIndex({ users, filters, roles }: Props) {
                             </select>
                         </div>
                         <div>
-                            <label htmlFor="status-select" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
-                                Status
-                            </label>
                             <select
                                 id="status-select"
                                 value={formData.status}
                                 onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
-                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                                className="h-8 w-full rounded-lg border border-slate-300 px-2.5 text-xs shadow-xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                             >
                                 <option value="">All Statuses</option>
                                 <option value="active">Active</option>
                                 <option value="inactive">Deactivated</option>
                             </select>
                         </div>
-                        <div className="grid gap-2 sm:flex sm:items-end">
+                        <div>
                             <button
                                 type="button"
                                 onClick={handleClearFilters}
-                                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 transition"
+                                className="h-8 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
                             >
                                 Clear
                             </button>
                         </div>
                     </div>
-                </div>
+                </section>
 
-                <div className="overflow-x-auto">
-                    <table className="min-w-[860px] divide-y divide-slate-200 text-sm md:min-w-full">
-                        <thead className="bg-slate-50">
-                            <tr>
-                                <th className="px-5 py-3 text-left text-sm font-semibold text-slate-700">Name & ID</th>
-                                <th className="px-5 py-3 text-left text-sm font-semibold text-slate-700">Email</th>
-                                <th className="px-5 py-3 text-left text-sm font-semibold text-slate-700">Role</th>
-                                <th className="px-5 py-3 text-left text-sm font-semibold text-slate-700">Office</th>
-                                <th className="px-5 py-3 text-left text-sm font-semibold text-slate-700">Status</th>
-                                <th className="px-5 py-3 text-left text-sm font-semibold text-slate-700">Actions</th>
-                            </tr>
-                        </thead>
+                {/* Users Table Card with Internal Scrolling */}
+                <section className="flex-1 min-h-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm flex flex-col">
+                    <div className="flex-1 min-h-0 overflow-y-auto">
+                        <table className="min-w-[860px] divide-y divide-slate-200 text-xs md:min-w-full">
+                            <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+                                <tr>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Name & ID</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Email</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Role</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Office</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Status</th>
+                                    <th className="px-3.5 py-2 text-right font-semibold text-slate-700">Actions</th>
+                                </tr>
+                            </thead>
                         <tbody className="divide-y divide-slate-100 bg-white">
                             {users.data.length === 0 && (
                                 <tr>
-                                    <td colSpan={6} className="px-5 py-10 text-center text-slate-500">
+                                    <td colSpan={6} className="px-4 py-8 text-center text-xs text-slate-500">
                                         No user records match your criteria.
                                     </td>
                                 </tr>
                             )}
                             {users.data.map((user) => (
-                                <tr key={user.id} className={`hover:bg-slate-50/80 transition ${!user.is_active ? 'bg-slate-50/40 opacity-80' : ''}`}>
-                                    <td className="px-5 py-4">
+                                <tr key={user.id} className={`hover:bg-slate-50/80 transition-colors ${!user.is_active ? 'bg-slate-50/40 opacity-80' : ''}`}>
+                                    <td className="px-3.5 py-2">
                                         <div className="font-semibold text-slate-800">{user.name}</div>
                                         {user.emp_id && (
-                                            <span className="mt-0.5 inline-block text-xs font-mono text-slate-500">
+                                            <span className="inline-block text-[11px] font-mono text-slate-500">
                                                 ID: {user.emp_id}
                                             </span>
                                         )}
                                     </td>
-                                    <td className="px-5 py-4 break-all text-slate-600">{user.email}</td>
-                                    <td className="px-5 py-4">
-                                        <span className="inline-flex rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                                    <td className="px-3.5 py-2 break-all text-slate-600 text-xs">{user.email}</td>
+                                    <td className="px-3.5 py-2">
+                                        <span className="inline-flex rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-700">
                                             {user.role?.name ?? 'Unassigned'}
                                         </span>
                                     </td>
-                                    <td className="px-5 py-4">
-                                        <span className="inline-flex rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                                    <td className="px-3.5 py-2">
+                                        <span className="inline-flex rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-700">
                                             {user.office?.code ?? '-'}
                                         </span>
                                     </td>
-                                    <td className="px-5 py-4">
+                                    <td className="px-3.5 py-2">
                                         {user.is_active ? (
-                                            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
                                                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
                                                 Active
                                             </span>
                                         ) : (
-                                            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-slate-500/20">
+                                            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 ring-1 ring-inset ring-slate-500/20">
                                                 <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
                                                 Deactivated
                                             </span>
                                         )}
                                     </td>
-                                    <td className="px-5 py-4">
-                                        <div className="flex flex-wrap items-center gap-2">
+                                    <td className="px-3.5 py-2 text-right">
+                                        <div className="flex items-center justify-end gap-1.5">
                                             <Link
                                                 href={route('admin-tech.users.edit', user.id)}
-                                                className="inline-flex h-8 items-center rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                                                className="inline-flex h-7 items-center rounded border border-slate-300 px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
                                             >
                                                 Edit
                                             </Link>
@@ -316,7 +309,7 @@ export default function UserIndex({ users, filters, roles }: Props) {
                                                     type="button"
                                                     onClick={() => setModalState({ type: 'toggle', user })}
                                                     disabled={!user.can_toggle_active}
-                                                    className="inline-flex h-8 items-center rounded-lg border border-amber-300 bg-amber-50/50 px-3 text-xs font-semibold text-amber-700 hover:bg-amber-100/70 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-transparent disabled:text-slate-400 transition"
+                                                    className="inline-flex h-7 items-center rounded border border-amber-300 bg-amber-50/50 px-2.5 text-xs font-semibold text-amber-700 hover:bg-amber-100/70 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-transparent disabled:text-slate-400 transition"
                                                     title={user.can_toggle_active ? 'Deactivate this user account' : user.toggle_active_reason ?? 'Deactivation unavailable.'}
                                                 >
                                                     Deactivate
@@ -326,7 +319,7 @@ export default function UserIndex({ users, filters, roles }: Props) {
                                                     type="button"
                                                     onClick={() => setModalState({ type: 'toggle', user })}
                                                     disabled={!user.can_toggle_active}
-                                                    className="inline-flex h-8 items-center rounded-lg border border-emerald-300 bg-emerald-50/50 px-3 text-xs font-semibold text-emerald-700 hover:bg-emerald-100/70 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-transparent disabled:text-slate-400 transition"
+                                                    className="inline-flex h-7 items-center rounded border border-emerald-300 bg-emerald-50/50 px-2.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100/70 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-transparent disabled:text-slate-400 transition"
                                                     title={user.can_toggle_active ? 'Reactivate this user account' : user.toggle_active_reason ?? 'Reactivation unavailable.'}
                                                 >
                                                     Activate
@@ -337,7 +330,7 @@ export default function UserIndex({ users, filters, roles }: Props) {
                                                 type="button"
                                                 onClick={() => setModalState({ type: 'delete', user })}
                                                 disabled={!user.can_delete}
-                                                className="inline-flex h-8 items-center rounded-lg border border-rose-300 px-3 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 transition"
+                                                className="inline-flex h-7 items-center rounded border border-rose-300 px-2.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 transition"
                                                 title={user.can_delete ? 'Delete this account' : user.delete_reason ?? 'Delete is currently unavailable.'}
                                             >
                                                 Delete
@@ -350,61 +343,45 @@ export default function UserIndex({ users, filters, roles }: Props) {
                     </table>
                 </div>
 
-                <div className="border-t border-slate-200 bg-slate-50 px-4 py-4 sm:px-6">
-                    <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                        <p className="text-sm text-slate-600">
-                            Showing <span className="font-semibold">{users.from ?? 0}</span> to <span className="font-semibold">{users.to ?? 0}</span> of <span className="font-semibold">{users.total}</span> user(s)
-                        </p>
-                        <p className="text-sm text-slate-600">
-                            Page <span className="font-semibold">{users.current_page}</span> of <span className="font-semibold">{users.last_page}</span>
-                        </p>
-                    </div>
-                    <div className="flex gap-2">
+                <div className="shrink-0 border-t border-slate-200 bg-white px-3.5 py-2 flex items-center justify-between text-xs">
+                    <p className="text-slate-500">
+                        Showing <span className="font-semibold">{users.from ?? 0}</span> to <span className="font-semibold">{users.to ?? 0}</span> of <span className="font-semibold">{users.total}</span> users &bull; Page <span className="font-semibold">{users.current_page}</span> of <span className="font-semibold">{users.last_page}</span>
+                    </p>
+                    <div className="flex items-center gap-1.5">
                         {users.prev_page_url ? (
                             <Link
                                 href={users.prev_page_url}
-                                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                                className="inline-flex items-center gap-1 rounded border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
                             >
-                                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path d="M15 19l-7-7 7-7" />
-                                </svg>
                                 Previous
                             </Link>
                         ) : (
                             <button
                                 disabled
-                                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-400 cursor-not-allowed"
+                                className="inline-flex items-center gap-1 rounded border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-400 cursor-not-allowed"
                             >
-                                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path d="M15 19l-7-7 7-7" />
-                                </svg>
                                 Previous
                             </button>
                         )}
                         {users.next_page_url ? (
                             <Link
                                 href={users.next_page_url}
-                                className="ml-auto inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                                className="inline-flex items-center gap-1 rounded border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
                             >
                                 Next
-                                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path d="M9 5l7 7-7 7" />
-                                </svg>
                             </Link>
                         ) : (
                             <button
                                 disabled
-                                className="ml-auto inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-400 cursor-not-allowed"
+                                className="inline-flex items-center gap-1 rounded border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-400 cursor-not-allowed"
                             >
                                 Next
-                                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path d="M9 5l7 7-7 7" />
-                                </svg>
                             </button>
                         )}
                     </div>
                 </div>
             </section>
+        </div>
 
             {modalState && (
                 <ConfirmationModal

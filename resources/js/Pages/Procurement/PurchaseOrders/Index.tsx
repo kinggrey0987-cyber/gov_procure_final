@@ -82,37 +82,45 @@ export default function PurchaseOrdersIndex({ purchaseOrders, filters }: Props) 
     };
 
     return (
-        <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Purchase Orders</h2>}>
+        <AuthenticatedLayout
+            header="Purchase Orders"
+            headerActions={
+                <Link
+                    href={route('procurement.purchase-orders.create')}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-red-600 px-3 text-xs font-semibold text-white shadow-sm hover:bg-red-700 transition"
+                >
+                    <span className="text-sm leading-none">＋</span>
+                    <span>Create PO</span>
+                </Link>
+            }
+        >
             <Head title="Purchase Orders" />
 
-            <div className="space-y-4 py-8">
-                <section className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-sm text-slate-600">Manage procurement execution stages after request review and supplier assignment.</p>
-                    <Link href={route('procurement.purchase-orders.create')} className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
-                        Create PO
-                    </Link>
-                </section>
-
-                <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                            <h3 className="text-sm font-semibold text-slate-900">Filter purchase orders</h3>
-                            <p className="text-xs text-slate-500">Filters update automatically; no apply button required.</p>
+            <div className="space-y-2 lg:h-[calc(100vh-8.5rem)] flex flex-col justify-between overflow-y-auto lg:overflow-hidden">
+                {/* Compact Control & Filter Header */}
+                <section className="shrink-0 rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                            <h3 className="text-xs font-bold text-slate-800">Filter Purchase Orders</h3>
+                            <span className="hidden text-[11px] text-slate-500 sm:inline">• Manage procurement execution stages and supplier fulfillment</span>
                         </div>
-                        <button
-                            type="button"
-                            onClick={resetFilters}
-                            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                        >
-                            Reset
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-slate-500">Showing {purchaseOrders.data.length} records</span>
+                            <button
+                                type="button"
+                                onClick={resetFilters}
+                                className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
+                            >
+                                Reset
+                            </button>
+                        </div>
                     </div>
-                    <div className="grid gap-3 lg:grid-cols-[12rem_minmax(0,1fr)_minmax(14rem,auto)]">
+                    <div className="mt-2 grid gap-2 sm:grid-cols-[13rem_minmax(0,1fr)]">
                         <select
                             value={status}
                             onChange={(event) => setStatus(event.target.value)}
                             aria-label="Filter purchase orders by status"
-                            className="w-full rounded-lg border-slate-300 text-sm"
+                            className="h-8 rounded-lg border-slate-300 py-1 text-xs"
                         >
                             <option value="">All PO statuses</option>
                             <option value="DRAFT">Draft PO</option>
@@ -124,62 +132,61 @@ export default function PurchaseOrdersIndex({ purchaseOrders, filters }: Props) 
                             type="text"
                             value={search}
                             onChange={(event) => setSearch(event.target.value)}
-                            placeholder="Search PO number, supplier, office"
-                            className="w-full rounded-lg border-slate-300 text-sm"
+                            placeholder="Search PO number, supplier, office..."
+                            className="h-8 rounded-lg border-slate-300 py-1 text-xs"
                         />
-
-                        <p className="flex items-center text-xs text-slate-500">Showing 5 records per page. Use pagination for the next 5.</p>
                     </div>
                 </section>
 
-                <section className="responsive-table-wrap rounded-xl border border-slate-200 bg-white shadow-sm">
-                    <table className="min-w-full divide-y divide-slate-200 text-sm">
-                        <thead className="bg-slate-50">
+                {/* Table Container with Internal Scroll */}
+                <section className="flex-1 min-h-0 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+                    <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
+                        <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
                             <tr>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">PO Number</th>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Supplier</th>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Linked Request</th>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Total Cost</th>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Status</th>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Date</th>
-                                <th className="px-4 py-3 text-right font-semibold text-slate-700">Actions</th>
+                                <th className="px-3.5 py-2 text-left font-semibold text-slate-700">PO Number</th>
+                                <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Supplier</th>
+                                <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Linked Request</th>
+                                <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Total Cost</th>
+                                <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Status</th>
+                                <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Date</th>
+                                <th className="px-3.5 py-2 text-right font-semibold text-slate-700">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {purchaseOrders.data.map((row) => (
-                                <tr key={row.purchase_order_id} className="hover:bg-slate-50/60">
-                                    <td className="px-4 py-3 font-semibold text-red-700">{row.po_number}</td>
-                                    <td className="px-4 py-3 text-slate-700">{row.supplier?.supplier_name ?? '-'}</td>
-                                    <td className="px-4 py-3 text-slate-700">
-                                        {row.purchase_request?.pr_number || (row.purchase_request?.purchase_request_id ? `PR-${String(row.purchase_request.purchase_request_id).padStart(6, '0')}` : '-')}
-                                        <p className="text-xs text-slate-500">{row.purchase_request?.office?.name ?? '-'}</p>
+                                <tr key={row.purchase_order_id} className="hover:bg-slate-50/60 transition-colors">
+                                    <td className="px-3.5 py-2 font-semibold text-red-700">{row.po_number}</td>
+                                    <td className="px-3.5 py-2 text-slate-700 font-medium">{row.supplier?.supplier_name ?? '-'}</td>
+                                    <td className="px-3.5 py-2 text-slate-700">
+                                        <div>{row.purchase_request?.pr_number || (row.purchase_request?.purchase_request_id ? `PR-${String(row.purchase_request.purchase_request_id).padStart(6, '0')}` : '-')}</div>
+                                        <p className="text-[11px] text-slate-500">{row.purchase_request?.office?.name ?? '-'}</p>
                                     </td>
-                                    <td className="px-4 py-3 font-semibold text-slate-800">{formatMoney(Number(row.total_amount || 0))}</td>
-                                    <td className="px-4 py-3">
+                                    <td className="px-3.5 py-2 font-semibold text-slate-800">{formatMoney(Number(row.total_amount || 0))}</td>
+                                    <td className="px-3.5 py-2">
                                         <span className={statusClass(row.status)}>{displayPurchaseOrderStatus(row.status)}</span>
                                     </td>
-                                    <td className="px-4 py-3 text-slate-600">{formatDate(row.created_at)}</td>
-                                    <td className="px-4 py-3 text-right">
-                                        <div className="flex flex-wrap justify-end gap-2">
-                                            <Link href={route('procurement.purchase-orders.show', row.purchase_order_id)} className="rounded border border-red-300 px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-50">
+                                    <td className="px-3.5 py-2 text-slate-600 text-xs">{formatDate(row.created_at)}</td>
+                                    <td className="px-3.5 py-2 text-right">
+                                        <div className="flex flex-wrap justify-end gap-1.5">
+                                            <Link href={route('procurement.purchase-orders.show', row.purchase_order_id)} className="rounded border border-red-200 bg-red-50/50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 transition">
                                                 View
                                             </Link>
                                             {row.status === 'DRAFT' ? (
-                                                <Link href={route('procurement.purchase-orders.edit', row.purchase_order_id)} className="rounded border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                                                <Link href={route('procurement.purchase-orders.edit', row.purchase_order_id)} className="rounded border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition">
                                                     Edit PO
                                                 </Link>
                                             ) : null}
                                             {row.status === 'DRAFT' ? (
-                                                <Link href={route('procurement.purchase-orders.items.index', row.purchase_order_id)} className="rounded border border-red-300 px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-50">
+                                                <Link href={route('procurement.purchase-orders.items.index', row.purchase_order_id)} className="rounded border border-red-200 bg-red-50/50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 transition">
                                                     Manage Items
                                                 </Link>
                                             ) : null}
                                             <span
-                                                className={`rounded px-3 py-1 text-xs font-semibold ${Number(row.deliveries_count ?? 0) > 0 ? 'border border-blue-300 text-blue-700' : 'border border-slate-200 text-slate-500'}`}
+                                                className={`rounded px-2.5 py-1 text-xs font-semibold ${Number(row.deliveries_count ?? 0) > 0 ? 'border border-blue-200 bg-blue-50 text-blue-700' : 'border border-slate-200 bg-slate-50 text-slate-500'}`}
                                             >
                                                 Deliveries: {Number(row.deliveries_count ?? 0)}
                                             </span>
-                                            <Link href={route('procurement.purchase-orders.records')} className="rounded border border-amber-300 px-3 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-50">
+                                            <Link href={route('procurement.purchase-orders.records')} className="rounded border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition">
                                                 Tracking Records
                                             </Link>
                                         </div>
@@ -188,7 +195,7 @@ export default function PurchaseOrdersIndex({ purchaseOrders, filters }: Props) 
                             ))}
                             {purchaseOrders.data.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-500">
+                                    <td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-500">
                                         No purchase orders found.
                                     </td>
                                 </tr>
@@ -197,7 +204,9 @@ export default function PurchaseOrdersIndex({ purchaseOrders, filters }: Props) 
                     </table>
                 </section>
 
-                <PaginationNav links={purchaseOrders.links} />
+                <div className="shrink-0 pt-0.5">
+                    <PaginationNav links={purchaseOrders.links} preserveState={false} />
+                </div>
             </div>
         </AuthenticatedLayout>
     );

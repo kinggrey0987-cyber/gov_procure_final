@@ -1,7 +1,6 @@
 import DashboardAlertBanner, { type DashboardAlert } from '@/Components/DashboardAlertBanner';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link } from '@inertiajs/react';
-import type { ReactNode } from 'react';
 
 type Props = {
     summary: {
@@ -20,35 +19,15 @@ type Props = {
 };
 
 export default function InventoryTracking({ summary, dashboardAlerts }: Props) {
-    const quickActions = [
-        { href: route('inventory.deliveries.index'), label: 'Monitor Deliveries', description: 'Review incoming supplies and delivery status.' },
-        { href: route('inventory.distribution-records.create'), label: 'Release Supplies', description: 'Create a distribution record for office requests.' },
-        { href: route('inventory.claims.index'), label: 'Review Claims', description: 'Validate pending office supply claims.' },
-        { href: route('inventory.inventory.index'), label: 'View Inventory', description: 'Check stock balances and low-stock items.' },
-    ];
-
     return (
-        <AuthenticatedLayout
-            header="GSO Dashboard"
-            headerActions={
-                <Link
-                    href={route('inventory.distribution-records.create')}
-                    className="inline-flex h-8 items-center rounded-lg bg-red-600 px-3 text-xs font-semibold text-white hover:bg-red-700 shadow-sm transition"
-                >
-                    <svg className="mr-1.5 h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                    </svg>
-                    Release Supplies
-                </Link>
-            }
-        >
+        <AuthenticatedLayout header="GSO Dashboard">
             <Head title="GSO Dashboard" />
 
-            <div className="space-y-2 lg:h-[calc(100vh-8.5rem)] flex flex-col justify-between overflow-y-auto lg:overflow-hidden">
+            <div className="space-y-2.5 lg:h-[calc(100vh-8.5rem)] flex flex-col justify-between overflow-y-auto lg:overflow-hidden">
                 <DashboardAlertBanner alerts={dashboardAlerts} />
 
                 {/* Unified High-Density GSO Telemetry Cockpit - Interactive Drilldown */}
-                <section className="shrink-0 rounded-xl border border-slate-200 bg-white p-2 shadow-sm space-y-1.5">
+                <section className="shrink-0 rounded-xl border border-slate-200 bg-white p-2.5 shadow-xs space-y-1.5">
                     {/* Stock & Operational Pressure Tier */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
                         <Link
@@ -56,10 +35,10 @@ export default function InventoryTracking({ summary, dashboardAlerts }: Props) {
                             className="flex items-center gap-2.5 px-3 py-1.5 transition rounded-lg group cursor-pointer hover:bg-emerald-50/60"
                             title="Click to view Inventory Stock Ledger"
                         >
-                            <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-600" />
+                            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-600 ring-2 ring-emerald-100" />
                             <div className="min-w-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 group-hover:text-emerald-800">Available Units</p>
-                                <p className="text-lg font-extrabold text-emerald-900 leading-tight">{formatQuantity(summary.total_available_stock)}</p>
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 group-hover:text-emerald-800">Available Units</p>
+                                <p className="text-xl font-extrabold text-emerald-900 leading-tight">{formatQuantity(summary.total_available_stock)}</p>
                             </div>
                         </Link>
                         <Link
@@ -67,10 +46,10 @@ export default function InventoryTracking({ summary, dashboardAlerts }: Props) {
                             className="flex items-center gap-2.5 px-3 py-1.5 transition rounded-lg group cursor-pointer hover:bg-amber-50/60"
                             title="Click to view Low Stock items"
                         >
-                            <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" />
+                            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-amber-500 ring-2 ring-amber-100" />
                             <div className="min-w-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-700 group-hover:text-amber-800">Low Stock</p>
-                                <p className="text-lg font-extrabold text-amber-900 leading-tight">{summary.low_stock_count}</p>
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 group-hover:text-amber-800">Low Stock</p>
+                                <p className="text-xl font-extrabold text-amber-900 leading-tight">{summary.low_stock_count}</p>
                             </div>
                         </Link>
                         <Link
@@ -78,10 +57,10 @@ export default function InventoryTracking({ summary, dashboardAlerts }: Props) {
                             className="flex items-center gap-2.5 px-3 py-1.5 transition rounded-lg group cursor-pointer hover:bg-blue-50/60"
                             title="Click to view Deliveries queue"
                         >
-                            <span className="h-2 w-2 shrink-0 rounded-full bg-blue-600" />
+                            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-blue-600 ring-2 ring-blue-100" />
                             <div className="min-w-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-700 group-hover:text-blue-800">Pending Deliveries</p>
-                                <p className="text-lg font-extrabold text-blue-900 leading-tight">{summary.pending_delivery_count}</p>
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700 group-hover:text-blue-800">Pending Deliveries</p>
+                                <p className="text-xl font-extrabold text-blue-900 leading-tight">{summary.pending_delivery_count}</p>
                             </div>
                         </Link>
                         <Link
@@ -89,10 +68,10 @@ export default function InventoryTracking({ summary, dashboardAlerts }: Props) {
                             className="flex items-center gap-2.5 px-3 py-1.5 transition rounded-lg group cursor-pointer hover:bg-rose-50/60"
                             title="Click to review Pending Claims"
                         >
-                            <span className="h-2 w-2 shrink-0 rounded-full bg-rose-600" />
+                            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-rose-600 ring-2 ring-rose-100" />
                             <div className="min-w-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-rose-700 group-hover:text-rose-800">Pending Claims</p>
-                                <p className="text-lg font-extrabold text-rose-900 leading-tight">{summary.open_claim_count}</p>
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-rose-700 group-hover:text-rose-800">Pending Claims</p>
+                                <p className="text-xl font-extrabold text-rose-900 leading-tight">{summary.open_claim_count}</p>
                             </div>
                         </Link>
                     </div>
@@ -100,9 +79,9 @@ export default function InventoryTracking({ summary, dashboardAlerts }: Props) {
                     {/* Ledger Volume Tier */}
                     <div className="border-t border-slate-100 pt-1.5 grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
                         <Link
-                            href={route('inventory.inventory.index')}
+                            href={route('inventory.items.index')}
                             className="flex items-center gap-2.5 px-3 py-0.5 transition rounded-lg group cursor-pointer hover:bg-slate-50"
-                            title="Click to view Item Catalog & Stock"
+                            title="Click to view Item Catalog"
                         >
                             <span className="h-2 w-2 shrink-0 rounded-full bg-slate-400" />
                             <div className="min-w-0">
@@ -124,7 +103,7 @@ export default function InventoryTracking({ summary, dashboardAlerts }: Props) {
                         <Link
                             href={route('inventory.distribution-records.index')}
                             className="flex items-center gap-2.5 px-3 py-0.5 transition rounded-lg group cursor-pointer hover:bg-emerald-50/60"
-                            title="Click to view Distribution Records"
+                            title="Click to view Released Records"
                         >
                             <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-600" />
                             <div className="min-w-0">
@@ -146,73 +125,169 @@ export default function InventoryTracking({ summary, dashboardAlerts }: Props) {
                     </div>
                 </section>
 
-                {/* Compact Quick Access Cards */}
-                <div className="shrink-0 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                    {quickActions.map((action) => (
-                        <Link
-                            key={action.href}
-                            href={action.href}
-                            className="group flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white p-2.5 shadow-xs transition hover:border-red-300 hover:bg-slate-50/70"
-                        >
-                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-700 transition group-hover:bg-red-600 group-hover:text-white">
-                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                </svg>
-                            </span>
-                            <div className="min-w-0">
-                                <p className="text-xs font-bold text-slate-900 group-hover:text-red-700">{action.label}</p>
-                                <p className="text-[10px] text-slate-500 truncate">{action.description}</p>
-                            </div>
-                        </Link>
-                    ))}
-                </div>
-
+                {/* Primary Dual Operational Command Hubs */}
                 <div className="grid gap-2.5 lg:grid-cols-2 flex-1 min-h-0">
+                    {/* Delivery & Distribution Hub */}
                     <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs flex flex-col justify-between">
                         <div>
                             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                                 <div>
-                                    <h3 className="text-xs font-bold text-slate-900">Delivery & Distribution</h3>
-                                    <p className="text-[10px] text-slate-500">Track delivery receipts and office release records</p>
+                                    <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                        <svg className="h-4 w-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                                        </svg>
+                                        Delivery & Distribution
+                                    </h3>
+                                    <p className="text-[10px] text-slate-500">Warehouse intake receipts and office supply releases</p>
                                 </div>
+                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${summary.pending_delivery_count > 0 ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'}`}>
+                                    {summary.pending_delivery_count > 0 ? `${summary.pending_delivery_count} Pending Deliveries` : 'Intake Up to Date'}
+                                </span>
                             </div>
-                            <p className="mt-2 text-xs text-slate-600 leading-relaxed">
-                                Manage incoming warehouse stock deliveries from suppliers, inspect specifications, and issue confirmed supplies to requisitioning offices.
-                            </p>
+
+                            {/* Direct Action Buttons - Always Visible Without Scrolling */}
+                            <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                                <Link
+                                    href={route('inventory.deliveries.index')}
+                                    className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-red-600 px-3 text-xs font-semibold text-white hover:bg-red-700 transition shadow-xs"
+                                >
+                                    <span>Monitor Deliveries</span>
+                                    {summary.pending_delivery_count > 0 ? (
+                                        <span className="rounded-full bg-white/25 px-1.5 py-0.2 text-[10px] font-bold">{summary.pending_delivery_count}</span>
+                                    ) : null}
+                                    <span>&rarr;</span>
+                                </Link>
+                                <Link
+                                    href={route('inventory.distribution-records.create')}
+                                    className="inline-flex h-8 items-center gap-1 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white hover:bg-emerald-700 transition shadow-xs"
+                                >
+                                    <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                                    </svg>
+                                    Release Supplies
+                                </Link>
+                                <Link
+                                    href={route('inventory.distribution-records.index')}
+                                    className="inline-flex h-8 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-xs"
+                                >
+                                    Distribution Records &rarr;
+                                </Link>
+                            </div>
                         </div>
-                        <div className="mt-3 flex flex-wrap gap-2 pt-2 border-t border-slate-100">
-                            <Link href={route('inventory.deliveries.index')} className="inline-flex h-7 items-center rounded-lg bg-red-600 px-3 text-xs font-semibold text-white hover:bg-red-700 transition shadow-xs">
-                                View Deliveries &rarr;
+
+                        {/* Operational Telemetry Sub-Strip (Fills space informatively with zero blank gap) */}
+                        <div className="mt-3 grid grid-cols-3 gap-2 rounded-lg bg-slate-50/80 p-2 border border-slate-100">
+                            <Link href={route('inventory.deliveries.index')} className="group text-center">
+                                <p className="text-[10px] font-medium text-slate-500 group-hover:text-slate-700">Pending Deliveries</p>
+                                <p className="text-sm font-bold text-slate-800 group-hover:text-red-700">{summary.pending_delivery_count}</p>
                             </Link>
-                            <Link href={route('inventory.distribution-records.index')} className="inline-flex h-7 items-center rounded-lg border border-emerald-300 bg-emerald-50 px-3 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition">
-                                Distribution Records &rarr;
+                            <Link href={route('inventory.distribution-records.index')} className="group text-center border-x border-slate-200">
+                                <p className="text-[10px] font-medium text-slate-500 group-hover:text-slate-700">Released Batches</p>
+                                <p className="text-sm font-bold text-slate-800 group-hover:text-emerald-700">{summary.released_distribution_count}</p>
+                            </Link>
+                            <Link href={route('inventory.distribution-records.index')} className="group text-center">
+                                <p className="text-[10px] font-medium text-slate-500 group-hover:text-slate-700">Received Batches</p>
+                                <p className="text-sm font-bold text-slate-800 group-hover:text-teal-700">{summary.received_distribution_count}</p>
                             </Link>
                         </div>
                     </div>
 
+                    {/* Stock & Claims Operations Hub */}
                     <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs flex flex-col justify-between">
                         <div>
                             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                                 <div>
-                                    <h3 className="text-xs font-bold text-slate-900">Stock & Claims Operations</h3>
-                                    <p className="text-[10px] text-slate-500">Available stock, reorder levels, and pending claims</p>
+                                    <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                        <svg className="h-4 w-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                        </svg>
+                                        Stock & Claims Operations
+                                    </h3>
+                                    <p className="text-[10px] text-slate-500">Live bin cards, safety stock levels, and discrepancy claims</p>
                                 </div>
+                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${summary.low_stock_count > 0 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                                    {summary.low_stock_count > 0 ? `${summary.low_stock_count} Low Stock Items` : 'Stock Healthy'}
+                                </span>
                             </div>
-                            <p className="mt-2 text-xs text-slate-600 leading-relaxed">
-                                Monitor real-time bin cards, stock movements, safety thresholds, and handle office discrepancy claim adjustments.
-                            </p>
+
+                            {/* Direct Action Buttons - Always Visible Without Scrolling */}
+                            <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                                <Link
+                                    href={route('inventory.inventory.index')}
+                                    className="inline-flex h-8 items-center rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white hover:bg-slate-800 transition shadow-xs"
+                                >
+                                    Stock Ledger &rarr;
+                                </Link>
+                                <Link
+                                    href={route('inventory.claims.index')}
+                                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-rose-300 bg-rose-50 px-3 text-xs font-semibold text-rose-800 hover:bg-rose-100 transition"
+                                >
+                                    <span>Review Claims</span>
+                                    {summary.open_claim_count > 0 ? (
+                                        <span className="rounded-full bg-rose-200 px-1.5 py-0.2 text-[10px] font-bold text-rose-900">{summary.open_claim_count}</span>
+                                    ) : null}
+                                    <span>&rarr;</span>
+                                </Link>
+                                <Link
+                                    href={route('inventory.inventory-movements.index')}
+                                    className="inline-flex h-8 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-xs"
+                                >
+                                    Movement Logs &rarr;
+                                </Link>
+                            </div>
                         </div>
-                        <div className="mt-3 flex flex-wrap gap-2 pt-2 border-t border-slate-100">
-                            <Link href={route('inventory.inventory.index')} className="inline-flex h-7 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-xs">
-                                Stock Ledger &rarr;
+
+                        {/* Operational Telemetry Sub-Strip (Fills space informatively with zero blank gap) */}
+                        <div className="mt-3 grid grid-cols-3 gap-2 rounded-lg bg-slate-50/80 p-2 border border-slate-100">
+                            <Link href={route('inventory.inventory.index')} className="group text-center">
+                                <p className="text-[10px] font-medium text-slate-500 group-hover:text-slate-700">Available Stock</p>
+                                <p className="text-sm font-bold text-slate-800 group-hover:text-emerald-700">{formatQuantity(summary.total_available_stock)}</p>
                             </Link>
-                            <Link href={route('inventory.claims.index')} className="inline-flex h-7 items-center rounded-lg border border-rose-300 bg-rose-50 px-3 text-xs font-semibold text-rose-800 hover:bg-rose-100 transition">
-                                Review Claims &rarr;
+                            <Link href={route('inventory.inventory.index')} className="group text-center border-x border-slate-200">
+                                <p className="text-[10px] font-medium text-slate-500 group-hover:text-slate-700">Low Stock Alert</p>
+                                <p className={`text-sm font-bold ${summary.low_stock_count > 0 ? 'text-amber-600' : 'text-slate-800'} group-hover:text-amber-700`}>{summary.low_stock_count}</p>
                             </Link>
-                            <Link href={route('inventory.inventory-movements.index')} className="inline-flex h-7 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-xs">
-                                Movement Logs &rarr;
+                            <Link href={route('inventory.claims.index')} className="group text-center">
+                                <p className="text-[10px] font-medium text-slate-500 group-hover:text-slate-700">Open Claims</p>
+                                <p className={`text-sm font-bold ${summary.open_claim_count > 0 ? 'text-rose-600' : 'text-slate-800'} group-hover:text-rose-700`}>{summary.open_claim_count}</p>
                             </Link>
                         </div>
+                    </div>
+                </div>
+
+                {/* Quick Catalog & Resource Directory Navigation */}
+                <div className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-xs flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Catalog & Setup:</span>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            <Link
+                                href={route('inventory.items.index')}
+                                className="inline-flex items-center rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200 transition"
+                            >
+                                Item Catalog ({summary.inventory_count})
+                            </Link>
+                            <Link
+                                href={route('inventory.item-categories.index')}
+                                className="inline-flex items-center rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200 transition"
+                            >
+                                Item Categories
+                            </Link>
+                            <Link
+                                href={route('inventory.item-units.index')}
+                                className="inline-flex items-center rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200 transition"
+                            >
+                                Item Units
+                            </Link>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Link
+                            href={route('inventory.office-requests.index')}
+                            className="text-xs font-medium text-red-600 hover:text-red-700 transition flex items-center gap-1"
+                        >
+                            <span>Office Supply Requests</span>
+                            <span>&rarr;</span>
+                        </Link>
                     </div>
                 </div>
             </div>
@@ -220,56 +295,10 @@ export default function InventoryTracking({ summary, dashboardAlerts }: Props) {
     );
 }
 
-function StatCard({ label, value, tone, helper }: { label: string; value: number | string; tone: 'slate' | 'amber' | 'sky' | 'blue' | 'emerald' | 'rose'; helper?: string }) {
-    const classes = {
-        slate: 'text-slate-700 bg-slate-50',
-        amber: 'text-amber-700 bg-amber-50',
-        sky: 'text-sky-700 bg-sky-50',
-        blue: 'text-blue-700 bg-blue-50',
-        emerald: 'text-emerald-700 bg-emerald-50',
-        rose: 'text-rose-700 bg-rose-50',
-    };
-
-    return (
-        <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
-            <p className="text-sm font-medium text-slate-500">{label}</p>
-            <p className={`mt-3 inline-flex rounded-lg px-3 py-1 text-2xl font-bold ${classes[tone]}`}>{value}</p>
-            {helper ? <p className="mt-2 text-xs leading-5 text-slate-500">{helper}</p> : null}
-        </div>
-    );
-}
-
-function MiniKpi({ label, value }: { label: string; value: number | string }) {
-    return (
-        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-            <p className="mt-1 text-xl font-bold text-slate-900">{value}</p>
-        </div>
-    );
-}
-
 function formatQuantity(value: number) {
     return new Intl.NumberFormat('en-PH', {
         maximumFractionDigits: 2,
     }).format(value);
-}
-
-function ActionLink({ href, label, description }: { href: string; label: string; description: string }) {
-    return (
-        <Link href={href} className="group rounded-xl border border-slate-200 bg-slate-50/70 p-4 transition hover:border-red-200 hover:bg-red-50">
-            <span className="text-sm font-semibold text-slate-900 group-hover:text-red-700">{label}</span>
-            <span className="mt-2 block text-xs leading-5 text-slate-500">{description}</span>
-        </Link>
-    );
-}
-
-function Panel({ title, children }: { title: string; children: ReactNode }) {
-    return (
-        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 className="text-base font-semibold text-slate-900">{title}</h3>
-            <div className="mt-3">{children}</div>
-        </section>
-    );
 }
 
 

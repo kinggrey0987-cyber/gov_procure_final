@@ -153,20 +153,20 @@ export default function AdminDashboard({ summary, activities, pagination, filter
         <AuthenticatedLayout header="Admin Dashboard">
             <Head title="Admin Dashboard" />
 
-            <div className="space-y-4">
+            <div className="space-y-2 lg:h-[calc(100vh-8.5rem)] flex flex-col justify-between overflow-y-auto lg:overflow-hidden">
                 {/* Compact KPI Stat Cards */}
-                <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <section className="shrink-0 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                     {statCards.map((card) => (
                         <Link
                             key={card.label}
                             href={card.href}
-                            className="group flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-sm transition hover:border-slate-300 hover:shadow-md cursor-pointer"
+                            className="group flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-xs transition hover:border-slate-300 hover:shadow-xs cursor-pointer"
                         >
                             <div>
-                                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 group-hover:text-slate-700 transition">{card.label}</p>
-                                <p className="mt-1 text-2xl font-bold tracking-tight text-slate-900 group-hover:text-red-700 transition sm:text-3xl">{card.value}</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 group-hover:text-slate-700 transition">{card.label}</p>
+                                <p className="mt-0.5 text-xl font-bold tracking-tight text-slate-900 group-hover:text-red-700 transition sm:text-2xl">{card.value}</p>
                             </div>
-                            <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white shadow-sm transition group-hover:scale-105 ${card.accent}`}>
+                            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white shadow-xs transition group-hover:scale-105 ${card.accent}`}>
                                 {card.icon}
                             </div>
                         </Link>
@@ -174,80 +174,76 @@ export default function AdminDashboard({ summary, activities, pagination, filter
                 </section>
 
                 {/* Streamlined Quick Access Grid */}
-                <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div className="mb-3 flex items-center justify-between">
-                        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Quick Access</h2>
-                        <span className="text-xs text-slate-400">Core Administration Portals</span>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-3">
+                <section className="shrink-0 rounded-xl border border-slate-200 bg-white p-2 shadow-xs">
+                    <div className="grid gap-2 sm:grid-cols-3">
                         <Link
                             href={route('admin-tech.users.index')}
-                            className="flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50/40 p-3 text-blue-800 transition hover:bg-blue-100/60 hover:border-blue-300"
+                            className="flex items-center gap-2.5 rounded-lg border border-blue-200 bg-blue-50/40 p-2 text-blue-800 transition hover:bg-blue-100/60 hover:border-blue-300"
                         >
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white">
-                                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white">
+                                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                                     <circle cx="9" cy="7" r="4" />
                                     <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
                                     <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                                 </svg>
                             </div>
-                            <div>
-                                <p className="text-sm font-bold">Manage Users</p>
-                                <p className="text-xs text-slate-500">Access and role permissions</p>
+                            <div className="min-w-0">
+                                <p className="text-xs font-bold">Manage Users</p>
+                                <p className="text-[10px] text-slate-500 truncate">Access and role permissions</p>
                             </div>
                         </Link>
 
                         <Link
                             href={route('admin-tech.offices.index')}
-                            className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50/40 p-3 text-emerald-800 transition hover:bg-emerald-100/60 hover:border-emerald-300"
+                            className="flex items-center gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50/40 p-2 text-emerald-800 transition hover:bg-emerald-100/60 hover:border-emerald-300"
                         >
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white">
-                                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white">
+                                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                     <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
                                     <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
                                 </svg>
                             </div>
-                            <div>
-                                <p className="text-sm font-bold">Manage Offices</p>
-                                <p className="text-xs text-slate-500">Municipal department directory</p>
+                            <div className="min-w-0">
+                                <p className="text-xs font-bold">Manage Offices</p>
+                                <p className="text-[10px] text-slate-500 truncate">Municipal department directory</p>
                             </div>
                         </Link>
 
                         <Link
                             href={route('admin-tech.roles.index')}
-                            className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50/40 p-3 text-red-800 transition hover:bg-red-100/60 hover:border-red-300"
+                            className="flex items-center gap-2.5 rounded-lg border border-red-200 bg-red-50/40 p-2 text-red-800 transition hover:bg-red-100/60 hover:border-red-300"
                         >
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-600 text-white">
-                                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-red-600 text-white">
+                                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                     <path d="M12 3l7 4v6c0 4.4-3.5 7.8-7 8-3.5-.2-7-3.6-7-8V7l7-4z" />
                                 </svg>
                             </div>
-                            <div>
-                                <p className="text-sm font-bold">System Monitoring</p>
-                                <p className="text-xs text-slate-500">Audit logs and active telemetry</p>
+                            <div className="min-w-0">
+                                <p className="text-xs font-bold">System Monitoring</p>
+                                <p className="text-[10px] text-slate-500 truncate">Health metrics and active telemetry</p>
                             </div>
                         </Link>
                     </div>
                 </section>
 
-                {/* Compact System Activity Section */}
-                <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+                {/* Compact System Activity Section with Internal Scrolling */}
+                <section className="flex-1 min-h-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm flex flex-col">
+                    <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-3.5 py-1.5 bg-slate-50/70">
                         <div>
-                            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-800">System Activity</h2>
-                            <p className="text-xs text-slate-500">Recent account and audit activity</p>
+                            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800">System Activity</h2>
+                            <p className="text-[10px] text-slate-500">Recent account and security audit events</p>
                         </div>
 
                         {/* Inline Compact Filter */}
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
                             <input
                                 id="admin-activity-search"
                                 type="text"
                                 value={formData.search}
                                 onChange={(event) => setFormData(prev => ({ ...prev, search: event.target.value }))}
                                 placeholder="Search action..."
-                                className="h-8 rounded-lg border border-slate-300 px-2.5 text-xs shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 w-40 sm:w-48"
+                                className="h-7 rounded-lg border border-slate-300 px-2 text-xs shadow-xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 w-36 sm:w-44"
                             />
                             <input
                                 id="admin-activity-actor"
@@ -255,13 +251,13 @@ export default function AdminDashboard({ summary, activities, pagination, filter
                                 value={formData.actor}
                                 onChange={(event) => setFormData(prev => ({ ...prev, actor: event.target.value }))}
                                 placeholder="Filter actor..."
-                                className="h-8 rounded-lg border border-slate-300 px-2.5 text-xs shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 w-32 sm:w-36"
+                                className="h-7 rounded-lg border border-slate-300 px-2 text-xs shadow-xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 w-28 sm:w-32"
                             />
                             {(formData.search || formData.actor) && (
                                 <button
                                     type="button"
                                     onClick={handleClearFilters}
-                                    className="h-8 rounded-lg border border-slate-300 px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                                    className="h-7 rounded-lg border border-slate-300 px-2 text-xs font-semibold text-slate-600 hover:bg-slate-100"
                                 >
                                     Clear
                                 </button>
@@ -269,28 +265,28 @@ export default function AdminDashboard({ summary, activities, pagination, filter
                         </div>
                     </div>
 
-                    <div className="overflow-x-auto">
+                    <div className="flex-1 min-h-0 overflow-y-auto">
                         <table className="min-w-full divide-y divide-slate-200 text-xs">
-                            <thead className="bg-slate-50">
+                            <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
                                 <tr>
-                                    <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Action / Activity</th>
-                                    <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Actor</th>
-                                    <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Timestamp</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-600">Action / Activity</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-600">Actor</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-600">Timestamp</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 bg-white">
                                 {activities.length === 0 ? (
                                     <tr>
-                                        <td colSpan={3} className="px-4 py-6 text-center text-slate-500">
+                                        <td colSpan={3} className="px-4 py-6 text-center text-xs text-slate-500">
                                             No system activity recorded yet.
                                         </td>
                                     </tr>
                                 ) : (
                                     activities.map((activity) => (
-                                        <tr key={activity.id} className="hover:bg-slate-50/80 transition">
-                                            <td className="px-4 py-2.5 font-medium text-slate-800">{activity.title}</td>
-                                            <td className="px-4 py-2.5 text-slate-600">{activity.actor}</td>
-                                            <td className="px-4 py-2.5 text-slate-500">{formatRelativeDate(activity.occurred_at)}</td>
+                                        <tr key={activity.id} className="hover:bg-slate-50/80 transition-colors">
+                                            <td className="px-3.5 py-1.5 font-medium text-slate-800">{activity.title}</td>
+                                            <td className="px-3.5 py-1.5 text-slate-600">{activity.actor}</td>
+                                            <td className="px-3.5 py-1.5 text-slate-500">{formatRelativeDate(activity.occurred_at)}</td>
                                         </tr>
                                     ))
                                 )}
@@ -299,7 +295,7 @@ export default function AdminDashboard({ summary, activities, pagination, filter
                     </div>
 
                     {activities.length > 0 && (
-                        <div className="border-t border-slate-200 px-4 py-2.5 flex items-center justify-between text-xs">
+                        <div className="shrink-0 border-t border-slate-200 px-3.5 py-1.5 flex items-center justify-between text-xs bg-white">
                             <p className="text-slate-500">
                                 Page <span className="font-semibold">{pagination.current_page}</span> of <span className="font-semibold">{pagination.last_page}</span> &bull; <span className="font-semibold">{pagination.total}</span> activities
                             </p>
@@ -307,14 +303,14 @@ export default function AdminDashboard({ summary, activities, pagination, filter
                                 <button
                                     onClick={() => handlePaginationLink(pagination.prev_page_url)}
                                     disabled={!pagination.prev_page_url}
-                                    className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                    className="inline-flex items-center gap-1 rounded border border-slate-300 px-2 py-0.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
                                 >
                                     Previous
                                 </button>
                                 <button
                                     onClick={() => handlePaginationLink(pagination.next_page_url)}
                                     disabled={!pagination.next_page_url}
-                                    className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                    className="inline-flex items-center gap-1 rounded border border-slate-300 px-2 py-0.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
                                 >
                                     Next
                                 </button>
