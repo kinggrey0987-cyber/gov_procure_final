@@ -14,6 +14,7 @@ type PaginationLink = {
 
 type PurchaseRequestRow = {
     purchase_request_id: number;
+    pr_number?: string | null;
     status: string;
     created_at?: string;
     office?: { name?: string | null } | null;
@@ -342,7 +343,7 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                                     <td className="px-4 py-3">
                                         <span className={statusClass(request.status)}>{displayPurchaseRequestStatus(request.status)}</span>
                                     </td>
-                                    <td className="px-4 py-3 text-right text-xs font-semibold text-slate-700">PR-{String(request.purchase_request_id).padStart(6, '0')}</td>
+                                    <td className="px-4 py-3 text-right text-xs font-semibold text-slate-700">{request.pr_number || `PR-${String(request.purchase_request_id).padStart(6, '0')}`}</td>
                                     <td className="px-4 py-3 text-right">
                                         <Link
                                             href={route('inventory.procurement-requests.show', {

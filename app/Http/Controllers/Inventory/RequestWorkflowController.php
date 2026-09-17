@@ -391,6 +391,7 @@ class RequestWorkflowController
         return Inertia::render('Inventory/ProcurementRequests/Show', [
             'purchaseRequest' => [
                 'purchase_request_id' => (int) $purchaseRequest->purchase_request_id,
+                'pr_number' => (string) $purchaseRequest->pr_number,
                 'status' => (string) $purchaseRequest->status,
                 'remarks' => $purchaseRequest->remarks,
                 'created_at' => optional($purchaseRequest->created_at)?->toIso8601String(),

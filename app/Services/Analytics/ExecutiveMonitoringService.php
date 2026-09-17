@@ -406,6 +406,12 @@ class ExecutiveMonitoringService
 
     private function formatPurchaseRequestReference(PurchaseRequest $request): string
     {
+        $prNumber = trim((string) $request->pr_number);
+
+        if ($prNumber !== '') {
+            return $prNumber;
+        }
+
         return 'PR-'.str_pad((string) $request->purchase_request_id, 6, '0', STR_PAD_LEFT);
     }
 

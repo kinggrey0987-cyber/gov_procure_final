@@ -16,6 +16,7 @@ type Props = {
     };
     recentPurchaseRequests: Array<{
         purchase_request_id: number;
+        pr_number?: string | null;
         office_name: string;
         status: string;
         created_at?: string | null;
@@ -56,7 +57,7 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
             }
 
             return [
-                `PR-${String(request.purchase_request_id).padStart(6, '0')}`,
+                request.pr_number || `PR-${String(request.purchase_request_id).padStart(6, '0')}`,
                 request.office_name,
                 request.status,
                 displayPurchaseRequestStatus(request.status),
@@ -196,7 +197,7 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
                                 filteredPurchaseRequests.slice(0, 5).map((request) => (
                                     <div key={request.purchase_request_id} className="flex items-center justify-between gap-3 px-6 py-4">
                                         <div>
-                                            <p className="font-semibold text-slate-800">PR-{String(request.purchase_request_id).padStart(6, '0')}</p>
+                                            <p className="font-semibold text-slate-800">{request.pr_number || `PR-${String(request.purchase_request_id).padStart(6, '0')}`}</p>
                                             <p className="text-sm text-slate-600">{request.office_name}</p>
                                         </div>
                                         <div className="text-right">

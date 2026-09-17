@@ -21,6 +21,7 @@ type PurchaseOrder = {
     supplier?: SupplierOption | null;
     purchase_request?: {
         purchase_request_id: number;
+        pr_number?: string | null;
         office?: {
             id: number;
             code?: string | null;
@@ -121,7 +122,7 @@ export default function PurchaseOrdersEdit({ purchaseOrder, suppliers }: Props) 
                             <span className="mb-1 block text-sm font-medium text-slate-700">Linked Purchase Request Source</span>
                             <input
                                 type="text"
-                                value={purchaseOrder.purchase_request?.purchase_request_id ? `PR-${String(purchaseOrder.purchase_request.purchase_request_id).padStart(6, '0')}` : 'No linked purchase request'}
+                                value={purchaseOrder.purchase_request?.pr_number || (purchaseOrder.purchase_request?.purchase_request_id ? `PR-${String(purchaseOrder.purchase_request.purchase_request_id).padStart(6, '0')}` : 'No linked purchase request')}
                                 className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600"
                                 readOnly
                             />

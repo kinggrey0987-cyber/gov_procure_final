@@ -677,9 +677,10 @@ export default function PurchaseOrdersShow({ purchaseOrder, isZeroCostReplacemen
                                                 <p>
                                                     <span className="font-semibold text-slate-600">P.R. No.(s):</span>{' '}
                                                     <span className="font-mono text-slate-900">
-                                                        {purchaseOrder.purchase_request?.purchase_request_id
-                                                            ? `PR-${String(purchaseOrder.purchase_request.purchase_request_id).padStart(6, '0')}`
-                                                            : (purchaseOrder.supply_request?.request_code || 'N/A')}
+                                                        {purchaseOrder.purchase_request?.pr_number
+                                                            || (purchaseOrder.purchase_request?.purchase_request_id
+                                                                ? `PR-${String(purchaseOrder.purchase_request.purchase_request_id).padStart(6, '0')}`
+                                                                : (purchaseOrder.supply_request?.request_code || 'N/A'))}
                                                     </span>
                                                 </p>
                                             </div>
@@ -850,7 +851,7 @@ export default function PurchaseOrdersShow({ purchaseOrder, isZeroCostReplacemen
                                                         {purchaseOrder.purchase_request?.office?.name || 'Requesting Municipal Office'}
                                                     </p>
                                                     <p className="text-[10px] text-slate-600">
-                                                        Ref: {purchaseOrder.purchase_request?.purchase_request_id ? `PR-${String(purchaseOrder.purchase_request.purchase_request_id).padStart(6, '0')}` : (purchaseOrder.supply_request?.request_code || 'Direct Municipal Order')}
+                                                        Ref: {purchaseOrder.purchase_request?.pr_number || (purchaseOrder.purchase_request?.purchase_request_id ? `PR-${String(purchaseOrder.purchase_request.purchase_request_id).padStart(6, '0')}` : (purchaseOrder.supply_request?.request_code || 'Direct Municipal Order'))}
                                                     </p>
                                                     <p className="text-[9px] text-emerald-700 font-semibold mt-0.5">Status: Placed & Official LGU Record</p>
                                                 </div>

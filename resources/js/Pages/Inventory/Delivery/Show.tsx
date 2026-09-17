@@ -73,6 +73,7 @@ type Delivery = {
     };
     follow_up_purchase_request?: {
         purchase_request_id: number;
+        pr_number?: string | null;
         status: string;
         source_type?: string | null;
         purchase_order_count?: number;
@@ -379,7 +380,7 @@ export default function DeliveryShow({ delivery }: Props) {
                                                 <div>
                                                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Linked Follow-up Request</p>
                                                     <p className="mt-1 text-sm font-semibold text-slate-900">
-                                                        PR-{String(delivery.follow_up_purchase_request.purchase_request_id).padStart(6, '0')}
+                                                        {delivery.follow_up_purchase_request.pr_number || `PR-${String(delivery.follow_up_purchase_request.purchase_request_id).padStart(6, '0')}`}
                                                     </p>
                                                     <p className="mt-1 text-sm text-slate-600">
                                                         Status: {humanizeEnum(delivery.follow_up_purchase_request.status)}
@@ -517,7 +518,7 @@ export default function DeliveryShow({ delivery }: Props) {
                             <MetaRow label="Supplier" value={delivery.supplier?.supplier_name ?? '-'} />
                             <MetaRow
                                 label="Follow-up Purchase Request"
-                                value={delivery.follow_up_purchase_request ? `PR-${String(delivery.follow_up_purchase_request.purchase_request_id).padStart(6, '0')}` : '-'}
+                                value={delivery.follow_up_purchase_request ? (delivery.follow_up_purchase_request.pr_number || `PR-${String(delivery.follow_up_purchase_request.purchase_request_id).padStart(6, '0')}`) : '-'}
                             />
                         </dl>
 

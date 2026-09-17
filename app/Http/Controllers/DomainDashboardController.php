@@ -232,6 +232,7 @@ class DomainDashboardController extends Controller
             ],
             'recentPurchaseRequests' => $recentPurchaseRequests->map(fn (PurchaseRequest $request): array => [
                 'purchase_request_id' => (int) $request->purchase_request_id,
+                'pr_number' => (string) $request->pr_number,
                 'office_name' => (string) ($request->office?->name ?? 'Unknown Office'),
                 'status' => (string) $request->status,
                 'created_at' => optional($request->created_at)?->toIso8601String(),

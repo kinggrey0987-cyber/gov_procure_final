@@ -4,6 +4,7 @@ import { Head, Link } from '@inertiajs/react';
 
 type PurchaseRequestDetail = {
     purchase_request_id: number;
+    pr_number?: string | null;
     status: string;
     remarks?: string | null;
     created_at?: string | null;
@@ -50,7 +51,7 @@ type Props = {
 };
 
 export default function ProcurementRequestShow({ purchaseRequest, backFilters }: Props) {
-    const reference = `PR-${String(purchaseRequest.purchase_request_id).padStart(6, '0')}`;
+    const reference = purchaseRequest.pr_number || `PR-${String(purchaseRequest.purchase_request_id).padStart(6, '0')}`;
     const totalQuantity = purchaseRequest.items.reduce((sum, item) => sum + Number(item.quantity_requested || 0), 0);
 
     return (
