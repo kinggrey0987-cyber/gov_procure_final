@@ -34,7 +34,7 @@ return [
 
     'lifetime' => (int) env('SESSION_LIFETIME', 120),
 
-    'expire_on_close' => (bool) env('SESSION_EXPIRE_ON_CLOSE', true),
+    'expire_on_close' => (bool) env('SESSION_EXPIRE_ON_CLOSE', false),
 
     /*
     |--------------------------------------------------------------------------
@@ -143,7 +143,7 @@ return [
     |
     */
 
-    'path' => env('SESSION_PATH', '/'),
+    'path' => env('SESSION_PATH') ?: '/',
 
     /*
     |--------------------------------------------------------------------------
@@ -156,7 +156,7 @@ return [
     |
     */
 
-    'domain' => env('SESSION_DOMAIN'),
+    'domain' => (env('SESSION_DOMAIN') === 'null' || ! env('SESSION_DOMAIN')) ? null : env('SESSION_DOMAIN'),
 
     /*
     |--------------------------------------------------------------------------

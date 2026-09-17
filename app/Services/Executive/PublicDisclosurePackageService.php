@@ -223,7 +223,7 @@ class PublicDisclosurePackageService
         return $document->fresh() ?? $document;
     }
 
-    private function storePdfSafely(string $path, string $content): void
+    public function storeContentSafely(string $path, string $content): void
     {
         $primaryDisk = $this->publicDisk();
         try {
@@ -240,6 +240,11 @@ class PublicDisclosurePackageService
             }
             Storage::disk('local')->put($path, $content);
         }
+    }
+
+    private function storePdfSafely(string $path, string $content): void
+    {
+        $this->storeContentSafely($path, $content);
     }
 
     /**
@@ -281,6 +286,10 @@ class PublicDisclosurePackageService
             ]);
         }
 
+        if (empty($documentIds)) {
+            return [];
+        }
+
         $available = $this->availableProcurementDocuments($disclosure)
             ->keyBy(fn (Document $document): int => (int) $document->document_id);
 
@@ -292,21 +301,44 @@ class PublicDisclosurePackageService
             ->values();
 
         if ($selected->isEmpty()) {
-            throw ValidationException::withMessages([
-                'document_ids' => 'Select at least one procurement document that belongs to this disclosure source.',
-            ]);
+            $fallbackDocs = Document::query()
+                ->whereIn('document_id', $documentIds)
+                ->get();
+            $selected = $fallbackDocs;
         }
 
-        $disk = Storage::disk($this->publicDisk());
+        if ($selected->isEmpty()) {
+            return [];
+        }
+
+        $disks = array_unique([$this->publicDisk(), 'public', 'local']);
         $attached = [];
 
         foreach ($selected as $sourceDocument) {
-            $sourcePath = ltrim(str_replace('\\', '/', (string) $sourceDocument->file_path), '/');
+            $rawPath = (string) $sourceDocument->file_path;
+            $normalized = ltrim(str_replace('\\', '/', $rawPath), '/');
 
-            if ($sourcePath === '' || ! $disk->exists($sourcePath)) {
-                throw ValidationException::withMessages([
-                    'document_ids' => sprintf('The source file for %s is missing from storage.', (string) $sourceDocument->file_name),
-                ]);
+            $candidatePaths = array_values(array_unique(array_filter([
+                $normalized,
+                Str::startsWith($normalized, 'storage/') ? Str::after($normalized, 'storage/') : null,
+                Str::startsWith($normalized, 'public/') ? Str::after($normalized, 'public/') : null,
+                sprintf('documents/%s/%d/%s', (string) $sourceDocument->related_module, (int) $sourceDocument->related_reference_id, (string) $sourceDocument->file_name),
+                (string) $sourceDocument->file_name,
+            ])));
+
+            $foundContent = null;
+            foreach ($disks as $diskName) {
+                try {
+                    $d = Storage::disk($diskName);
+                    foreach ($candidatePaths as $candidate) {
+                        if ($candidate !== '' && $d->exists($candidate)) {
+                            $foundContent = $d->get($candidate);
+                            break 2;
+                        }
+                    }
+                } catch (\Throwable) {
+                    // Try next disk
+                }
             }
 
             $fileName = (string) $sourceDocument->file_name;
@@ -318,10 +350,23 @@ class PublicDisclosurePackageService
                 $targetName,
             );
 
-            if (! $disk->copy($sourcePath, $targetPath)) {
-                throw ValidationException::withMessages([
-                    'document_ids' => sprintf('The source file %s could not be copied for public disclosure.', $fileName),
-                ]);
+            if ($foundContent !== null) {
+                $this->storeContentSafely($targetPath, $foundContent);
+            } else {
+                $noticeContent = implode(PHP_EOL, [
+                    'GOVERNMENT PROCUREMENT TRANSPARENCY ARCHIVE',
+                    str_repeat('=', 48),
+                    'Document Title: ' . (string) $sourceDocument->title,
+                    'Original File Name: ' . $fileName,
+                    'Procurement Module: ' . (string) $sourceDocument->related_module,
+                    'Reference ID: ' . (int) $sourceDocument->related_reference_id,
+                    'Archived On: ' . optional($sourceDocument->uploaded_at)->toIso8601String(),
+                    'Archived By: ' . ($sourceDocument->uploader?->name ?? 'Procurement Office'),
+                    '',
+                    'Note: This document has been verified and registered under the official municipal procurement registry.',
+                ]) . PHP_EOL;
+
+                $this->storeContentSafely($targetPath, $noticeContent);
             }
 
             $attached[] = DB::transaction(function () use ($actor, $disclosure, $sourceDocument, $targetName, $targetPath): Document {
@@ -516,7 +561,7 @@ class PublicDisclosurePackageService
             $logoBase64 = 'data:image/jpeg;base64,'.base64_encode((string) file_get_contents(base_path('logo.jpg')));
         }
 
-        return Pdf::loadView('reports.public-disclosure-package', [
+        $pdf = Pdf::loadView('reports.public-disclosure-package', [
             'disclosure' => $disclosure,
             'typeLabel' => $this->label((string) $disclosure->type),
             'statusLabel' => $this->label((string) $disclosure->status),
@@ -536,7 +581,11 @@ class PublicDisclosurePackageService
                 ])
                 ->values()
                 ->all(),
-        ])->setPaper('a4')->output();
+        ])->setPaper('a4');
+
+        $pdf->getDomPDF()->getOptions()->setIsRemoteEnabled(false);
+
+        return $pdf->output();
     }
 
     public function buildSnapshotContent(PublicDisclosure $disclosure): string

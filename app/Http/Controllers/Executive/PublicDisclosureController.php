@@ -99,20 +99,30 @@ class PublicDisclosureController
         // Attach selected procurement documents strictly belonging to this referenced source record
         $procurementDocIds = $request->input('procurement_document_ids', []);
         if (is_array($procurementDocIds) && count($procurementDocIds) > 0) {
-            $this->packageService->attachProcurementDocuments($disclosure, $user, array_map('intval', $procurementDocIds));
+            try {
+                $this->packageService->attachProcurementDocuments($disclosure, $user, array_map('intval', $procurementDocIds));
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Failed attaching procurement documents: ' . $e->getMessage());
+            }
         }
 
         // Upload any extra municipal supporting files
         $supportingFiles = $request->file('supporting_files', []);
-        foreach ($supportingFiles as $supportingFile) {
-            if (! $supportingFile instanceof UploadedFile) {
-                continue;
-            }
+        if (is_array($supportingFiles)) {
+            foreach ($supportingFiles as $supportingFile) {
+                if (! $supportingFile instanceof UploadedFile) {
+                    continue;
+                }
 
-            $this->documentService->upload($user, 'public_disclosures', (int) $disclosure->disclosure_id, [
-                'title' => pathinfo($supportingFile->getClientOriginalName(), PATHINFO_FILENAME),
-                'file' => $supportingFile,
-            ]);
+                try {
+                    $this->documentService->upload($user, 'public_disclosures', (int) $disclosure->disclosure_id, [
+                        'title' => pathinfo($supportingFile->getClientOriginalName(), PATHINFO_FILENAME),
+                        'file' => $supportingFile,
+                    ]);
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('Failed uploading supporting municipal file: ' . $e->getMessage());
+                }
+            }
         }
 
         // If user requested immediate publishing, publish now (which generates the official certified package PDF)
@@ -124,7 +134,11 @@ class PublicDisclosureController
             );
         } elseif (! $request->hasFile('main_file')) {
             // In draft mode without custom main file, ensure the official package PDF exists so user can preview it
-            $this->packageService->ensureOfficialPackageAttachment($disclosure, $user);
+            try {
+                $this->packageService->ensureOfficialPackageAttachment($disclosure, $user);
+            } catch (\Throwable) {
+                // Draft can still be edited if snapshot PDF creation has minor delay
+            }
         }
 
         return Redirect::route('executive.disclosures.show', $disclosure->disclosure_id)

@@ -11,6 +11,18 @@ class StorePublicDisclosureRequest extends FormRequest
         return $this->user()?->can('public-disclosure.manage') ?? false;
     }
 
+    protected function prepareForValidation(): void
+    {
+        // If main_file was submitted as null string or empty string, remove it so validation is clean
+        if ($this->has('main_file') && ! $this->hasFile('main_file')) {
+            $this->request->remove('main_file');
+        }
+
+        if ($this->has('reference_id') && ($this->input('reference_id') === '' || $this->input('reference_id') === null)) {
+            $this->merge(['reference_id' => null]);
+        }
+    }
+
     /**
      * @return array<string, array<int, string>>
      */

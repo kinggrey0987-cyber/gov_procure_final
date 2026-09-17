@@ -1,15 +1,20 @@
-import { router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 
 const IDLE_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
 const WARNING_WINDOW_MS = 60 * 1000; // 60 seconds warning before logout
 const STORAGE_KEY = 'govsupply_session_last_active';
 const THROTTLE_INTERVAL_MS = 3000; // Throttle activity writes to 3 seconds
+const MOUNT_GRACE_PERIOD_MS = 60 * 1000; // 60 seconds grace period on mount to prevent instant logouts
 
 export default function SessionTimeoutGuard() {
+    const page = usePage();
+    const currentUserId = (page.props as any)?.auth?.user?.id ?? null;
+
     const [secondsRemaining, setSecondsRemaining] = useState<number | null>(null);
     const [showWarning, setShowWarning] = useState<boolean>(false);
     const lastWriteRef = useRef<number>(Date.now());
+    const mountTimeRef = useRef<number>(Date.now());
     const isLoggingOutRef = useRef<boolean>(false);
 
     const recordActivity = () => {
@@ -41,6 +46,13 @@ export default function SessionTimeoutGuard() {
 
     const handleLogout = () => {
         if (isLoggingOutRef.current) return;
+
+        // Never trigger logout during the initial mount grace period
+        if (Date.now() - mountTimeRef.current < MOUNT_GRACE_PERIOD_MS) {
+            recordActivity();
+            return;
+        }
+
         isLoggingOutRef.current = true;
         try {
             localStorage.removeItem(STORAGE_KEY);
@@ -52,14 +64,14 @@ export default function SessionTimeoutGuard() {
     };
 
     useEffect(() => {
-        // Initialize last active timestamp if not already set
-        const existing = localStorage.getItem(STORAGE_KEY);
-        if (!existing) {
-            try {
-                localStorage.setItem(STORAGE_KEY, Date.now().toString());
-            } catch {
-                // Ignore
-            }
+        // ALWAYS refresh active timestamp on mount because an authenticated view was just loaded
+        const now = Date.now();
+        lastWriteRef.current = now;
+        mountTimeRef.current = now;
+        try {
+            localStorage.setItem(STORAGE_KEY, now.toString());
+        } catch {
+            // Ignore
         }
 
         // Register user activity listeners
@@ -84,6 +96,13 @@ export default function SessionTimeoutGuard() {
 
         // Check on tab focus or visibility change (e.g., wake from sleep or tab switch)
         const checkImmediate = () => {
+            if (isLoggingOutRef.current) return;
+
+            // If component just mounted recently, don't trigger immediate logout
+            if (Date.now() - mountTimeRef.current < MOUNT_GRACE_PERIOD_MS) {
+                return;
+            }
+
             const lastActiveStr = localStorage.getItem(STORAGE_KEY);
             const lastActive = lastActiveStr ? Number(lastActiveStr) : Date.now();
             const elapsed = Date.now() - lastActive;
@@ -99,6 +118,11 @@ export default function SessionTimeoutGuard() {
         // Interval timer running every second to update countdown & trigger warning/logout
         const timer = window.setInterval(() => {
             if (isLoggingOutRef.current) return;
+
+            // If component just mounted recently, don't trigger logout
+            if (Date.now() - mountTimeRef.current < MOUNT_GRACE_PERIOD_MS) {
+                return;
+            }
 
             const lastActiveStr = localStorage.getItem(STORAGE_KEY);
             const lastActive = lastActiveStr ? Number(lastActiveStr) : Date.now();
@@ -130,7 +154,7 @@ export default function SessionTimeoutGuard() {
             document.removeEventListener('visibilitychange', checkImmediate);
             window.clearInterval(timer);
         };
-    }, []);
+    }, [currentUserId]);
 
     if (!showWarning || secondsRemaining === null) {
         return null;

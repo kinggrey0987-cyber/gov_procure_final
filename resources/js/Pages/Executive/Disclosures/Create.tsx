@@ -198,14 +198,41 @@ export default function DisclosureCreate({ eligibleSources, procurementDocuments
         const status = publicationAction === 'PUBLISHED' ? 'PUBLISHED' : 'DRAFT';
         const remarks = form.data.remarks;
 
-        form.transform((data) => ({
-            ...data,
-            status,
-            remarks,
-        }));
+        form.transform((data) => {
+            const transformed: Record<string, any> = {
+                title: data.title,
+                type: data.type,
+                status,
+                remarks,
+            };
+
+            if (data.reference_type) {
+                transformed.reference_type = data.reference_type;
+            }
+            if (data.reference_id) {
+                transformed.reference_id = Number(data.reference_id);
+            }
+            if (data.description) {
+                transformed.description = data.description;
+            }
+            if (data.procurement_document_ids && data.procurement_document_ids.length > 0) {
+                transformed.procurement_document_ids = data.procurement_document_ids;
+            }
+            if (data.main_file instanceof File) {
+                transformed.main_file = data.main_file;
+            }
+            if (data.supporting_files && data.supporting_files.length > 0) {
+                transformed.supporting_files = data.supporting_files;
+            }
+
+            return transformed;
+        });
 
         form.post(route('executive.disclosures.store'), {
             forceFormData: true,
+            onError: (errors) => {
+                console.error('Disclosure creation errors:', errors);
+            },
             onFinish: () => {
                 form.transform((data) => data);
                 form.setData('status', priorStatus);
@@ -225,6 +252,23 @@ export default function DisclosureCreate({ eligibleSources, procurementDocuments
                 </section>
 
                 <form className="space-y-5" onSubmit={onSubmit}>
+                    {Object.keys(form.errors).length > 0 && (
+                        <div className="rounded-2xl border border-red-300 bg-red-50 p-5 shadow-sm">
+                            <div className="flex items-center gap-2.5 text-red-800 font-semibold text-sm">
+                                <svg className="h-5 w-5 shrink-0 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                                <span>Please resolve the following before proceeding:</span>
+                            </div>
+                            <ul className="mt-2.5 list-disc list-inside text-xs text-red-700 space-y-1">
+                                {Object.entries(form.errors).map(([key, msg]) => (
+                                    <li key={key}>
+                                        <strong className="capitalize">{key.replaceAll('_', ' ')}:</strong> {msg}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
                     <StepCard step="1" title="Select Source" subtitle="Choose an approved record to publish from">
                         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
                             <section className="rounded-xl border border-red-200 bg-red-50/60 p-4">
@@ -283,6 +327,11 @@ export default function DisclosureCreate({ eligibleSources, procurementDocuments
                                 )}
                             </section>
                         </div>
+                        {form.errors.reference_id && (
+                            <p className="mt-3 rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs font-semibold text-red-700">
+                                Source error: {form.errors.reference_id}
+                            </p>
+                        )}
                         {sourceOptions.length === 0 ? (
                             <div className="rounded-xl border border-dashed border-red-200 bg-red-50 px-4 py-4 text-sm text-slate-600">
                                 No eligible source records are currently available.
@@ -292,7 +341,7 @@ export default function DisclosureCreate({ eligibleSources, procurementDocuments
 
                     <StepCard step="2" title="Disclosure Details" subtitle="Define the public-facing content">
                         <div className="grid gap-3 md:grid-cols-2">
-                            <Field label="Title" required>
+                            <Field label="Title" required error={form.errors.title}>
                                 <input
                                     className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm"
                                     placeholder="Disclosure title"
@@ -300,7 +349,7 @@ export default function DisclosureCreate({ eligibleSources, procurementDocuments
                                     onChange={(event) => form.setData('title', event.target.value)}
                                 />
                             </Field>
-                            <Field label="Disclosure Type" required>
+                            <Field label="Disclosure Type" required error={form.errors.type}>
                                 <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
                                     <p className="text-sm font-semibold text-slate-800">
                                         {form.data.type ? formatTypeLabel(form.data.type) : 'Select a source to assign a disclosure type'}
@@ -432,6 +481,11 @@ export default function DisclosureCreate({ eligibleSources, procurementDocuments
                                                     <span>Selected replacement: {form.data.main_file.name}</span>
                                                 </p>
                                             )}
+                                            {form.errors.main_file && (
+                                                <p className="text-xs font-semibold text-red-600">
+                                                    {form.errors.main_file}
+                                                </p>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -480,6 +534,11 @@ export default function DisclosureCreate({ eligibleSources, procurementDocuments
                                 </div>
 
                                 <div className="mt-4">
+                                    {(form.errors.procurement_document_ids || (form.errors as any).document_ids) && (
+                                        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700">
+                                            {form.errors.procurement_document_ids || (form.errors as any).document_ids}
+                                        </div>
+                                    )}
                                     {!selectedSource ? (
                                         <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-6 text-center">
                                             <svg className="mx-auto h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -677,11 +736,28 @@ export default function DisclosureCreate({ eligibleSources, procurementDocuments
                         </div>
                     </StepCard>
 
-                    <div className="flex flex-wrap items-center gap-2">
-                        <button type="submit" className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800" disabled={form.processing}>
-                            {publicationAction === 'PUBLISHED' ? 'Publish Disclosure' : 'Save Draft'}
+                    <div className="flex flex-wrap items-center gap-3 pt-2">
+                        <button
+                            type="submit"
+                            className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60 transition"
+                            disabled={form.processing}
+                        >
+                            {form.processing ? (
+                                <>
+                                    <svg className="h-4 w-4 animate-spin text-white" viewBox="0 0 24 24" fill="none">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                                    </svg>
+                                    <span>{publicationAction === 'PUBLISHED' ? 'Publishing Disclosure...' : 'Saving Draft...'}</span>
+                                </>
+                            ) : (
+                                <span>{publicationAction === 'PUBLISHED' ? 'Publish Disclosure' : 'Save Draft'}</span>
+                            )}
                         </button>
-                        <Link href={route('executive.transparency-monitoring')} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                        <Link
+                            href={route('executive.transparency-monitoring')}
+                            className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition"
+                        >
                             Back to Transparency & Disclosures
                         </Link>
                     </div>
@@ -706,7 +782,7 @@ function StepCard({ step, title, subtitle, children }: { step: string; title: st
     );
 }
 
-function Field({ label, children, required }: { label: string; children: ReactNode; required?: boolean }) {
+function Field({ label, children, required, error }: { label: string; children: ReactNode; required?: boolean; error?: string }) {
     return (
         <label className="block space-y-1">
             <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">
@@ -714,6 +790,7 @@ function Field({ label, children, required }: { label: string; children: ReactNo
                 {required ? ' *' : ''}
             </span>
             {children}
+            {error ? <p className="text-xs font-semibold text-red-600">{error}</p> : null}
         </label>
     );
 }

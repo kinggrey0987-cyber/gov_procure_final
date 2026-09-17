@@ -85,6 +85,13 @@ export default function Login({
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
 
+        // Refresh activity timestamp in localStorage so new session doesn't inherit old inactivity time
+        try {
+            localStorage.setItem('govsupply_session_last_active', Date.now().toString());
+        } catch {
+            // Ignore
+        }
+
         post(route('login'), {
             onFinish: () => reset('password'),
         });
