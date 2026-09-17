@@ -44,11 +44,11 @@ export default function InventoryTracking({ summary, dashboardAlerts }: Props) {
         >
             <Head title="GSO Dashboard" />
 
-            <div className="space-y-3.5">
+            <div className="space-y-2 lg:h-[calc(100vh-8.5rem)] flex flex-col justify-between overflow-y-auto lg:overflow-hidden">
                 <DashboardAlertBanner alerts={dashboardAlerts} />
 
                 {/* Unified High-Density GSO Telemetry Cockpit - Interactive Drilldown */}
-                <section className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm space-y-2">
+                <section className="shrink-0 rounded-xl border border-slate-200 bg-white p-2 shadow-sm space-y-1.5">
                     {/* Stock & Operational Pressure Tier */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
                         <Link
@@ -98,10 +98,10 @@ export default function InventoryTracking({ summary, dashboardAlerts }: Props) {
                     </div>
 
                     {/* Ledger Volume Tier */}
-                    <div className="border-t border-slate-100 pt-2 grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+                    <div className="border-t border-slate-100 pt-1.5 grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
                         <Link
                             href={route('inventory.inventory.index')}
-                            className="flex items-center gap-2.5 px-3 py-1 transition rounded-lg group cursor-pointer hover:bg-slate-50"
+                            className="flex items-center gap-2.5 px-3 py-0.5 transition rounded-lg group cursor-pointer hover:bg-slate-50"
                             title="Click to view Item Catalog & Stock"
                         >
                             <span className="h-2 w-2 shrink-0 rounded-full bg-slate-400" />
@@ -112,7 +112,7 @@ export default function InventoryTracking({ summary, dashboardAlerts }: Props) {
                         </Link>
                         <Link
                             href={route('inventory.inventory-movements.index')}
-                            className="flex items-center gap-2.5 px-3 py-1 transition rounded-lg group cursor-pointer hover:bg-indigo-50/60"
+                            className="flex items-center gap-2.5 px-3 py-0.5 transition rounded-lg group cursor-pointer hover:bg-indigo-50/60"
                             title="Click to view Movement Logs"
                         >
                             <span className="h-2 w-2 shrink-0 rounded-full bg-indigo-600" />
@@ -123,7 +123,7 @@ export default function InventoryTracking({ summary, dashboardAlerts }: Props) {
                         </Link>
                         <Link
                             href={route('inventory.distribution-records.index')}
-                            className="flex items-center gap-2.5 px-3 py-1 transition rounded-lg group cursor-pointer hover:bg-emerald-50/60"
+                            className="flex items-center gap-2.5 px-3 py-0.5 transition rounded-lg group cursor-pointer hover:bg-emerald-50/60"
                             title="Click to view Distribution Records"
                         >
                             <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-600" />
@@ -134,7 +134,7 @@ export default function InventoryTracking({ summary, dashboardAlerts }: Props) {
                         </Link>
                         <Link
                             href={route('inventory.distribution-records.index')}
-                            className="flex items-center gap-2.5 px-3 py-1 transition rounded-lg group cursor-pointer hover:bg-teal-50/60"
+                            className="flex items-center gap-2.5 px-3 py-0.5 transition rounded-lg group cursor-pointer hover:bg-teal-50/60"
                             title="Click to view Received Records"
                         >
                             <span className="h-2 w-2 shrink-0 rounded-full bg-teal-600" />
@@ -147,59 +147,69 @@ export default function InventoryTracking({ summary, dashboardAlerts }: Props) {
                 </section>
 
                 {/* Compact Quick Access Cards */}
-                <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="shrink-0 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                     {quickActions.map((action) => (
                         <Link
                             key={action.href}
                             href={action.href}
-                            className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-red-300 hover:bg-slate-50/70 hover:shadow"
+                            className="group flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white p-2.5 shadow-xs transition hover:border-red-300 hover:bg-slate-50/70"
                         >
-                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-700 transition group-hover:bg-red-600 group-hover:text-white">
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-700 transition group-hover:bg-red-600 group-hover:text-white">
                                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                                 </svg>
                             </span>
                             <div className="min-w-0">
                                 <p className="text-xs font-bold text-slate-900 group-hover:text-red-700">{action.label}</p>
-                                <p className="text-[11px] text-slate-500 truncate">{action.description}</p>
+                                <p className="text-[10px] text-slate-500 truncate">{action.description}</p>
                             </div>
                         </Link>
                     ))}
                 </div>
 
-                <div className="grid gap-3.5 lg:grid-cols-2">
-                    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                            <div>
-                                <h3 className="text-sm font-bold text-slate-900">Delivery & Distribution</h3>
-                                <p className="text-[11px] text-slate-500">Track delivery receipts and office release records</p>
+                <div className="grid gap-2.5 lg:grid-cols-2 flex-1 min-h-0">
+                    <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs flex flex-col justify-between">
+                        <div>
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                                <div>
+                                    <h3 className="text-xs font-bold text-slate-900">Delivery & Distribution</h3>
+                                    <p className="text-[10px] text-slate-500">Track delivery receipts and office release records</p>
+                                </div>
                             </div>
+                            <p className="mt-2 text-xs text-slate-600 leading-relaxed">
+                                Manage incoming warehouse stock deliveries from suppliers, inspect specifications, and issue confirmed supplies to requisitioning offices.
+                            </p>
                         </div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                            <Link href={route('inventory.deliveries.index')} className="inline-flex h-8 items-center rounded-lg bg-red-600 px-3 text-xs font-semibold text-white hover:bg-red-700 transition shadow-sm">
+                        <div className="mt-3 flex flex-wrap gap-2 pt-2 border-t border-slate-100">
+                            <Link href={route('inventory.deliveries.index')} className="inline-flex h-7 items-center rounded-lg bg-red-600 px-3 text-xs font-semibold text-white hover:bg-red-700 transition shadow-xs">
                                 View Deliveries &rarr;
                             </Link>
-                            <Link href={route('inventory.distribution-records.index')} className="inline-flex h-8 items-center rounded-lg border border-emerald-300 bg-emerald-50 px-3 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition">
+                            <Link href={route('inventory.distribution-records.index')} className="inline-flex h-7 items-center rounded-lg border border-emerald-300 bg-emerald-50 px-3 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition">
                                 Distribution Records &rarr;
                             </Link>
                         </div>
                     </div>
 
-                    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                            <div>
-                                <h3 className="text-sm font-bold text-slate-900">Stock & Claims Operations</h3>
-                                <p className="text-[11px] text-slate-500">Available stock, reorder levels, and pending claims</p>
+                    <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs flex flex-col justify-between">
+                        <div>
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                                <div>
+                                    <h3 className="text-xs font-bold text-slate-900">Stock & Claims Operations</h3>
+                                    <p className="text-[10px] text-slate-500">Available stock, reorder levels, and pending claims</p>
+                                </div>
                             </div>
+                            <p className="mt-2 text-xs text-slate-600 leading-relaxed">
+                                Monitor real-time bin cards, stock movements, safety thresholds, and handle office discrepancy claim adjustments.
+                            </p>
                         </div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                            <Link href={route('inventory.inventory.index')} className="inline-flex h-8 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-sm">
+                        <div className="mt-3 flex flex-wrap gap-2 pt-2 border-t border-slate-100">
+                            <Link href={route('inventory.inventory.index')} className="inline-flex h-7 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-xs">
                                 Stock Ledger &rarr;
                             </Link>
-                            <Link href={route('inventory.claims.index')} className="inline-flex h-8 items-center rounded-lg border border-rose-300 bg-rose-50 px-3 text-xs font-semibold text-rose-800 hover:bg-rose-100 transition">
+                            <Link href={route('inventory.claims.index')} className="inline-flex h-7 items-center rounded-lg border border-rose-300 bg-rose-50 px-3 text-xs font-semibold text-rose-800 hover:bg-rose-100 transition">
                                 Review Claims &rarr;
                             </Link>
-                            <Link href={route('inventory.inventory-movements.index')} className="inline-flex h-8 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-sm">
+                            <Link href={route('inventory.inventory-movements.index')} className="inline-flex h-7 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-xs">
                                 Movement Logs &rarr;
                             </Link>
                         </div>

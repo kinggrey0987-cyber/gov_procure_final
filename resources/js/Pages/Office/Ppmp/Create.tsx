@@ -51,6 +51,14 @@ export default function PpmpCreate({ itemOptions }: Props) {
     const duplicateRowIndexes = useMemo(() => duplicateIndexesForDraftItems(form.data.items), [form.data.items]);
     const hasDuplicateItems = duplicateRowIndexes.size > 0;
 
+    const totalEstimatedBudget = useMemo(() => {
+        return form.data.items.reduce((sum, item) => {
+            const q = Number(item.quantity) || 0;
+            const c = Number(item.unit_cost) || 0;
+            return sum + (q * c);
+        }, 0);
+    }, [form.data.items]);
+
     const submit = (event: FormEvent) => {
         event.preventDefault();
 
@@ -86,70 +94,123 @@ export default function PpmpCreate({ itemOptions }: Props) {
         <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Create PPMP</h2>}>
             <Head title="Create PPMP" />
 
-            <form onSubmit={submit} className="space-y-6 py-4">
+            <form onSubmit={submit} className="lg:h-[calc(100vh-8rem)] flex flex-col justify-between py-1 space-y-2 overflow-y-auto lg:overflow-hidden">
                 {Object.keys(form.errors).length > 0 ? (
-                    <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm">
-                        <p className="font-semibold">Unable to save PPMP.</p>
-                        <p className="mt-1">Please complete all required fields and review the highlighted item rows.</p>
-                        <ul className="mt-2 list-disc list-inside space-y-0.5 text-xs text-rose-600">
-                            {Object.entries(form.errors).map(([key, msg]) => (
-                                <li key={key}>{msg}</li>
-                            ))}
-                        </ul>
+                    <div className="shrink-0 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs text-rose-700 shadow-xs flex items-center justify-between">
+                        <div>
+                            <span className="font-semibold">Unable to save PPMP. </span>
+                            <span>Please review highlighted fields and items ({Object.keys(form.errors).length} error{Object.keys(form.errors).length > 1 ? 's' : ''}).</span>
+                        </div>
                     </div>
                 ) : null}
 
-                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <div className="mb-4 flex items-center justify-between">
-                        <h3 className="text-2xl font-semibold text-slate-800">PPMP Details</h3>
+                {/* Card 1: PPMP Details (Matches User Manual Screenshot) */}
+                <section className="shrink-0 rounded-xl border border-slate-200 bg-white p-3 sm:p-3.5 shadow-xs">
+                    <div className="mb-2 flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            {isRefreshing ? <span className="text-xs text-slate-500">Refreshing item options...</span> : null}
-                            <Link href={route('office.ppmp.index')} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">Back to PPMP</Link>
+                            <h3 className="text-base font-bold text-slate-800">PPMP Details</h3>
+                            {isRefreshing ? <span className="text-[11px] text-slate-400 animate-pulse">Refreshing item options...</span> : null}
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Link
+                                href={route('office.ppmp.index')}
+                                className="rounded-lg border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                            >
+                                Back to PPMP
+                            </Link>
                         </div>
                     </div>
-                    <div className="grid gap-4 md:grid-cols-2">
+
+                    <div className="grid gap-2 sm:grid-cols-2">
                         <label className="block">
-                            <span className="mb-1 block text-sm font-medium text-slate-700">Fiscal Year</span>
-                            <input type="number" min={CURRENT_YEAR} className={`w-full rounded-lg border px-3 py-2 text-sm ${form.errors.fiscal_year ? 'border-rose-400 bg-rose-50/30' : 'border-slate-300'}`} value={form.data.fiscal_year} onChange={(event) => form.setData('fiscal_year', Number(event.target.value))} required />
-                            <span className="mt-1 block text-xs text-slate-500">Fiscal year cannot be earlier than {CURRENT_YEAR}.</span>
-                            <InputError message={form.errors.fiscal_year} className="mt-1" />
+                            <span className="mb-0.5 block text-xs font-medium text-slate-700">Fiscal Year</span>
+                            <input
+                                type="number"
+                                min={CURRENT_YEAR}
+                                className={`w-full rounded-lg border px-2.5 py-1 text-xs font-medium ${form.errors.fiscal_year ? 'border-rose-400 bg-rose-50/30' : 'border-slate-300'}`}
+                                value={form.data.fiscal_year}
+                                onChange={(event) => form.setData('fiscal_year', Number(event.target.value))}
+                                required
+                            />
+                            <span className="mt-0.5 block text-[10px] text-slate-500">Fiscal year cannot be earlier than {CURRENT_YEAR}.</span>
+                            <InputError message={form.errors.fiscal_year} className="mt-0.5 text-[10px]" />
                         </label>
+
                         <label className="block">
-                            <span className="mb-1 block text-sm font-medium text-slate-700">Date Prepared</span>
-                            <input type="date" className={`w-full rounded-lg border bg-slate-50 px-3 py-2 text-sm text-slate-700 ${form.errors.date_prepared ? 'border-rose-400 bg-rose-50/30' : 'border-slate-300'}`} value={form.data.date_prepared} readOnly aria-readonly="true" required />
-                            <span className="mt-1 block text-xs text-slate-500">Automatically set to today and locked for audit consistency.</span>
-                            <InputError message={form.errors.date_prepared} className="mt-1" />
+                            <span className="mb-0.5 block text-xs font-medium text-slate-700">Date Prepared</span>
+                            <input
+                                type="date"
+                                className="w-full rounded-lg border border-slate-300 bg-slate-50 px-2.5 py-1 text-xs text-slate-700 font-medium"
+                                value={form.data.date_prepared}
+                                readOnly
+                                aria-readonly="true"
+                                required
+                            />
+                            <span className="mt-0.5 block text-[10px] text-slate-500">Automatically set to today and locked for audit consistency.</span>
+                            <InputError message={form.errors.date_prepared} className="mt-0.5 text-[10px]" />
                         </label>
-                        <label className="block md:col-span-2">
-                            <span className="mb-1 block text-sm font-medium text-slate-700">Fund Source</span>
-                            <select value={form.data.fund_source} onChange={(event) => form.setData('fund_source', event.target.value)} className={`w-full rounded-lg border px-3 py-2 text-sm ${form.errors.fund_source ? 'border-rose-400 bg-rose-50/30' : 'border-slate-300'}`} required>
+
+                        <label className="block">
+                            <span className="mb-0.5 block text-xs font-medium text-slate-700">Fund Source</span>
+                            <select
+                                value={form.data.fund_source}
+                                onChange={(event) => form.setData('fund_source', event.target.value)}
+                                className={`w-full rounded-lg border px-2.5 py-1 text-xs ${form.errors.fund_source ? 'border-rose-400 bg-rose-50/30' : 'border-slate-300'}`}
+                                required
+                            >
                                 {FUND_SOURCES.map((option) => (
                                     <option key={option.value} value={option.value}>{option.label}</option>
                                 ))}
                             </select>
-                            <InputError message={form.errors.fund_source} className="mt-1" />
+                            <InputError message={form.errors.fund_source} className="mt-0.5 text-[10px]" />
+                        </label>
+
+                        <label className="block">
+                            <span className="mb-0.5 block text-xs font-medium text-slate-700">Remarks <span className="text-slate-400 font-normal">(Optional)</span></span>
+                            <input
+                                type="text"
+                                placeholder="Additional context or remarks..."
+                                className={`w-full rounded-lg border px-2.5 py-1 text-xs ${form.errors.remarks ? 'border-rose-400 bg-rose-50/30' : 'border-slate-300'}`}
+                                value={form.data.remarks}
+                                onChange={(event) => form.setData('remarks', event.target.value)}
+                            />
+                            <InputError message={form.errors.remarks} className="mt-0.5 text-[10px]" />
                         </label>
                     </div>
-                    <label className="mt-4 block">
-                        <span className="mb-1 block text-sm font-medium text-slate-700">Remarks</span>
-                        <textarea className={`h-20 w-full rounded-lg border px-3 py-2 text-sm ${form.errors.remarks ? 'border-rose-400 bg-rose-50/30' : 'border-slate-300'}`} value={form.data.remarks} onChange={(event) => form.setData('remarks', event.target.value)} />
-                        <InputError message={form.errors.remarks} className="mt-1" />
-                    </label>
                 </section>
 
-                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <div className="mb-4 flex items-center justify-between">
-                        <h4 className="text-xl font-semibold text-slate-800">PPMP Items</h4>
-                        <button type="button" onClick={addItem} className="rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">Add Item Row</button>
+                {/* Card 2: PPMP Items (Matches User Manual Screenshot) */}
+                <section className="flex-1 flex flex-col min-h-0 rounded-xl border border-slate-200 bg-white p-3 sm:p-3.5 shadow-xs">
+                    <div className="mb-2 flex items-center justify-between shrink-0">
+                        <div className="flex items-center gap-2">
+                            <h4 className="text-base font-bold text-slate-800">PPMP Items</h4>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
+                                {form.data.items.length} {form.data.items.length === 1 ? 'row' : 'rows'}
+                            </span>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={addItem}
+                            className="inline-flex items-center gap-1 rounded-lg border border-red-300 px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 transition shadow-xs"
+                        >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                            </svg>
+                            <span>Add Item Row</span>
+                        </button>
                     </div>
 
                     {hasDuplicateItems ? (
-                        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
-                            Duplicate PPMP item lines are not allowed. Use one row per item and procurement quarter, then adjust the quantity or remove the duplicate row.
+                        <div className="mb-2 shrink-0 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 flex items-center gap-2">
+                            <svg className="w-4 h-4 shrink-0 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                            <span>Duplicate PPMP item lines are not allowed. Use one row per item and quarter, then adjust quantity.</span>
                         </div>
                     ) : null}
 
-                    <div className="space-y-4">
+                    {/* Scrollable Items Container (Page itself does not scroll; only rows scroll inside) */}
+                    <div className="flex-1 overflow-y-auto pr-1 space-y-2 min-h-0">
                         {form.data.items.map((item, index) => {
                             const selectedItem = itemOptionById.get(item.item_id);
                             const unit = selectedItem?.default_unit || 'box';
@@ -164,149 +225,192 @@ export default function PpmpCreate({ itemOptions }: Props) {
                             const hasRowError = Object.keys(form.errors).some((key) => key.startsWith(`items.${index}.`));
 
                             return (
-                            <div key={index} className={`rounded-xl border p-4 transition ${
-                                isDuplicate
-                                    ? 'border-amber-300 bg-amber-50/40'
-                                    : hasRowError
-                                    ? 'border-rose-300 bg-rose-50/20 ring-1 ring-rose-200'
-                                    : 'border-slate-200'
-                            }`}>
-                                {isDuplicate ? (
-                                    <div className="mb-3 rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm font-semibold text-amber-800">
-                                        Duplicate combination: this item is already allocated for {item.procurement_schedule || 'this quarter'}. Change the schedule or adjust the existing row.
-                                    </div>
-                                ) : null}
-                                <div className="grid gap-3 md:grid-cols-2">
-                                    <label className="block md:col-span-2">
-                                        <span className="mb-1 block text-sm font-medium text-slate-700">Catalog Item</span>
-                                        <select
-                                            value={item.item_id}
-                                            onChange={(event) => chooseItem(index, event.target.value)}
-                                            className={`w-full rounded-lg border px-3 py-2 text-sm ${
-                                                form.errors[`items.${index}.item_id`] || form.errors[`items.${index}.item_category_id`]
-                                                    ? 'border-rose-400 bg-rose-50/30'
-                                                    : 'border-slate-300'
-                                            }`}
-                                            required
-                                        >
-                                            <option value="">Select Item</option>
-                                            {itemOptions.map((option) => (
-                                                <option key={option.item_id} value={option.item_id}>
-                                                    {option.item_name} {option.pieces_per_box && option.pieces_per_box > 1 ? `(${option.pieces_per_box} ${option.sub_unit || 'piece'}s/${option.default_unit || 'box'})` : ''}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <InputError message={form.errors[`items.${index}.item_id`]} className="mt-1" />
-                                        <InputError message={form.errors[`items.${index}.item_category_id`]} className="mt-1" />
-                                    </label>
-                                    <label className="block">
-                                        <span className="mb-1 block text-sm font-medium text-slate-700">Quantity ({unit.toUpperCase()})</span>
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            step="1"
-                                            value={item.quantity}
-                                            onChange={(event) => patchItem(index, { quantity: event.target.value })}
-                                            className={`w-full rounded-lg border px-3 py-2 text-sm ${
-                                                form.errors[`items.${index}.quantity`]
-                                                    ? 'border-rose-400 bg-rose-50/30'
-                                                    : 'border-slate-300'
-                                            }`}
-                                            required
-                                        />
-                                        <div className="mt-1 text-xs text-slate-600">
-                                            <span>
-                                                Planned: <strong className="text-slate-800">{qtyNum} {unit}</strong>
-                                                {piecesPerBox > 1 ? (
-                                                    <span className="text-indigo-600 font-semibold ml-1">
-                                                        = {totalPieces.toLocaleString()} total {subUnit}s ({qtyNum} × {piecesPerBox} {subUnit}s/{unit})
-                                                    </span>
-                                                ) : null}
+                                <div
+                                    key={index}
+                                    className={`rounded-xl border p-2.5 transition ${
+                                        isDuplicate
+                                            ? 'border-amber-300 bg-amber-50/40'
+                                            : hasRowError
+                                            ? 'border-rose-300 bg-rose-50/20 ring-1 ring-rose-200'
+                                            : 'border-slate-200 bg-slate-50/40'
+                                    }`}
+                                >
+                                    <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-slate-200">
+                                        <div className="flex items-center gap-2">
+                                            <span className="inline-flex items-center justify-center h-5 px-2 rounded-full text-[11px] font-bold bg-slate-200 text-slate-700">
+                                                Row #{index + 1}
                                             </span>
-                                        </div>
-                                        <InputError message={form.errors[`items.${index}.quantity`]} className="mt-1" />
-                                    </label>
-                                    <label className="block">
-                                        <span className="mb-1 block text-sm font-medium text-slate-700">Packaging Unit</span>
-                                        <input value={unit + (piecesPerBox > 1 ? ` (${piecesPerBox} ${subUnit}s/${unit})` : '')} readOnly aria-readonly="true" className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700" />
-                                    </label>
-                                    <label className="block">
-                                        <span className="mb-1 block text-sm font-medium text-slate-700">Estimated Unit Cost (₱ per {unit})</span>
-                                        <input
-                                            type="number"
-                                            min="0.01"
-                                            step="0.01"
-                                            value={item.unit_cost}
-                                            onChange={(event) => patchItem(index, { unit_cost: event.target.value })}
-                                            className={`w-full rounded-lg border px-3 py-2 text-sm ${
-                                                form.errors[`items.${index}.unit_cost`]
-                                                    ? 'border-rose-400 bg-rose-50/30'
-                                                    : 'border-slate-300'
-                                            }`}
-                                            required
-                                        />
-                                        <div className="mt-1 flex flex-wrap items-center justify-between text-xs text-slate-600">
-                                            {unitCostNum > 0 && piecesPerBox > 1 ? (
-                                                <span className="text-emerald-700 font-medium">
-                                                    ≈ ₱{costPerPiece.toFixed(2)}/{subUnit}
-                                                </span>
-                                            ) : <span />}
                                             {lineSubtotal > 0 ? (
-                                                <span className="font-semibold text-slate-800">
+                                                <span className="text-xs font-semibold text-emerald-700">
                                                     Subtotal: ₱{lineSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </span>
                                             ) : null}
+                                            {isDuplicate ? (
+                                                <span className="text-[11px] font-medium text-amber-700">
+                                                    (Duplicate allocation for {item.procurement_schedule || 'this quarter'})
+                                                </span>
+                                            ) : null}
                                         </div>
-                                        <InputError message={form.errors[`items.${index}.unit_cost`]} className="mt-1" />
-                                    </label>
-                                    <label className="block">
-                                        <span className="mb-1 block text-sm font-medium text-slate-700">Procurement Schedule</span>
-                                        <select
-                                            value={item.procurement_schedule}
-                                            onChange={(event) => patchItem(index, { procurement_schedule: event.target.value })}
-                                            className={`w-full rounded-lg border px-3 py-2 text-sm ${
-                                                form.errors[`items.${index}.procurement_schedule`]
-                                                    ? 'border-rose-400 bg-rose-50/30'
-                                                    : 'border-slate-300'
-                                            }`}
-                                            required
-                                        >
-                                            <option value="">Select Quarter</option>
-                                            {QUARTER_OPTIONS.map((quarter) => (
-                                                <option key={quarter} value={quarter}>{quarter}</option>
-                                            ))}
-                                        </select>
-                                        <InputError message={form.errors[`items.${index}.procurement_schedule`]} className="mt-1" />
-                                    </label>
-                                    <label className="block">
-                                        <span className="mb-1 block text-sm font-medium text-slate-700">Item Specification / Brand Details</span>
-                                        <input
-                                            value={item.remarks}
-                                            onChange={(event) => patchItem(index, { remarks: event.target.value })}
-                                            placeholder="e.g. Panda 0.7mm Black, A4 80gsm 500 sheets"
-                                            className={`w-full rounded-lg border px-3 py-2 text-sm ${
-                                                form.errors[`items.${index}.remarks`]
-                                                    ? 'border-rose-400 bg-rose-50/30'
-                                                    : 'border-slate-300'
-                                            }`}
-                                            required
-                                        />
-                                        <span className="mt-1 block text-xs text-slate-500">Essential technical specification auto-filled into Supply Requests and Purchase Orders.</span>
-                                        <InputError message={form.errors[`items.${index}.remarks`]} className="mt-1" />
-                                    </label>
+
+                                        {form.data.items.length > 1 ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => removeItem(index)}
+                                                className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium text-rose-600 hover:bg-rose-50 hover:text-rose-700 transition"
+                                            >
+                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                                <span>Remove Row</span>
+                                            </button>
+                                        ) : null}
+                                    </div>
+
+                                    <div className="grid gap-2">
+                                        {/* Catalog Item */}
+                                        <label className="block">
+                                            <span className="mb-0.5 block text-xs font-medium text-slate-700">Catalog Item</span>
+                                            <select
+                                                value={item.item_id}
+                                                onChange={(event) => chooseItem(index, event.target.value)}
+                                                className={`w-full rounded-lg border px-2.5 py-1 text-xs ${
+                                                    form.errors[`items.${index}.item_id`] || form.errors[`items.${index}.item_category_id`]
+                                                        ? 'border-rose-400 bg-rose-50/30'
+                                                        : 'border-slate-300'
+                                                }`}
+                                                required
+                                            >
+                                                <option value="">Select Item</option>
+                                                {itemOptions.map((option) => (
+                                                    <option key={option.item_id} value={option.item_id}>
+                                                        {option.item_name} {option.pieces_per_box && option.pieces_per_box > 1 ? `(${option.pieces_per_box} ${option.sub_unit || 'piece'}s/${option.default_unit || 'box'})` : ''}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <InputError message={form.errors[`items.${index}.item_id`]} className="mt-0.5 text-[10px]" />
+                                            <InputError message={form.errors[`items.${index}.item_category_id`]} className="mt-0.5 text-[10px]" />
+                                        </label>
+
+                                        {/* Quantity, Packaging, Unit Cost, Schedule in a 4-col responsive grid */}
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                            <label className="block">
+                                                <span className="mb-0.5 block text-xs font-medium text-slate-700">Quantity ({unit.toUpperCase()})</span>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    step="1"
+                                                    value={item.quantity}
+                                                    onChange={(event) => patchItem(index, { quantity: event.target.value })}
+                                                    className={`w-full rounded-lg border px-2.5 py-1 text-xs ${
+                                                        form.errors[`items.${index}.quantity`]
+                                                            ? 'border-rose-400 bg-rose-50/30'
+                                                            : 'border-slate-300'
+                                                    }`}
+                                                    required
+                                                />
+                                                <div className="mt-0.5 text-[10px] text-slate-600 truncate" title={`Planned: ${qtyNum} ${unit}${piecesPerBox > 1 ? ` = ${totalPieces} ${subUnit}s` : ''}`}>
+                                                    Planned: <strong className="text-slate-800">{qtyNum} {unit}</strong>
+                                                    {piecesPerBox > 1 ? <span className="text-indigo-600 ml-1">({totalPieces.toLocaleString()} {subUnit}s)</span> : null}
+                                                </div>
+                                                <InputError message={form.errors[`items.${index}.quantity`]} className="mt-0.5 text-[10px]" />
+                                            </label>
+
+                                            <label className="block">
+                                                <span className="mb-0.5 block text-xs font-medium text-slate-700">Packaging Unit</span>
+                                                <input
+                                                    value={unit + (piecesPerBox > 1 ? ` (${piecesPerBox} ${subUnit}s/${unit})` : '')}
+                                                    readOnly
+                                                    aria-readonly="true"
+                                                    className="w-full rounded-lg border border-slate-300 bg-slate-100/70 px-2.5 py-1 text-xs text-slate-700"
+                                                />
+                                            </label>
+
+                                            <label className="block">
+                                                <span className="mb-0.5 block text-xs font-medium text-slate-700">Est. Unit Cost (₱/{unit})</span>
+                                                <input
+                                                    type="number"
+                                                    min="0.01"
+                                                    step="0.01"
+                                                    value={item.unit_cost}
+                                                    onChange={(event) => patchItem(index, { unit_cost: event.target.value })}
+                                                    className={`w-full rounded-lg border px-2.5 py-1 text-xs ${
+                                                        form.errors[`items.${index}.unit_cost`]
+                                                            ? 'border-rose-400 bg-rose-50/30'
+                                                            : 'border-slate-300'
+                                                    }`}
+                                                    required
+                                                />
+                                                {unitCostNum > 0 && piecesPerBox > 1 ? (
+                                                    <div className="mt-0.5 text-[10px] text-emerald-700 font-medium">
+                                                        ≈ ₱{costPerPiece.toFixed(2)}/{subUnit}
+                                                    </div>
+                                                ) : null}
+                                                <InputError message={form.errors[`items.${index}.unit_cost`]} className="mt-0.5 text-[10px]" />
+                                            </label>
+
+                                            <label className="block">
+                                                <span className="mb-0.5 block text-xs font-medium text-slate-700">Procurement Schedule</span>
+                                                <select
+                                                    value={item.procurement_schedule}
+                                                    onChange={(event) => patchItem(index, { procurement_schedule: event.target.value })}
+                                                    className={`w-full rounded-lg border px-2.5 py-1 text-xs ${
+                                                        form.errors[`items.${index}.procurement_schedule`]
+                                                            ? 'border-rose-400 bg-rose-50/30'
+                                                            : 'border-slate-300'
+                                                    }`}
+                                                    required
+                                                >
+                                                    <option value="">Select Quarter</option>
+                                                    {QUARTER_OPTIONS.map((quarter) => (
+                                                        <option key={quarter} value={quarter}>{quarter}</option>
+                                                    ))}
+                                                </select>
+                                                <InputError message={form.errors[`items.${index}.procurement_schedule`]} className="mt-0.5 text-[10px]" />
+                                            </label>
+                                        </div>
+
+                                        {/* Item Specification / Brand Details */}
+                                        <label className="block">
+                                            <span className="mb-0.5 block text-xs font-medium text-slate-700">Item Specification / Brand Details</span>
+                                            <input
+                                                value={item.remarks}
+                                                onChange={(event) => patchItem(index, { remarks: event.target.value })}
+                                                placeholder="e.g. Panda 0.7mm Black, A4 80gsm 500 sheets"
+                                                className={`w-full rounded-lg border px-2.5 py-1 text-xs ${
+                                                    form.errors[`items.${index}.remarks`]
+                                                        ? 'border-rose-400 bg-rose-50/30'
+                                                        : 'border-slate-300'
+                                                }`}
+                                                required
+                                            />
+                                            <span className="mt-0.5 block text-[10px] text-slate-500">Essential technical specification auto-filled into Supply Requests and Purchase Orders.</span>
+                                            <InputError message={form.errors[`items.${index}.remarks`]} className="mt-0.5 text-[10px]" />
+                                        </label>
+                                    </div>
                                 </div>
-                                <div className="mt-3 flex justify-end">
-                                    <button type="button" onClick={() => removeItem(index)} className="rounded-lg border border-rose-300 px-3 py-1.5 text-xs font-semibold text-rose-700">Remove Row</button>
-                                </div>
-                            </div>
                             );
                         })}
                     </div>
-                </section>
 
-                <div className="flex justify-end">
-                    <button type="submit" disabled={form.processing || hasDuplicateItems} className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">Save PPMP</button>
-                </div>
+                    {/* Bottom Action Strip inside Card 2 */}
+                    <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between shrink-0">
+                        <div className="text-xs text-slate-600">
+                            <span>Estimated PPMP Total: </span>
+                            <strong className="text-sm font-bold text-emerald-700">
+                                ₱{totalEstimatedBudget.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </strong>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="submit"
+                                disabled={form.processing || hasDuplicateItems}
+                                className="rounded-lg bg-red-600 px-5 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 transition shadow-xs"
+                            >
+                                {form.processing ? 'Saving...' : 'Save PPMP'}
+                            </button>
+                        </div>
+                    </div>
+                </section>
             </form>
         </AuthenticatedLayout>
     );
@@ -349,4 +453,3 @@ function emptyItem(): ItemDraft {
         remarks: '',
     };
 }
-

@@ -9,8 +9,10 @@ import { FormEventHandler, useRef } from 'react';
 
 export default function UpdatePasswordForm({
     className = '',
+    hideHeader = false,
 }: {
     className?: string;
+    hideHeader?: boolean;
 }) {
     const passwordInput = useRef<HTMLInputElement>(null);
     const currentPasswordInput = useRef<HTMLInputElement>(null);
@@ -52,18 +54,20 @@ export default function UpdatePasswordForm({
 
     return (
         <section className={className}>
-            <header>
-                <h2 className="text-lg font-medium text-gray-900">
-                    Update Password
-                </h2>
+            {!hideHeader && (
+                <header>
+                    <h2 className="text-lg font-medium text-gray-900">
+                        Update Password
+                    </h2>
 
-                <p className="mt-1 text-sm text-gray-600">
-                    Ensure your account is using a long, random password to stay
-                    secure.
-                </p>
-            </header>
+                    <p className="mt-1 text-sm text-gray-600">
+                        Ensure your account is using a long, random password to stay
+                        secure.
+                    </p>
+                </header>
+            )}
 
-            <form onSubmit={updatePassword} className="mt-6 space-y-6">
+            <form onSubmit={updatePassword} className={`${hideHeader ? 'mt-0' : 'mt-4'} space-y-3`}>
                 <div>
                     <InputLabel
                         htmlFor="current_password"

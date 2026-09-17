@@ -85,6 +85,12 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
         );
     }, [form.data.items, form.data.needed_by_date, form.data.ppmp_id, form.data.priority_level, form.data.purpose, form.data.request_category, neededByDateError]);
 
+    const totalRequestedItems = useMemo(() => {
+        return form.data.items.reduce((sum, item) => {
+            return sum + (Number(item.quantity_requested) || 0);
+        }, 0);
+    }, [form.data.items]);
+
     const submit = (event: FormEvent) => {
         event.preventDefault();
         if (neededByDateError) {
@@ -203,7 +209,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
         }
     }, [fetchPpmpItems]);
 
-    const { isRefreshing, lastRefreshedAt, refreshNow } = useSmartRefresh({
+    const { isRefreshing, refreshNow } = useSmartRefresh({
         only: ['ppmpOptions', 'requestDate'],
         onRefresh: handleReferenceRefresh,
         enabled: !form.processing,
@@ -240,42 +246,38 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
         <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Create Supply Request</h2>}>
             <Head title="Create Supply Request" />
 
-            <form onSubmit={submit} className="space-y-6 py-4">
-                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <form onSubmit={submit} className="lg:h-[calc(100vh-8rem)] flex flex-col justify-between py-1 space-y-2 overflow-y-auto lg:overflow-hidden">
+                {/* Card 1: New Supply Request (Matches User Manual Screenshot) */}
+                <section className="shrink-0 rounded-xl border border-slate-200 bg-white p-3 sm:p-3.5 shadow-xs">
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                         <div>
-                            <h3 className="text-2xl font-semibold text-slate-800">New Supply Request</h3>
-                            <p className="text-sm text-slate-600">Select a PPMP first, then add request lines from that plan only.</p>
-                            <p className="mt-1 text-xs text-slate-500">
-                                {isRefreshing
-                                    ? 'Refreshing PPMP references...'
-                                    : lastRefreshedAt
-                                    ? `Updated ${lastRefreshedAt.toLocaleTimeString()}`
-                                    : 'Use "Refresh Options" to sync approved PPMP references.'}
-                            </p>
+                            <h3 className="text-base font-bold text-slate-800">New Supply Request</h3>
+                            <p className="text-xs text-slate-600">Select a PPMP first, then add request lines from that plan only.</p>
                         </div>
                         <div className="flex items-center gap-2">
                             <button
                                 type="button"
                                 onClick={() => void refreshNow()}
                                 disabled={isRefreshing}
-                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                                className="rounded-lg border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60 transition"
                             >
                                 {isRefreshing ? 'Refreshing...' : 'Refresh Options'}
                             </button>
                             <Link
                                 href={route('office.supply-requests.index')}
-                                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                                className="rounded-lg border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
                             >
                                 Back to Tracking
                             </Link>
                         </div>
                     </div>
 
-                    <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                        <Field label="Source PPMP">
+                    {/* Source PPMP Box */}
+                    <div className="mb-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+                        <label className="block">
+                            <span className="mb-1 block text-xs font-medium text-slate-700">Source PPMP</span>
                             <select
-                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium"
                                 value={form.data.ppmp_id}
                                 onChange={(event) => void handlePpmpChange(event.target.value)}
                                 required
@@ -287,20 +289,32 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                     </option>
                                 ))}
                             </select>
-                            <p className="mt-1 text-xs text-slate-500">Only approved PPMPs can be used as the basis for a supply request.</p>
-                        </Field>
-                        {!hasPpmp ? <p className="mt-2 text-xs font-medium text-amber-700">No approved PPMP is available yet. Your office must have an approved PPMP before creating a supply request.</p> : null}
+                            <p className="mt-0.5 text-[10px] text-slate-500">Only approved PPMPs can be used as the basis for a supply request.</p>
+                        </label>
+                        {!hasPpmp ? (
+                            <p className="mt-1 text-[11px] font-medium text-amber-700">No approved PPMP is available yet. Your office must have an approved PPMP before creating a supply request.</p>
+                        ) : null}
                     </div>
 
-                    <div className="grid gap-4 md:grid-cols-2">
-                        <Field label="Request Date" hint="Request date is automatically recorded by the system.">
-                            <input type="text" className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700" value={dateInputValue(requestDate)} readOnly aria-readonly="true" />
-                        </Field>
+                    {/* Compact 4-column row for dates & categories */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <label className="block">
+                            <span className="mb-0.5 block text-xs font-medium text-slate-700">Request Date</span>
+                            <input
+                                type="text"
+                                className="w-full rounded-lg border border-slate-300 bg-slate-50 px-2.5 py-1 text-xs text-slate-700 font-medium"
+                                value={dateInputValue(requestDate)}
+                                readOnly
+                                aria-readonly="true"
+                            />
+                            <span className="mt-0.5 block text-[10px] text-slate-500">Auto-recorded</span>
+                        </label>
 
-                        <Field label="Needed By Date">
+                        <label className="block">
+                            <span className="mb-0.5 block text-xs font-medium text-slate-700">Needed By Date</span>
                             <input
                                 type="date"
-                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                className="w-full rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium"
                                 value={form.data.needed_by_date}
                                 min={today}
                                 onChange={(event) => {
@@ -309,12 +323,15 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                 }}
                                 required
                             />
-                            {neededByDateError || form.errors.needed_by_date ? <p className="mt-1 text-xs text-rose-600">{neededByDateError || form.errors.needed_by_date}</p> : null}
-                        </Field>
+                            {neededByDateError || form.errors.needed_by_date ? (
+                                <p className="mt-0.5 text-[10px] text-rose-600 truncate">{neededByDateError || form.errors.needed_by_date}</p>
+                            ) : null}
+                        </label>
 
-                        <Field label="Request Category">
+                        <label className="block">
+                            <span className="mb-0.5 block text-xs font-medium text-slate-700">Request Category</span>
                             <select
-                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                className="w-full rounded-lg border border-slate-300 px-2.5 py-1 text-xs"
                                 value={form.data.request_category}
                                 onChange={(event) => form.setData('request_category', event.target.value)}
                                 required
@@ -324,12 +341,12 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                 <option value="IT_EQUIPMENT">IT Equipment</option>
                                 <option value="FACILITY">Facility</option>
                             </select>
-                            {form.errors.request_category ? <p className="mt-1 text-xs text-rose-600">{form.errors.request_category}</p> : null}
-                        </Field>
+                        </label>
 
-                        <Field label="Priority Level">
+                        <label className="block">
+                            <span className="mb-0.5 block text-xs font-medium text-slate-700">Priority Level</span>
                             <select
-                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                className="w-full rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium"
                                 value={form.data.priority_level}
                                 onChange={(event) => form.setData('priority_level', event.target.value)}
                                 required
@@ -339,80 +356,129 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                 <option value="HIGH">High</option>
                                 <option value="URGENT">Urgent</option>
                             </select>
-                            {form.errors.priority_level ? <p className="mt-1 text-xs text-rose-600">{form.errors.priority_level}</p> : null}
-                        </Field>
+                        </label>
                     </div>
 
-                    <div className="mt-4 grid gap-4">
-                        <Field label="Purpose">
-                            <textarea
-                                className="h-24 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    {/* Purpose & Notes in 2-column row */}
+                    <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <label className="block">
+                            <span className="mb-0.5 block text-xs font-medium text-slate-700">Purpose <span className="text-rose-500">*</span></span>
+                            <input
+                                type="text"
+                                placeholder="Purpose of this supply request..."
+                                className={`w-full rounded-lg border px-2.5 py-1 text-xs ${form.errors.purpose ? 'border-rose-400 bg-rose-50/30' : 'border-slate-300'}`}
                                 value={form.data.purpose}
                                 onChange={(event) => form.setData('purpose', event.target.value)}
                                 required
                             />
-                            {form.errors.purpose ? <p className="mt-1 text-xs text-rose-600">{form.errors.purpose}</p> : null}
-                        </Field>
-                        <Field label="Notes (Optional)">
-                            <textarea
-                                className="h-20 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                            {form.errors.purpose ? <p className="mt-0.5 text-[10px] text-rose-600">{form.errors.purpose}</p> : null}
+                        </label>
+
+                        <label className="block">
+                            <span className="mb-0.5 block text-xs font-medium text-slate-700">Notes <span className="text-slate-400 font-normal">(Optional)</span></span>
+                            <input
+                                type="text"
+                                placeholder="Optional notes for review..."
+                                className="w-full rounded-lg border border-slate-300 px-2.5 py-1 text-xs"
                                 value={form.data.review_notes}
                                 onChange={(event) => form.setData('review_notes', event.target.value)}
                             />
-                            {form.errors.review_notes ? <p className="mt-1 text-xs text-rose-600">{form.errors.review_notes}</p> : null}
-                        </Field>
+                        </label>
                     </div>
                 </section>
 
-                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <div className="mb-4 flex items-center justify-between">
-                        <h4 className="text-xl font-semibold text-slate-800">Request Items</h4>
+                {/* Card 2: Request Items (Matches User Manual Screenshot) */}
+                <section className="flex-1 flex flex-col min-h-0 rounded-xl border border-slate-200 bg-white p-3 sm:p-3.5 shadow-xs">
+                    <div className="mb-2 flex items-center justify-between shrink-0">
+                        <div className="flex items-center gap-2">
+                            <h4 className="text-base font-bold text-slate-800">Request Items</h4>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
+                                {form.data.items.length} {form.data.items.length === 1 ? 'line' : 'lines'}
+                            </span>
+                        </div>
                         <button
                             type="button"
                             onClick={addItem}
                             disabled={!hasPpmp}
-                            className="rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                            className="inline-flex items-center gap-1 rounded-lg border border-red-300 px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 transition shadow-xs"
                         >
-                            Add Item Row
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                            </svg>
+                            <span>Add Item Row</span>
                         </button>
                     </div>
 
-                    {loadingOptions ? <p className="mb-3 text-sm text-slate-500">Loading approved PPMP items...</p> : null}
-
-                    {hasPpmp && !loadingOptions && itemOptions.length === 0 ? (
-                        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                            <p className="font-semibold">No requestable PPMP items were found for the selected PPMP.</p>
-                            <p>Use Refresh Options after approval, or verify that the planned item is still active in the item catalog.</p>
-                        </div>
-                    ) : null}
+                    {loadingOptions ? <p className="mb-1 text-xs text-slate-500">Loading approved PPMP items...</p> : null}
 
                     {scheduleMismatchLineCount > 0 ? (
-                        <div className="mb-3 rounded-lg border border-orange-300 bg-orange-50 px-3 py-2 text-xs text-orange-900">
-                            <p className="font-semibold">{scheduleMismatchLineCount} out-of-schedule PPMP line(s) detected.</p>
-                            <p>GSO may still process this SR, but early consumption will be flagged in Executive anomaly monitoring.</p>
+                        <div className="mb-1.5 shrink-0 rounded-md border border-orange-300 bg-orange-50 px-2.5 py-1 text-[11px] text-orange-900">
+                            <strong>Notice:</strong> {scheduleMismatchLineCount} out-of-schedule PPMP line(s) detected (early requisition will be flagged for anomaly monitoring).
                         </div>
                     ) : null}
 
                     {duplicateLineCount > 0 ? (
-                        <div className="mb-3 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs text-rose-900">
-                            <p className="font-semibold">{duplicateLineCount} duplicate PPMP line selection(s) detected.</p>
-                            <p>Use one row per PPMP item line and update the quantity instead of adding the same line again.</p>
+                        <div className="mb-1.5 shrink-0 rounded-md border border-rose-300 bg-rose-50 px-2.5 py-1 text-[11px] text-rose-900">
+                            <strong>Duplicate:</strong> {duplicateLineCount} duplicate PPMP line selection(s) detected. Adjust quantity on a single row instead.
                         </div>
                     ) : null}
 
-                    <div className="space-y-4">
+                    {/* Scrollable Items Container (Page stays fixed; only rows scroll) */}
+                    <div className="flex-1 overflow-y-auto pr-1 space-y-2 min-h-0">
                         {form.data.items.map((item, index) => {
                             const option = optionById.get(item.ppmp_item_id);
                             const isDuplicate = item.ppmp_item_id !== '' && duplicatePpmpItemIds.includes(item.ppmp_item_id);
+                            const piecesPerBox = option?.pieces_per_box || 1;
+                            const subUnit = option?.sub_unit || 'piece';
+                            const reqQty = Number(item.quantity_requested || 0);
+                            const reqPieces = reqQty * piecesPerBox;
+                            const postReqBalance = (option?.remaining_quantity ?? 0) - reqQty;
 
                             return (
-                                <div key={index} className="rounded-xl border border-slate-200 p-4">
-                                    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
-                                        <Field label="PPMP Item">
+                                <div
+                                    key={index}
+                                    className={`rounded-xl border p-2.5 transition ${
+                                        isDuplicate
+                                            ? 'border-rose-300 bg-rose-50/40'
+                                            : option?.is_schedule_mismatch
+                                            ? 'border-orange-200 bg-orange-50/30'
+                                            : 'border-slate-200 bg-slate-50/40'
+                                    }`}
+                                >
+                                    <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-slate-200">
+                                        <div className="flex items-center gap-2">
+                                            <span className="inline-flex items-center justify-center h-5 px-2 rounded-full text-[11px] font-bold bg-slate-200 text-slate-700">
+                                                Line #{index + 1}
+                                            </span>
+                                            {item.item_name_snapshot ? (
+                                                <span className="text-xs font-semibold text-slate-800 truncate max-w-sm">
+                                                    {item.item_name_snapshot}
+                                                </span>
+                                            ) : null}
+                                        </div>
+
+                                        {form.data.items.length > 1 ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => removeItem(index)}
+                                                className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium text-rose-600 hover:bg-rose-50 hover:text-rose-700 transition"
+                                            >
+                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                                <span>Remove Row</span>
+                                            </button>
+                                        ) : null}
+                                    </div>
+
+                                    <div className="grid gap-2">
+                                        {/* PPMP Item Selector */}
+                                        <label className="block">
+                                            <span className="mb-0.5 block text-xs font-medium text-slate-700">PPMP Item</span>
                                             <select
                                                 value={item.ppmp_item_id}
                                                 onChange={(event) => handleOptionChange(index, event.target.value)}
-                                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                                className="w-full rounded-lg border border-slate-300 px-2.5 py-1 text-xs"
                                                 disabled={!hasPpmp || loadingOptions}
                                                 required
                                             >
@@ -420,12 +486,12 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                                 {itemOptions.map((entry) => {
                                                     const isExhausted = Number(entry.remaining_quantity) <= 0;
                                                     const isOutSchedule = Boolean(entry.is_schedule_mismatch);
-                                                    
+
                                                     let statusTag = `(Remaining: ${entry.remaining_quantity} ${entry.default_unit || 'units'})`;
                                                     if (isExhausted) {
-                                                        statusTag = `⚠️ [Allocation Exhausted (0 left) — Supplemental Requisition]`;
+                                                        statusTag = `⚠️ [Allocation Exhausted (0 left)]`;
                                                     } else if (isOutSchedule) {
-                                                        statusTag = `⏰ [Schedule: ${entry.procurement_schedule || 'Later Quarter'} — Early Requisition] (Remaining: ${entry.remaining_quantity})`;
+                                                        statusTag = `⏰ [Schedule: ${entry.procurement_schedule || 'Later Quarter'}] (Remaining: ${entry.remaining_quantity})`;
                                                     }
 
                                                     return (
@@ -439,163 +505,107 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                                     );
                                                 })}
                                             </select>
-                                            {form.errors[`items.${index}.ppmp_item_id`] ? <p className="mt-1 text-xs text-rose-600">{form.errors[`items.${index}.ppmp_item_id`]}</p> : null}
-                                        </Field>
+                                            {form.errors[`items.${index}.ppmp_item_id`] ? <p className="mt-0.5 text-[10px] text-rose-600">{form.errors[`items.${index}.ppmp_item_id`]}</p> : null}
+                                        </label>
 
-                                        <Field label="Item Snapshot" hint="Auto-filled from the selected PPMP item.">
-                                            <input
-                                                value={item.item_name_snapshot}
-                                                readOnly
-                                                aria-readonly="true"
-                                                className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700"
-                                            />
-                                        </Field>
-
-                                        <Field label={`Quantity (${option?.default_unit || 'Units'})`}>
-                                            <input
-                                                type="number"
-                                                min="1"
-                                                value={item.quantity_requested}
-                                                onChange={(event) => updateItem(index, { quantity_requested: event.target.value })}
-                                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                                                required
-                                            />
-                                            {(() => {
-                                                const reqQty = Number(item.quantity_requested || 0);
-                                                const piecesPerBox = option?.pieces_per_box || 1;
-                                                const subUnit = option?.sub_unit || 'piece';
-                                                const reqPieces = reqQty * piecesPerBox;
-
-                                                return (
-                                                    <div className="mt-1 text-xs text-slate-600">
-                                                        <span>
-                                                            Requested: <strong className="text-slate-800">{reqQty} {option?.default_unit || 'units'}</strong>
-                                                            {piecesPerBox > 1 ? (
-                                                                <span className="text-indigo-600 font-semibold ml-1">
-                                                                    = {reqPieces.toLocaleString()} total {subUnit}s ({reqQty} × {piecesPerBox} {subUnit}s/{option?.default_unit || 'box'})
-                                                                </span>
-                                                            ) : null}
+                                        {/* Quantity & Packaging Unit in 2-col row */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            <label className="block">
+                                                <span className="mb-0.5 block text-xs font-medium text-slate-700">Quantity ({option?.default_unit || 'Units'})</span>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    value={item.quantity_requested}
+                                                    onChange={(event) => updateItem(index, { quantity_requested: event.target.value })}
+                                                    className="w-full rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium"
+                                                    required
+                                                />
+                                                <div className="mt-0.5 text-[10px] text-slate-600">
+                                                    Requested: <strong className="text-slate-800">{reqQty} {option?.default_unit || 'units'}</strong>
+                                                    {piecesPerBox > 1 ? (
+                                                        <span className="text-indigo-600 font-semibold ml-1">
+                                                            = {reqPieces.toLocaleString()} total {subUnit}s
                                                         </span>
-                                                    </div>
-                                                );
-                                            })()}
-                                            {form.errors[`items.${index}.quantity_requested`] ? <p className="mt-1 text-xs text-rose-600">{form.errors[`items.${index}.quantity_requested`]}</p> : null}
-                                        </Field>
+                                                    ) : null}
+                                                </div>
+                                                {form.errors[`items.${index}.quantity_requested`] ? <p className="mt-0.5 text-[10px] text-rose-600">{form.errors[`items.${index}.quantity_requested`]}</p> : null}
+                                            </label>
 
-                                        <Field label="Packaging Unit" hint="Auto-filled from the item catalog.">
-                                            <input
-                                                value={option?.default_unit ? `${option.default_unit}${option.pieces_per_box && option.pieces_per_box > 1 ? ` (${option.pieces_per_box} ${option.sub_unit || 'piece'}s/${option.default_unit})` : ''}` : '-'}
-                                                readOnly
-                                                aria-readonly="true"
-                                                className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700"
-                                            />
-                                        </Field>
+                                            <label className="block">
+                                                <span className="mb-0.5 block text-xs font-medium text-slate-700">Packaging Unit</span>
+                                                <input
+                                                    value={option?.default_unit ? `${option.default_unit}${option.pieces_per_box && option.pieces_per_box > 1 ? ` (${option.pieces_per_box} ${option.sub_unit || 'piece'}s/${option.default_unit})` : ''}` : '-'}
+                                                    readOnly
+                                                    aria-readonly="true"
+                                                    className="w-full rounded-lg border border-slate-300 bg-slate-100/70 px-2.5 py-1 text-xs text-slate-700"
+                                                />
+                                            </label>
+                                        </div>
 
-                                    </div>
-
-                                    {option ? (() => {
-                                        const piecesPerBox = option.pieces_per_box || 1;
-                                        const subUnit = option.sub_unit || 'piece';
-                                        const reqQty = Number(item.quantity_requested || 0);
-                                        const postReqBalance = option.remaining_quantity - reqQty;
-
-                                        return (
-                                            <div className="mt-3 grid gap-2 rounded-lg bg-slate-50 p-3 text-xs text-slate-600 md:grid-cols-4">
-                                                <div>Planned: <strong>{option.planned_quantity} {option.default_unit || ''}</strong> {piecesPerBox > 1 ? <span className="text-slate-500">({(option.planned_quantity * piecesPerBox).toLocaleString()} {subUnit}s)</span> : null}</div>
-                                                <div>Already Requested: <strong>{option.requested_quantity} {option.default_unit || ''}</strong> {piecesPerBox > 1 ? <span className="text-slate-500">({(option.requested_quantity * piecesPerBox).toLocaleString()} {subUnit}s)</span> : null}</div>
-                                                <div>Remaining: <strong className={option.remaining_quantity <= 0 ? 'text-amber-700 font-semibold' : 'text-emerald-700 font-semibold'}>{option.remaining_quantity} {option.default_unit || ''}</strong> {piecesPerBox > 1 ? <span className="text-slate-500">({(option.remaining_quantity * piecesPerBox).toLocaleString()} {subUnit}s)</span> : null}</div>
-                                                <div>Packaging Spec: <strong className="text-indigo-700">{piecesPerBox} {subUnit}s / {option.default_unit || 'box'}</strong></div>
-                                                {reqQty > 0 && piecesPerBox > 1 ? (
-                                                    <div className="md:col-span-4 mt-1 border-t border-slate-200 pt-1 text-slate-700">
-                                                        Balance after this request: <strong className={postReqBalance < 0 ? 'text-rose-600 font-bold' : 'text-slate-800'}>{postReqBalance} {option.default_unit || 'boxes'} ({(postReqBalance * piecesPerBox).toLocaleString()} {subUnit}s)</strong>
-                                                    </div>
-                                                ) : null}
+                                        {/* Allocation Balances Strip */}
+                                        {option ? (
+                                            <div className="rounded-lg bg-slate-100/80 p-2 text-[11px] text-slate-600 grid grid-cols-2 sm:grid-cols-4 gap-1">
+                                                <div>Planned: <strong>{option.planned_quantity} {option.default_unit}</strong></div>
+                                                <div>Requested: <strong>{option.requested_quantity} {option.default_unit}</strong></div>
+                                                <div>
+                                                    Remaining: <strong className={option.remaining_quantity <= 0 ? 'text-amber-700 font-bold' : 'text-emerald-700 font-bold'}>
+                                                        {option.remaining_quantity} {option.default_unit}
+                                                    </strong>
+                                                </div>
+                                                <div>
+                                                    Post-Req Balance: <strong className={postReqBalance < 0 ? 'text-rose-600 font-bold' : 'text-slate-900 font-bold'}>
+                                                        {postReqBalance} {option.default_unit}
+                                                    </strong>
+                                                </div>
                                             </div>
-                                        );
-                                    })() : null}
-
-                                    {isDuplicate ? (
-                                        <div className="mt-2 rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-xs text-rose-900">
-                                            <p className="font-semibold">This PPMP item line is already selected in another row.</p>
-                                            <p>Remove the duplicate row and update the quantity on the existing row.</p>
-                                        </div>
-                                    ) : null}
-
-                                    {option?.is_schedule_mismatch ? (
-                                        <div className="mt-2 rounded-md border border-orange-300 bg-orange-50 px-3 py-2 text-xs text-orange-900">
-                                            <p className="font-semibold">Out-of-schedule PPMP consumption detected.</p>
-                                            <p>This item is planned for {option.procurement_schedule || 'a later schedule'} but the request is being made in {option.current_quarter || 'the current quarter'}. It can proceed to GSO but will be flagged for Executive anomaly review.</p>
-                                        </div>
-                                    ) : null}
-
-                                    <input type="hidden" value={item.item_id} readOnly />
-
-                                    <div className="mt-3 flex justify-end">
-                                        <button
-                                            type="button"
-                                            onClick={() => removeItem(index)}
-                                            className="rounded-lg border border-rose-300 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50"
-                                        >
-                                            Remove Row
-                                        </button>
+                                        ) : null}
                                     </div>
                                 </div>
                             );
                         })}
                     </div>
-                </section>
 
-                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    {Object.keys(form.errors).length > 0 ? (
-                        <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                            <p className="font-semibold">Unable to save supply request.</p>
-                            <p className="mt-1">Please fix the highlighted fields and submit again.</p>
+                    {/* Bottom Action Strip (Save & Submit) */}
+                    <div className="mt-2 pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 shrink-0">
+                        <div className="text-xs text-slate-600">
+                            <span>Total Units Requested: </span>
+                            <strong className="text-sm font-bold text-slate-900">{totalRequestedItems}</strong>
+                            {!hasPpmp ? (
+                                <span className="ml-2 text-[11px] text-amber-700 font-medium">(Select approved PPMP first)</span>
+                            ) : duplicateLineCount > 0 ? (
+                                <span className="ml-2 text-[11px] text-rose-700 font-medium">(Remove duplicate lines)</span>
+                            ) : null}
                         </div>
-                    ) : null}
 
-                    <div className="flex flex-wrap justify-end gap-2">
-                        <Link
-                            href={route('office.supply-requests.index')}
-                            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
-                        >
-                            Cancel
-                        </Link>
-                        <button
-                            type="submit"
-                            onClick={() => {
-                                submitAfterSaveRef.current = false;
-                            }}
-                            disabled={form.processing || !hasPpmp || duplicateLineCount > 0 || !isFormComplete}
-                            className="rounded-lg border border-red-300 bg-white px-5 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60"
-                        >
-                            Save Request
-                        </button>
-                        <button
-                            type="submit"
-                            onClick={() => {
-                                submitAfterSaveRef.current = true;
-                            }}
-                            disabled={form.processing || !hasPpmp || duplicateLineCount > 0 || !isFormComplete}
-                            className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
-                        >
-                            Submit Request
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <Link
+                                href={route('office.supply-requests.index')}
+                                className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                            >
+                                Cancel
+                            </Link>
+                            <button
+                                type="submit"
+                                onClick={() => {
+                                    submitAfterSaveRef.current = false;
+                                }}
+                                disabled={form.processing || !hasPpmp || duplicateLineCount > 0 || !isFormComplete}
+                                className="rounded-lg border border-red-300 bg-white px-4 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60 transition shadow-xs"
+                            >
+                                Save Request
+                            </button>
+                            <button
+                                type="submit"
+                                onClick={() => {
+                                    submitAfterSaveRef.current = true;
+                                }}
+                                disabled={form.processing || !hasPpmp || duplicateLineCount > 0 || !isFormComplete}
+                                className="rounded-lg bg-red-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60 transition shadow-xs"
+                            >
+                                Submit Request
+                            </button>
+                        </div>
                     </div>
-                    {!hasPpmp ? (
-                        <p className="mt-3 text-right text-xs font-medium text-amber-700">
-                            Save is disabled until you select an approved PPMP.
-                        </p>
-                    ) : null}
-                    {duplicateLineCount > 0 ? (
-                        <p className="mt-3 text-right text-xs font-medium text-rose-700">
-                            Save is disabled while duplicate PPMP item lines exist.
-                        </p>
-                    ) : null}
-                    {hasPpmp && !isFormComplete ? (
-                        <p className="mt-3 text-right text-xs font-medium text-rose-700">
-                            Save is disabled until purpose and every request item field are complete.
-                        </p>
-                    ) : null}
                 </section>
             </form>
         </AuthenticatedLayout>
@@ -609,14 +619,4 @@ function emptyItem(): RequestItemDraft {
         item_name_snapshot: '',
         quantity_requested: '1',
     };
-}
-
-function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
-    return (
-        <label className="block">
-            <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>
-            {children}
-            {hint ? <span className="mt-1 block text-xs text-slate-500">{hint}</span> : null}
-        </label>
-    );
 }

@@ -99,7 +99,7 @@ export default function UpdateProfileInformation({
                 </p>
             </header>
 
-            <form onSubmit={submit} className="mt-6 space-y-6">
+            <form onSubmit={submit} className="mt-3.5 space-y-3.5">
                 <div>
                     <InputLabel htmlFor="name" value="Name" />
 
@@ -113,7 +113,7 @@ export default function UpdateProfileInformation({
                         autoComplete="name"
                     />
 
-                    <InputError className="mt-2" message={errors.name} />
+                    <InputError className="mt-1" message={errors.name} />
                 </div>
 
                 <div>
@@ -129,9 +129,9 @@ export default function UpdateProfileInformation({
                         autoComplete="username"
                     />
 
-                    <InputError className="mt-2" message={errors.email} />
+                    <InputError className="mt-1" message={errors.email} />
                     {data.email !== user.email ? (
-                        <p className="mt-2 text-xs text-amber-700">
+                        <p className="mt-1.5 text-xs text-amber-700">
                             Changing your email requires a verification code sent to your current email address: {user.email}.
                         </p>
                     ) : null}
