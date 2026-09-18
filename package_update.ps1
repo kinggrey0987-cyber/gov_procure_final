@@ -60,7 +60,7 @@ $includeItems = @(
 $existingItems = $includeItems | Where-Object { Test-Path $_ }
 
 # Archive files using native Windows PowerShell / tar
-tar -a -c -f $datedZipPath --exclude="public/storage" --exclude="database/*.sqlite" $existingItems
+tar -a -c -f $datedZipPath --exclude="public/storage" --exclude="database/*.sqlite" --exclude="bootstrap/cache/*.php" $existingItems
 Copy-Item $datedZipPath -Destination $latestZipPath -Force
 
 # 5. Auto-prune old archives (keeps latest 10)
