@@ -389,9 +389,16 @@ export default function ExecutiveRecordArchivesIndex({ records, telemetry, archi
                             </tbody>
                         </table>
                     </div>
-                </section>
 
-                <PaginationNav links={records.links} preserveState={false} />
+                    {records.links && records.links.length > 3 && (
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-slate-50/70 px-4 py-2.5">
+                            <span className="text-xs font-medium text-slate-500">
+                                Showing {records.data.length} records
+                            </span>
+                            <PaginationNav links={records.links} preserveState={false} />
+                        </div>
+                    )}
+                </section>
             </div>
 
             <ConfirmationModal

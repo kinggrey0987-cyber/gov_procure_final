@@ -592,7 +592,10 @@ export default function ProcurementDocumentsIndex({
                         )}
 
                         {documents.links?.length > 3 && (
-                            <div className="border-t border-slate-200 px-6 py-4">
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-slate-50/70 px-4 py-2.5">
+                                <span className="text-xs font-medium text-slate-500">
+                                    Showing {documents.data.length} records
+                                </span>
                                 <PaginationNav links={documents.links} />
                             </div>
                         )}

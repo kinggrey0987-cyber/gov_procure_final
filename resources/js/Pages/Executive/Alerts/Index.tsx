@@ -145,15 +145,22 @@ export default function ExecutiveAlertIndex({ alerts, filters, filter_options, p
                                         </td>
                                     </tr>
                                 ))}
-                            </tbody>
-                        </table>
-                    </div>
+                        </tbody>
+                    </table>
 
-                    <PaginationNav links={alerts.links} preserveState={false} />
+                    {alerts.links && alerts.links.length > 3 && (
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-slate-50/70 px-4 py-2.5">
+                            <span className="text-xs font-medium text-slate-500">
+                                Showing {alerts.data.length} alerts
+                            </span>
+                            <PaginationNav links={alerts.links} preserveState={false} />
+                        </div>
+                    )}
                 </div>
             </div>
-        </AuthenticatedLayout>
-    );
+        </div>
+    </AuthenticatedLayout>
+);
 }
 
 

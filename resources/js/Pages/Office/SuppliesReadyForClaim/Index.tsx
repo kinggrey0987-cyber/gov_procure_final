@@ -30,89 +30,94 @@ export default function SuppliesReadyForClaimIndex({ records }: Props) {
         <AuthenticatedLayout header="Supplies Ready for Claim">
             <Head title="Supplies Ready for Claim" />
 
-            <div className="space-y-2 lg:h-[calc(100vh-8.5rem)] flex flex-col justify-between overflow-y-auto lg:overflow-hidden">
+            <div className="space-y-3">
                 <section className="shrink-0 rounded-xl border border-slate-200 bg-white px-3.5 py-2 shadow-sm flex items-center justify-between">
                     <p className="text-xs text-slate-600">Confirm receipt first, then file claims from the received supply request.</p>
                     <span className="text-[11px] text-slate-500 font-medium">Showing {records.data.length} records</span>
                 </section>
 
-                <section className="flex-1 min-h-0 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+                <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
                     {records.data.length === 0 ? (
                         <div className="px-4 py-8 text-center text-sm text-slate-600">No released supply records available for your office yet.</div>
                     ) : (
-                        <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
-                            <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-                                <tr>
-                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Request ID</th>
-                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Request Date</th>
-                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Items</th>
-                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Storage Location</th>
-                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Ready Since</th>
-                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Status</th>
-                                    <th className="px-3.5 py-2 text-right font-semibold text-slate-700">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {records.data.map((record) => (
-                                    <tr key={record.distribution_record_id} className="hover:bg-slate-50/60 transition-colors">
-                                        <td className="px-3.5 py-2 font-semibold text-red-700">{record.request_id}</td>
-                                        <td className="px-3.5 py-2 text-slate-700">{record.request_date ?? '-'}</td>
-                                        <td className="px-3.5 py-2 text-slate-700">
-                                            <p className="font-medium">{record.items_count} item(s)</p>
-                                            <p className="text-[11px] text-slate-500">{record.items_summary}</p>
-                                        </td>
-                                        <td className="px-3.5 py-2 text-slate-700 font-medium">{record.location}</td>
-                                        <td className="px-3.5 py-2 text-slate-700">{record.ready_since ?? '-'}</td>
-                                        <td className="px-3.5 py-2">
-                                            <StatusBadge status={record.status} />
-                                        </td>
-                                        <td className="px-3.5 py-2 text-right">
-                                            <div className="flex items-center justify-end gap-1.5">
-                                                {record.status.toUpperCase() === 'RELEASED' ? (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            router.post(route('office.distribution-records.receive', record.distribution_record_id), {}, {
-                                                                preserveScroll: true,
-                                                            });
-                                                        }}
-                                                        className="rounded bg-red-700 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-800 transition"
-                                                    >
-                                                        Confirm Received
-                                                    </button>
-                                                ) : null}
-                                                <Link
-                                                    href={route('office.distribution-records.show', record.distribution_record_id)}
-                                                    className="rounded border border-red-200 bg-red-50/50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 transition"
-                                                >
-                                                    View
-                                                </Link>
-                                                {record.status.toUpperCase() === 'RECEIVED' ? (
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-slate-200 text-xs">
+                                <thead className="bg-slate-50 shadow-xs">
+                                    <tr>
+                                        <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Request ID</th>
+                                        <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Request Date</th>
+                                        <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Items</th>
+                                        <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Storage Location</th>
+                                        <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Ready Since</th>
+                                        <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Status</th>
+                                        <th className="px-3.5 py-2 text-right font-semibold text-slate-700">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {records.data.map((record) => (
+                                        <tr key={record.distribution_record_id} className="hover:bg-slate-50/60 transition-colors">
+                                            <td className="px-3.5 py-2 font-semibold text-red-700">{record.request_id}</td>
+                                            <td className="px-3.5 py-2 text-slate-700">{record.request_date ?? '-'}</td>
+                                            <td className="px-3.5 py-2 text-slate-700">
+                                                <p className="font-medium">{record.items_count} item(s)</p>
+                                                <p className="text-[11px] text-slate-500">{record.items_summary}</p>
+                                            </td>
+                                            <td className="px-3.5 py-2 text-slate-700 font-medium">{record.location}</td>
+                                            <td className="px-3.5 py-2 text-slate-700">{record.ready_since ?? '-'}</td>
+                                            <td className="px-3.5 py-2">
+                                                <StatusBadge status={record.status} />
+                                            </td>
+                                            <td className="px-3.5 py-2 text-right">
+                                                <div className="flex items-center justify-end gap-1.5">
+                                                    {record.status.toUpperCase() === 'RELEASED' ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                router.post(route('office.distribution-records.receive', record.distribution_record_id), {}, {
+                                                                    preserveScroll: true,
+                                                                });
+                                                            }}
+                                                            className="rounded bg-red-700 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-800 transition"
+                                                        >
+                                                            Confirm Received
+                                                        </button>
+                                                    ) : null}
                                                     <Link
-                                                        href={route('office.claims.create', {
-                                                            supply_request_id: record.supply_request_id,
-                                                        })}
+                                                        href={route('office.distribution-records.show', record.distribution_record_id)}
                                                         className="rounded border border-red-200 bg-red-50/50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 transition"
                                                     >
-                                                        File Claim
+                                                        View
                                                     </Link>
-                                                ) : (
-                                                    <span className="rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-400">
-                                                        Claim after receipt
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                                    {record.status.toUpperCase() === 'RECEIVED' ? (
+                                                        <Link
+                                                            href={route('office.claims.create', {
+                                                                supply_request_id: record.supply_request_id,
+                                                            })}
+                                                            className="rounded border border-red-200 bg-red-50/50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 transition"
+                                                        >
+                                                            File Claim
+                                                        </Link>
+                                                    ) : (
+                                                        <span className="rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-400">
+                                                            Claim after receipt
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     )}
-                </section>
 
-                <div className="shrink-0 pt-0.5">
-                    <PaginationNav links={records.links} preserveState={false} />
-                </div>
+                    <div className="border-t border-slate-200 bg-slate-50/70 px-3.5 py-2 flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs text-slate-500 font-medium">
+                            Showing <span className="font-semibold text-slate-700">{records.data.length}</span> claimable records
+                        </p>
+                        <PaginationNav links={records.links} preserveState={false} />
+                    </div>
+                </section>
             </div>
         </AuthenticatedLayout>
     );

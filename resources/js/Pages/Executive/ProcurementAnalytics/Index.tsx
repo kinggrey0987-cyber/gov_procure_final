@@ -662,9 +662,14 @@ export default function ProcurementAnalyticsIndex({
                                     ))}
                                 </tbody>
                             </table>
-                            <div className="px-6 py-4">
-                                <PaginationNav links={procurementRecords.links} preserveState={false} />
-                            </div>
+                            {procurementRecords.links && procurementRecords.links.length > 3 && (
+                                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-slate-50/70 px-4 py-2.5">
+                                    <span className="text-xs font-medium text-slate-500">
+                                        Showing {procurementRecords.data.length} records
+                                    </span>
+                                    <PaginationNav links={procurementRecords.links} preserveState={false} />
+                                </div>
+                            )}
                         </div>
                     )}
                 </section>

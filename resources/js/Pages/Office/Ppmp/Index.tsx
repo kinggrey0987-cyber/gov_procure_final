@@ -80,7 +80,7 @@ export default function PpmpIndex({ ppmps, filters, filter_options }: Props) {
         >
             <Head title="PPMP" />
 
-            <div className="space-y-2 lg:h-[calc(100vh-8.5rem)] flex flex-col justify-between overflow-y-auto lg:overflow-hidden">
+            <div className="space-y-3">
                 {/* Compact Control & Filter Header */}
                 <section className="shrink-0 rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm">
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -93,7 +93,7 @@ export default function PpmpIndex({ ppmps, filters, filter_options }: Props) {
                             <button
                                 type="button"
                                 onClick={() => router.get(route('office.ppmp.index'))}
-                                className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
+                                className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition shadow-2xs"
                             >
                                 Reset
                             </button>
@@ -103,7 +103,7 @@ export default function PpmpIndex({ ppmps, filters, filter_options }: Props) {
                         <select
                             value={status}
                             onChange={(event) => setStatus(event.target.value)}
-                            className="h-8 rounded-lg border-slate-300 py-1 text-xs"
+                            className="h-8 rounded-lg border-slate-300 pl-2.5 pr-8 py-1 text-xs"
                         >
                             <option value="">All statuses</option>
                             {['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'RETURNED_FOR_REVISION'].map((option) => (
@@ -113,7 +113,7 @@ export default function PpmpIndex({ ppmps, filters, filter_options }: Props) {
                         <select
                             value={year}
                             onChange={(event) => setYear(event.target.value)}
-                            className="h-8 rounded-lg border-slate-300 py-1 text-xs"
+                            className="h-8 rounded-lg border-slate-300 pl-2.5 pr-8 py-1 text-xs"
                         >
                             <option value="">All years</option>
                             {(filter_options?.years ?? []).map((option) => (
@@ -125,7 +125,7 @@ export default function PpmpIndex({ ppmps, filters, filter_options }: Props) {
                         <select
                             value={month}
                             onChange={(event) => setMonth(event.target.value)}
-                            className="h-8 rounded-lg border-slate-300 py-1 text-xs"
+                            className="h-8 rounded-lg border-slate-300 pl-2.5 pr-8 py-1 text-xs"
                         >
                             <option value="">All months</option>
                             {[
@@ -150,61 +150,68 @@ export default function PpmpIndex({ ppmps, filters, filter_options }: Props) {
                     </div>
                 </section>
 
-                {/* Table Container with Internal Scroll */}
-                <section className="flex-1 min-h-0 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+                {/* Snug Table Container with Pagination Attached Directly Below Records */}
+                <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
                     {ppmps.data.length === 0 ? (
                         <div className="px-4 py-8 text-center text-sm text-slate-500">No PPMP entries yet.</div>
                     ) : (
-                        <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
-                            <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-                                <tr>
-                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">PPMP ID</th>
-                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Fiscal Year</th>
-                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Date Prepared</th>
-                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Status</th>
-                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Last Updated</th>
-                                    <th className="px-3.5 py-2 text-right font-semibold text-slate-700">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {ppmps.data.map((ppmp) => (
-                                    <tr key={ppmp.ppmp_id} className="hover:bg-slate-50/60 transition-colors">
-                                        <td className="px-3.5 py-2 font-semibold text-red-700">{ppmp.ppmp_code}</td>
-                                        <td className="px-3.5 py-2 text-slate-700 font-medium">{ppmp.fiscal_year}</td>
-                                        <td className="px-3.5 py-2 text-slate-700">{ppmp.date_prepared ?? '-'}</td>
-                                        <td className="px-3.5 py-2">
-                                            <StatusBadge status={ppmp.status} />
-                                        </td>
-                                        <td className="px-3.5 py-2 text-slate-700 text-xs">{formatDateTime(ppmp.last_updated)}</td>
-                                        <td className="px-3.5 py-2 text-right">
-                                            <div className="inline-flex flex-wrap justify-end gap-1.5">
-                                                <Link
-                                                    href={route('office.ppmp.show', ppmp.ppmp_id)}
-                                                    className="rounded border border-red-200 bg-red-50/50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 transition"
-                                                >
-                                                    View Details
-                                                </Link>
-                                                {ppmp.status === 'DRAFT' && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setDraftToDelete(ppmp)}
-                                                        className="rounded border border-rose-200 bg-rose-50/50 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition"
-                                                    >
-                                                        Delete
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </td>
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
+                                <thead className="bg-slate-50 shadow-xs">
+                                    <tr>
+                                        <th className="px-3.5 py-2 text-left font-semibold text-slate-700">PPMP ID</th>
+                                        <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Fiscal Year</th>
+                                        <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Date Prepared</th>
+                                        <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Status</th>
+                                        <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Last Updated</th>
+                                        <th className="px-3.5 py-2 text-right font-semibold text-slate-700">Action</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 bg-white">
+                                    {ppmps.data.map((ppmp) => (
+                                        <tr key={ppmp.ppmp_id} className="hover:bg-slate-50/60 transition-colors">
+                                            <td className="px-3.5 py-2 font-semibold text-red-700">{ppmp.ppmp_code}</td>
+                                            <td className="px-3.5 py-2 text-slate-700 font-medium">{ppmp.fiscal_year}</td>
+                                            <td className="px-3.5 py-2 text-slate-700">{ppmp.date_prepared ?? '-'}</td>
+                                            <td className="px-3.5 py-2">
+                                                <StatusBadge status={ppmp.status} />
+                                            </td>
+                                            <td className="px-3.5 py-2 text-slate-700 text-xs">{formatDateTime(ppmp.last_updated)}</td>
+                                            <td className="px-3.5 py-2 text-right">
+                                                <div className="inline-flex flex-wrap justify-end gap-1.5">
+                                                    <Link
+                                                        href={route('office.ppmp.show', ppmp.ppmp_id)}
+                                                        className="rounded border border-red-200 bg-red-50/50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 transition"
+                                                    >
+                                                        View Details
+                                                    </Link>
+                                                    {ppmp.status === 'DRAFT' && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setDraftToDelete(ppmp)}
+                                                            className="rounded border border-rose-200 bg-rose-50/50 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition"
+                                                        >
+                                                            Delete
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+
+                    {ppmps.links && ppmps.links.length > 3 && (
+                        <div className="border-t border-slate-200 bg-slate-50/70 px-3.5 py-2 flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-xs text-slate-500 font-medium">
+                                Showing <span className="font-semibold text-slate-700">{ppmps.data.length}</span> PPMP plans
+                            </p>
+                            <PaginationNav links={ppmps.links} preserveState={false} />
+                        </div>
                     )}
                 </section>
-
-                <div className="shrink-0 pt-0.5">
-                    <PaginationNav links={ppmps.links} preserveState={false} />
-                </div>
             </div>
 
             <Modal show={draftToDelete !== null} maxWidth="md" onClose={() => setDraftToDelete(null)}>

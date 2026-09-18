@@ -153,7 +153,7 @@ export default function AdminDashboard({ summary, activities, pagination, filter
         <AuthenticatedLayout header="Admin Dashboard">
             <Head title="Admin Dashboard" />
 
-            <div className="space-y-2 lg:h-[calc(100vh-8.5rem)] flex flex-col justify-between overflow-y-auto lg:overflow-hidden">
+            <div className="space-y-3">
                 {/* Compact KPI Stat Cards */}
                 <section className="shrink-0 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                     {statCards.map((card) => (
@@ -227,8 +227,8 @@ export default function AdminDashboard({ summary, activities, pagination, filter
                     </div>
                 </section>
 
-                {/* Compact System Activity Section with Internal Scrolling */}
-                <section className="flex-1 min-h-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm flex flex-col">
+                {/* Compact System Activity Section */}
+                <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
                     <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-3.5 py-1.5 bg-slate-50/70">
                         <div>
                             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800">System Activity</h2>
@@ -265,7 +265,7 @@ export default function AdminDashboard({ summary, activities, pagination, filter
                         </div>
                     </div>
 
-                    <div className="flex-1 min-h-0 overflow-y-auto">
+                    <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-slate-200 text-xs">
                             <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
                                 <tr>

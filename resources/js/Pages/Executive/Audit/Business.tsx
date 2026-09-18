@@ -391,9 +391,14 @@ export default function BusinessAudit({ auditLogs, auditLogsExport, filters, ana
                             </table>
                         </div>
                     )}
-                    <div className="px-6 py-4">
-                        <PaginationNav links={auditLogs.links} preserveState={false} />
-                    </div>
+                    {auditLogs.links && auditLogs.links.length > 3 && (
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-slate-50/70 px-4 py-2.5">
+                            <span className="text-xs font-medium text-slate-500">
+                                Showing {auditLogs.data.length} audit logs
+                            </span>
+                            <PaginationNav links={auditLogs.links} preserveState={false} />
+                        </div>
+                    )}
                 </section>
 
                 <div id={exportSectionId} className="pdf-export-content hidden space-y-6 text-slate-900">

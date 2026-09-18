@@ -94,7 +94,7 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
         <AuthenticatedLayout header="Request Review">
             <Head title="Request Review" />
 
-            <div className="space-y-2 lg:h-[calc(100vh-8.5rem)] flex flex-col justify-between overflow-y-auto lg:overflow-hidden">
+            <div className="space-y-3">
                 {/* Compact Control & Filter Header */}
                 <section className="shrink-0 rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm">
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -126,7 +126,7 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                             value={status}
                             onChange={(event) => setStatus(event.target.value)}
                             aria-label="Filter request review queue by status"
-                            className="h-8 rounded-lg border-slate-300 py-1 text-xs"
+                            className="h-8 rounded-lg border-slate-300 pl-2.5 pr-8 py-1 text-xs"
                         >
                             <option value="">All PR statuses</option>
                             <option value="OPEN">Pending Review</option>
@@ -141,14 +141,15 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                             value={search}
                             onChange={(event) => setSearch(event.target.value)}
                             placeholder="Search request code, office, or PR ID..."
-                            className="h-8 rounded-lg border-slate-300 py-1 text-xs"
+                            className="h-8 rounded-lg border-slate-300 px-2.5 py-1 text-xs"
                         />
                     </div>
                 </section>
 
-                {/* Table Container with Internal Scroll */}
-                <section className="flex-1 min-h-0 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-                    <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
+                {/* Table Container */}
+                <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
                         <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
                             <tr>
                                 <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Request ID</th>
@@ -237,12 +238,18 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                             ) : null}
                         </tbody>
                     </table>
-                </section>
-
-                <div className="shrink-0 pt-0.5">
-                    <PaginationNav links={purchaseRequests.links} preserveState={false} />
                 </div>
-            </div>
+
+                {purchaseRequests.links && purchaseRequests.links.length > 3 && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-slate-50/70 px-3.5 py-2">
+                        <span className="text-[11px] font-medium text-slate-500">
+                            Showing {purchaseRequests.data.length} records
+                        </span>
+                        <PaginationNav links={purchaseRequests.links} preserveState={false} />
+                    </div>
+                )}
+            </section>
+        </div>
         </AuthenticatedLayout>
     );
 }

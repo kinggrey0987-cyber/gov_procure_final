@@ -24,7 +24,7 @@ export default function RoleIndex({ roles }: Props) {
         <AuthenticatedLayout header="System Monitoring">
             <Head title="System Monitoring" />
 
-            <div className="space-y-2 lg:h-[calc(100vh-8.5rem)] flex flex-col justify-between overflow-y-auto lg:overflow-hidden">
+            <div className="space-y-3">
                 {/* High-Density System Health Telemetry Cockpit */}
                 <section className="shrink-0 rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
                     <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
@@ -59,8 +59,8 @@ export default function RoleIndex({ roles }: Props) {
                     </div>
                 </section>
 
-                {/* Access Control Registry with Sticky Header & Internal Scroll */}
-                <section className="flex-1 min-h-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm flex flex-col">
+                {/* Access Control Registry */}
+                <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
                     <div className="shrink-0 flex items-center justify-between border-b border-slate-200 bg-slate-50/70 px-3.5 py-2">
                         <div>
                             <h3 className="text-xs font-bold text-slate-800">Access Control Registry</h3>
@@ -69,7 +69,7 @@ export default function RoleIndex({ roles }: Props) {
                         <span className="text-[11px] text-slate-500 font-medium">Showing {roles.length} roles</span>
                     </div>
 
-                    <div className="flex-1 min-h-0 overflow-y-auto">
+                    <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
                             <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
                                 <tr>

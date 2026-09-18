@@ -369,11 +369,16 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                             ) : null}
                         </tbody>
                     </table>
-                </section>
 
-                <div>
-                    <PaginationNav links={purchaseRequests.links} />
-                </div>
+                    {purchaseRequests.links && purchaseRequests.links.length > 3 && (
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-slate-50/70 px-4 py-2.5">
+                            <span className="text-xs font-medium text-slate-500">
+                                Showing {purchaseRequests.data.length} records
+                            </span>
+                            <PaginationNav links={purchaseRequests.links} />
+                        </div>
+                    )}
+                </section>
             </div>
         </AuthenticatedLayout>
     );

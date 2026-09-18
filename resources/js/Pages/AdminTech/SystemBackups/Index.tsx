@@ -108,7 +108,7 @@ export default function AdminSystemBackupsIndex({ records, telemetry, backupType
         <AuthenticatedLayout header="Technical System Backups">
             <Head title="Technical System Backups" />
 
-            <div className="space-y-2 lg:h-[calc(100vh-8.5rem)] flex flex-col justify-between overflow-y-auto lg:overflow-hidden">
+            <div className="space-y-3">
                 {/* High-Density System Backup Telemetry Cockpit */}
                 {telemetry ? (
                     <section className="shrink-0 rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
@@ -216,8 +216,8 @@ export default function AdminSystemBackupsIndex({ records, telemetry, backupType
                     </form>
                 </section>
 
-                {/* Backups Table with Internal Scrolling */}
-                <section className="flex-1 min-h-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm flex flex-col">
+                {/* Backups Table */}
+                <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
                     <div className="shrink-0 flex items-center justify-between border-b border-slate-200 bg-slate-50/70 px-3.5 py-2">
                         <div>
                             <h3 className="text-xs font-bold text-slate-800">System Backup Archives</h3>
@@ -226,7 +226,7 @@ export default function AdminSystemBackupsIndex({ records, telemetry, backupType
                         <span className="text-[11px] text-slate-500 font-medium">Showing {records.data.length} snapshots</span>
                     </div>
 
-                    <div className="flex-1 min-h-0 overflow-y-auto">
+                    <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-slate-200 text-xs">
                             <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
                                 <tr>
@@ -328,11 +328,16 @@ export default function AdminSystemBackupsIndex({ records, telemetry, backupType
                             </tbody>
                         </table>
                     </div>
-                </section>
 
-                <div className="shrink-0 pt-0.5">
-                    <PaginationNav links={records.links} preserveState={false} />
-                </div>
+                    {records.links && records.links.length > 3 && (
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-slate-50/70 px-3.5 py-2">
+                            <span className="text-[11px] font-medium text-slate-500">
+                                Showing {records.data.length} snapshots
+                            </span>
+                            <PaginationNav links={records.links} preserveState={false} />
+                        </div>
+                    )}
+                </section>
             </div>
 
             <ConfirmationModal

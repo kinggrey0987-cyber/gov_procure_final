@@ -144,9 +144,16 @@ export default function ExecutiveAnomalyIndex({ anomalies, filters, filter_optio
                                 ))}
                             </tbody>
                         </table>
-                    </div>
 
-                    <PaginationNav links={anomalies.links} preserveState={false} />
+                        {anomalies.links && anomalies.links.length > 3 && (
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-slate-50/70 px-4 py-2.5">
+                                <span className="text-xs font-medium text-slate-500">
+                                    Showing {anomalies.data.length} anomalies
+                                </span>
+                                <PaginationNav links={anomalies.links} preserveState={false} />
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </AuthenticatedLayout>
