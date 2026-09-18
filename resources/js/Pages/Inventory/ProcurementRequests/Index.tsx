@@ -72,9 +72,9 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
     const [selectedLowStockItem, setSelectedLowStockItem] = useState<LowStockItem | null>(null);
     const [modalQuantity, setModalQuantity] = useState('');
 
-    const { isRefreshing, lastRefreshedAt } = useSmartRefresh({
+    const { isRefreshing, refreshNow } = useSmartRefresh({
         only: ['purchaseRequests', 'shortageCandidates', 'lowStockItems', 'atReorderItems', 'focusInventoryId'],
-        refreshOnFocus: true,
+        refreshOnFocus: false,
         refreshOnMount: false,
     });
 
@@ -130,19 +130,22 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
     return (
         <AuthenticatedLayout
             header={
-                <h2 className="text-xl font-semibold leading-tight text-gray-800">Purchase Requests</h2>
+                <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-semibold leading-tight text-gray-800">Purchase Requests</h2>
+                    <button
+                        type="button"
+                        onClick={() => void refreshNow()}
+                        disabled={isRefreshing}
+                        className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60 transition shadow-2xs"
+                    >
+                        {isRefreshing ? 'Refreshing…' : 'Refresh Queue'}
+                    </button>
+                </div>
             }
         >
             <Head title="Procurement Requests" />
 
             <div className="space-y-6 py-8">
-                <p className="text-xs text-slate-500">
-                    {isRefreshing
-                        ? 'Refreshing procurement queue...'
-                        : lastRefreshedAt
-                        ? `Updated ${lastRefreshedAt.toLocaleTimeString()}`
-                        : 'Refreshes when you return to this tab or manually reload the page'}
-                </p>
 
                 {focusInventoryId ? (
                     <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 shadow-sm">

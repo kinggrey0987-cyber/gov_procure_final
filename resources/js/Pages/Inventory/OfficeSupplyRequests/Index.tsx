@@ -86,9 +86,9 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
         setWorkflowBucket(filters.workflow_bucket ?? '');
     }, [filters.office_id, filters.q, filters.stock_assessment, filters.workflow_bucket]);
 
-    const { isRefreshing, lastRefreshedAt } = useSmartRefresh({
+    const { isRefreshing, lastRefreshedAt, refreshNow } = useSmartRefresh({
         only: ['requests', 'filters'],
-        refreshOnFocus: true,
+        refreshOnFocus: false,
         refreshOnMount: false,
     });
 
@@ -322,6 +322,14 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
                             <option value="STOCK_READY">Stock Ready</option>
                             <option value="SHORTAGE_REQUIRES_PROCUREMENT">Needs Procurement</option>
                         </select>
+                        <button
+                            type="button"
+                            onClick={() => void refreshNow()}
+                            disabled={isRefreshing}
+                            className="inline-flex h-8 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60 transition shadow-2xs"
+                        >
+                            {isRefreshing ? 'Refreshing…' : 'Refresh'}
+                        </button>
                         <Link
                             href={route('inventory.office-supply-requests.index')}
                             className="inline-flex h-8 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs"

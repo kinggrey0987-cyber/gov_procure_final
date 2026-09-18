@@ -34,10 +34,10 @@ const CURRENT_YEAR = new Date().getFullYear();
 const TODAY = todayInputValue();
 
 export default function PpmpCreate({ itemOptions }: Props) {
-    const { isRefreshing } = useSmartRefresh({
+    const { isRefreshing, refreshNow } = useSmartRefresh({
         only: ['itemOptions'],
-        refreshOnFocus: true,
-        refreshOnMount: true,
+        refreshOnFocus: false,
+        refreshOnMount: false,
     });
 
     const form = useForm({
@@ -109,9 +109,16 @@ export default function PpmpCreate({ itemOptions }: Props) {
                     <div className="mb-2 flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             <h3 className="text-base font-bold text-slate-800">PPMP Details</h3>
-                            {isRefreshing ? <span className="text-[11px] text-slate-400 animate-pulse">Refreshing item options...</span> : null}
                         </div>
                         <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => void refreshNow()}
+                                disabled={isRefreshing}
+                                className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60 transition shadow-2xs"
+                            >
+                                {isRefreshing ? 'Refreshing…' : 'Refresh Options'}
+                            </button>
                             <Link
                                 href={route('office.ppmp.index')}
                                 className="rounded-lg border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"

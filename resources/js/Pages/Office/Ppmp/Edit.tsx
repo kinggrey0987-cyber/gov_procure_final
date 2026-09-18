@@ -64,10 +64,10 @@ const CURRENT_YEAR = new Date().getFullYear();
 export default function PpmpEdit({ ppmp, itemOptions }: Props) {
     const { flash, errors: pageErrors } = usePage().props as unknown as PageFlash;
     const [processingRowId, setProcessingRowId] = useState<number | null>(null);
-    const { isRefreshing } = useSmartRefresh({
+    const { isRefreshing, refreshNow } = useSmartRefresh({
         only: ['itemOptions'],
-        refreshOnFocus: true,
-        refreshOnMount: true,
+        refreshOnFocus: false,
+        refreshOnMount: false,
     });
 
     const form = useForm({
@@ -183,7 +183,14 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                     <div className="flex items-center justify-between">
                         <h3 className="text-2xl font-semibold text-slate-800">PPMP #{ppmp.ppmp_id}</h3>
                         <div className="flex items-center gap-2">
-                            {isRefreshing ? <span className="text-xs text-slate-500">Refreshing item options...</span> : null}
+                            <button
+                                type="button"
+                                onClick={() => void refreshNow()}
+                                disabled={isRefreshing}
+                                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60 transition shadow-2xs"
+                            >
+                                {isRefreshing ? 'Refreshing…' : 'Refresh Options'}
+                            </button>
                             <Link href={route('office.ppmp.show', ppmp.ppmp_id)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">Back to Details</Link>
                         </div>
                     </div>

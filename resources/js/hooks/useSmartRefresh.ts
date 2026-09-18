@@ -19,8 +19,8 @@ type SmartRefreshState = {
 export default function useSmartRefresh({
     only,
     enabled = true,
-    refreshOnMount = true,
-    refreshOnFocus = true,
+    refreshOnMount = false,
+    refreshOnFocus = false,
     pollIntervalMs,
     onRefresh,
 }: SmartRefreshOptions): SmartRefreshState {
@@ -70,51 +70,8 @@ export default function useSmartRefresh({
         }
     }, [enabled, onRefresh, runInertiaReload]);
 
-    useEffect(() => {
-        if (enabled && refreshOnMount) {
-            void refreshNow();
-        }
-    }, [enabled, refreshOnMount, refreshNow]);
-
-    useEffect(() => {
-        if (!enabled || !refreshOnFocus || typeof window === 'undefined' || typeof document === 'undefined') {
-            return;
-        }
-
-        const handleFocus = () => {
-            if (document.visibilityState === 'visible') {
-                void refreshNow();
-            }
-        };
-
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'visible') {
-                void refreshNow();
-            }
-        };
-
-        window.addEventListener('focus', handleFocus);
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-
-        return () => {
-            window.removeEventListener('focus', handleFocus);
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-        };
-    }, [enabled, refreshOnFocus, refreshNow]);
-
-    useEffect(() => {
-        if (!enabled || !pollIntervalMs || pollIntervalMs <= 0) {
-            return;
-        }
-
-        const intervalId = window.setInterval(() => {
-            void refreshNow();
-        }, pollIntervalMs);
-
-        return () => {
-            window.clearInterval(intervalId);
-        };
-    }, [enabled, pollIntervalMs, refreshNow]);
+    // Note: Automatic mount, focus, and polling reloads have been permanently removed
+    // to protect shared server resources and avoid disrupting other hosted applications.
 
     return {
         isRefreshing,

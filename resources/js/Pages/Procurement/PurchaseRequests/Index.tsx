@@ -66,11 +66,10 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
         return nextFilters;
     }, [status, debouncedSearch]);
 
-    const { isRefreshing, lastRefreshedAt } = useSmartRefresh({
+    const { isRefreshing, refreshNow } = useSmartRefresh({
         only: ['purchaseRequests', 'filters'],
-        refreshOnFocus: true,
+        refreshOnFocus: false,
         refreshOnMount: false,
-        pollIntervalMs: 30000,
     });
 
     useEffect(() => {
@@ -102,12 +101,17 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                         <div className="flex items-center gap-2">
                             <h3 className="text-xs font-bold text-slate-800">Filter Review Queue</h3>
                             <span className="hidden text-[11px] text-slate-500 sm:inline">• Review procurement requests and move eligible ones to processing</span>
-                            <span className="text-[11px] text-slate-400">
-                                ({isRefreshing ? 'Refreshing queue…' : lastRefreshedAt ? `Updated ${lastRefreshedAt.toLocaleTimeString()}` : 'Auto-refresh 30s'})
-                            </span>
                         </div>
                         <div className="flex items-center gap-2">
                             <span className="text-[11px] text-slate-500">Showing {purchaseRequests.data.length} records</span>
+                            <button
+                                type="button"
+                                onClick={() => void refreshNow()}
+                                disabled={isRefreshing}
+                                className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60 transition shadow-2xs"
+                            >
+                                {isRefreshing ? 'Refreshing…' : 'Refresh Queue'}
+                            </button>
                             <button
                                 type="button"
                                 onClick={resetFilters}

@@ -59,9 +59,9 @@ type Props = {
 export default function ExecutiveApprovalsIndex({ records, recordsExport, summary, filters, filter_options, office_breakdown }: Props) {
     const printSectionId = 'executive-approvals-print-section';
     const exportSectionId = 'executive-approvals-export-section';
-    const { isRefreshing, lastRefreshedAt } = useSmartRefresh({
+    const { isRefreshing, refreshNow } = useSmartRefresh({
         only: ['records', 'summary', 'filters', 'filter_options'],
-        refreshOnFocus: true,
+        refreshOnFocus: false,
         refreshOnMount: false,
     });
 
@@ -234,6 +234,14 @@ export default function ExecutiveApprovalsIndex({ records, recordsExport, summar
             header="PPMP Approvals"
             headerActions={
                 <div className="print-hide flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => void refreshNow()}
+                        disabled={isRefreshing}
+                        className="inline-flex h-8 items-center rounded-lg border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 shadow-sm transition"
+                    >
+                        {isRefreshing ? 'Refreshing…' : 'Refresh'}
+                    </button>
                     <button
                         type="button"
                         onClick={exportPdf}
