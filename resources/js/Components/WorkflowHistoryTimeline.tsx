@@ -88,11 +88,12 @@ export default function WorkflowHistoryTimeline({
     approvalHistory = [],
     title = 'Real-Time Workflow & Audit History',
     subtitle = 'Chronological immutable log of state transitions, accountable officers, and timestamps.',
-    collapsible = false,
+    collapsible = true,
     defaultOpen = false,
-    compact = false,
+    compact = true,
 }: Props) {
     const [isOpen, setIsOpen] = useState(defaultOpen);
+    const [viewMode, setViewMode] = useState<'table' | 'cards'>(compact ? 'table' : 'cards');
 
     const combinedEvents = useMemo(() => {
         const events: Array<{
@@ -239,104 +240,106 @@ export default function WorkflowHistoryTimeline({
         </div>
     );
 
-    // Standard card-timeline view
+    // Standard card-timeline view bounded in max-height so it never breaks layout
     const renderCardTimeline = () => (
-        <div className="relative mt-6 space-y-6 before:absolute before:bottom-3 before:left-4 before:top-3 before:w-0.5 before:bg-slate-200 sm:before:left-5">
-            {combinedEvents.map((event, idx) => {
-                const isLatest = idx === 0;
-                const badgeStyle = getStatusBadgeStyle(event.new_status);
-                const roleBadgeStyle = getRoleBadgeStyle(event.actor_role);
+        <div className="max-h-96 overflow-y-auto pr-1">
+            <div className="relative mt-2 space-y-4 before:absolute before:bottom-3 before:left-4 before:top-3 before:w-0.5 before:bg-slate-200 sm:before:left-5">
+                {combinedEvents.map((event, idx) => {
+                    const isLatest = idx === 0;
+                    const badgeStyle = getStatusBadgeStyle(event.new_status);
+                    const roleBadgeStyle = getRoleBadgeStyle(event.actor_role);
 
-                return (
-                    <div key={event.id} className="relative flex items-start gap-4 sm:gap-5">
-                        {/* Dot indicator */}
-                        <div
-                            className={`relative z-10 flex h-8 w-8 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center rounded-full border-2 ${
-                                isLatest
-                                    ? 'border-emerald-500 bg-emerald-100 text-emerald-700 ring-4 ring-emerald-50'
-                                    : 'border-slate-300 bg-white text-slate-600 shadow-sm'
-                            }`}
-                        >
-                            {event.type === 'APPROVAL' ? (
-                                <span className="text-xs sm:text-sm">⚖️</span>
-                            ) : isLatest ? (
-                                <span className="text-xs sm:text-sm font-bold">✓</span>
-                            ) : (
-                                <span className="text-xs sm:text-sm">●</span>
-                            )}
-                        </div>
+                    return (
+                        <div key={event.id} className="relative flex items-start gap-4 sm:gap-5">
+                            {/* Dot indicator */}
+                            <div
+                                className={`relative z-10 flex h-8 w-8 sm:h-9 sm:w-9 flex-shrink-0 items-center justify-center rounded-full border-2 ${
+                                    isLatest
+                                        ? 'border-emerald-500 bg-emerald-100 text-emerald-700 ring-4 ring-emerald-50'
+                                        : 'border-slate-300 bg-white text-slate-600 shadow-sm'
+                                }`}
+                            >
+                                {event.type === 'APPROVAL' ? (
+                                    <span className="text-xs sm:text-sm">⚖️</span>
+                                ) : isLatest ? (
+                                    <span className="text-xs sm:text-sm font-bold">✓</span>
+                                ) : (
+                                    <span className="text-xs sm:text-sm">●</span>
+                                )}
+                            </div>
 
-                        {/* Event Card */}
-                        <div
-                            className={`min-w-0 flex-1 rounded-xl border p-4 shadow-sm transition ${
-                                isLatest
-                                    ? 'border-emerald-300 bg-emerald-50/40'
-                                    : 'border-slate-200 bg-white hover:border-slate-300'
-                            }`}
-                        >
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                {/* Status transition */}
-                                <div className="flex flex-wrap items-center gap-1.5">
-                                    {event.old_status ? (
-                                        <>
-                                            <span className="inline-flex rounded-md border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
-                                                {humanizeEnum(event.old_status)}
+                            {/* Event Card */}
+                            <div
+                                className={`min-w-0 flex-1 rounded-xl border p-3 sm:p-3.5 shadow-xs transition ${
+                                    isLatest
+                                        ? 'border-emerald-300 bg-emerald-50/40'
+                                        : 'border-slate-200 bg-white hover:border-slate-300'
+                                }`}
+                            >
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    {/* Status transition */}
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                        {event.old_status ? (
+                                            <>
+                                                <span className="inline-flex rounded-md border border-slate-200 bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                                                    {humanizeEnum(event.old_status)}
+                                                </span>
+                                                <span className="text-xs font-bold text-slate-400">➔</span>
+                                            </>
+                                        ) : null}
+                                        <span
+                                            className={`inline-flex rounded-md border px-2 py-0.5 text-xs font-bold ${badgeStyle.border} ${badgeStyle.bg} ${badgeStyle.text}`}
+                                        >
+                                            {event.type === 'APPROVAL'
+                                                ? (event.new_status === 'PROCESSING'
+                                                    ? 'Processing'
+                                                    : (event.actor_role?.toLowerCase().includes('executive') || event.actor_role?.toLowerCase().includes('mayor')
+                                                        ? `Executive Approval: ${humanizeEnum(event.new_status)}`
+                                                        : `Approval: ${humanizeEnum(event.new_status)}`))
+                                                : humanizeEnum(event.new_status)}
+                                        </span>
+                                        {isLatest ? (
+                                            <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">
+                                                Current State
                                             </span>
-                                            <span className="text-xs font-bold text-slate-400">➔</span>
-                                        </>
+                                        ) : null}
+                                    </div>
+
+                                    {/* Timestamp */}
+                                    <div className="flex items-center gap-1 text-xs text-slate-500 font-medium whitespace-nowrap">
+                                        <span>🕒</span>
+                                        <span>{formatTimestamp(event.timestamp)}</span>
+                                    </div>
+                                </div>
+
+                                {/* Accountable Officer Details */}
+                                <div className="mt-2.5 flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100">
+                                    <span className="text-[11px] font-semibold text-slate-500">Action taken by:</span>
+                                    <strong className="text-xs font-bold text-slate-900">{event.actor_name}</strong>
+                                    {event.actor_role ? (
+                                        <span className={`inline-flex rounded border px-1.5 py-0.2 text-[10px] font-semibold ${roleBadgeStyle}`}>
+                                            {event.actor_role}
+                                        </span>
                                     ) : null}
-                                    <span
-                                        className={`inline-flex rounded-md border px-2.5 py-0.5 text-xs font-bold ${badgeStyle.border} ${badgeStyle.bg} ${badgeStyle.text}`}
-                                    >
-                                        {event.type === 'APPROVAL'
-                                            ? (event.new_status === 'PROCESSING'
-                                                ? 'Processing'
-                                                : (event.actor_role?.toLowerCase().includes('executive') || event.actor_role?.toLowerCase().includes('mayor')
-                                                    ? `Executive Approval: ${humanizeEnum(event.new_status)}`
-                                                    : `Approval: ${humanizeEnum(event.new_status)}`))
-                                            : humanizeEnum(event.new_status)}
-                                    </span>
-                                    {isLatest ? (
-                                        <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
-                                            Current State
+                                    {event.actor_office ? (
+                                        <span className="text-[10px] text-slate-500 font-medium">
+                                            • {event.actor_office}
                                         </span>
                                     ) : null}
                                 </div>
 
-                                {/* Timestamp */}
-                                <div className="flex items-center gap-1 text-xs text-slate-500 font-medium whitespace-nowrap">
-                                    <span>🕒</span>
-                                    <span>{formatTimestamp(event.timestamp)}</span>
-                                </div>
-                            </div>
-
-                            {/* Accountable Officer Details */}
-                            <div className="mt-3 flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
-                                <span className="text-xs font-semibold text-slate-500">Action taken by:</span>
-                                <strong className="text-xs font-bold text-slate-900">{event.actor_name}</strong>
-                                {event.actor_role ? (
-                                    <span className={`inline-flex rounded border px-2 py-0.5 text-[11px] font-semibold ${roleBadgeStyle}`}>
-                                        {event.actor_role}
-                                    </span>
-                                ) : null}
-                                {event.actor_office ? (
-                                    <span className="text-[11px] text-slate-500 font-medium">
-                                        • {event.actor_office}
-                                    </span>
+                                {/* Official Remarks */}
+                                {event.remarks ? (
+                                    <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50/80 p-2 text-xs text-slate-700">
+                                        <p className="font-semibold text-slate-600 text-[10px] uppercase tracking-wider mb-0.5">Official Remarks / Note:</p>
+                                        <p className="leading-relaxed italic text-xs">"{event.remarks}"</p>
+                                    </div>
                                 ) : null}
                             </div>
-
-                            {/* Official Remarks */}
-                            {event.remarks ? (
-                                <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/80 p-2.5 text-xs text-slate-700">
-                                    <p className="font-semibold text-slate-600 text-[10px] uppercase tracking-wider mb-0.5">Official Remarks / Note:</p>
-                                    <p className="leading-relaxed italic">"{event.remarks}"</p>
-                                </div>
-                            ) : null}
                         </div>
-                    </div>
-                );
-            })}
+                    );
+                })}
+            </div>
         </div>
     );
 
@@ -375,15 +378,34 @@ export default function WorkflowHistoryTimeline({
                 </button>
 
                 {isOpen ? (
-                    <div className="border-t border-slate-100 p-4 sm:p-5 bg-slate-50/30">
+                    <div className="border-t border-slate-100 p-4 sm:p-5 bg-slate-50/30 space-y-3">
                         {combinedEvents.length === 0 ? (
                             <div className="py-6 text-center text-xs text-slate-500">
                                 No previous status transitions recorded yet.
                             </div>
-                        ) : compact ? (
-                            renderCompactTable()
                         ) : (
-                            renderCardTimeline()
+                            <>
+                                <div className="flex items-center justify-between pb-2 border-b border-slate-200/80">
+                                    <span className="text-[11px] font-semibold text-slate-500">Display layout:</span>
+                                    <div className="flex items-center gap-1 bg-slate-200/70 p-0.5 rounded-lg text-[11px]">
+                                        <button
+                                            type="button"
+                                            onClick={() => setViewMode('table')}
+                                            className={`px-2.5 py-1 rounded-md font-semibold transition ${viewMode === 'table' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+                                        >
+                                            Table View (Compact)
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setViewMode('cards')}
+                                            className={`px-2.5 py-1 rounded-md font-semibold transition ${viewMode === 'cards' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+                                        >
+                                            Timeline Cards
+                                        </button>
+                                    </div>
+                                </div>
+                                {viewMode === 'table' ? renderCompactTable() : renderCardTimeline()}
+                            </>
                         )}
                     </div>
                 ) : null}
