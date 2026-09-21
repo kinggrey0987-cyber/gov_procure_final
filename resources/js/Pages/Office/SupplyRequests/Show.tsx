@@ -45,7 +45,11 @@ type Props = {
         processing_timeline: {
             mode: 'PROCUREMENT' | 'DIRECT_STOCK';
             current_status: string;
+            workflow_status?: 'COMPLETED' | 'REJECTED' | 'CANCELLED' | 'RETURNED' | 'IN_PROGRESS';
+            is_completed?: boolean;
             is_rejected: boolean;
+            is_cancelled?: boolean;
+            is_returned?: boolean;
             stages: Array<{
                 order?: number;
                 key: string;
@@ -53,6 +57,13 @@ type Props = {
                 owner: string;
                 reached: boolean;
                 is_current: boolean;
+                is_completed?: boolean;
+                is_rejected?: boolean;
+                is_cancelled?: boolean;
+                is_discontinued?: boolean;
+                is_returned?: boolean;
+                status_badge?: 'COMPLETED' | 'ACTIVE' | 'REJECTED' | 'CANCELLED' | 'DISCONTINUED' | 'RETURNED' | 'PENDING';
+                action_label?: string | null;
                 actor_name?: string | null;
                 actor_role?: string | null;
                 actor_office?: string | null;
@@ -273,150 +284,348 @@ export default function SupplyRequestShow({
                 ) : null}
 
                 {activeTab === 'status' ? (
-                    <div className="space-y-6">
-                        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-4">
+                    <div className="space-y-4">
+                        <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm">
+                            {/* Header */}
+                            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
                                 <div>
-                                    <h4 className="text-xl font-bold text-slate-900">Processing Timeline & Accountable Officers</h4>
-                                    <p className="mt-1 text-sm text-slate-500">
-                                        Real-time operational tracking showing designated offices, accountable officers, and completion timestamps.
+                                    <h4 className="text-lg sm:text-xl font-bold text-slate-900">Processing Timeline & Accountable Officers</h4>
+                                    <p className="mt-0.5 text-xs sm:text-sm text-slate-500">
+                                        Operational lifecycle tracking designated offices, accountable officers, and completion timestamps.
                                     </p>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-wrap items-center gap-2">
                                     <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
                                         Route: <strong className="text-slate-900">{supplyRequest.processing_timeline.mode === 'PROCUREMENT' ? 'Procurement Required' : 'Direct Stock Release'}</strong>
                                     </span>
+                                    {supplyRequest.processing_timeline.workflow_status === 'COMPLETED' ? (
+                                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800 ring-1 ring-emerald-300">
+                                            <span>✓</span> Workflow Completed
+                                        </span>
+                                    ) : supplyRequest.processing_timeline.workflow_status === 'REJECTED' ? (
+                                        <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-100 px-3 py-1 text-xs font-bold text-rose-800 ring-1 ring-rose-300">
+                                            <span>✕</span> Workflow Rejected
+                                        </span>
+                                    ) : supplyRequest.processing_timeline.workflow_status === 'CANCELLED' ? (
+                                        <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-200 px-3 py-1 text-xs font-bold text-slate-700 ring-1 ring-slate-300">
+                                            <span>✕</span> Workflow Cancelled
+                                        </span>
+                                    ) : supplyRequest.processing_timeline.workflow_status === 'RETURNED' ? (
+                                        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800 ring-1 ring-amber-300">
+                                            <span>↺</span> Returned for Revision
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-800 ring-1 ring-indigo-300">
+                                            <span className="h-2 w-2 rounded-full bg-indigo-600 animate-pulse"></span> In Progress
+                                        </span>
+                                    )}
                                 </div>
                             </div>
 
-                            <div className="mt-5 grid gap-4 lg:grid-cols-2">
-                                {supplyRequest.processing_timeline.stages.map((stage) => {
+                            {/* Stepper Progress Bar (Visual Lifecycle Ribbon) */}
+                            <div className="mt-4 mb-5 overflow-x-auto pb-1">
+                                <div className="flex items-center min-w-[620px] justify-between">
+                                    {supplyRequest.processing_timeline.stages.map((stage, sIdx) => {
+                                        const isCurrent = stage.is_current;
+                                        const isCompleted = stage.is_completed ?? (stage.reached && !isCurrent && !stage.is_rejected);
+                                        const isRejected = stage.is_rejected ?? false;
+                                        const isCancelled = stage.is_cancelled ?? false;
+                                        const isDiscontinued = stage.is_discontinued ?? false;
+                                        const isLast = sIdx === supplyRequest.processing_timeline.stages.length - 1;
+
+                                        return (
+                                            <div key={`stepper-${stage.key}`} className="flex items-center flex-1 last:flex-none">
+                                                <div className="flex items-center gap-2">
+                                                    <span
+                                                        className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-all ${
+                                                            isRejected
+                                                                ? 'bg-rose-100 text-rose-700 border-2 border-rose-500 ring-2 ring-rose-100'
+                                                                : isCancelled
+                                                                ? 'bg-slate-200 text-slate-700 border border-slate-400'
+                                                                : isCurrent
+                                                                ? 'bg-indigo-600 text-white border-2 border-indigo-200 ring-4 ring-indigo-100 animate-pulse'
+                                                                : isCompleted
+                                                                ? 'bg-emerald-600 text-white border-2 border-emerald-200'
+                                                                : isDiscontinued
+                                                                ? 'bg-slate-100 text-slate-400 border border-slate-200'
+                                                                : 'bg-slate-100 text-slate-500 border border-slate-300'
+                                                        }`}
+                                                    >
+                                                        {isRejected ? '✕' : isCompleted ? '✓' : sIdx + 1}
+                                                    </span>
+                                                    <div className="flex flex-col">
+                                                        <span
+                                                            className={`text-xs font-semibold whitespace-nowrap ${
+                                                                isCurrent
+                                                                    ? 'text-indigo-900 font-bold'
+                                                                    : isCompleted
+                                                                    ? 'text-slate-800'
+                                                                    : isRejected
+                                                                    ? 'text-rose-800 font-bold'
+                                                                    : isDiscontinued
+                                                                    ? 'text-slate-400 line-through'
+                                                                    : 'text-slate-500'
+                                                            }`}
+                                                        >
+                                                            {stage.label.replace(/^Stage \d+:\s*/i, '')}
+                                                        </span>
+                                                        <span className="text-[10px] text-slate-400 whitespace-nowrap">
+                                                            {isCurrent
+                                                                ? 'Active'
+                                                                : isCompleted
+                                                                ? 'Done'
+                                                                : isRejected
+                                                                ? 'Rejected'
+                                                                : isDiscontinued
+                                                                ? 'Skipped'
+                                                                : 'Upcoming'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                {!isLast && (
+                                                    <div
+                                                        className={`h-0.5 flex-1 mx-2 transition-all ${
+                                                            isCompleted
+                                                                ? 'bg-emerald-500'
+                                                                : isCurrent
+                                                                ? 'bg-gradient-to-r from-indigo-500 to-slate-200'
+                                                                : isRejected
+                                                                ? 'bg-rose-300'
+                                                                : 'bg-slate-200'
+                                                        }`}
+                                                    />
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Responsive 3-Column Stage Cards Grid */}
+                            <div className="grid gap-3 sm:gap-3.5 md:grid-cols-2 xl:grid-cols-3">
+                                {supplyRequest.processing_timeline.stages.map((stage, idx) => {
                                     const isCurrent = stage.is_current;
-                                    const isCompleted = stage.reached && !isCurrent;
+                                    const isCompleted = stage.is_completed ?? (stage.reached && !isCurrent && !stage.is_rejected);
+                                    const isRejected = stage.is_rejected ?? false;
+                                    const isCancelled = stage.is_cancelled ?? false;
+                                    const isDiscontinued = stage.is_discontinued ?? false;
+                                    const isReturned = stage.is_returned ?? false;
 
                                     return (
                                         <div
                                             key={stage.key}
-                                            className={`relative flex flex-col justify-between rounded-2xl border p-4 sm:p-5 transition ${
-                                                isCurrent
-                                                    ? 'border-indigo-400 bg-gradient-to-br from-indigo-50/70 via-white to-indigo-50/30 shadow-md ring-2 ring-indigo-200'
+                                            className={`flex flex-col justify-between rounded-xl border p-3.5 sm:p-4 transition ${
+                                                isRejected
+                                                    ? 'border-rose-300 bg-rose-50/40 shadow-xs ring-1 ring-rose-200'
+                                                    : isCancelled
+                                                    ? 'border-slate-300 bg-slate-100/60 shadow-xs'
+                                                    : isReturned
+                                                    ? 'border-amber-300 bg-amber-50/40 shadow-xs ring-1 ring-amber-200'
+                                                    : isCurrent
+                                                    ? 'border-indigo-400 bg-indigo-50/40 shadow-sm ring-2 ring-indigo-100'
                                                     : isCompleted
-                                                    ? 'border-emerald-300 bg-gradient-to-br from-emerald-50/60 via-white to-emerald-50/20 shadow-sm'
-                                                    : 'border-slate-200 bg-slate-50/60 opacity-80'
+                                                    ? 'border-emerald-200 bg-emerald-50/20 shadow-xs'
+                                                    : isDiscontinued
+                                                    ? 'border-slate-200 bg-slate-50/40 opacity-50'
+                                                    : 'border-slate-200 bg-white/80 opacity-80'
                                             }`}
                                         >
                                             <div>
-                                                {/* Top header: stage label + status pill */}
-                                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                                    <h5 className={`text-base font-bold ${isCurrent ? 'text-indigo-950' : isCompleted ? 'text-slate-900' : 'text-slate-600'}`}>
-                                                        {stage.label}
-                                                    </h5>
+                                                {/* Header: Stage number + label + status badge */}
+                                                <div className="flex items-start justify-between gap-1.5">
+                                                    <div className="flex items-center gap-1.5 min-w-0">
+                                                        <span className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md text-[10px] font-bold ${
+                                                            isRejected
+                                                                ? 'bg-rose-100 text-rose-800'
+                                                                : isCurrent
+                                                                ? 'bg-indigo-600 text-white'
+                                                                : isCompleted
+                                                                ? 'bg-emerald-100 text-emerald-800'
+                                                                : isDiscontinued
+                                                                ? 'bg-slate-200 text-slate-500'
+                                                                : 'bg-slate-100 text-slate-600'
+                                                        }`}>
+                                                            {idx + 1}
+                                                        </span>
+                                                        <h5 className={`text-xs sm:text-sm font-bold truncate ${
+                                                            isRejected
+                                                                ? 'text-rose-950'
+                                                                : isCancelled
+                                                                ? 'text-slate-700'
+                                                                : isReturned
+                                                                ? 'text-amber-950'
+                                                                : isCurrent
+                                                                ? 'text-indigo-950'
+                                                                : isCompleted
+                                                                ? 'text-slate-900'
+                                                                : isDiscontinued
+                                                                ? 'text-slate-400 line-through'
+                                                                : 'text-slate-600'
+                                                        }`}>
+                                                            {stage.label.replace(/^Stage \d+:\s*/i, '')}
+                                                        </h5>
+                                                    </div>
 
-                                                    {isCurrent ? (
-                                                        <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-100 px-3 py-1 text-xs font-bold text-indigo-800 ring-1 ring-indigo-300">
-                                                            <span className="h-2 w-2 rounded-full bg-indigo-600 animate-ping"></span>
+                                                    {isRejected ? (
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-800 ring-1 ring-rose-300 whitespace-nowrap flex-shrink-0">
+                                                            <span>✕</span> Rejected
+                                                        </span>
+                                                    ) : isCancelled ? (
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-700 whitespace-nowrap flex-shrink-0">
+                                                            <span>✕</span> Cancelled
+                                                        </span>
+                                                    ) : isReturned ? (
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800 ring-1 ring-amber-300 whitespace-nowrap flex-shrink-0">
+                                                            <span>↺</span> Returned
+                                                        </span>
+                                                    ) : isCurrent ? (
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2.5 py-0.5 text-[10px] font-bold text-indigo-800 ring-1 ring-indigo-300 whitespace-nowrap flex-shrink-0">
+                                                            <span className="h-1.5 w-1.5 rounded-full bg-indigo-600 animate-ping"></span>
                                                             Active Stage
                                                         </span>
                                                     ) : isCompleted ? (
-                                                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-800">
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 whitespace-nowrap flex-shrink-0">
                                                             <span>✓</span> Completed
                                                         </span>
+                                                    ) : isDiscontinued ? (
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-200/60 px-2 py-0.5 text-[10px] font-medium text-slate-500 whitespace-nowrap flex-shrink-0">
+                                                            Discontinued
+                                                        </span>
                                                     ) : (
-                                                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-200/80 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500 whitespace-nowrap flex-shrink-0">
                                                             <span>⏳</span> Pending
                                                         </span>
                                                     )}
                                                 </div>
 
-                                                {/* Real-time Officer Information */}
-                                                <div className="mt-3.5 space-y-1.5">
-                                                    {isCompleted ? (
-                                                        <div className="rounded-xl border border-emerald-200/70 bg-white/80 p-3 shadow-xs">
-                                                            <div className="flex items-center justify-between text-xs">
-                                                                <span className="font-semibold text-emerald-900">Executed by:</span>
-                                                                <span className="text-slate-500 font-medium">
-                                                                    🕒 {formatTimelineDateTime(stage.completed_at)}
-                                                                </span>
+                                                {/* Accountable Officer & Timestamp */}
+                                                <div className="mt-2.5 space-y-1">
+                                                    {isRejected ? (
+                                                        <div>
+                                                            <div className="flex items-center justify-between text-[11px]">
+                                                                <span className="font-semibold text-rose-900">Rejected by:</span>
+                                                                {stage.completed_at ? (
+                                                                    <span className="text-slate-500 font-medium">
+                                                                        🕒 {formatTimelineDateTime(stage.completed_at)}
+                                                                    </span>
+                                                                ) : null}
                                                             </div>
-                                                            <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                                                                <span className="text-sm font-bold text-slate-900">{stage.actor_name || 'Authorized Officer'}</span>
+                                                            <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                                                                <span className="text-xs font-bold text-slate-900">{stage.actor_name || stage.owner}</span>
                                                                 {stage.actor_role ? (
-                                                                    <span className="rounded bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-800">
+                                                                    <span className="rounded bg-rose-50 border border-rose-200 px-1 py-0.2 text-[10px] font-semibold text-rose-800">
                                                                         {stage.actor_role}
                                                                     </span>
                                                                 ) : null}
                                                                 {stage.actor_office ? (
-                                                                    <span className="text-xs text-slate-500">• {stage.actor_office}</span>
+                                                                    <span className="text-[10px] text-slate-500 truncate max-w-[140px]">• {stage.actor_office}</span>
                                                                 ) : null}
                                                             </div>
-                                                            {stage.action_summary ? (
-                                                                <p className="mt-2 text-xs text-slate-600 border-t border-slate-100 pt-2 leading-relaxed">
-                                                                    {stage.action_summary}
-                                                                </p>
-                                                            ) : null}
+                                                        </div>
+                                                    ) : isCompleted ? (
+                                                        <div>
+                                                            <div className="flex items-center justify-between text-[11px]">
+                                                                <span className="font-semibold text-emerald-900">{stage.action_label || 'Executed by:'}</span>
+                                                                <span className="text-slate-500 font-medium">
+                                                                    🕒 {formatTimelineDateTime(stage.completed_at)}
+                                                                </span>
+                                                            </div>
+                                                            <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                                                                <span className="text-xs font-bold text-slate-900">{stage.actor_name || 'Authorized Officer'}</span>
+                                                                {stage.actor_role ? (
+                                                                    <span className="rounded bg-emerald-50 border border-emerald-200 px-1 py-0.2 text-[10px] font-semibold text-emerald-800">
+                                                                        {stage.actor_role}
+                                                                    </span>
+                                                                ) : null}
+                                                                {stage.actor_office ? (
+                                                                    <span className="text-[10px] text-slate-500 truncate max-w-[140px]">• {stage.actor_office}</span>
+                                                                ) : null}
+                                                            </div>
                                                         </div>
                                                     ) : isCurrent ? (
-                                                        <div className="rounded-xl border border-indigo-200 bg-white/90 p-3 shadow-sm">
-                                                            <div className="flex items-center justify-between text-xs">
-                                                                <span className="font-semibold text-indigo-900">Currently Handled By:</span>
+                                                        <div>
+                                                            <div className="flex items-center justify-between text-[11px]">
+                                                                <span className="font-semibold text-indigo-900">{stage.action_label || 'Handled by:'}</span>
                                                                 {stage.completed_at ? (
                                                                     <span className="text-indigo-600 font-medium">
                                                                         🕒 Since {formatTimelineDateTime(stage.completed_at)}
                                                                     </span>
                                                                 ) : null}
                                                             </div>
-                                                            <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                                                                <span className="text-sm font-bold text-indigo-950">{stage.actor_name || stage.owner}</span>
+                                                            <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                                                                <span className="text-xs font-bold text-indigo-950">{stage.actor_name || stage.owner}</span>
                                                                 {stage.actor_role ? (
-                                                                    <span className="rounded bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 text-[11px] font-semibold text-indigo-800">
+                                                                    <span className="rounded bg-indigo-50 border border-indigo-200 px-1 py-0.2 text-[10px] font-semibold text-indigo-800">
                                                                         {stage.actor_role}
                                                                     </span>
                                                                 ) : (
-                                                                    <span className="rounded bg-slate-100 border border-slate-200 px-1.5 py-0.5 text-[11px] font-semibold text-slate-700">
+                                                                    <span className="rounded bg-slate-100 border border-slate-200 px-1 py-0.2 text-[10px] font-semibold text-slate-700">
                                                                         {stage.owner}
                                                                     </span>
                                                                 )}
                                                                 {stage.actor_office ? (
-                                                                    <span className="text-xs text-indigo-700">• {stage.actor_office}</span>
+                                                                    <span className="text-[10px] text-indigo-700 truncate max-w-[140px]">• {stage.actor_office}</span>
                                                                 ) : null}
                                                             </div>
-                                                            {stage.action_summary ? (
-                                                                <p className="mt-2 text-xs font-medium text-indigo-900 border-t border-indigo-100 pt-2 leading-relaxed">
-                                                                    {stage.action_summary}
-                                                                </p>
-                                                            ) : null}
+                                                        </div>
+                                                    ) : isDiscontinued ? (
+                                                        <div>
+                                                            <div className="flex items-center justify-between text-[11px] text-slate-400">
+                                                                <span className="font-semibold text-slate-500">Terminated</span>
+                                                                <span>Not Reached</span>
+                                                            </div>
+                                                            <p className="mt-0.5 text-xs text-slate-400 line-through">{stage.owner}</p>
                                                         </div>
                                                     ) : (
-                                                        <div className="rounded-xl border border-slate-200 bg-white/60 p-3">
-                                                            <div className="flex items-center justify-between text-xs text-slate-500">
-                                                                <span className="font-semibold text-slate-600">Designated Unit / Officer:</span>
-                                                                <span>Pending</span>
+                                                        <div>
+                                                            <div className="flex items-center justify-between text-[11px] text-slate-500">
+                                                                <span className="font-semibold text-slate-600">Designated Unit:</span>
+                                                                <span className="text-[10px]">Pending</span>
                                                             </div>
-                                                            <p className="mt-1 text-sm font-semibold text-slate-700">{stage.owner}</p>
-                                                            <p className="mt-2 text-xs text-slate-500 border-t border-slate-100 pt-2 leading-relaxed">
-                                                                {stage.action_summary || 'Prerequisite stages must conclude before this stage is engaged.'}
-                                                            </p>
+                                                            <p className="mt-0.5 text-xs font-semibold text-slate-700 truncate">{stage.owner}</p>
                                                         </div>
                                                     )}
                                                 </div>
                                             </div>
+
+                                            {/* Action Summary / Note */}
+                                            {stage.action_summary ? (
+                                                <div className={`mt-2.5 rounded-lg border p-2 text-[11px] leading-snug ${
+                                                    isRejected
+                                                        ? 'border-rose-200 bg-rose-50/60 text-rose-900 font-medium'
+                                                        : isCurrent
+                                                        ? 'border-indigo-100 bg-indigo-50/40 text-indigo-950 font-medium'
+                                                        : isDiscontinued
+                                                        ? 'border-slate-200 bg-slate-50 text-slate-400 italic'
+                                                        : 'border-slate-100 bg-slate-50/60 text-slate-600'
+                                                }`}>
+                                                    <span className="line-clamp-2 hover:line-clamp-none transition-all">
+                                                        {isRejected ? <strong>Reason: </strong> : null}
+                                                        {stage.action_summary}
+                                                    </span>
+                                                </div>
+                                            ) : null}
                                         </div>
                                     );
                                 })}
                             </div>
 
                             {supplyRequest.processing_timeline.is_rejected ? (
-                                <div className="mt-4 rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-xs text-rose-900 shadow-sm">
-                                    <strong className="font-bold">Request Returned / Rejected:</strong> This request was flagged during review/procurement. Check the chronological workflow log below for detailed remarks.
+                                <div className="mt-4 rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-xs text-rose-900 shadow-xs">
+                                    <strong className="font-bold">Request Returned / Disapproved:</strong> This request was flagged during evaluation. Review the rejection remarks above or inspect the detailed audit trail below.
                                 </div>
                             ) : null}
                         </section>
 
+                        {/* Collapsible System Audit Trail (Collapsed by default so everything above fits in one screen!) */}
                         <WorkflowHistoryTimeline
                             statusHistory={statusHistory}
                             approvalHistory={approvalHistory}
-                            title="Real-Time Workflow & Audit History"
-                            subtitle="Chronological immutable log of state transitions, accountable officers, and official timestamps."
+                            title="Detailed Operational & Audit Trail"
+                            subtitle="Chronological immutable record of low-level status transitions, database events, and accountable officers."
+                            collapsible={true}
+                            defaultOpen={false}
+                            compact={true}
                         />
                     </div>
                 ) : null}

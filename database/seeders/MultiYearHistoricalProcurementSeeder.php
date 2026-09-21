@@ -270,7 +270,7 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
                             'purpose' => sprintf('%s Q%d Supply Requisition for FY %d.', $officeCode, $qData['q'], $year),
                             'priority_level' => 'NORMAL',
                             'status' => 'COMPLETED',
-                            'approved_by' => $execUser->id,
+                            'approved_by' => $gsoUser->id,
                             'approved_at' => $reqDate->copy()->addDays(2),
                             'created_at' => $reqDate,
                             'updated_at' => $distDate,
@@ -353,9 +353,9 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
                     ApprovalHistory::query()->create([
                         'reference_type' => SupplyRequest::class,
                         'reference_id' => $supplyRequest->supply_request_id,
-                        'approved_by' => $execUser->id,
+                        'approved_by' => $gsoUser->id,
                         'status' => 'APPROVED',
-                        'remarks' => 'Approved against annual PPMP.',
+                        'remarks' => 'Approved by GSO Property Officer against PPMP allocation.',
                         'approved_at' => $reqDate->copy()->addDays(2),
                     ]);
 
@@ -380,9 +380,9 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
                     ApprovalHistory::query()->create([
                         'reference_type' => PurchaseRequest::class,
                         'reference_id' => $pr->purchase_request_id,
-                        'approved_by' => $execUser->id,
+                        'approved_by' => $procUser->id,
                         'status' => 'APPROVED',
-                        'remarks' => 'Approved by BAC & Executive.',
+                        'remarks' => 'Approved by BAC Procurement Officer.',
                         'approved_at' => $poDate,
                     ]);
 
@@ -396,7 +396,7 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
                             'supply_request_id' => $supplyRequest->supply_request_id,
                             'supplier_id' => $supplier->supplier_id,
                             'created_by' => $procUser->id,
-                            'approved_by' => $execUser->id,
+                            'approved_by' => $procUser->id,
                             'procurement_method' => 'SHOPPING',
                             'status' => 'COMPLETED',
                             'expected_delivery_date' => $delDate,

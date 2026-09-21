@@ -424,11 +424,19 @@ class SupplyRequestController extends Controller
             return 'PROCUREMENT_PO_DRAFT';
         }
 
+        if ($baseStatus === 'REJECTED') {
+            return 'REJECTED';
+        }
+
+        if ($baseStatus === 'CANCELLED') {
+            return 'CANCELLED';
+        }
+
         $purchaseRequestStatuses = $supplyRequest->purchaseRequests
             ->pluck('status')
             ->map(fn ($status): string => strtoupper((string) $status));
 
-        if ($baseStatus === 'REJECTED' && $purchaseRequestStatuses->contains('REJECTED')) {
+        if ($purchaseRequestStatuses->contains('REJECTED')) {
             return 'REJECTED';
         }
 
@@ -551,7 +559,7 @@ class SupplyRequestController extends Controller
 
     /**
      * @param  array{status?: \Illuminate\Support\Collection<int, \App\Models\StatusHistory>, approval?: \Illuminate\Support\Collection<int, \App\Models\ApprovalHistory>}  $history
-     * @return array{mode: string, current_status: string, is_rejected: bool, stages: array<int, array<string, mixed>>}
+     * @return array{mode: string, current_status: string, workflow_status: string, is_completed: bool, is_rejected: bool, is_cancelled: bool, is_returned: bool, stages: array<int, array<string, mixed>>}
      */
     private function buildProcessingTimeline(SupplyRequest $supplyRequest, string $trackingStatus, bool $requiresProcurement, array $history = []): array
     {
@@ -590,6 +598,11 @@ class SupplyRequestController extends Controller
 
         $currentOrder = $orderMap[$status] ?? 1;
 
+        $isCompleted = in_array($status, ['RECEIVED', 'COMPLETED'], true);
+        $isRejected = $status === 'REJECTED' || (string) $supplyRequest->status === 'REJECTED';
+        $isCancelled = $status === 'CANCELLED' || (string) $supplyRequest->status === 'CANCELLED';
+        $isReturned = $status === 'RETURNED_FOR_REVISION' || (string) $supplyRequest->status === 'RETURNED_FOR_REVISION';
+
         $statusHistory = collect($history['status'] ?? []);
         $requester = $supplyRequest->requester;
         $office = $supplyRequest->office;
@@ -601,6 +614,33 @@ class SupplyRequestController extends Controller
             ->sortByDesc('distribution_record_id')
             ->first();
 
+        // Check if rejection occurred in PR (Procurement) or SR (GSO Validation)
+        $rejectionStageOrder = 3;
+        $rejectionActor = null;
+        $rejectionRole = null;
+        $rejectionOffice = null;
+        $rejectionTime = null;
+        $rejectionSummary = null;
+
+        if ($isRejected) {
+            if ($requiresProcurement && $primaryPr && (string) $primaryPr->status === 'REJECTED') {
+                $rejectionStageOrder = 4;
+                $prRejectionStatus = $primaryPr->statusHistory()->where('new_status', 'REJECTED')->latest('id')->first();
+                $rejectionActor = $prRejectionStatus?->changedBy?->name ?? 'BAC Procurement Officer';
+                $rejectionRole = $prRejectionStatus?->changedBy?->role?->name ?? 'Procurement Officer';
+                $rejectionOffice = $prRejectionStatus?->changedBy?->office?->name ?? 'Bids and Awards Committee';
+                $rejectionTime = optional($prRejectionStatus?->changed_at ?? $primaryPr->updated_at)?->toIso8601String();
+                $rejectionSummary = $primaryPr->remarks ?: ($prRejectionStatus?->remarks ?: 'Purchase request rejected during procurement evaluation.');
+            } else {
+                $srRejectionStatus = $statusHistory->firstWhere('new_status', 'REJECTED');
+                $rejectionActor = $srRejectionStatus?->changedBy?->name ?? 'GSO Property Officer';
+                $rejectionRole = $srRejectionStatus?->changedBy?->role?->name ?? 'GSO Property Officer';
+                $rejectionOffice = $srRejectionStatus?->changedBy?->office?->name ?? 'General Services Office';
+                $rejectionTime = optional($srRejectionStatus?->changed_at ?? $supplyRequest->updated_at)?->toIso8601String();
+                $rejectionSummary = $srRejectionStatus?->remarks ?: ($supplyRequest->review_notes ?: 'Supply request disapproved during GSO warehouse validation.');
+            }
+        }
+
         // 1. Resolve Stage 1 (Draft)
         $draftEntry = $statusHistory->firstWhere('new_status', 'DRAFT') ?? $statusHistory->last();
         $stage1Actor = $draftEntry?->changedBy?->name ?? $requester?->name ?? 'Requisitioning Officer';
@@ -611,7 +651,7 @@ class SupplyRequestController extends Controller
 
         // 2. Resolve Stage 2 (Submitted to GSO)
         $submittedEntry = $statusHistory->firstWhere('new_status', 'SUBMITTED');
-        $stage2Reached = $currentOrder >= 2;
+        $stage2Reached = $isCompleted || $currentOrder >= 2;
         $stage2Actor = $submittedEntry?->changedBy?->name ?? ($stage2Reached ? ($requester?->name ?? 'Office Requisitioner') : null);
         $stage2Role = $submittedEntry?->changedBy?->role?->name ?? ($stage2Reached ? ($requester?->role?->name ?? 'Office Requisitioner') : 'Office Requisitioner');
         $stage2Office = $submittedEntry?->changedBy?->office?->name ?? ($stage2Reached ? ($office?->name ?? 'End-User Office') : $office?->name);
@@ -622,45 +662,67 @@ class SupplyRequestController extends Controller
 
         // 3. Resolve Stage 3 (GSO Validation)
         $gsoEntry = $statusHistory->first(fn ($e) => in_array($e->new_status, ['IN_REVIEW', 'FOR_PROCUREMENT', 'APPROVED', 'RELEASED', 'PARTIALLY_RELEASED', 'REJECTED']));
-        $stage3Reached = $currentOrder >= 3;
-        $stage3Actor = $gsoEntry?->changedBy?->name
-            ?? ($stage3Reached ? ($primaryPr?->requester?->name ?? $primaryDist?->preparer?->name ?? 'GSO Property Officer') : null);
-        $stage3Role = $gsoEntry?->changedBy?->role?->name
-            ?? ($stage3Reached ? 'GSO Property Officer' : 'GSO Property Officer');
-        $stage3Office = $gsoEntry?->changedBy?->office?->name ?? 'General Services Office';
-        $stage3Time = $stage3Reached ? optional($gsoEntry?->changed_at ?? $primaryPr?->created_at ?? $primaryDist?->created_at)?->toIso8601String() : null;
-        $stage3Summary = $stage3Reached
-            ? ($requiresProcurement
-                ? 'Warehouse stock verified: shortage identified and routed to BAC Procurement Unit.'
-                : 'Warehouse stock verified: supplies available in stock and approved for direct release.')
-            : 'Pending GSO warehouse inventory assessment and stock availability check.';
+        $stage3Reached = $isCompleted || $currentOrder >= 3;
+        $stage3Actor = ($isRejected && $rejectionStageOrder === 3)
+            ? $rejectionActor
+            : ($gsoEntry?->changedBy?->name ?? ($stage3Reached ? ($primaryPr?->requester?->name ?? $primaryDist?->preparer?->name ?? 'GSO Property Officer') : null));
+        $stage3Role = ($isRejected && $rejectionStageOrder === 3)
+            ? $rejectionRole
+            : ($gsoEntry?->changedBy?->role?->name ?? ($stage3Reached ? 'GSO Property Officer' : 'GSO Property Officer'));
+        $stage3Office = ($isRejected && $rejectionStageOrder === 3)
+            ? $rejectionOffice
+            : ($gsoEntry?->changedBy?->office?->name ?? 'General Services Office');
+        $stage3Time = ($isRejected && $rejectionStageOrder === 3)
+            ? $rejectionTime
+            : ($stage3Reached ? optional($gsoEntry?->changed_at ?? $primaryPr?->created_at ?? $primaryDist?->created_at)?->toIso8601String() : null);
+        $stage3Summary = ($isRejected && $rejectionStageOrder === 3)
+            ? $rejectionSummary
+            : ($stage3Reached
+                ? ($requiresProcurement
+                    ? 'Warehouse stock verified: shortage identified and routed to BAC Procurement Unit.'
+                    : 'Warehouse stock verified: supplies available in stock and approved for direct release.')
+                : 'Pending GSO warehouse inventory assessment and stock availability check.');
 
         if ($requiresProcurement) {
             // Stage 4: Procurement Unit
-            $stage4Reached = $currentOrder >= 4;
+            $stage4Reached = $isCompleted || $currentOrder >= 4;
             $stage4Actor = null;
             $stage4Role = 'BAC Procurement Unit';
             $stage4Office = 'Bids and Awards Committee';
             $stage4Time = null;
             $stage4Summary = 'Pending BAC procurement evaluation upon shortage routing.';
 
-            if ($stage4Reached) {
+            if ($isRejected && $rejectionStageOrder === 4) {
+                $stage4Actor = $rejectionActor;
+                $stage4Role = $rejectionRole;
+                $stage4Office = $rejectionOffice;
+                $stage4Time = $rejectionTime;
+                $stage4Summary = $rejectionSummary;
+            } elseif ($stage4Reached) {
                 if ($primaryPo && in_array(strtoupper((string) $primaryPo->status), ['PLACED', 'RECEIVED', 'COMPLETED'])) {
-                    $stage4Actor = $primaryPo->approver?->name ?? $primaryPo->creator?->name ?? 'BAC Procurement Secretariat';
-                    $stage4Role = $primaryPo->approver?->role?->name ?? $primaryPo->creator?->role?->name ?? 'BAC Procurement Officer';
-                    $stage4Office = $primaryPo->approver?->office?->name ?? $primaryPo->creator?->office?->name ?? 'Bids and Awards Committee';
+                    // Avoid Executive (Mayor) attribution for procurement unit operational execution
+                    $poActorUser = $primaryPo->creator;
+                    if (! $poActorUser || str_contains(strtolower((string) ($poActorUser->role?->name ?? '')), 'executive')) {
+                        $poActorUser = (! str_contains(strtolower((string) ($primaryPo->approver?->role?->name ?? '')), 'executive'))
+                            ? $primaryPo->approver
+                            : null;
+                    }
+                    $stage4Actor = $poActorUser?->name ?? 'BAC Procurement Officer';
+                    $stage4Role = $poActorUser?->role?->name ?? 'BAC Procurement Officer';
+                    $stage4Office = $poActorUser?->office?->name ?? 'Bids and Awards Committee';
                     $stage4Time = optional($primaryPo->date_approved ?? $primaryPo->created_at)?->toIso8601String();
                     $stage4Summary = sprintf('Purchase Order %s issued to %s (%s).', (string) $primaryPo->po_number, (string) ($primaryPo->supplier?->supplier_name ?? 'Contractor'), $primaryPo->status === 'COMPLETED' || $primaryPo->status === 'RECEIVED' ? 'Delivered & Inspected' : 'Awaiting Delivery');
                 } elseif ($primaryPo) {
-                    $stage4Actor = $primaryPo->creator?->name ?? 'BAC Procurement Officer';
-                    $stage4Role = 'BAC Procurement Officer';
-                    $stage4Office = 'Bids and Awards Committee';
+                    $poActorUser = (! str_contains(strtolower((string) ($primaryPo->creator?->role?->name ?? '')), 'executive')) ? $primaryPo->creator : null;
+                    $stage4Actor = $poActorUser?->name ?? 'BAC Procurement Officer';
+                    $stage4Role = $poActorUser?->role?->name ?? 'BAC Procurement Officer';
+                    $stage4Office = $poActorUser?->office?->name ?? 'Bids and Awards Committee';
                     $stage4Time = optional($primaryPo->created_at)?->toIso8601String();
                     $stage4Summary = sprintf('Purchase Order %s drafted; awaiting procurement placement.', (string) $primaryPo->po_number);
                 } elseif ($primaryPr) {
                     $stage4Actor = $primaryPr->requester?->name ?? 'BAC Procurement Secretariat';
-                    $stage4Role = 'Procurement Officer';
-                    $stage4Office = 'Bids and Awards Committee';
+                    $stage4Role = $primaryPr->requester?->role?->name ?? 'Procurement Officer';
+                    $stage4Office = $primaryPr->requester?->office?->name ?? 'Bids and Awards Committee';
                     $stage4Time = optional($primaryPr->created_at)?->toIso8601String();
                     $stage4Summary = sprintf('Purchase Request PR-%06d queued in BAC procurement review.', (int) $primaryPr->purchase_request_id);
                 } else {
@@ -670,7 +732,7 @@ class SupplyRequestController extends Controller
             }
 
             // Stage 5: Released for Office
-            $stage5Reached = $currentOrder >= 5;
+            $stage5Reached = $isCompleted || $currentOrder >= 5;
             $stage5Actor = $primaryDist?->preparer?->name ?? ($stage5Reached ? 'GSO Warehouse Custodian' : null);
             $stage5Role = $primaryDist?->preparer?->role?->name ?? 'GSO Property Custodian';
             $stage5Office = 'General Services Office';
@@ -682,13 +744,13 @@ class SupplyRequestController extends Controller
                 : 'Pending procurement delivery and GSO warehouse staging for office pickup.';
 
             // Stage 6: Completed
-            $stage6Reached = $currentOrder >= 6;
+            $stage6Reached = $isCompleted || $currentOrder >= 6;
             $stage6Actor = $primaryDist?->receiver?->name ?? ($stage6Reached ? ($requester?->name ?? 'Office Requisitioner') : null);
             $stage6Role = $primaryDist?->receiver?->role?->name ?? 'End-User Unit Recipient';
             $stage6Office = $office?->name ?? 'End-User Office';
             $stage6Time = $stage6Reached ? optional($primaryDist?->received_date ?? $primaryDist?->updated_at ?? $supplyRequest->updated_at)?->toIso8601String() : null;
             $stage6Summary = $stage6Reached
-                ? 'Supplies claimed, inspected, and confirmed received by requesting office.'
+                ? 'Supplies claimed, inspected, and confirmed received by requesting office. Workflow successfully fulfilled.'
                 : 'Office to confirm receipt and verify items upon physical pickup.';
 
             $stages = [
@@ -761,7 +823,7 @@ class SupplyRequestController extends Controller
             ];
         } else {
             // Direct Stock mode
-            $stage4Reached = $currentOrder >= 4;
+            $stage4Reached = $isCompleted || $currentOrder >= 4;
             $stage4Actor = $primaryDist?->preparer?->name ?? ($stage4Reached ? 'GSO Warehouse Custodian' : null);
             $stage4Role = $primaryDist?->preparer?->role?->name ?? 'GSO Property Custodian';
             $stage4Office = 'General Services Office';
@@ -772,13 +834,13 @@ class SupplyRequestController extends Controller
                     : 'Direct stock supplies released for office collection.')
                 : 'Pending GSO warehouse staging for office pickup.';
 
-            $stage5Reached = $currentOrder >= 5;
+            $stage5Reached = $isCompleted || $currentOrder >= 5;
             $stage5Actor = $primaryDist?->receiver?->name ?? ($stage5Reached ? ($requester?->name ?? 'Office Requisitioner') : null);
             $stage5Role = $primaryDist?->receiver?->role?->name ?? 'End-User Unit Recipient';
             $stage5Office = $office?->name ?? 'End-User Office';
             $stage5Time = $stage5Reached ? optional($primaryDist?->received_date ?? $primaryDist?->updated_at ?? $supplyRequest->updated_at)?->toIso8601String() : null;
             $stage5Summary = $stage5Reached
-                ? 'Supplies claimed, inspected, and confirmed received by requesting office.'
+                ? 'Supplies claimed, inspected, and confirmed received by requesting office. Workflow successfully fulfilled.'
                 : 'Office to confirm receipt and verify items upon physical pickup.';
 
             $stages = [
@@ -840,25 +902,132 @@ class SupplyRequestController extends Controller
             ];
         }
 
+        $finalOrder = $requiresProcurement ? 6 : 5;
+
+        $processedStages = collect($stages)->map(function (array $stage) use ($status, $currentOrder, $isCompleted, $isRejected, $isCancelled, $isReturned, $rejectionStageOrder, $finalOrder): array {
+            $stageOrder = (int) $stage['order'];
+
+            $isStageCompleted = false;
+            $isStageCurrent = false;
+            $isStageRejected = false;
+            $isStageCancelled = false;
+            $isStageDiscontinued = false;
+            $isStageReturned = false;
+            $statusBadge = 'PENDING';
+            $actionLabel = 'Designated Unit / Officer:';
+            $reached = false;
+            $actionSummary = $stage['action_summary'] ?? null;
+
+            if ($isCompleted) {
+                // All stages reached and completed!
+                $reached = true;
+                $isStageCompleted = true;
+                $statusBadge = 'COMPLETED';
+                $actionLabel = ($stageOrder === $finalOrder) ? 'Confirmed by:' : 'Executed by:';
+            } elseif ($isRejected) {
+                if ($stageOrder < $rejectionStageOrder) {
+                    $reached = true;
+                    $isStageCompleted = true;
+                    $statusBadge = 'COMPLETED';
+                    $actionLabel = 'Executed by:';
+                } elseif ($stageOrder === $rejectionStageOrder) {
+                    $reached = true;
+                    $isStageRejected = true;
+                    $statusBadge = 'REJECTED';
+                    $actionLabel = 'Rejected by:';
+                } else {
+                    $reached = false;
+                    $isStageDiscontinued = true;
+                    $statusBadge = 'DISCONTINUED';
+                    $actionLabel = 'Workflow Terminated';
+                    $actionSummary = sprintf('Stage discontinued due to rejection at Stage %d.', $rejectionStageOrder);
+                }
+            } elseif ($isCancelled) {
+                $cancelOrder = $currentOrder;
+                if ($stageOrder < $cancelOrder) {
+                    $reached = true;
+                    $isStageCompleted = true;
+                    $statusBadge = 'COMPLETED';
+                    $actionLabel = 'Executed by:';
+                } elseif ($stageOrder === $cancelOrder) {
+                    $reached = true;
+                    $isStageCancelled = true;
+                    $statusBadge = 'CANCELLED';
+                    $actionLabel = 'Cancelled by:';
+                } else {
+                    $reached = false;
+                    $isStageDiscontinued = true;
+                    $statusBadge = 'DISCONTINUED';
+                    $actionLabel = 'Workflow Terminated';
+                    $actionSummary = sprintf('Stage discontinued due to cancellation at Stage %d.', $cancelOrder);
+                }
+            } else {
+                // In-flight active workflow
+                if ($stageOrder < $currentOrder) {
+                    $reached = true;
+                    $isStageCompleted = true;
+                    $statusBadge = 'COMPLETED';
+                    $actionLabel = 'Executed by:';
+                } elseif ($stageOrder === $currentOrder) {
+                    $reached = true;
+                    if ($isReturned) {
+                        $isStageReturned = true;
+                        $statusBadge = 'RETURNED';
+                        $actionLabel = 'Returned by:';
+                    } else {
+                        $isStageCurrent = true;
+                        $statusBadge = 'ACTIVE';
+                        $actionLabel = 'Currently Handled By:';
+                    }
+                } else {
+                    $reached = false;
+                    $statusBadge = 'PENDING';
+                    $actionLabel = 'Designated Unit / Officer:';
+                }
+            }
+
+            return [
+                'order' => $stageOrder,
+                'key' => $stage['key'],
+                'label' => $stage['label'],
+                'owner' => $stage['owner'],
+                'actor_name' => $stage['actor_name'] ?? null,
+                'actor_role' => $stage['actor_role'] ?? null,
+                'actor_office' => $stage['actor_office'] ?? null,
+                'completed_at' => $stage['completed_at'] ?? null,
+                'action_summary' => $actionSummary,
+                'action_label' => $actionLabel,
+                'reached' => $reached,
+                'is_current' => $isStageCurrent,
+                'is_completed' => $isStageCompleted,
+                'is_rejected' => $isStageRejected,
+                'is_cancelled' => $isStageCancelled,
+                'is_discontinued' => $isStageDiscontinued,
+                'is_returned' => $isStageReturned,
+                'status_badge' => $statusBadge,
+            ];
+        })->values()->all();
+
+        $workflowStatus = 'IN_PROGRESS';
+        if ($isCompleted) {
+            $workflowStatus = 'COMPLETED';
+        } elseif ($isRejected) {
+            $workflowStatus = 'REJECTED';
+        } elseif ($isCancelled) {
+            $workflowStatus = 'CANCELLED';
+        } elseif ($isReturned) {
+            $workflowStatus = 'RETURNED';
+        }
+
         return [
             'mode' => $mode,
             'current_status' => $status,
-            'is_rejected' => $status === 'REJECTED',
-            'stages' => collect($stages)
-                ->map(fn (array $stage): array => [
-                    'key' => $stage['key'],
-                    'label' => $stage['label'],
-                    'owner' => $stage['owner'],
-                    'actor_name' => $stage['actor_name'] ?? null,
-                    'actor_role' => $stage['actor_role'] ?? null,
-                    'actor_office' => $stage['actor_office'] ?? null,
-                    'completed_at' => $stage['completed_at'] ?? null,
-                    'action_summary' => $stage['action_summary'] ?? null,
-                    'reached' => (int) $stage['order'] <= $currentOrder,
-                    'is_current' => (int) $stage['order'] === $currentOrder,
-                ])
-                ->values()
-                ->all(),
+            'workflow_status' => $workflowStatus,
+            'is_completed' => $isCompleted,
+            'is_rejected' => $isRejected,
+            'is_cancelled' => $isCancelled,
+            'is_returned' => $isReturned,
+            'stages' => $processedStages,
         ];
     }
 
