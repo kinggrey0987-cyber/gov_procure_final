@@ -79,13 +79,13 @@ class PurchaseRequestController extends Controller
                 'supplyRequest.requester',
             ]),
             'traceability' => $traceability,
-            'reviewMode' => $isReviewMode,
+            'reviewMode' => $isReviewMode && (string) $purchaseRequest->status === 'OPEN',
             'backFilters' => [
                 'status' => trim((string) $request->input('status', '')),
                 'search' => trim((string) $request->input('search', '')),
             ],
             'permissions' => [
-                'process' => $request->user()?->can('procurement.purchase-request.process', $purchaseRequest) ?? false,
+                'process' => ($request->user()?->can('procurement.purchase-request.process', $purchaseRequest) ?? false) && (string) $purchaseRequest->status === 'OPEN',
             ],
             'backLink' => $isExecutiveRoute ? [
                 'href' => route('executive.procurement-analytics'),
@@ -187,7 +187,6 @@ class PurchaseRequestController extends Controller
 
             return redirect()->route('procurement.purchase-requests.show', [
                 'purchase_request' => $purchaseRequest->purchase_request_id,
-                'mode' => 'review',
             ])->with('success', 'Purchase request returned for revision successfully.');
         }
 
@@ -202,7 +201,6 @@ class PurchaseRequestController extends Controller
 
             return redirect()->route('procurement.purchase-requests.show', [
                 'purchase_request' => $purchaseRequest->purchase_request_id,
-                'mode' => 'review',
             ])->with('success', 'Purchase request rejected successfully.');
         }
 
@@ -210,7 +208,6 @@ class PurchaseRequestController extends Controller
 
         return redirect()->route('procurement.purchase-requests.show', [
             'purchase_request' => $purchaseRequest->purchase_request_id,
-            'mode' => 'review',
         ])
             ->with('success', 'Purchase request moved to processing successfully.');
     }

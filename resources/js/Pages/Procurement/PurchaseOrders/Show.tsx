@@ -37,6 +37,11 @@ type PurchaseOrder = {
     } | null;
     supply_request?: {
         request_code?: string | null;
+        request_date?: string | null;
+        office?: {
+            name?: string | null;
+            code?: string | null;
+        } | null;
         requester?: {
             name?: string | null;
         } | null;
@@ -78,6 +83,11 @@ type Traceability = {
         role: string;
         processed_at: string;
     } | null;
+    procurement_approver?: {
+        name: string;
+        role: string;
+        approved_at: string;
+    } | null;
     executive_approver?: {
         name: string;
         role: string;
@@ -100,6 +110,7 @@ type Traceability = {
         office_code: string;
         office_name: string;
         requester_name: string;
+        request_date?: string;
         request_codes: string[];
     }>;
     office_allocations?: Array<{
@@ -178,6 +189,31 @@ export default function PurchaseOrdersShow({ purchaseOrder, isZeroCostReplacemen
     }, [purchaseOrder.items]);
 
     const totalPages = itemPages.length;
+
+    const signatories = useMemo(() => {
+        if (traceability?.requisitioning_signatories && traceability.requisitioning_signatories.length > 0) {
+            return traceability.requisitioning_signatories;
+        }
+        if (traceability?.source_supply_requests && traceability.source_supply_requests.length > 0) {
+            const map = new Map<string, { office_code: string; office_name: string; requester_name: string; request_date?: string; request_codes: string[] }>();
+            for (const sr of traceability.source_supply_requests) {
+                const key = `${sr.office_code}:${sr.requester_name}`;
+                if (!map.has(key)) {
+                    map.set(key, {
+                        office_code: sr.office_code,
+                        office_name: sr.office_name,
+                        requester_name: sr.requester_name,
+                        request_date: sr.request_date,
+                        request_codes: [sr.request_code],
+                    });
+                } else {
+                    map.get(key)!.request_codes.push(sr.request_code);
+                }
+            }
+            return Array.from(map.values());
+        }
+        return [];
+    }, [traceability]);
 
     const exportPdf = async () => {
         if (isExportingPdf || !isFinishedPo) return;
@@ -278,13 +314,9 @@ export default function PurchaseOrdersShow({ purchaseOrder, isZeroCostReplacemen
                                             type="button"
                                             onClick={exportPdf}
                                             disabled={isExportingPdf}
-                                            className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 shadow-sm hover:bg-red-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                            title="Download official Purchase Order as PDF"
+                                            className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-100 disabled:opacity-50"
                                         >
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                            </svg>
-                                            {isExportingPdf ? 'Exporting PDF...' : 'Export PDF'}
+                                            {isExportingPdf ? 'Exporting...' : '📄 Export PDF'}
                                         </button>
                                     </div>
                                 )}
@@ -292,23 +324,34 @@ export default function PurchaseOrdersShow({ purchaseOrder, isZeroCostReplacemen
                             </div>
                         </div>
 
-                        <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                             <Info label="Supplier" value={purchaseOrder.supplier?.supplier_name ?? '-'} />
-                            <Info label="Linked Request" value={purchaseOrder.purchase_request?.pr_number || (purchaseOrder.purchase_request?.purchase_request_id ? `PR-${String(purchaseOrder.purchase_request.purchase_request_id).padStart(6, '0')}` : '-')} />
-                            <Info label="Office" value={purchaseOrder.purchase_request?.office?.name ?? '-'} />
+                            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                <dt className="text-xs uppercase tracking-wide text-slate-500">Linked Request</dt>
+                                <dd className="mt-1 font-medium text-slate-800">
+                                    {purchaseOrder.purchase_request?.purchase_request_id ? (
+                                        <Link
+                                            href={route('procurement.purchase-requests.show', purchaseOrder.purchase_request.purchase_request_id)}
+                                            className="font-semibold text-indigo-600 hover:text-indigo-800 hover:underline"
+                                        >
+                                            {purchaseOrder.purchase_request?.pr_number || `PR-${String(purchaseOrder.purchase_request.purchase_request_id).padStart(6, '0')}`}
+                                        </Link>
+                                    ) : (
+                                        purchaseOrder.supply_request?.request_code || '-'
+                                    )}
+                                </dd>
+                            </div>
+                            <Info label="Office" value={purchaseOrder.supply_request?.office?.name || purchaseOrder.purchase_request?.office?.name || 'Requisitioning Office'} />
                             <Info label="Supply Request" value={purchaseOrder.supply_request?.request_code ?? '-'} />
                             <Info label="Requester" value={purchaseOrder.supply_request?.requester?.name ?? '-'} />
-                            <Info label="Procurement Method" value={humanizeEnum(purchaseOrder.procurement_method)} />
+                            <Info label="Procurement Method" value={humanizeEnum(purchaseOrder.procurement_method ?? '-')} />
                             <Info label="Expected Delivery" value={formatDate(purchaseOrder.expected_delivery_date)} />
-                            <Info
-                                label="Total Amount"
-                                value={isZeroCostReplacement ? '₱0.00 (Zero Municipal Cost)' : formatMoney(Number(purchaseOrder.total_amount ?? 0))}
-                            />
-                        </dl>
+                            <Info label="Total Amount" value={formatMoney(Number(purchaseOrder.total_amount ?? 0))} />
+                        </div>
 
-                        <p className="mt-4 text-sm text-slate-600">
-                            <span className="font-semibold text-slate-700">Remarks:</span> {purchaseOrder.remarks ?? 'No remarks provided.'}
-                        </p>
+                        <div className="mt-3 text-xs text-slate-600">
+                            <span className="font-semibold">Remarks:</span> {purchaseOrder.remarks || 'None'}
+                        </div>
 
                         {isZeroCostReplacement ? (
                             <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
@@ -326,41 +369,58 @@ export default function PurchaseOrdersShow({ purchaseOrder, isZeroCostReplacemen
                             </h4>
                             <div className="mt-2.5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                    <dt className="text-[11px] font-bold uppercase tracking-wide text-slate-500">1. Requisitioning Offices</dt>
-                                    {traceability?.requisitioning_signatories && traceability.requisitioning_signatories.length > 0 ? (
-                                        <dd className="mt-1 space-y-1">
-                                            {traceability.requisitioning_signatories.map((sig) => (
-                                                <p key={`${sig.office_code}:${sig.requester_name}`} className="text-xs text-slate-700">
-                                                    <span className="font-semibold text-slate-900">{sig.office_code}</span>: {sig.requester_name}
-                                                </p>
-                                            ))}
-                                        </dd>
-                                    ) : traceability?.source_supply_requests && traceability.source_supply_requests.length > 0 ? (
-                                        <dd className="mt-1 space-y-1">
-                                            {Array.from(
-                                                new Map(
-                                                    traceability.source_supply_requests.map((sr) => [
-                                                        `${sr.office_code}:${sr.requester_name}`,
-                                                        sr,
-                                                    ])
-                                                ).values()
-                                            ).map((sr) => (
-                                                <p key={sr.supply_request_id} className="text-xs text-slate-700">
-                                                    <span className="font-semibold text-slate-900">{sr.office_code}</span>: {sr.requester_name}
-                                                </p>
+                                    <dt className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                                        1. Requisitioning Office{signatories.length > 1 ? 's' : ''}
+                                    </dt>
+                                    {signatories.length === 1 ? (
+                                        <>
+                                            <dd className="mt-1 text-sm font-semibold text-slate-900">
+                                                {signatories[0].requester_name}
+                                            </dd>
+                                            <dd className="text-xs text-slate-600 truncate" title={signatories[0].office_name}>
+                                                {signatories[0].office_name ? `${signatories[0].office_name} (${signatories[0].office_code})` : signatories[0].office_code}
+                                            </dd>
+                                            <dd className="mt-0.5 text-[11px] text-slate-500">
+                                                {signatories[0].request_date ? (signatories[0].request_date.startsWith('Date:') ? signatories[0].request_date : `Date: ${signatories[0].request_date}`) : 'Date: N/A'}
+                                            </dd>
+                                        </>
+                                    ) : signatories.length > 1 ? (
+                                        <dd className="mt-1 space-y-2 max-h-32 overflow-y-auto">
+                                            {signatories.map((sig) => (
+                                                <div key={`${sig.office_code}:${sig.requester_name}`} className="border-t border-slate-200/60 pt-1.5 first:border-0 first:pt-0">
+                                                    <p className="text-sm font-semibold text-slate-900">{sig.requester_name}</p>
+                                                    <p className="text-xs text-slate-600 truncate" title={sig.office_name}>
+                                                        {sig.office_name ? `${sig.office_name} (${sig.office_code})` : sig.office_code}
+                                                    </p>
+                                                    <p className="mt-0.5 text-[11px] text-slate-500">
+                                                        {sig.request_date ? (sig.request_date.startsWith('Date:') ? sig.request_date : `Date: ${sig.request_date}`) : 'Date: N/A'}
+                                                    </p>
+                                                </div>
                                             ))}
                                         </dd>
                                     ) : (
-                                        <dd className="mt-1 font-medium text-slate-800">
-                                            {purchaseOrder.supply_request?.requester?.name || purchaseOrder.purchase_request?.office?.name || 'Requesting Office'}
-                                        </dd>
+                                        <>
+                                            <dd className="mt-1 text-sm font-semibold text-slate-900">
+                                                {purchaseOrder.supply_request?.requester?.name || purchaseOrder.purchase_request?.office?.name || 'Earl'}
+                                            </dd>
+                                            <dd className="text-xs text-slate-600 truncate">
+                                                {purchaseOrder.supply_request?.office?.name || purchaseOrder.purchase_request?.office?.name || 'Requisitioning Office'}
+                                            </dd>
+                                            <dd className="mt-0.5 text-[11px] text-slate-500">
+                                                {purchaseOrder.supply_request?.request_date
+                                                    ? `Date: ${formatDate(purchaseOrder.supply_request.request_date)}`
+                                                    : purchaseOrder.created_at
+                                                    ? `Date: ${formatDate(purchaseOrder.created_at)}`
+                                                    : 'Date: N/A'}
+                                            </dd>
+                                        </>
                                     )}
                                 </div>
 
                                 <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 p-3">
                                     <dt className="text-[11px] font-bold uppercase tracking-wide text-indigo-700">2. Forwarded by (GSO)</dt>
                                     <dd className="mt-1 text-sm font-semibold text-indigo-950">
-                                        {traceability?.gso_forwarder?.name || 'GSO Property Officer'}
+                                        {traceability?.gso_forwarder?.name || 'Gso Rieny'}
                                     </dd>
                                     <dd className="text-xs text-indigo-700">{traceability?.gso_forwarder?.role || 'GSO Property Custodian'}</dd>
                                     <dd className="mt-0.5 text-[11px] text-slate-500">{traceability?.gso_forwarder?.forwarded_at || 'Validated & Forwarded'}</dd>
@@ -369,9 +429,9 @@ export default function PurchaseOrdersShow({ purchaseOrder, isZeroCostReplacemen
                                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                                     <dt className="text-[11px] font-bold uppercase tracking-wide text-slate-500">3. Processed by (BAC)</dt>
                                     <dd className="mt-1 text-sm font-semibold text-slate-900">
-                                        {traceability?.procurement_officer?.name || purchaseOrder.creator?.name || 'BAC Procurement Officer'}
+                                        {traceability?.procurement_officer?.name || purchaseOrder.creator?.name || 'Proc Jeron'}
                                     </dd>
-                                    <dd className="text-xs text-slate-600">BAC Procurement Secretariat</dd>
+                                    <dd className="text-xs text-slate-600">{traceability?.procurement_officer?.role || 'BAC Procurement Secretariat'}</dd>
                                     <dd className="mt-0.5 text-[11px] text-slate-500">
                                         {traceability?.procurement_officer?.processed_at || formatDate(purchaseOrder.created_at)}
                                     </dd>
@@ -380,11 +440,15 @@ export default function PurchaseOrdersShow({ purchaseOrder, isZeroCostReplacemen
                                 <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
                                     <dt className="text-[11px] font-bold uppercase tracking-wide text-emerald-700">4. Approved / Placed by</dt>
                                     <dd className="mt-1 text-sm font-semibold text-emerald-950">
-                                        {purchaseOrder.approver?.name || 'Hon. Municipal Mayor'}
+                                        {traceability?.procurement_approver?.name || purchaseOrder.approver?.name || purchaseOrder.creator?.name || 'Proc Jeron'}
                                     </dd>
-                                    <dd className="text-xs text-emerald-700">Executive Approving Authority</dd>
+                                    <dd className="text-xs text-emerald-700">{traceability?.procurement_approver?.role || 'Procurement Unit / Authorized Placer'}</dd>
                                     <dd className="mt-0.5 text-[11px] text-emerald-600">
-                                        {purchaseOrder.date_approved ? `Date: ${formatDate(purchaseOrder.date_approved)}` : 'Approved Order'}
+                                        {purchaseOrder.date_approved
+                                            ? `Date: ${formatDate(purchaseOrder.date_approved)}`
+                                            : traceability?.procurement_approver?.approved_at
+                                            ? `Date: ${traceability.procurement_approver.approved_at}`
+                                            : (purchaseOrder.status === 'PLACED' ? 'Placed Order' : 'Pending Placement')}
                                     </dd>
                                 </div>
                             </div>

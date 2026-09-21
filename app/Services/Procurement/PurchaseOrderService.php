@@ -167,6 +167,61 @@ class PurchaseOrderService
             ]);
         }
 
+        $sourceSupplyRequests = $this->traceabilityService->getSourceSupplyRequests($purchaseOrder);
+        if ($sourceSupplyRequests->isEmpty() && $purchaseOrder->supplyRequest) {
+            $sourceSupplyRequests = collect([$purchaseOrder->supplyRequest]);
+        }
+
+        $purchaseRequestItems = $purchaseOrder->purchaseRequest?->items ?? collect();
+        $validItemIds = $purchaseRequestItems->pluck('item_id')->map(fn ($id) => (int) $id)->all();
+
+        $allSourceItemIds = collect();
+        foreach ($sourceSupplyRequests as $sr) {
+            $sr->loadMissing('items');
+            foreach ($sr->items ?? [] as $srItem) {
+                if ($validItemIds !== [] && ! in_array((int) $srItem->item_id, $validItemIds, true)) {
+                    continue;
+                }
+                $allSourceItemIds->push((int) $srItem->supply_request_item_id);
+            }
+        }
+
+        if ($allSourceItemIds->isNotEmpty()) {
+            $encodedItemIds = $purchaseOrder->items()
+                ->whereNotNull('supply_request_item_id')
+                ->where('supply_request_item_id', '>', 0)
+                ->pluck('supply_request_item_id')
+                ->map(fn ($id) => (int) $id)
+                ->unique();
+
+            $missingItemIds = $allSourceItemIds->diff($encodedItemIds);
+
+            if ($missingItemIds->isNotEmpty()) {
+                throw ValidationException::withMessages([
+                    'items' => sprintf(
+                        'All %d source request items must be encoded before issuing the purchase order (%d item line(s) remaining).',
+                        $allSourceItemIds->count(),
+                        $missingItemIds->count()
+                    ),
+                ]);
+            }
+        } elseif ($purchaseOrder->purchaseRequest) {
+            $purchaseOrder->loadMissing('purchaseRequest.items');
+            $prItemCount = $purchaseOrder->purchaseRequest?->items?->count() ?? 0;
+            if ($prItemCount > 0) {
+                $poItemCount = $purchaseOrder->items()->count();
+                if ($poItemCount < $prItemCount) {
+                    throw ValidationException::withMessages([
+                        'items' => sprintf(
+                            'All %d items from the purchase request must be encoded before issuing the purchase order (%d encoded).',
+                            $prItemCount,
+                            $poItemCount
+                        ),
+                    ]);
+                }
+            }
+        }
+
         if (! $purchaseOrder->items()->exists()) {
             throw ValidationException::withMessages([
                 'items' => 'At least one purchase order item is required before placing.',
@@ -185,15 +240,6 @@ class PurchaseOrderService
 
             $this->recordStatus($purchaseOrder, $oldStatus, 'PLACED', $actor, 'Purchase order placed.');
             $this->recordAudit($actor, 'PLACE', $purchaseOrder);
-
-            ApprovalHistory::query()->create([
-                'reference_type' => PurchaseOrder::class,
-                'reference_id' => (int) $purchaseOrder->purchase_order_id,
-                'approved_by' => null,
-                'status' => 'PLACED',
-                'remarks' => 'Purchase order placement recorded.',
-                'approved_at' => null,
-            ]);
 
             $delivery = Delivery::query()
                 ->where('purchase_order_id', (int) $purchaseOrder->purchase_order_id)

@@ -647,8 +647,8 @@ class SupplyRequestController extends Controller
             if ($stage4Reached) {
                 if ($primaryPo && in_array(strtoupper((string) $primaryPo->status), ['PLACED', 'RECEIVED', 'COMPLETED'])) {
                     $stage4Actor = $primaryPo->approver?->name ?? $primaryPo->creator?->name ?? 'BAC Procurement Secretariat';
-                    $stage4Role = $primaryPo->approver ? 'Executive Approving Authority' : ($primaryPo->creator?->role?->name ?? 'BAC Procurement Officer');
-                    $stage4Office = $primaryPo->approver ? 'Office of the Mayor / BAC' : 'Bids and Awards Committee';
+                    $stage4Role = $primaryPo->approver?->role?->name ?? $primaryPo->creator?->role?->name ?? 'BAC Procurement Officer';
+                    $stage4Office = $primaryPo->approver?->office?->name ?? $primaryPo->creator?->office?->name ?? 'Bids and Awards Committee';
                     $stage4Time = optional($primaryPo->date_approved ?? $primaryPo->created_at)?->toIso8601String();
                     $stage4Summary = sprintf('Purchase Order %s issued to %s (%s).', (string) $primaryPo->po_number, (string) ($primaryPo->supplier?->supplier_name ?? 'Contractor'), $primaryPo->status === 'COMPLETED' || $primaryPo->status === 'RECEIVED' ? 'Delivered & Inspected' : 'Awaiting Delivery');
                 } elseif ($primaryPo) {
@@ -656,7 +656,7 @@ class SupplyRequestController extends Controller
                     $stage4Role = 'BAC Procurement Officer';
                     $stage4Office = 'Bids and Awards Committee';
                     $stage4Time = optional($primaryPo->created_at)?->toIso8601String();
-                    $stage4Summary = sprintf('Purchase Order %s drafted; awaiting executive placement.', (string) $primaryPo->po_number);
+                    $stage4Summary = sprintf('Purchase Order %s drafted; awaiting procurement placement.', (string) $primaryPo->po_number);
                 } elseif ($primaryPr) {
                     $stage4Actor = $primaryPr->requester?->name ?? 'BAC Procurement Secretariat';
                     $stage4Role = 'Procurement Officer';

@@ -28,15 +28,27 @@ class PurchaseOrderItemController extends Controller
         $purchaseOrder->load([
             'items.item.category',
             'purchaseRequest.office',
+            'purchaseRequest.items',
             'supplyRequest.office',
         ]);
 
         $sourceSupplyRequests = $this->traceabilityService->getSourceSupplyRequests($purchaseOrder);
 
+        $purchaseRequestItems = $purchaseOrder->purchaseRequest?->items ?? collect();
+        $prItemsByItemId = $purchaseRequestItems->keyBy('item_id');
+        $validItemIds = $prItemsByItemId->keys()->map(fn ($id) => (int) $id)->all();
+
         $sourceItems = collect();
         foreach ($sourceSupplyRequests as $sr) {
             $sr->loadMissing(['items.item', 'items.ppmpItem', 'office']);
             foreach ($sr->items ?? [] as $row) {
+                if ($validItemIds !== [] && ! in_array((int) $row->item_id, $validItemIds, true)) {
+                    continue;
+                }
+
+                $prItem = $prItemsByItemId->get((int) $row->item_id);
+                $qtyRequested = $prItem ? (float) $prItem->quantity_requested : (float) ($row->quantity_requested ?? 0);
+
                 $sourceItems->push([
                     'supply_request_item_id' => (int) $row->supply_request_item_id,
                     'supply_request_id' => (int) $row->supply_request_id,
@@ -46,7 +58,7 @@ class PurchaseOrderItemController extends Controller
                     'item_name_snapshot' => (string) ($row->item_name_snapshot ?: ($row->item?->item_name ?? 'Unknown item')),
                     'item_specification' => (string) ($row->ppmpItem?->remarks ?? ''),
                     'default_unit' => (string) ($row->item?->default_unit ?? ''),
-                    'quantity_requested' => (float) ($row->quantity_requested ?? 0),
+                    'quantity_requested' => $qtyRequested,
                 ]);
             }
         }
@@ -54,6 +66,13 @@ class PurchaseOrderItemController extends Controller
         if ($sourceItems->isEmpty() && $purchaseOrder->supplyRequest) {
             $purchaseOrder->loadMissing(['supplyRequest.items.item', 'supplyRequest.items.ppmpItem', 'supplyRequest.office']);
             foreach ($purchaseOrder->supplyRequest->items ?? [] as $row) {
+                if ($validItemIds !== [] && ! in_array((int) $row->item_id, $validItemIds, true)) {
+                    continue;
+                }
+
+                $prItem = $prItemsByItemId->get((int) $row->item_id);
+                $qtyRequested = $prItem ? (float) $prItem->quantity_requested : (float) ($row->quantity_requested ?? 0);
+
                 $sourceItems->push([
                     'supply_request_item_id' => (int) $row->supply_request_item_id,
                     'supply_request_id' => (int) $row->supply_request_id,
@@ -63,7 +82,7 @@ class PurchaseOrderItemController extends Controller
                     'item_name_snapshot' => (string) ($row->item_name_snapshot ?: ($row->item?->item_name ?? 'Unknown item')),
                     'item_specification' => (string) ($row->ppmpItem?->remarks ?? ''),
                     'default_unit' => (string) ($row->item?->default_unit ?? ''),
-                    'quantity_requested' => (float) ($row->quantity_requested ?? 0),
+                    'quantity_requested' => $qtyRequested,
                 ]);
             }
         }
@@ -72,6 +91,12 @@ class PurchaseOrderItemController extends Controller
             'purchaseOrder' => $purchaseOrder,
             'items' => $purchaseOrder->items()->latest('purchase_order_item_id')->paginate(5)->withQueryString(),
             'sourceItems' => $sourceItems->values(),
+            'encodedSourceItemIds' => $purchaseOrder->items()
+                ->whereNotNull('supply_request_item_id')
+                ->where('supply_request_item_id', '>', 0)
+                ->pluck('supply_request_item_id')
+                ->map(fn ($id) => (int) $id)
+                ->values(),
         ]);
     }
 

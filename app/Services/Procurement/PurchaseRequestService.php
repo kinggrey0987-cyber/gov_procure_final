@@ -27,6 +27,7 @@ class PurchaseRequestService
         private readonly AuditLogService $auditLogService,
         private readonly NotificationService $notificationService,
         private readonly AnomalyService $anomalyService,
+        private readonly \App\Services\Inventory\InventoryMovementService $inventoryMovementService,
     ) {
     }
 
@@ -70,21 +71,7 @@ class PurchaseRequestService
                 'remarks' => $payload['remarks'] ?? null,
             ]);
 
-            $itemRows = [];
-            foreach ($supplyRequest->items as $supplyRequestItem) {
-                $itemRows[] = [
-                    'purchase_request_id' => (int) $purchaseRequest->purchase_request_id,
-                    'item_id' => (int) $supplyRequestItem->item_id,
-                    'quantity_requested' => (float) $supplyRequestItem->quantity_requested,
-                    'remarks' => null,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
-            }
-
-            if ($itemRows !== []) {
-                PurchaseRequestItem::query()->insert($itemRows);
-            }
+            $this->recreateItemsFromSupplyRequest($purchaseRequest, $supplyRequest, $actor);
 
             $this->recordStatus($purchaseRequest, null, 'OPEN', $actor, 'Purchase request created from submitted supply request.');
             $this->recordAudit($actor, 'CREATE', $purchaseRequest);
@@ -166,8 +153,9 @@ class PurchaseRequestService
                     'remarks' => $remarks,
                 ])->save();
 
+                $this->releaseReservedStockForPurchaseRequest($purchaseRequest, $actor);
                 $purchaseRequest->items()->delete();
-                $this->recreateItemsFromSupplyRequest($purchaseRequest, $supplyRequest);
+                $this->recreateItemsFromSupplyRequest($purchaseRequest, $supplyRequest, $actor);
 
                 $this->recordStatus($purchaseRequest, $oldStatus, 'OPEN', $actor, 'Purchase request re-queued by GSO after office revision.');
                 $this->recordAudit($actor, 'REQUEUE', $purchaseRequest);
@@ -181,7 +169,7 @@ class PurchaseRequestService
                     'remarks' => $remarks,
                 ]);
 
-                $this->recreateItemsFromSupplyRequest($purchaseRequest, $supplyRequest);
+                $this->recreateItemsFromSupplyRequest($purchaseRequest, $supplyRequest, $actor);
 
                 $this->recordStatus($purchaseRequest, null, 'OPEN', $actor, 'Purchase request queued by GSO due to stock shortage.');
                 $this->recordAudit($actor, 'QUEUE', $purchaseRequest);
@@ -218,18 +206,50 @@ class PurchaseRequestService
         });
     }
 
-    private function recreateItemsFromSupplyRequest(PurchaseRequest $purchaseRequest, SupplyRequest $supplyRequest): void
+    private function recreateItemsFromSupplyRequest(PurchaseRequest $purchaseRequest, SupplyRequest $supplyRequest, ?User $actor = null): void
     {
         $itemRows = [];
         foreach ($supplyRequest->items as $supplyRequestItem) {
-            $itemRows[] = [
-                'purchase_request_id' => (int) $purchaseRequest->purchase_request_id,
-                'item_id' => (int) $supplyRequestItem->item_id,
-                'quantity_requested' => (float) $supplyRequestItem->quantity_requested,
-                'remarks' => null,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
+            $itemId = (int) $supplyRequestItem->item_id;
+            $requested = (float) $supplyRequestItem->quantity_requested;
+
+            /** @var Inventory|null $inventory */
+            $inventory = Inventory::query()->where('item_id', $itemId)->lockForUpdate()->first();
+            $available = (float) ($inventory?->available_stock ?? 0);
+
+            $shortage = max($requested - $available, 0.0);
+            $reserveAmount = min($requested, $available);
+
+            if ($shortage > 0) {
+                $itemRows[] = [
+                    'purchase_request_id' => (int) $purchaseRequest->purchase_request_id,
+                    'item_id' => $itemId,
+                    'quantity_requested' => round($shortage, 2),
+                    'remarks' => $reserveAmount > 0
+                        ? sprintf('Net shortage requested (%.2f requested, %.2f reserved from warehouse).', $requested, $reserveAmount)
+                        : null,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }
+
+            if ($reserveAmount > 0 && $inventory instanceof Inventory) {
+                $inventory->forceFill([
+                    'available_stock' => (float) $inventory->available_stock - $reserveAmount,
+                    'reserved_quantity' => (float) $inventory->reserved_quantity + $reserveAmount,
+                    'last_updated' => now(),
+                ])->save();
+
+                $this->inventoryMovementService->record(
+                    inventoryId: (int) $inventory->inventory_id,
+                    movementType: 'STOCK_RESERVATION',
+                    referenceType: PurchaseRequest::class,
+                    referenceId: (int) $purchaseRequest->purchase_request_id,
+                    quantity: $reserveAmount,
+                    actor: $actor,
+                    remarks: sprintf('Stock reserved for PR %s (SR %s).', (string) $purchaseRequest->pr_number, (string) $supplyRequest->request_code),
+                );
+            }
         }
 
         if ($itemRows !== []) {
@@ -734,16 +754,6 @@ class PurchaseRequestService
             );
 
             $this->recordStatus($purchaseRequest, $oldStatus, 'PROCESSING', $actor, 'Purchase request is now in procurement processing.');
-
-            ApprovalHistory::query()->create([
-                'reference_type' => PurchaseRequest::class,
-                'reference_id' => (int) $purchaseRequest->purchase_request_id,
-                'approved_by' => null,
-                'status' => 'PROCESSING',
-                'remarks' => 'Procurement processing stage recorded.',
-                'approved_at' => null,
-            ]);
-
             $this->recordAudit($actor, 'PROCESS', $purchaseRequest);
 
             $supplyRequest = $purchaseRequest->supplyRequest()->first();
@@ -780,6 +790,8 @@ class PurchaseRequestService
         return DB::transaction(function () use ($purchaseRequest, $actor, $finalRemarks): PurchaseRequest {
             $oldStatus = (string) $purchaseRequest->status;
 
+            $this->releaseReservedStockForPurchaseRequest($purchaseRequest, $actor);
+
             $purchaseRequest->forceFill([
                 'status' => 'RETURNED_FOR_REVISION',
                 'remarks' => $finalRemarks,
@@ -793,16 +805,6 @@ class PurchaseRequestService
             );
 
             $this->recordStatus($purchaseRequest, $oldStatus, 'RETURNED_FOR_REVISION', $actor, 'Purchase request returned for revision by procurement.');
-
-            ApprovalHistory::query()->create([
-                'reference_type' => PurchaseRequest::class,
-                'reference_id' => (int) $purchaseRequest->purchase_request_id,
-                'approved_by' => null,
-                'status' => 'RETURNED_FOR_REVISION',
-                'remarks' => $finalRemarks,
-                'approved_at' => null,
-            ]);
-
             $this->recordAudit($actor, 'RETURN_FOR_REVISION', $purchaseRequest);
 
             return $purchaseRequest->fresh(['items', 'office', 'requester', 'supplyRequest']) ?? $purchaseRequest;
@@ -829,6 +831,8 @@ class PurchaseRequestService
         return DB::transaction(function () use ($purchaseRequest, $actor, $finalRemarks): PurchaseRequest {
             $oldStatus = (string) $purchaseRequest->status;
 
+            $this->releaseReservedStockForPurchaseRequest($purchaseRequest, $actor);
+
             $purchaseRequest->forceFill([
                 'status' => 'REJECTED',
                 'remarks' => $finalRemarks,
@@ -842,16 +846,6 @@ class PurchaseRequestService
             );
 
             $this->recordStatus($purchaseRequest, $oldStatus, 'REJECTED', $actor, 'Purchase request rejected by procurement.');
-
-            ApprovalHistory::query()->create([
-                'reference_type' => PurchaseRequest::class,
-                'reference_id' => (int) $purchaseRequest->purchase_request_id,
-                'approved_by' => null,
-                'status' => 'REJECTED',
-                'remarks' => $finalRemarks,
-                'approved_at' => null,
-            ]);
-
             $this->recordAudit($actor, 'REJECT', $purchaseRequest);
 
             return $purchaseRequest->fresh(['items', 'office', 'requester', 'supplyRequest']) ?? $purchaseRequest;
@@ -1018,15 +1012,6 @@ class PurchaseRequestService
             'remarks' => $remarks,
             'changed_at' => now(),
         ]);
-
-        ApprovalHistory::query()->create([
-            'reference_type' => SupplyRequest::class,
-            'reference_id' => (int) $supplyRequest->supply_request_id,
-            'approved_by' => null,
-            'status' => $newStatus,
-            'remarks' => $remarks,
-            'approved_at' => null,
-        ]);
     }
 
     private function syncSupplyRequestStatus(
@@ -1174,17 +1159,51 @@ class PurchaseRequestService
 
             $itemRows = [];
             foreach ($mergedItems as $merged) {
-                $itemRows[] = [
-                    'purchase_request_id' => (int) $purchaseRequest->purchase_request_id,
-                    'item_id' => (int) $merged['item_id'],
-                    'quantity_requested' => round((float) $merged['quantity_requested'], 2),
-                    'remarks' => 'Consolidated from office supply requests.',
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
+                $itemId = (int) $merged['item_id'];
+                $totalRequested = (float) $merged['quantity_requested'];
+
+                /** @var Inventory|null $inventory */
+                $inventory = Inventory::query()->where('item_id', $itemId)->lockForUpdate()->first();
+                $available = (float) ($inventory?->available_stock ?? 0);
+
+                $shortage = max($totalRequested - $available, 0.0);
+                $reserveAmount = min($totalRequested, $available);
+
+                if ($shortage > 0) {
+                    $itemRows[] = [
+                        'purchase_request_id' => (int) $purchaseRequest->purchase_request_id,
+                        'item_id' => $itemId,
+                        'quantity_requested' => round($shortage, 2),
+                        'remarks' => $reserveAmount > 0
+                            ? sprintf('Consolidated net shortage (%.2f requested, %.2f reserved from warehouse).', $totalRequested, $reserveAmount)
+                            : 'Consolidated from office supply requests.',
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                }
+
+                if ($reserveAmount > 0 && $inventory instanceof Inventory) {
+                    $inventory->forceFill([
+                        'available_stock' => (float) $inventory->available_stock - $reserveAmount,
+                        'reserved_quantity' => (float) $inventory->reserved_quantity + $reserveAmount,
+                        'last_updated' => now(),
+                    ])->save();
+
+                    $this->inventoryMovementService->record(
+                        inventoryId: (int) $inventory->inventory_id,
+                        movementType: 'STOCK_RESERVATION',
+                        referenceType: PurchaseRequest::class,
+                        referenceId: (int) $purchaseRequest->purchase_request_id,
+                        quantity: $reserveAmount,
+                        actor: $actor,
+                        remarks: sprintf('Stock reserved for consolidated PR %s from %d supply requests.', (string) $purchaseRequest->pr_number, $eligible->count()),
+                    );
+                }
             }
 
-            PurchaseRequestItem::query()->insert($itemRows);
+            if ($itemRows !== []) {
+                PurchaseRequestItem::query()->insert($itemRows);
+            }
 
             // Update all source supply requests to FOR_PROCUREMENT
             foreach ($eligible as $supplyRequest) {
@@ -1219,5 +1238,41 @@ class PurchaseRequestService
 
             return $purchaseRequest->fresh(['items', 'office', 'requester', 'supplyRequest']) ?? $purchaseRequest;
         });
+    }
+
+    private function releaseReservedStockForPurchaseRequest(PurchaseRequest $purchaseRequest, ?User $actor = null): void
+    {
+        $reservationMovements = \App\Models\InventoryMovement::query()
+            ->where('movement_type', 'STOCK_RESERVATION')
+            ->where('reference_type', PurchaseRequest::class)
+            ->where('reference_id', (int) $purchaseRequest->purchase_request_id)
+            ->get();
+
+        foreach ($reservationMovements as $movement) {
+            /** @var Inventory|null $inventory */
+            $inventory = Inventory::query()->where('inventory_id', (int) $movement->inventory_id)->lockForUpdate()->first();
+            if ($inventory instanceof Inventory) {
+                $restoreQty = min((float) $movement->quantity, (float) $inventory->reserved_quantity);
+                if ($restoreQty > 0) {
+                    $inventory->forceFill([
+                        'available_stock' => (float) $inventory->available_stock + $restoreQty,
+                        'reserved_quantity' => max((float) $inventory->reserved_quantity - $restoreQty, 0),
+                        'last_updated' => now(),
+                    ])->save();
+                }
+            }
+
+            $this->inventoryMovementService->record(
+                inventoryId: (int) $movement->inventory_id,
+                movementType: 'RESERVATION_REVERSAL',
+                referenceType: PurchaseRequest::class,
+                referenceId: (int) $purchaseRequest->purchase_request_id,
+                quantity: (float) $movement->quantity,
+                actor: $actor,
+                remarks: sprintf('Reservation reversed after PR %s status change.', (string) $purchaseRequest->pr_number),
+            );
+
+            $movement->forceFill(['movement_type' => 'STOCK_RESERVATION_RELEASED'])->save();
+        }
     }
 }

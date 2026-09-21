@@ -396,6 +396,125 @@ class ProcurementFoundationHardeningTest extends TestCase
         $this->actingAs($admin)->get(route('procurement.purchase-orders.index'))->assertForbidden();
     }
 
+    public function test_purchase_order_placement_requires_all_source_request_items_to_be_encoded(): void
+    {
+        $office = $this->createOffice();
+        $officeUser = $this->createUser(UserRole::OFFICE_USER, $office);
+        $procurementOfficer = $this->createUser(UserRole::PROCUREMENT_OFFICER, $office);
+
+        $ppmp = Ppmp::query()->create([
+            'office_id' => $office->id,
+            'prepared_by' => $officeUser->id,
+            'fiscal_year' => 2026,
+            'status' => 'SUBMITTED',
+            'total_estimated_budget' => 2000,
+            'date_prepared' => now()->toDateString(),
+        ]);
+
+        $ppmpItem1 = PpmpItem::query()->create([
+            'ppmp_id' => $ppmp->ppmp_id,
+            'item_id' => 501,
+            'item_category_id' => 51,
+            'quantity' => 10,
+            'unit_cost' => 100,
+            'estimated_budget' => 1000,
+            'procurement_schedule' => 'Q2',
+        ]);
+
+        $ppmpItem2 = PpmpItem::query()->create([
+            'ppmp_id' => $ppmp->ppmp_id,
+            'item_id' => 502,
+            'item_category_id' => 51,
+            'quantity' => 20,
+            'unit_cost' => 50,
+            'estimated_budget' => 1000,
+            'procurement_schedule' => 'Q2',
+        ]);
+
+        $supplyRequest = SupplyRequest::query()->create([
+            'request_code' => 'SR-MULTI-ENC-1',
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(5)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Multi item encoding test',
+            'priority_level' => 'HIGH',
+            'status' => 'SUBMITTED',
+        ]);
+
+        $srItem1 = SupplyRequestItem::query()->create([
+            'supply_request_id' => $supplyRequest->supply_request_id,
+            'item_id' => 501,
+            'ppmp_item_id' => $ppmpItem1->ppmp_item_id,
+            'item_name_snapshot' => 'Item 501',
+            'quantity_requested' => 10,
+        ]);
+
+        $srItem2 = SupplyRequestItem::query()->create([
+            'supply_request_id' => $supplyRequest->supply_request_id,
+            'item_id' => 502,
+            'ppmp_item_id' => $ppmpItem2->ppmp_item_id,
+            'item_name_snapshot' => 'Item 502',
+            'quantity_requested' => 20,
+        ]);
+
+        $purchaseRequest = $this->createProcessingPurchaseRequest($procurementOfficer, $supplyRequest);
+        $supplier = $this->createSupplier($procurementOfficer, 'ACTIVE');
+
+        $this->actingAs($procurementOfficer)->post(route('procurement.purchase-orders.store'), [
+            'purchase_request_id' => $purchaseRequest->purchase_request_id,
+            'supply_request_id' => $supplyRequest->supply_request_id,
+            'supplier_id' => $supplier->supplier_id,
+            'po_number' => 'PO-ENCODE-0001',
+            'procurement_method' => 'SMALL_VALUE_PROCUREMENT',
+            'expected_delivery_date' => now()->addDays(5)->toDateString(),
+            'terms_notes' => 'Net 30',
+        ])->assertRedirect();
+
+        $purchaseOrder = PurchaseOrder::query()->where('supplier_id', $supplier->supplier_id)->firstOrFail();
+
+        // Encode ONLY item 1 out of 2
+        $this->actingAs($procurementOfficer)->post(route('procurement.purchase-orders.items.store', $purchaseOrder->purchase_order_id), [
+            'supply_request_item_id' => $srItem1->supply_request_item_id,
+            'item_id' => 501,
+            'item_name_snapshot' => 'Item 501',
+            'quantity_ordered' => 10,
+            'unit' => 'BOX',
+            'unit_price' => 100,
+        ])->assertRedirect();
+
+        // Attempting to place PO with 1 of 2 items encoded MUST fail validation
+        $this->actingAs($procurementOfficer)
+            ->post(route('procurement.purchase-orders.place', $purchaseOrder->purchase_order_id), [
+                'remarks' => 'placing partially encoded PO',
+            ])
+            ->assertSessionHasErrors('items');
+
+        $purchaseOrder->refresh();
+        $this->assertSame('DRAFT', $purchaseOrder->status);
+
+        // Encode the 2nd item
+        $this->actingAs($procurementOfficer)->post(route('procurement.purchase-orders.items.store', $purchaseOrder->purchase_order_id), [
+            'supply_request_item_id' => $srItem2->supply_request_item_id,
+            'item_id' => 502,
+            'item_name_snapshot' => 'Item 502',
+            'quantity_ordered' => 20,
+            'unit' => 'PACK',
+            'unit_price' => 50,
+        ])->assertRedirect();
+
+        // Placing PO with all items encoded now succeeds
+        $this->actingAs($procurementOfficer)
+            ->post(route('procurement.purchase-orders.place', $purchaseOrder->purchase_order_id), [
+                'remarks' => 'placing fully encoded PO',
+            ])
+            ->assertRedirect();
+
+        $purchaseOrder->refresh();
+        $this->assertSame('PLACED', $purchaseOrder->status);
+    }
+
     private function createSubmittedSupplyRequestContext(
         Office $office,
         User $officeUser,

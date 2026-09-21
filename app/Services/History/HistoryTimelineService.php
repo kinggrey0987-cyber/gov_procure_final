@@ -36,6 +36,7 @@ class HistoryTimelineService
 
         $approvalHistory = ApprovalHistory::query()
             ->forReference($referenceType, $referenceId)
+            ->whereNotNull('approved_by')
             ->with(['approver.role', 'approver.office'])
             ->orderByDesc('approved_at')
             ->orderByDesc('id')

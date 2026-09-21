@@ -1137,7 +1137,13 @@ class InventoryDistributionFoundationTest extends TestCase
         $this->assertDatabaseHas('purchase_request_items', [
             'purchase_request_id' => $purchaseRequest->purchase_request_id,
             'item_id' => $context['item']->item_id,
-            'quantity_requested' => 10,
+            'quantity_requested' => 8,
+        ]);
+
+        $this->assertDatabaseHas('inventory', [
+            'item_id' => $context['item']->item_id,
+            'available_stock' => 0,
+            'reserved_quantity' => 2,
         ]);
 
         $this->assertDatabaseHas('notifications', [
@@ -1452,7 +1458,7 @@ class InventoryDistributionFoundationTest extends TestCase
         $this->assertSame('OPEN', (string) $created->status);
         $this->assertNull($createdSupplyRequest->ppmp_id);
         $this->assertSame($ppmpCountBefore, Ppmp::query()->count());
-        $this->assertStringStartsWith('SR-'.$this->gsoOfficer->office?->code.'-'.now()->format('Ym').'-', (string) $createdSupplyRequest->request_code);
+        $this->assertStringStartsWith('SR-'.$this->gsoOfficer->office?->code.'-'.now()->format('Y-m').'-', (string) $createdSupplyRequest->request_code);
         $this->assertStringContainsString('LOW_STOCK_SIGNAL:inventory:'.$inventoryId, (string) $created->remarks);
 
         $createdSupplyRequestItem = SupplyRequestItem::query()

@@ -38,15 +38,29 @@ type Props = {
         data: PurchaseOrderItem[];
     };
     sourceItems: SourceItem[];
+    encodedSourceItemIds?: number[];
 };
 
-export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceItems }: Props) {
+export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceItems, encodedSourceItemIds }: Props) {
     const toWholeQuantity = (value: string | number): number => Math.max(Math.trunc(Number(value) || 0), 0);
     const hasSourceItems = sourceItems.length > 0;
     const isDraft = (purchaseOrder.status ?? 'DRAFT') === 'DRAFT';
-    const canProcess = isDraft && items.data.length > 0;
     const [itemPendingRemoval, setItemPendingRemoval] = useState<PurchaseOrderItem | null>(null);
     const [confirmingProcess, setConfirmingProcess] = useState(false);
+
+    const encodedSourceIds = new Set(
+        encodedSourceItemIds && encodedSourceItemIds.length > 0
+            ? encodedSourceItemIds.map(Number)
+            : items.data.map((row) => Number(row.supply_request_item_id))
+    );
+
+    const totalSourceCount = sourceItems.length;
+    const unencodedItems = sourceItems.filter((source) => !encodedSourceIds.has(Number(source.supply_request_item_id)));
+    const encodedCount = totalSourceCount - unencodedItems.length;
+    const remainingCount = unencodedItems.length;
+
+    const isAllItemsEncoded = hasSourceItems ? remainingCount === 0 : items.data.length > 0;
+    const canProcess = isDraft && isAllItemsEncoded;
 
     const form = useForm({
         supply_request_item_id: 0,
@@ -59,7 +73,6 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
     });
 
     const selectedSource = sourceItems.find((row) => row.supply_request_item_id === form.data.supply_request_item_id) ?? null;
-    const encodedSourceIds = new Set(items.data.map((row) => Number(row.supply_request_item_id)));
     const isDuplicateSelection = form.data.supply_request_item_id > 0 && encodedSourceIds.has(Number(form.data.supply_request_item_id));
 
     const applySourceItem = (supplyRequestItemId: number) => {
@@ -285,12 +298,37 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                                 <div>
                                     <p className="text-xs font-semibold uppercase tracking-[0.15em] text-red-700">Ready for Processing</p>
                                     <h3 className="mt-1 text-xl font-semibold text-slate-800">Process Purchase Order</h3>
-                                    <p className="mt-1 text-sm text-slate-600">After encoding the supplier-quoted item lines, issue the PO and generate the delivery intake workflow.</p>
+                                    <p className="mt-1 text-sm text-slate-600">
+                                        After encoding all supplier-quoted item lines, issue the PO and generate the delivery intake workflow.
+                                    </p>
                                 </div>
-                                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${canProcess ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                                    {canProcess ? `${items.data.length} encoded line(s)` : 'Add at least 1 item'}
+                                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                                    canProcess 
+                                        ? 'bg-emerald-100 text-emerald-700' 
+                                        : 'bg-amber-100 text-amber-800'
+                                }`}>
+                                    {hasSourceItems
+                                        ? (remainingCount === 0
+                                            ? `All ${totalSourceCount} item(s) encoded`
+                                            : `${encodedCount} of ${totalSourceCount} encoded (${remainingCount} remaining)`)
+                                        : (canProcess ? `${items.data.length} encoded line(s)` : 'Add at least 1 item')
+                                    }
                                 </span>
                             </div>
+
+                            {!isAllItemsEncoded && hasSourceItems ? (
+                                <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/90 p-4 text-xs text-amber-900">
+                                    <div className="flex items-center gap-2 font-semibold text-amber-800">
+                                        <span>⚠️</span>
+                                        <span>All source request items must be encoded before this purchase order can be processed.</span>
+                                    </div>
+                                    <p className="mt-1.5 text-amber-700">
+                                        <span className="font-semibold">{remainingCount} item(s) remaining:</span>{' '}
+                                        {unencodedItems.map((u) => u.item_name_snapshot).join(', ')}.
+                                    </p>
+                                </div>
+                            ) : null}
+
                             <label className="mt-4 block">
                                 <span className="mb-1 block text-sm font-medium text-slate-700">Processing Remarks</span>
                                 <textarea
@@ -322,7 +360,7 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                             <p className="text-xs font-semibold uppercase tracking-[0.15em] text-red-700">Process Purchase Order</p>
                             <h3 className="mt-2 text-lg font-semibold text-slate-900">Issue this purchase order?</h3>
                             <p className="mt-2 text-sm text-slate-600">
-                                This will issue {purchaseOrder.po_number ?? `PO #${purchaseOrder.purchase_order_id}`} and create the delivery intake workflow for {items.data.length} encoded line(s).
+                                This will issue {purchaseOrder.po_number ?? `PO #${purchaseOrder.purchase_order_id}`} and create the delivery intake workflow for all {totalSourceCount || items.data.length} encoded line(s).
                             </p>
                             {processForm.data.remarks ? (
                                 <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">

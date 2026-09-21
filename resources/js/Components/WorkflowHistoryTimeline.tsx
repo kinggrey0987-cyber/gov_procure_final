@@ -114,13 +114,22 @@ export default function WorkflowHistoryTimeline({
         });
 
         approvalHistory.forEach((item) => {
+            // Do not render empty ghost approval stubs that have no actual approver and no timestamp
+            if (!item.approver && !item.approved_at) {
+                return;
+            }
+
+            const roleLower = item.approver?.role?.toLowerCase() || '';
+            const isExecutive = roleLower.includes('executive') || roleLower.includes('mayor');
+            const isProcessing = item.status === 'PROCESSING';
+
             events.push({
                 id: `approval-${item.id}`,
                 type: 'APPROVAL',
                 timestamp: item.approved_at ?? null,
                 new_status: item.status,
-                actor_name: item.approver?.name || 'Executive Approving Authority',
-                actor_role: item.approver?.role || 'Executive Approver',
+                actor_name: item.approver?.name || (isProcessing ? 'Procurement Unit' : 'Authorized Officer'),
+                actor_role: item.approver?.role || (isProcessing ? 'BAC Procurement Secretariat' : (isExecutive ? 'Executive Approver' : 'Approving Authority')),
                 actor_office: item.approver?.office,
                 remarks: item.remarks,
             });
@@ -200,7 +209,13 @@ export default function WorkflowHistoryTimeline({
                                             <span
                                                 className={`inline-flex rounded-md border px-2.5 py-0.5 text-xs font-bold ${badgeStyle.border} ${badgeStyle.bg} ${badgeStyle.text}`}
                                             >
-                                                {event.type === 'APPROVAL' ? `Executive Approval: ${humanizeEnum(event.new_status)}` : humanizeEnum(event.new_status)}
+                                                {event.type === 'APPROVAL'
+                                                    ? (event.new_status === 'PROCESSING'
+                                                        ? 'Processing'
+                                                        : (event.actor_role?.toLowerCase().includes('executive') || event.actor_role?.toLowerCase().includes('mayor')
+                                                            ? `Executive Approval: ${humanizeEnum(event.new_status)}`
+                                                            : `Approval: ${humanizeEnum(event.new_status)}`))
+                                                    : humanizeEnum(event.new_status)}
                                             </span>
                                             {isLatest ? (
                                                 <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">

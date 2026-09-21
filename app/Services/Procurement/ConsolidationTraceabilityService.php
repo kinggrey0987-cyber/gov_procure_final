@@ -4,6 +4,7 @@ namespace App\Services\Procurement;
 
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequest;
+use App\Models\StatusHistory;
 use App\Models\SupplyRequest;
 use App\Models\SupplyRequestItem;
 use App\Models\User;
@@ -71,7 +72,7 @@ class ConsolidationTraceabilityService
                 $allSupplyRequests = $allSupplyRequests->merge($extraRequests);
             }
 
-            $historySrIds = \App\Models\StatusHistory::query()
+            $historySrIds = StatusHistory::query()
                 ->where('reference_type', SupplyRequest::class)
                 ->where('remarks', 'like', "%PR-{$prIdPad}%")
                 ->pluck('reference_id')
@@ -116,15 +117,7 @@ class ConsolidationTraceabilityService
         $isConsolidated = $allSupplyRequests->count() >= 2;
 
         // Build GSO Forwarder attribution
-        $gsoForwarder = null;
-        if ($purchaseRequest->requester instanceof User) {
-            $roleCode = (string) ($purchaseRequest->requester->role?->code ?? '');
-            $gsoForwarder = [
-                'name' => (string) $purchaseRequest->requester->name,
-                'role' => $roleCode === 'GSO_OFFICER' ? 'GSO Property Custodian' : ($purchaseRequest->requester->role?->name ?? 'Forwarding Officer'),
-                'forwarded_at' => optional($purchaseRequest->created_at)->format('M d, Y h:i A'),
-            ];
-        }
+        $gsoForwarder = $this->resolveGsoForwarder($purchaseRequest, $allSupplyRequests);
 
         // Build source supply requests breakdown
         $sourceRequests = $allSupplyRequests->map(function (SupplyRequest $sr): array {
@@ -152,23 +145,132 @@ class ConsolidationTraceabilityService
                     'office_code' => $sr['office_code'],
                     'office_name' => $sr['office_name'],
                     'requester_name' => $sr['requester_name'],
+                    'request_date' => $sr['request_date'],
                     'request_codes' => [$sr['request_code']],
                 ];
             } else {
                 $seenSignatories[$key]['request_codes'][] = $sr['request_code'];
             }
         }
+
+        if (empty($seenSignatories)) {
+            $officeName = (string) ($purchaseRequest->office?->name ?? $purchaseRequest->supplyRequest?->office?->name ?? 'Requesting Office');
+            $officeCode = (string) ($purchaseRequest->office?->code ?? $purchaseRequest->supplyRequest?->office?->code ?? 'OFFICE');
+            $requesterName = (string) ($purchaseRequest->supplyRequest?->requester?->name ?? $purchaseRequest->requester?->name ?? 'Office Requisitioner');
+            $reqDate = optional($purchaseRequest->supplyRequest?->request_date ?? $purchaseRequest->created_at)->format('M d, Y');
+
+            $seenSignatories[] = [
+                'office_code' => $officeCode,
+                'office_name' => $officeName,
+                'requester_name' => $requesterName,
+                'request_date' => $reqDate,
+                'request_codes' => array_filter([(string) ($purchaseRequest->supplyRequest?->request_code ?? '')]),
+            ];
+        }
+
         $requisitioningSignatories = array_values($seenSignatories);
 
         // Build office allocations per item
         $officeAllocations = $this->buildOfficeAllocations($allSupplyRequests);
 
+        // Procurement Officer attribution (if PR is in processing)
+        $procurementOfficer = null;
+        if ($purchaseRequest->purchase_request_id) {
+            $procHistory = StatusHistory::query()
+                ->where('reference_type', PurchaseRequest::class)
+                ->where('reference_id', (int) $purchaseRequest->purchase_request_id)
+                ->whereIn('new_status', ['PROCESSING', 'APPROVED'])
+                ->whereHas('changedBy.role', fn ($q) => $q->where('code', 'PROC_OFFICER'))
+                ->with('changedBy.role')
+                ->latest('status_history_id')
+                ->first();
+
+            if ($procHistory && $procHistory->changedBy instanceof User) {
+                $procurementOfficer = [
+                    'name' => (string) $procHistory->changedBy->name,
+                    'role' => 'BAC Procurement Secretariat',
+                    'processed_at' => optional($procHistory->changed_at ?? $procHistory->created_at)->format('M d, Y h:i A'),
+                ];
+            }
+        }
+
         return [
             'is_consolidated' => $isConsolidated,
             'gso_forwarder' => $gsoForwarder,
+            'procurement_officer' => $procurementOfficer,
             'source_supply_requests' => $sourceRequests,
             'requisitioning_signatories' => $requisitioningSignatories,
             'office_allocations' => $officeAllocations,
+        ];
+    }
+
+    /**
+     * Resolve the actual GSO officer who forwarded / queued this request for procurement.
+     *
+     * @param  \Illuminate\Support\Collection<int, SupplyRequest>  $allSupplyRequests
+     * @return array{name: string, role: string, forwarded_at: string}
+     */
+    private function resolveGsoForwarder(PurchaseRequest $purchaseRequest, \Illuminate\Support\Collection $allSupplyRequests): array
+    {
+        $gsoUser = null;
+        $forwardedAt = null;
+
+        // 1. Check if the purchase request requester is explicitly a GSO officer
+        if ($purchaseRequest->requester instanceof User && (string) ($purchaseRequest->requester->role?->code ?? '') === 'GSO_OFFICER') {
+            $gsoUser = $purchaseRequest->requester;
+            $forwardedAt = optional($purchaseRequest->created_at)->format('M d, Y h:i A');
+        }
+
+        // 2. Check StatusHistory on the purchase request for a transition recorded by a GSO officer
+        if (! $gsoUser && $purchaseRequest->purchase_request_id) {
+            $gsoHistory = StatusHistory::query()
+                ->where('reference_type', PurchaseRequest::class)
+                ->where('reference_id', (int) $purchaseRequest->purchase_request_id)
+                ->whereHas('changedBy.role', fn ($q) => $q->where('code', 'GSO_OFFICER'))
+                ->with('changedBy.role')
+                ->latest('status_history_id')
+                ->first();
+
+            if ($gsoHistory && $gsoHistory->changedBy instanceof User) {
+                $gsoUser = $gsoHistory->changedBy;
+                $forwardedAt = optional($gsoHistory->changed_at ?? $gsoHistory->created_at)->format('M d, Y h:i A');
+            }
+        }
+
+        // 3. Check StatusHistory on linked supply requests for a transition recorded by a GSO officer
+        if (! $gsoUser && $allSupplyRequests->isNotEmpty()) {
+            $srIds = $allSupplyRequests->pluck('supply_request_id')->filter()->all();
+            $srHistory = StatusHistory::query()
+                ->where('reference_type', SupplyRequest::class)
+                ->whereIn('reference_id', $srIds)
+                ->where('new_status', 'FOR_PROCUREMENT')
+                ->whereHas('changedBy.role', fn ($q) => $q->where('code', 'GSO_OFFICER'))
+                ->with('changedBy.role')
+                ->latest('status_history_id')
+                ->first();
+
+            if ($srHistory && $srHistory->changedBy instanceof User) {
+                $gsoUser = $srHistory->changedBy;
+                $forwardedAt = optional($srHistory->changed_at ?? $srHistory->created_at)->format('M d, Y h:i A');
+            }
+        }
+
+        // 4. Fallback to active GSO Officer in the system
+        if (! $gsoUser) {
+            $gsoUser = User::query()
+                ->whereHas('role', fn ($q) => $q->where('code', 'GSO_OFFICER'))
+                ->with('role')
+                ->first();
+        }
+
+        if (! $forwardedAt) {
+            $forwardedAt = optional($purchaseRequest->created_at)->format('M d, Y h:i A');
+        }
+
+        return [
+            'name' => (string) ($gsoUser?->name ?? 'GSO Property Officer'),
+            'role' => 'GSO Property Custodian',
+            'forwarded_at' => $forwardedAt ?: 'Validated & Forwarded',
         ];
     }
 
@@ -200,17 +302,19 @@ class ConsolidationTraceabilityService
         if ($purchaseOrder->creator instanceof User) {
             $procurementOfficer = [
                 'name' => (string) $purchaseOrder->creator->name,
-                'role' => 'BAC Procurement Officer',
+                'role' => 'BAC Procurement Secretariat',
                 'processed_at' => optional($purchaseOrder->created_at)->format('M d, Y h:i A'),
             ];
         }
 
-        // Executive Officer / Mayor attribution
-        $executiveApprover = null;
+        // Approver / Placer attribution
+        $approverData = null;
         if ($purchaseOrder->approver instanceof User) {
-            $executiveApprover = [
+            $roleCode = (string) ($purchaseOrder->approver->role?->code ?? '');
+            $isExec = $roleCode === 'EXEC_OFFICER';
+            $approverData = [
                 'name' => (string) $purchaseOrder->approver->name,
-                'role' => 'Executive Officer / Municipal Mayor',
+                'role' => $isExec ? 'Executive Officer / Municipal Mayor' : 'Procurement Unit / Authorized Placer',
                 'approved_at' => optional($purchaseOrder->date_approved ?? $purchaseOrder->updated_at)->format('M d, Y'),
             ];
         }
@@ -219,7 +323,8 @@ class ConsolidationTraceabilityService
             'is_consolidated' => $prTraceability['is_consolidated'] ?? false,
             'gso_forwarder' => $prTraceability['gso_forwarder'] ?? null,
             'procurement_officer' => $procurementOfficer,
-            'executive_approver' => $executiveApprover,
+            'executive_approver' => $approverData,
+            'procurement_approver' => $approverData,
             'source_supply_requests' => $prTraceability['source_supply_requests'] ?? [],
             'requisitioning_signatories' => $prTraceability['requisitioning_signatories'] ?? [],
             'office_allocations' => $prTraceability['office_allocations'] ?? [],

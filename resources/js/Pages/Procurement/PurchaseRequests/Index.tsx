@@ -203,27 +203,30 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                                         <td className="px-3.5 py-2 text-slate-600 text-xs">{formatDate(row.created_at)}</td>
                                         <td className="px-3.5 py-2 text-right">
                                             <div className="flex justify-end gap-2">
-                                                <Link
-                                                    href={route('procurement.purchase-requests.show', {
-                                                        purchase_request: row.purchase_request_id,
-                                                        status: status || undefined,
-                                                        search: search || undefined,
-                                                    })}
-                                                    className="inline-flex items-center rounded border border-red-200 bg-red-50/50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 transition"
-                                                >
-                                                    View
-                                                </Link>
-                                                <Link
-                                                    href={route('procurement.purchase-requests.show', {
-                                                        purchase_request: row.purchase_request_id,
-                                                        mode: 'review',
-                                                        status: status || undefined,
-                                                        search: search || undefined,
-                                                    })}
-                                                    className="inline-flex items-center rounded border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
-                                                >
-                                                    Review
-                                                </Link>
+                                                {row.status === 'OPEN' ? (
+                                                    <Link
+                                                        href={route('procurement.purchase-requests.show', {
+                                                            purchase_request: row.purchase_request_id,
+                                                            mode: 'review',
+                                                            status: status || undefined,
+                                                            search: search || undefined,
+                                                        })}
+                                                        className="inline-flex items-center rounded border border-red-200 bg-red-50/50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 transition"
+                                                    >
+                                                        Review
+                                                    </Link>
+                                                ) : (
+                                                    <Link
+                                                        href={route('procurement.purchase-requests.show', {
+                                                            purchase_request: row.purchase_request_id,
+                                                            status: status || undefined,
+                                                            search: search || undefined,
+                                                        })}
+                                                        className="inline-flex items-center rounded border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
+                                                    >
+                                                        View
+                                                    </Link>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>

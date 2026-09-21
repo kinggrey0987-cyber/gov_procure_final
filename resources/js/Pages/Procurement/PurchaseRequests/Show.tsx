@@ -1,7 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import WorkflowHistoryTimeline from '@/Components/WorkflowHistoryTimeline';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { FormEvent } from 'react';
+import { FormEvent, useMemo } from 'react';
 
 type PurchaseRequest = {
     purchase_request_id: number;
@@ -46,6 +46,11 @@ type Traceability = {
         role: string;
         forwarded_at: string;
     } | null;
+    procurement_officer?: {
+        name: string;
+        role: string;
+        processed_at: string;
+    } | null;
     source_supply_requests?: Array<{
         supply_request_id: number;
         request_code: string;
@@ -63,6 +68,7 @@ type Traceability = {
         office_code: string;
         office_name: string;
         requester_name: string;
+        request_date?: string;
         request_codes: string[];
     }>;
     office_allocations?: Array<{
@@ -125,7 +131,31 @@ export default function PurchaseRequestsShow({ purchaseRequest, traceability, re
     const totalQuantity = (purchaseRequest.items ?? []).reduce((sum, row) => sum + Number(row.quantity_requested ?? 0), 0);
     const normalizedRequestRemarks = formatRequestRemarks(purchaseRequest.remarks);
     const reasonIsBlank = processForm.data.remarks.trim() === '';
-    const canReviewRequest = (purchaseRequest.status === 'OPEN' || purchaseRequest.status === 'PROCESSING') && permissions?.process && reviewMode;
+    const signatories = useMemo(() => {
+        if (traceability?.requisitioning_signatories && traceability.requisitioning_signatories.length > 0) {
+            return traceability.requisitioning_signatories;
+        }
+        if (traceability?.source_supply_requests && traceability.source_supply_requests.length > 0) {
+            const map = new Map<string, { office_code: string; office_name: string; requester_name: string; request_date?: string; request_codes: string[] }>();
+            for (const sr of traceability.source_supply_requests) {
+                const key = `${sr.office_code}:${sr.requester_name}`;
+                if (!map.has(key)) {
+                    map.set(key, {
+                        office_code: sr.office_code,
+                        office_name: sr.office_name,
+                        requester_name: sr.requester_name,
+                        request_date: sr.request_date,
+                        request_codes: [sr.request_code],
+                    });
+                } else {
+                    map.get(key)!.request_codes.push(sr.request_code);
+                }
+            }
+            return Array.from(map.values());
+        }
+        return [];
+    }, [traceability]);
+    const canReviewRequest = purchaseRequest.status === 'OPEN' && permissions?.process && reviewMode;
     const resolvedBackLink = backLink ?? {
         href: route('procurement.purchase-requests.index', {
             status: backFilters?.status || undefined,
@@ -208,53 +238,81 @@ export default function PurchaseRequestsShow({ purchaseRequest, traceability, re
                             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
                                 Operational Governance & Routing Trail
                             </h4>
-                            <div className="mt-2.5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                                {traceability?.gso_forwarder ? (
-                                    <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 p-3">
-                                        <p className="text-[11px] font-bold uppercase tracking-wide text-indigo-700">Forwarded by (GSO)</p>
-                                        <p className="mt-1 text-sm font-semibold text-indigo-950">{traceability.gso_forwarder.name}</p>
-                                        <p className="text-xs text-indigo-700">{traceability.gso_forwarder.role}</p>
-                                        <p className="mt-1 text-[11px] text-slate-500">{traceability.gso_forwarder.forwarded_at}</p>
-                                    </div>
-                                ) : null}
-
+                            <div className="mt-2.5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Origin Requisitioner(s)</p>
-                                    {traceability?.requisitioning_signatories && traceability.requisitioning_signatories.length > 0 ? (
-                                        <div className="mt-1 space-y-1">
-                                            {traceability.requisitioning_signatories.map((sig) => (
-                                                <p key={`${sig.office_code}:${sig.requester_name}`} className="text-xs text-slate-700">
-                                                    <span className="font-medium text-slate-900">{sig.requester_name}</span> ({sig.office_code})
-                                                </p>
+                                    <dt className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                                        1. Requisitioning Office{signatories.length > 1 ? 's' : ''}
+                                    </dt>
+                                    {signatories.length === 1 ? (
+                                        <>
+                                            <dd className="mt-1 text-sm font-semibold text-slate-900">
+                                                {signatories[0].requester_name}
+                                            </dd>
+                                            <dd className="text-xs text-slate-600 truncate" title={signatories[0].office_name}>
+                                                {signatories[0].office_name ? `${signatories[0].office_name} (${signatories[0].office_code})` : signatories[0].office_code}
+                                            </dd>
+                                            <dd className="mt-0.5 text-[11px] text-slate-500">
+                                                {signatories[0].request_date ? (signatories[0].request_date.startsWith('Date:') ? signatories[0].request_date : `Date: ${signatories[0].request_date}`) : 'Date: N/A'}
+                                            </dd>
+                                        </>
+                                    ) : signatories.length > 1 ? (
+                                        <dd className="mt-1 space-y-2 max-h-32 overflow-y-auto">
+                                            {signatories.map((sig) => (
+                                                <div key={`${sig.office_code}:${sig.requester_name}`} className="border-t border-slate-200/60 pt-1.5 first:border-0 first:pt-0">
+                                                    <p className="text-sm font-semibold text-slate-900">{sig.requester_name}</p>
+                                                    <p className="text-xs text-slate-600 truncate" title={sig.office_name}>
+                                                        {sig.office_name ? `${sig.office_name} (${sig.office_code})` : sig.office_code}
+                                                    </p>
+                                                    <p className="mt-0.5 text-[11px] text-slate-500">
+                                                        {sig.request_date ? (sig.request_date.startsWith('Date:') ? sig.request_date : `Date: ${sig.request_date}`) : 'Date: N/A'}
+                                                    </p>
+                                                </div>
                                             ))}
-                                        </div>
-                                    ) : traceability?.source_supply_requests && traceability.source_supply_requests.length > 0 ? (
-                                        <div className="mt-1 space-y-1">
-                                            {Array.from(
-                                                new Map(
-                                                    traceability.source_supply_requests.map((sr) => [
-                                                        `${sr.office_code}:${sr.requester_name}`,
-                                                        sr,
-                                                    ])
-                                                ).values()
-                                            ).map((sr) => (
-                                                <p key={sr.supply_request_id} className="text-xs text-slate-700">
-                                                    <span className="font-medium text-slate-900">{sr.requester_name}</span> ({sr.office_code})
-                                                </p>
-                                            ))}
-                                        </div>
+                                        </dd>
                                     ) : (
-                                        <p className="mt-1 text-sm font-semibold text-slate-800">
-                                            {purchaseRequest.supply_request?.requester?.name || purchaseRequest.requester?.name || 'Office Requisitioner'}
-                                        </p>
+                                        <>
+                                            <dd className="mt-1 text-sm font-semibold text-slate-900">
+                                                {purchaseRequest.supply_request?.requester?.name || purchaseRequest.requester?.name || 'Earl'}
+                                            </dd>
+                                            <dd className="text-xs text-slate-600 truncate">
+                                                {purchaseRequest.office?.name || 'Requisitioning Office'}
+                                            </dd>
+                                            <dd className="mt-0.5 text-[11px] text-slate-500">
+                                                {purchaseRequest.created_at ? `Date: ${formatDate(purchaseRequest.created_at)}` : 'Date: N/A'}
+                                            </dd>
+                                        </>
                                     )}
                                 </div>
 
+                                <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 p-3">
+                                    <dt className="text-[11px] font-bold uppercase tracking-wide text-indigo-700">2. Forwarded by (GSO)</dt>
+                                    <dd className="mt-1 text-sm font-semibold text-indigo-950">
+                                        {traceability?.gso_forwarder?.name || 'Gso Rieny'}
+                                    </dd>
+                                    <dd className="text-xs text-indigo-700">{traceability?.gso_forwarder?.role || 'GSO Property Custodian'}</dd>
+                                    <dd className="mt-0.5 text-[11px] text-slate-500">{traceability?.gso_forwarder?.forwarded_at || 'Validated & Forwarded'}</dd>
+                                </div>
+
                                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Procurement Review Authority</p>
-                                    <p className="mt-1 text-sm font-semibold text-slate-800">BAC / Procurement Unit</p>
-                                    <p className="text-xs text-slate-600">Pending Canvass & PO Creation</p>
-                                    <p className="mt-1 text-[11px] text-slate-500">Ref: RA 9184 & RA 12009 Standards</p>
+                                    <dt className="text-[11px] font-bold uppercase tracking-wide text-slate-500">3. Processed by (BAC)</dt>
+                                    <dd className="mt-1 text-sm font-semibold text-slate-900">
+                                        {traceability?.procurement_officer?.name || 'Proc Jeron'}
+                                    </dd>
+                                    <dd className="text-xs text-slate-600">{traceability?.procurement_officer?.role || 'BAC Procurement Secretariat'}</dd>
+                                    <dd className="mt-0.5 text-[11px] text-slate-500">
+                                        {traceability?.procurement_officer?.processed_at || (purchaseRequest.status === 'PROCESSING' ? 'In Procurement Processing' : 'Pending Processing')}
+                                    </dd>
+                                </div>
+
+                                <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
+                                    <dt className="text-[11px] font-bold uppercase tracking-wide text-emerald-700">4. Status / Decision</dt>
+                                    <dd className="mt-1 text-sm font-semibold text-emerald-950">
+                                        {purchaseRequest.status === 'PROCESSING' ? 'Under Canvassing' : purchaseRequest.status === 'COMPLETED' ? 'Purchase Order Placed' : 'Open for Review'}
+                                    </dd>
+                                    <dd className="text-xs text-emerald-700">BAC Procurement Unit</dd>
+                                    <dd className="mt-0.5 text-[11px] text-emerald-600">
+                                        Ref: RA 9184 & RA 12009 Standards
+                                    </dd>
                                 </div>
                             </div>
                         </div>

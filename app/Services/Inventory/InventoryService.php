@@ -139,7 +139,10 @@ class InventoryService
                 ]);
             }
 
-            if ((float) $inventory->available_stock < $quantity) {
+            $fromReserved = min($quantity, max((float) $inventory->reserved_quantity, 0.0));
+            $fromAvailable = $quantity - $fromReserved;
+
+            if ((float) $inventory->available_stock < $fromAvailable) {
                 throw ValidationException::withMessages([
                     'quantity_released' => 'Released quantity cannot exceed available stock.',
                 ]);
@@ -147,7 +150,8 @@ class InventoryService
 
             $inventory->forceFill([
                 'stock_on_hand' => (float) $inventory->stock_on_hand - $quantity,
-                'available_stock' => (float) $inventory->available_stock - $quantity,
+                'available_stock' => (float) $inventory->available_stock - $fromAvailable,
+                'reserved_quantity' => (float) $inventory->reserved_quantity - $fromReserved,
                 'released_quantity' => (float) $inventory->released_quantity + $quantity,
                 'last_updated' => now(),
             ])->save();

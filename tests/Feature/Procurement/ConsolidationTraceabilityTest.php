@@ -290,4 +290,89 @@ class ConsolidationTraceabilityTest extends TestCase
         $this->assertEquals(20750.00, (float) $po->fresh()->total_amount);
         $this->assertCount(2, $po->fresh()->items);
     }
+
+    public function test_traceability_resolves_actual_gso_and_dates_and_procurement_approver(): void
+    {
+        $roleGso = Role::query()->firstOrCreate(['code' => UserRole::GSO_OFFICER->value], ['name' => 'GSO Officer']);
+        $roleProc = Role::query()->firstOrCreate(['code' => UserRole::PROCUREMENT_OFFICER->value], ['name' => 'Procurement Officer']);
+        $roleOffice = Role::query()->firstOrCreate(['code' => UserRole::OFFICE_USER->value], ['name' => 'Office User']);
+
+        $officeMpdo = Office::query()->create(['name' => 'Municipal Planning and Development Office', 'code' => 'MPDO', 'status' => 'ACTIVE']);
+
+        $gsoOfficer = User::factory()->create(['role_id' => $roleGso->id, 'office_id' => $officeMpdo->id, 'name' => 'Gso Rieny']);
+        $procOfficer = User::factory()->create(['role_id' => $roleProc->id, 'office_id' => $officeMpdo->id, 'name' => 'Proc Jeron']);
+        $userEarl = User::factory()->create(['role_id' => $roleOffice->id, 'office_id' => $officeMpdo->id, 'name' => 'Earl']);
+
+        $sr = SupplyRequest::query()->create([
+            'request_code' => 'SR-MPDO-2026-09-0011',
+            'office_id' => $officeMpdo->id,
+            'requested_by' => $userEarl->id,
+            'status' => 'FOR_PROCUREMENT',
+            'priority_level' => 'NORMAL',
+            'request_category' => 'OFFICE_SUPPLIES',
+            'purpose' => 'Office Supplies',
+            'request_date' => '2026-09-21',
+            'needed_by_date' => '2026-09-28',
+        ]);
+
+        // PurchaseRequest has requested_by = Earl (Office user who made the request)
+        $pr = PurchaseRequest::query()->create([
+            'supply_request_id' => $sr->supply_request_id,
+            'office_id' => $officeMpdo->id,
+            'requested_by' => $userEarl->id,
+            'status' => 'PROCESSING',
+            'remarks' => 'test only',
+        ]);
+
+        // GSO queued this PR in status history
+        \App\Models\StatusHistory::query()->create([
+            'reference_type' => PurchaseRequest::class,
+            'reference_id' => $pr->purchase_request_id,
+            'new_status' => 'OPEN',
+            'changed_by' => $gsoOfficer->id,
+            'remarks' => 'Queued by GSO',
+            'changed_at' => now(),
+        ]);
+
+        $supplier = Supplier::query()->create([
+            'supplier_name' => 'Metro Office Depot Trading',
+            'status' => 'ACTIVE',
+        ]);
+
+        $po = PurchaseOrder::query()->create([
+            'po_number' => 'PO-2026-09-0004',
+            'purchase_request_id' => $pr->purchase_request_id,
+            'supply_request_id' => $sr->supply_request_id,
+            'supplier_id' => $supplier->supplier_id,
+            'created_by' => $procOfficer->id,
+            'approved_by' => $procOfficer->id,
+            'status' => 'PLACED',
+            'total_amount' => 25000,
+            'procurement_method' => 'COMPETITIVE_BIDDING',
+            'remarks' => 'test only',
+            'date_approved' => '2026-09-21',
+        ]);
+
+        $service = app(ConsolidationTraceabilityService::class);
+        $prTraceability = $service->resolveForPurchaseRequest($pr);
+        $poTraceability = $service->resolveForPurchaseOrder($po);
+
+        // 1. Box 1: Requisitioning office & person & date
+        $this->assertNotEmpty($prTraceability['requisitioning_signatories']);
+        $this->assertEquals('Earl', $prTraceability['requisitioning_signatories'][0]['requester_name']);
+        $this->assertEquals('MPDO', $prTraceability['requisitioning_signatories'][0]['office_code']);
+        $this->assertEquals('Sep 21, 2026', $prTraceability['requisitioning_signatories'][0]['request_date']);
+
+        // 2. Box 2: Forwarded by GSO should be Gso Rieny (GSO Property Custodian), NOT Earl!
+        $this->assertEquals('Gso Rieny', $prTraceability['gso_forwarder']['name']);
+        $this->assertEquals('GSO Property Custodian', $prTraceability['gso_forwarder']['role']);
+
+        // 3. Box 3: Processed by BAC
+        $this->assertEquals('Proc Jeron', $poTraceability['procurement_officer']['name']);
+        $this->assertEquals('BAC Procurement Secretariat', $poTraceability['procurement_officer']['role']);
+
+        // 4. Box 4: Approved by BAC
+        $this->assertEquals('Proc Jeron', $poTraceability['procurement_approver']['name']);
+        $this->assertEquals('Procurement Unit / Authorized Placer', $poTraceability['procurement_approver']['role']);
+    }
 }

@@ -198,13 +198,14 @@ export default function ExecutiveApprovalShow({
 
                 <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                     <h3 className="text-lg font-semibold text-slate-900">Planned Item Details</h3>
-                    <p className="mt-1 text-sm text-slate-600">Readable item names and categories included for review clarity.</p>
+                    <p className="mt-1 text-sm text-slate-600">Readable item names, specifications, and categories included for review clarity.</p>
 
                     <div className="mt-4 overflow-x-auto">
                         <table className="min-w-full text-left text-sm">
                             <thead>
                                 <tr className="border-b text-xs uppercase tracking-wide text-slate-500">
                                     <th className="py-2 pr-4">Item</th>
+                                    <th className="py-2 pr-4">Specification</th>
                                     <th className="py-2 pr-4">Category</th>
                                     <th className="py-2 pr-4">Qty</th>
                                     <th className="py-2 pr-4">Unit Cost</th>
@@ -215,12 +216,13 @@ export default function ExecutiveApprovalShow({
                             <tbody>
                                 {ppmp.items.length === 0 && (
                                     <tr>
-                                        <td colSpan={6} className="py-3 text-slate-500">No planned items available.</td>
+                                        <td colSpan={7} className="py-3 text-slate-500">No planned items available.</td>
                                     </tr>
                                 )}
                                 {ppmp.items.map((item) => (
                                     <tr key={item.ppmp_item_id} className="border-b">
                                         <td className="py-2 pr-4 font-medium text-slate-800">{item.item_name}</td>
+                                        <td className="py-2 pr-4 text-slate-700">{item.remarks?.trim() || '-'}</td>
                                         <td className="py-2 pr-4 text-slate-700">{item.category_name}</td>
                                         <td className="py-2 pr-4 text-slate-700">{item.quantity}</td>
                                         <td className="py-2 pr-4 text-slate-700">{formatCurrency(item.unit_cost)}</td>

@@ -518,7 +518,9 @@ class DistributionRecordService
                 $requested = (float) $items->sum('quantity_requested');
                 $requestRemaining = max($requested - (float) ($requestReleasedByItemId->get($itemId) ?? 0.0), 0);
                 $availableStock = (float) ($first?->item?->inventory?->available_stock ?? 0);
-                $quantity = min($requestRemaining, $availableStock);
+                $reservedStock = (float) ($first?->item?->inventory?->reserved_quantity ?? 0);
+                $releasableStock = $availableStock + $reservedStock;
+                $quantity = min($requestRemaining, $releasableStock);
 
                 if ($record->delivery_id !== null) {
                     $quantity = min($quantity, (float) ($deliveryRemainingByItemId->get($itemId) ?? 0.0));

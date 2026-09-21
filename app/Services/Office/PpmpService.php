@@ -301,17 +301,6 @@ class PpmpService
             'remarks' => $remarks,
             'changed_at' => now(),
         ]);
-
-        if ($newStatus === 'SUBMITTED') {
-            ApprovalHistory::query()->create([
-                'reference_type' => Ppmp::class,
-                'reference_id' => (int) $ppmp->ppmp_id,
-                'approved_by' => null,
-                'status' => 'SUBMITTED',
-                'remarks' => 'Office-side submission recorded.',
-                'approved_at' => null,
-            ]);
-        }
     }
 
     private function recordAudit(User $actor, string $actionType, Ppmp $ppmp, ?array $additionalDetails = null): void
