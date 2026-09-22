@@ -190,17 +190,23 @@ export default function ProcurementAnalyticsIndex({
 
     const [trendView, setTrendView] = useState<'spending' | 'volume'>('spending');
 
+    const isSingleYearScope = Boolean(form.year);
+
     const spendTrendPoints: SpendPoint[] = useMemo(() => {
         if (monthly_trends.spending && monthly_trends.spending.length > 0) {
+            const allMonths = monthly_trends.spending.map((row) => row.month);
+            const uniqueYears = [...new Set(allMonths.map((m) => m.split('-')[0]))];
+            const isSingleYear = isSingleYearScope || uniqueYears.length <= 1;
+
             return monthly_trends.spending.map((row) => ({
-                label: formatMonth(row.month),
+                label: formatMonth(row.month, isSingleYear),
                 value: row.total,
                 orderCount: row.order_count,
                 rawMonth: row.month,
             }));
         }
         return [];
-    }, [monthly_trends.spending]);
+    }, [monthly_trends.spending, isSingleYearScope]);
 
     const totalProcurementSpend = useMemo(
         () => office_comparison.reduce((sum, o) => sum + o.purchase_order_total_amount, 0),
@@ -212,7 +218,9 @@ export default function ProcurementAnalyticsIndex({
         [office_comparison],
     );
 
-    const monthlyMerged = mergeTrend(monthly_trends.purchase_requests, monthly_trends.purchase_orders);
+    const monthlyMerged = useMemo(() => {
+        return mergeTrend(monthly_trends.purchase_requests, monthly_trends.purchase_orders, isSingleYearScope);
+    }, [monthly_trends.purchase_requests, monthly_trends.purchase_orders, isSingleYearScope]);
     const officeValueBreakdown = office_comparison
         .map((row) => ({
             label: row.office_name,
@@ -461,7 +469,62 @@ export default function ProcurementAnalyticsIndex({
                 </section>
 
                 <div className="grid gap-6 xl:grid-cols-12 items-stretch">
-                    {/* Prioritized Procurement Spending Concentration */}
+                    {/* Hero Priority: Procurement Spending & Velocity Trend (Full Width xl:col-span-12) */}
+                    <div className="xl:col-span-12 flex flex-col">
+                        <ExecutiveChartCard
+                            title={trendView === 'spending' ? 'Procurement Spending Trend' : 'PR vs PO Movement Trend'}
+                            subtitle={
+                                trendView === 'spending'
+                                    ? 'Monthly financial procurement expenditure across fiscal periods'
+                                    : 'Monthly document requisition and order fulfillment velocity'
+                            }
+                            eyebrow={trendView === 'spending' ? 'Financial Signal' : 'Operational Signal'}
+                            tone="default"
+                            className="h-full shadow-sm hover:shadow-md"
+                            action={
+                                <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-xs font-semibold">
+                                    <button
+                                        type="button"
+                                        onClick={() => setTrendView('spending')}
+                                        className={`rounded-md px-2.5 py-1 transition ${
+                                            trendView === 'spending'
+                                                ? 'bg-white text-red-700 shadow-sm font-bold'
+                                                : 'text-slate-600 hover:text-slate-900'
+                                        }`}
+                                    >
+                                        ₱ Expenditure (PHP)
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setTrendView('volume')}
+                                        className={`rounded-md px-2.5 py-1 transition ${
+                                            trendView === 'volume'
+                                                ? 'bg-white text-red-700 shadow-sm font-bold'
+                                                : 'text-slate-600 hover:text-slate-900'
+                                        }`}
+                                    >
+                                        📊 Document Volume
+                                    </button>
+                                </div>
+                            }
+                        >
+                            {trendView === 'spending' ? (
+                                <SpendTrendBarChart
+                                    data={spendTrendPoints}
+                                    emptyText="No procurement expenditure recorded in current filter scope"
+                                />
+                            ) : (
+                                <TrendGroupedBarChart
+                                    data={monthlyMerged}
+                                    firstLabel="Purchase Requests"
+                                    secondLabel="Purchase Orders"
+                                    emptyText="No data in current filter scope"
+                                />
+                            )}
+                        </ExecutiveChartCard>
+                    </div>
+
+                    {/* Departmental Procurement Spending Concentration (xl:col-span-6) */}
                     <div className="xl:col-span-6 flex flex-col">
                         <ExecutiveChartCard
                             title="Top Procurement Concentration"
@@ -543,63 +606,9 @@ export default function ProcurementAnalyticsIndex({
                         </ExecutiveChartCard>
                     </div>
 
-                    {/* Dedicated Procurement Spending & Velocity Trend */}
-                    <div className="xl:col-span-6 flex flex-col">
-                        <ExecutiveChartCard
-                            title={trendView === 'spending' ? 'Procurement Spending Trend' : 'PR vs PO Movement Trend'}
-                            subtitle={
-                                trendView === 'spending'
-                                    ? 'Monthly financial procurement expenditure across fiscal periods'
-                                    : 'Monthly document requisition and order fulfillment velocity'
-                            }
-                            eyebrow={trendView === 'spending' ? 'Financial Signal' : 'Operational Signal'}
-                            tone="default"
-                            className="h-full"
-                            action={
-                                <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-xs font-semibold">
-                                    <button
-                                        type="button"
-                                        onClick={() => setTrendView('spending')}
-                                        className={`rounded-md px-2.5 py-1 transition ${
-                                            trendView === 'spending'
-                                                ? 'bg-white text-red-700 shadow-sm font-bold'
-                                                : 'text-slate-600 hover:text-slate-900'
-                                        }`}
-                                    >
-                                        ₱ Expenditure (PHP)
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setTrendView('volume')}
-                                        className={`rounded-md px-2.5 py-1 transition ${
-                                            trendView === 'volume'
-                                                ? 'bg-white text-red-700 shadow-sm font-bold'
-                                                : 'text-slate-600 hover:text-slate-900'
-                                        }`}
-                                    >
-                                        📊 Document Volume
-                                    </button>
-                                </div>
-                            }
-                        >
-                            {trendView === 'spending' ? (
-                                <SpendTrendBarChart
-                                    data={spendTrendPoints}
-                                    emptyText="No procurement expenditure recorded in current filter scope"
-                                />
-                            ) : (
-                                <TrendGroupedBarChart
-                                    data={monthlyMerged}
-                                    firstLabel="Purchase Requests"
-                                    secondLabel="Purchase Orders"
-                                    emptyText="No data in current filter scope"
-                                />
-                            )}
-                        </ExecutiveChartCard>
-                    </div>
-
-                    <div className="xl:col-span-6">
-                        <ExecutiveChartCard title="PR Status Mix" subtitle="Request lifecycle" tone="default">
+                    {/* PR Status Mix (xl:col-span-3) */}
+                    <div className="xl:col-span-3 flex flex-col">
+                        <ExecutiveChartCard title="PR Status Mix" subtitle="Request lifecycle" tone="default" className="h-full">
                             <DonutChart
                                 data={statusMixPr}
                                 centerLabel="PR"
@@ -608,8 +617,9 @@ export default function ProcurementAnalyticsIndex({
                         </ExecutiveChartCard>
                     </div>
 
-                    <div className="xl:col-span-6">
-                        <ExecutiveChartCard title="PO Status Mix" subtitle="Order progression" tone="default">
+                    {/* PO Status Mix (xl:col-span-3) */}
+                    <div className="xl:col-span-3 flex flex-col">
+                        <ExecutiveChartCard title="PO Status Mix" subtitle="Order progression" tone="default" className="h-full">
                             <DonutChart
                                 data={statusMixPo}
                                 centerLabel="PO"
@@ -809,7 +819,7 @@ export default function ProcurementAnalyticsIndex({
     );
 }
 
-function mergeTrend(requestTrend: TrendRow[], orderTrend: TrendRow[]) {
+function mergeTrend(requestTrend: TrendRow[], orderTrend: TrendRow[], isSingleYear?: boolean) {
     const monthMap = new Map<string, { pr: number; po: number }>();
 
     requestTrend.forEach((row) => {
@@ -822,23 +832,31 @@ function mergeTrend(requestTrend: TrendRow[], orderTrend: TrendRow[]) {
         monthMap.set(row.month, { ...existing, po: row.total });
     });
 
-    return [...monthMap.entries()]
-        .sort(([monthA], [monthB]) => monthA.localeCompare(monthB))
-        .map(([month, totals]) => ({
-            label: formatMonth(month),
-            first: totals.pr,
-            second: totals.po,
-        }));
+    const entries = [...monthMap.entries()].sort(([monthA], [monthB]) => monthA.localeCompare(monthB));
+    const uniqueYears = [...new Set(entries.map(([month]) => month.split('-')[0]))];
+    const singleYear = isSingleYear ?? uniqueYears.length <= 1;
+
+    return entries.map(([month, totals]) => ({
+        label: formatMonth(month, singleYear),
+        first: totals.pr,
+        second: totals.po,
+    }));
 }
 
-function formatMonth(value: string): string {
+function formatMonth(value: string, isSingleYear?: boolean): string {
     const date = new Date(`${value}-01T00:00:00`);
 
     if (Number.isNaN(date.getTime())) {
         return value;
     }
 
-    return date.toLocaleDateString('en-PH', { month: 'short', year: 'numeric' });
+    if (isSingleYear) {
+        return date.toLocaleDateString('en-PH', { month: 'short' });
+    }
+
+    const monthStr = date.toLocaleDateString('en-PH', { month: 'short' });
+    const yearStr = date.toLocaleDateString('en-PH', { year: '2-digit' });
+    return `${monthStr} '${yearStr}`;
 }
 
 function Card({ label, value, tone }: { label: string; value: string | number; tone: 'sky' | 'emerald' | 'amber' }) {

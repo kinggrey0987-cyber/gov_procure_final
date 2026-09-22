@@ -3,10 +3,7 @@
 namespace Database\Seeders;
 
 use App\Enums\FundSource;
-use App\Models\Alert;
-use App\Models\Anomaly;
 use App\Models\ApprovalHistory;
-use App\Models\AuditLog;
 use App\Models\Claim;
 use App\Models\Delivery;
 use App\Models\DeliveryItem;
@@ -15,7 +12,6 @@ use App\Models\DistributionItem;
 use App\Models\DistributionRecord;
 use App\Models\Document;
 use App\Models\Item;
-use App\Models\ItemCategory;
 use App\Models\Office;
 use App\Models\Ppmp;
 use App\Models\PpmpItem;
@@ -48,8 +44,10 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
         }
 
         $officeDefs = [
+            'MAYOR_OFFICE' => ['name' => "Municipal Mayor's Office", 'description' => 'Executive office overseeing municipal operations.'],
             'MPDO' => ['name' => 'Municipal Planning and Development Office', 'description' => 'Planning and development office for municipal programs and PPMP ownership.'],
             'MSWDO' => ['name' => 'Municipal Social Welfare and Development Office', 'description' => 'Social welfare and development office for municipal services.'],
+            'GSO' => ['name' => 'General Services Office', 'description' => 'Handles inventory, deliveries, and supply distribution.'],
             'ENG' => ['name' => 'Municipal Engineering Office', 'description' => 'Municipal infrastructure and engineering office.'],
             'MHO' => ['name' => 'Municipal Health Office', 'description' => 'Public healthcare and community medical services.'],
         ];
@@ -62,12 +60,16 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
             );
         }
 
-        $mpdoUser = User::query()->where('office_id', $offices['MPDO']->id)->first() ?? $execUser;
-        $mswdoUser = User::query()->where('office_id', $offices['MSWDO']->id)->first() ?? $execUser;
-        $engUser = User::query()->where('office_id', $offices['ENG']->id)->first() ?? $execUser;
-        $mhoUser = User::query()->where('office_id', $offices['MHO']->id)->first() ?? $execUser;
+        $officeUsers = [
+            'MAYOR_OFFICE' => User::query()->where('office_id', $offices['MAYOR_OFFICE']->id)->first() ?? $execUser,
+            'MPDO' => User::query()->where('office_id', $offices['MPDO']->id)->first() ?? $execUser,
+            'MSWDO' => User::query()->where('office_id', $offices['MSWDO']->id)->first() ?? $execUser,
+            'GSO' => User::query()->where('office_id', $offices['GSO']->id)->first() ?? $gsoUser,
+            'ENG' => User::query()->where('office_id', $offices['ENG']->id)->first() ?? $execUser,
+            'MHO' => User::query()->where('office_id', $offices['MHO']->id)->first() ?? $execUser,
+        ];
 
-        $supplier = Supplier::query()->firstOrCreate(
+        $supplier1 = Supplier::query()->firstOrCreate(
             ['supplier_name' => 'Metro Office Depot Trading'],
             [
                 'contact_person' => 'Mina Solis',
@@ -78,34 +80,58 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
             ]
         );
 
+        $supplier2 = Supplier::query()->firstOrCreate(
+            ['supplier_name' => 'Northbay General Merchandising'],
+            [
+                'contact_person' => 'Arvin Reyes',
+                'email' => 'sales@northbaymerch.example',
+                'phone' => '09179876543',
+                'address' => 'Industrial Road, City Proper',
+                'status' => 'ACTIVE',
+            ]
+        );
+
+        $supplier3 = Supplier::query()->firstOrCreate(
+            ['supplier_name' => 'Pacific Health & Safety Solutions'],
+            [
+                'contact_person' => 'Elena Bautista',
+                'email' => 'supplies@pacifichealth.example',
+                'phone' => '09187654321',
+                'address' => 'Healthcare District, Metro Avenue',
+                'status' => 'ACTIVE',
+            ]
+        );
+
+        $suppliers = [$supplier1, $supplier2, $supplier3];
+
         $items = Item::query()->get()->keyBy('item_name');
         if ($items->isEmpty()) {
             $this->command?->warn('MultiYearHistoricalProcurementSeeder skipped: No items found in item catalog.');
             return;
         }
 
-        $this->command?->info('Seeding FY 2024 Historical Procurement Dataset (4 quarters, all offices, closed workflows)...');
+        $this->command?->info('Seeding FY 2024 Expanded Historical Procurement Dataset (50 PPMPs, 50 SRs, 50 PRs, 50 POs)...');
         $this->seedFiscalYear(
             year: 2024,
             execUser: $execUser,
             gsoUser: $gsoUser,
             procUser: $procUser,
-            officeUsers: ['MPDO' => $mpdoUser, 'MSWDO' => $mswdoUser, 'ENG' => $engUser, 'MHO' => $mhoUser],
+            officeUsers: $officeUsers,
             offices: $offices,
-            supplier: $supplier,
+            suppliers: $suppliers,
             items: $items,
             priceScale: 0.89, // 2024 baseline (~11% lower than 2026)
         );
 
-        $this->command?->info('Seeding FY 2025 Historical Procurement Dataset (4 quarters, all offices, closed workflows)...');
+        $this->command?->info('Seeding FY 2025 Expanded Historical Procurement Dataset (50 PPMPs, 50 SRs, 50 PRs, 50 POs)...');
         $this->seedFiscalYear(
             year: 2025,
             execUser: $execUser,
             gsoUser: $gsoUser,
             procUser: $procUser,
-            officeUsers: ['MPDO' => $mpdoUser, 'MSWDO' => $mswdoUser, 'ENG' => $engUser, 'MHO' => $mhoUser],
+            officeUsers: $officeUsers,
             offices: $offices,
-            supplier: $supplier,
+            suppliers: $suppliers,
             items: $items,
             priceScale: 0.95, // 2025 baseline (~5% lower than 2026)
         );
@@ -115,7 +141,8 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
 
     /**
      * @param array<string, User> $officeUsers
-     * @param \Illuminate\Database\Eloquent\Collection<string, Office> $offices
+     * @param \Illuminate\Support\Collection<string, Office> $offices
+     * @param array<int, Supplier> $suppliers
      * @param \Illuminate\Database\Eloquent\Collection<string, Item> $items
      */
     private function seedFiscalYear(
@@ -125,99 +152,64 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
         User $procUser,
         array $officeUsers,
         $offices,
-        Supplier $supplier,
+        array $suppliers,
         $items,
         float $priceScale
     ): void {
-        DB::transaction(function () use ($year, $execUser, $gsoUser, $procUser, $officeUsers, $offices, $supplier, $items, $priceScale) {
-            $plans = [];
-            if (isset($offices['MPDO'])) {
-                $plans['MPDO'] = [
-                    'user' => $officeUsers['MPDO'] ?? $execUser,
-                    'office' => $offices['MPDO'],
-                    'items' => [
-                        ['name' => 'Bond Paper', 'q1' => 10, 'q2' => 10, 'q3' => 10, 'q4' => 10, 'base_cost' => 950],
-                        ['name' => 'Ballpen', 'q1' => 5, 'q2' => 5, 'q3' => 5, 'q4' => 5, 'base_cost' => 300],
-                        ['name' => 'Folder', 'q1' => 2, 'q2' => 2, 'q3' => 2, 'q4' => 2, 'base_cost' => 1200],
-                    ],
-                ];
-            }
-            if (isset($offices['MSWDO'])) {
-                $plans['MSWDO'] = [
-                    'user' => $officeUsers['MSWDO'] ?? $execUser,
-                    'office' => $offices['MSWDO'],
-                    'items' => [
-                        ['name' => 'Rubbing Alcohol', 'q1' => 10, 'q2' => 10, 'q3' => 10, 'q4' => 10, 'base_cost' => 400],
-                        ['name' => 'Detergent Powder', 'q1' => 15, 'q2' => 15, 'q3' => 15, 'q4' => 15, 'base_cost' => 120],
-                        ['name' => 'Safety Gloves', 'q1' => 10, 'q2' => 10, 'q3' => 10, 'q4' => 10, 'base_cost' => 45],
-                    ],
-                ];
-            }
-            if (isset($offices['ENG'])) {
-                $plans['ENG'] = [
-                    'user' => $officeUsers['ENG'] ?? $execUser,
-                    'office' => $offices['ENG'],
-                    'items' => [
-                        ['name' => 'Printer Ink', 'q1' => 5, 'q2' => 5, 'q3' => 5, 'q4' => 5, 'base_cost' => 850],
-                        ['name' => 'Mouse', 'q1' => 10, 'q2' => 10, 'q3' => 10, 'q4' => 10, 'base_cost' => 325],
-                        ['name' => 'Logbook', 'q1' => 5, 'q2' => 5, 'q3' => 5, 'q4' => 5, 'base_cost' => 150],
-                    ],
-                ];
-            }
-            if (isset($offices['MHO'])) {
-                $plans['MHO'] = [
-                    'user' => $officeUsers['MHO'] ?? $execUser,
-                    'office' => $offices['MHO'],
-                    'items' => [
-                        ['name' => 'Rubbing Alcohol', 'q1' => 12, 'q2' => 12, 'q3' => 12, 'q4' => 12, 'base_cost' => 400],
-                        ['name' => 'Detergent Powder', 'q1' => 10, 'q2' => 10, 'q3' => 10, 'q4' => 10, 'base_cost' => 120],
-                        ['name' => 'Safety Gloves', 'q1' => 15, 'q2' => 15, 'q3' => 15, 'q4' => 15, 'base_cost' => 45],
-                    ],
-                ];
-            }
+        DB::transaction(function () use ($year, $execUser, $gsoUser, $procUser, $officeUsers, $offices, $suppliers, $items, $priceScale) {
+            // -------------------------------------------------------------------------
+            // 1. Define 50 Distinct, Authentic PPMP Configurations Across 6 Departments
+            // -------------------------------------------------------------------------
+            $ppmpDefs = $this->getPpmpDefinitions($year);
 
-            foreach ($plans as $officeCode => $planData) {
-                $user = $planData['user'] ?? $execUser;
-                $office = $planData['office'] ?? null;
+            $seededPpmps = []; // keyed by ppmp index 1..50
+            $ppmpItemsByPlan = []; // keyed by ppmp index => array of ['ppmp_item' => ..., 'item' => ..., 'unit_cost' => ...]
+
+            foreach ($ppmpDefs as $index => $def) {
+                $officeCode = $def['office_code'];
+                $office = $offices->get($officeCode);
                 if (! $office) {
                     continue;
                 }
 
-                $datePrepared = Carbon::create($year - 1, 11, 15);
-                $dateApproved = Carbon::create($year - 1, 12, 20);
+                $user = $officeUsers[$officeCode] ?? $execUser;
+                $monthPrepared = $def['prep_month'];
+                $dayPrepared = min(28, 5 + ($index % 20));
 
-                // 1. Create PPMP
+                $datePrepared = Carbon::create($year, $monthPrepared, $dayPrepared);
+                $dateApproved = $datePrepared->copy()->addDays(5);
+
                 $ppmp = Ppmp::query()->updateOrCreate(
                     [
                         'office_id' => $office->id,
                         'fiscal_year' => $year,
+                        'remarks' => $def['title'],
                     ],
                     [
                         'prepared_by' => $user->id,
                         'approved_by' => $execUser->id,
-                        'fund_source' => FundSource::APPROPRIATION_ORDINANCE,
+                        'fund_source' => $def['fund_source'],
                         'status' => 'APPROVED',
                         'total_estimated_budget' => 0,
                         'date_prepared' => $datePrepared,
                         'date_approved' => $dateApproved,
-                        'remarks' => sprintf('Official approved PPMP for %s Fiscal Year %d.', $officeCode, $year),
                         'created_at' => $datePrepared,
                         'updated_at' => $dateApproved,
                     ]
                 );
 
                 $totalBudget = 0;
-                $seededPpmpItems = [];
+                $seededItems = [];
 
-                foreach ($planData['items'] as $itemDef) {
+                foreach ($def['items'] as $itemDef) {
                     $itemModel = $items->get($itemDef['name']) ?? $items->first();
                     if (! $itemModel) {
                         continue;
                     }
 
                     $unitCost = round($itemDef['base_cost'] * $priceScale, 2);
-                    $totalQty = $itemDef['q1'] + $itemDef['q2'] + $itemDef['q3'] + $itemDef['q4'];
-                    $estBudget = round($totalQty * $unitCost, 2);
+                    $qty = $itemDef['qty'];
+                    $estBudget = round($qty * $unitCost, 2);
                     $totalBudget += $estBudget;
 
                     $ppmpItem = PpmpItem::query()->updateOrCreate(
@@ -227,348 +219,346 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
                         ],
                         [
                             'item_category_id' => $itemModel->item_category_id,
-                            'quantity' => $totalQty,
+                            'quantity' => $qty,
                             'unit_cost' => $unitCost,
                             'estimated_budget' => $estBudget,
-                            'procurement_schedule' => 'Q1,Q2,Q3,Q4',
-                            'remarks' => sprintf('Annual allocation for %s (%d).', $itemModel->item_name, $year),
+                            'procurement_schedule' => $itemDef['sched'],
+                            'remarks' => sprintf('Allocation for %s under %s (%d).', $itemModel->item_name, $def['title'], $year),
                             'created_at' => $datePrepared,
                             'updated_at' => $dateApproved,
                         ]
                     );
 
-                    $seededPpmpItems[] = ['ppmp_item' => $ppmpItem, 'item' => $itemModel, 'unit_cost' => $unitCost];
+                    $seededItems[] = [
+                        'ppmp_item' => $ppmpItem,
+                        'item' => $itemModel,
+                        'unit_cost' => $unitCost,
+                    ];
                 }
 
                 $ppmp->update(['total_estimated_budget' => $totalBudget]);
+                $seededPpmps[$index] = $ppmp;
+                $ppmpItemsByPlan[$index] = $seededItems;
+            }
 
-                // 2. Create Completed Supply Requests & Procurement for all 4 Quarters
-                $quarters = [
-                    ['q' => 1, 'month' => 2, 'day' => 10, 'po_day' => 20, 'del_day' => 28],
-                    ['q' => 2, 'month' => 5, 'day' => 12, 'po_day' => 22, 'del_day' => 30],
-                    ['q' => 3, 'month' => 8, 'day' => 14, 'po_day' => 24, 'del_day' => 31],
-                    ['q' => 4, 'month' => 11, 'day' => 8,  'po_day' => 18, 'del_day' => 26],
-                ];
+            // -------------------------------------------------------------------------
+            // 2. Generate 50 Complete Closed Cycles (SR -> PR -> PO -> Delivery -> Dist)
+            //    Evenly distributed: 4 cycles/month (Jan-Oct) + 5 cycles (Nov) + 5 cycles (Dec)
+            // -------------------------------------------------------------------------
+            $methods = ['SHOPPING', 'SMALL_VALUE_PROCUREMENT', 'SMALL_VALUE_PROCUREMENT', 'PUBLIC_BIDDING'];
+            $priorityLevels = ['NORMAL', 'NORMAL', 'NORMAL', 'URGENT'];
 
-                foreach ($quarters as $qData) {
-                    $reqDate = Carbon::create($year, $qData['month'], $qData['day']);
-                    $poDate = Carbon::create($year, $qData['month'], $qData['po_day']);
-                    $delDate = Carbon::create($year, $qData['month'], $qData['del_day']);
-                    $distDate = $delDate->copy()->addDays(2);
+            for ($i = 1; $i <= 50; $i++) {
+                // Determine calendar month (1..12)
+                if ($i <= 40) {
+                    $month = (int) ceil($i / 4); // 4 per month for months 1..10
+                    $subIndex = ($i - 1) % 4;
+                    $day = 5 + ($subIndex * 6); // days 5, 11, 17, 23
+                } elseif ($i <= 45) {
+                    $month = 11; // 5 in November
+                    $subIndex = $i - 41;
+                    $day = 3 + ($subIndex * 5); // days 3, 8, 13, 18, 23
+                } else {
+                    $month = 12; // 5 in December
+                    $subIndex = $i - 46;
+                    $day = 1 + ($subIndex * 3); // days 1, 4, 7, 10, 13
+                }
 
-                    $requestCode = sprintf('SR-%s-%d-%02d-0001', $officeCode, $year, $qData['month']);
+                // Match to the corresponding PPMP
+                $ppmpIndex = $i;
+                $ppmp = $seededPpmps[$ppmpIndex] ?? $seededPpmps[1];
+                $planDef = $ppmpDefs[$ppmpIndex] ?? $ppmpDefs[1];
+                $officeCode = $planDef['office_code'];
+                $office = $offices->get($officeCode);
+                $officeUser = $officeUsers[$officeCode] ?? $execUser;
+                $availableItems = $ppmpItemsByPlan[$ppmpIndex] ?? [];
 
-                    $supplyRequest = SupplyRequest::query()->updateOrCreate(
-                        ['request_code' => $requestCode],
+                if (! $office || empty($availableItems)) {
+                    continue;
+                }
+
+                // Timestamps properly anchored in the fiscal year
+                $reqDate = Carbon::create($year, $month, min(20, $day));
+                $neededDate = $reqDate->copy()->addDays(12);
+                $approvedDate = $reqDate->copy()->addDays(2);
+                $prDate = $reqDate->copy()->addDays(3);
+                $poDate = $reqDate->copy()->addDays(5);
+                $delDate = $poDate->copy()->addDays(6);
+                $distDate = $delDate->copy()->addDays(2);
+
+                // Select supplier realistically: Medical/Cleaning -> Supplier 3; IT -> Supplier 2; General -> Supplier 1
+                $category = $planDef['category'];
+                if ($category === 'Medical & Safety' || $category === 'Janitorial Supplies') {
+                    $supplier = $suppliers[2] ?? $suppliers[0];
+                } elseif ($category === 'IT Equipment') {
+                    $supplier = $suppliers[1] ?? $suppliers[0];
+                } else {
+                    $supplier = $suppliers[0];
+                }
+
+                $method = $methods[$i % count($methods)];
+                $priority = $priorityLevels[$i % count($priorityLevels)];
+
+                // 2.1 Supply Request (SR)
+                $requestCode = sprintf('SR-%s-%d-%02d-%04d', $officeCode, $year, $month, $i);
+
+                $supplyRequest = SupplyRequest::query()->updateOrCreate(
+                    ['request_code' => $requestCode],
+                    [
+                        'office_id' => $office->id,
+                        'requested_by' => $officeUser->id,
+                        'ppmp_id' => $ppmp->ppmp_id,
+                        'request_date' => $reqDate,
+                        'needed_by_date' => $neededDate,
+                        'request_category' => $category,
+                        'purpose' => sprintf('%s Requisition for %s (FY %d Batch %02d).', $officeCode, $planDef['title'], $year, $i),
+                        'priority_level' => $priority,
+                        'status' => 'COMPLETED',
+                        'approved_by' => $gsoUser->id,
+                        'approved_at' => $approvedDate,
+                        'created_at' => $reqDate,
+                        'updated_at' => $distDate,
+                    ]
+                );
+
+                $srItems = [];
+                foreach ($availableItems as $itemData) {
+                    $pItem = $itemData['ppmp_item'];
+                    $itemObj = $itemData['item'];
+                    $reqQty = max(1, (int) round($pItem->quantity / 2));
+
+                    $srItem = SupplyRequestItem::query()->updateOrCreate(
                         [
-                            'office_id' => $office->id,
-                            'requested_by' => $user->id,
-                            'ppmp_id' => $ppmp->ppmp_id,
-                            'request_date' => $reqDate,
-                            'needed_by_date' => $reqDate->copy()->addDays(15),
-                            'request_category' => 'Office Supplies',
-                            'purpose' => sprintf('%s Q%d Supply Requisition for FY %d.', $officeCode, $qData['q'], $year),
-                            'priority_level' => 'NORMAL',
-                            'status' => 'COMPLETED',
-                            'approved_by' => $gsoUser->id,
-                            'approved_at' => $reqDate->copy()->addDays(2),
+                            'supply_request_id' => $supplyRequest->supply_request_id,
+                            'item_id' => $itemObj->item_id,
+                        ],
+                        [
+                            'ppmp_item_id' => $pItem->ppmp_item_id,
+                            'item_name_snapshot' => $itemObj->item_name,
+                            'quantity_requested' => $reqQty,
                             'created_at' => $reqDate,
-                            'updated_at' => $distDate,
+                            'updated_at' => $reqDate,
                         ]
                     );
 
-                    $srItems = [];
-                    foreach ($seededPpmpItems as $pItemData) {
-                        $pItem = $pItemData['ppmp_item'];
-                        $itemObj = $pItemData['item'];
-                        $reqQty = max(1, round($pItem->quantity / 4));
+                    $srItems[] = [
+                        'sr_item' => $srItem,
+                        'item' => $itemObj,
+                        'unit_cost' => $itemData['unit_cost'],
+                        'qty' => $reqQty,
+                    ];
+                }
 
-                        $srItem = SupplyRequestItem::query()->updateOrCreate(
-                            [
-                                'supply_request_id' => $supplyRequest->supply_request_id,
-                                'item_id' => $itemObj->item_id,
-                            ],
-                            [
-                                'ppmp_item_id' => $pItem->ppmp_item_id,
-                                'item_name_snapshot' => $itemObj->item_name,
-                                'quantity_requested' => $reqQty,
-                                'created_at' => $reqDate,
-                                'updated_at' => $reqDate,
-                            ]
-                        );
+                // 2.2 Purchase Request (PR)
+                $prNumber = sprintf('PR-%d-%02d-%04d', $year, $month, $i);
 
-                        $srItems[] = ['sr_item' => $srItem, 'item' => $itemObj, 'unit_cost' => $pItemData['unit_cost'], 'qty' => $reqQty];
-                    }
+                $pr = PurchaseRequest::query()->updateOrCreate(
+                    ['supply_request_id' => $supplyRequest->supply_request_id],
+                    [
+                        'pr_number' => $prNumber,
+                        'office_id' => $office->id,
+                        'requested_by' => $officeUser->id,
+                        'status' => 'COMPLETED',
+                        'remarks' => sprintf('Official BAC approved PR for %s (%s, FY %d).', $officeCode, $planDef['title'], $year),
+                        'created_at' => $prDate,
+                        'updated_at' => $poDate,
+                    ]
+                );
 
-                    // 3. Purchase Request & Purchase Order
-                    $prNumber = sprintf('PR-%d-%02d-%04d', $year, $qData['month'], (int) $office->id);
-                    $pr = PurchaseRequest::query()->updateOrCreate(
-                        ['supply_request_id' => $supplyRequest->supply_request_id],
+                foreach ($srItems as $srItemData) {
+                    PurchaseRequestItem::query()->updateOrCreate(
                         [
-                            'pr_number' => $prNumber,
-                            'office_id' => $office->id,
-                            'requested_by' => $user->id,
-                            'status' => 'COMPLETED',
-                            'remarks' => sprintf('Official approved PR for %s Q%d %d.', $officeCode, $qData['q'], $year),
-                            'created_at' => $reqDate->copy()->addDays(3),
+                            'purchase_request_id' => $pr->purchase_request_id,
+                            'item_id' => $srItemData['item']->item_id,
+                        ],
+                        [
+                            'quantity_requested' => $srItemData['qty'],
+                            'remarks' => sprintf('Allocation for %s under %s.', $srItemData['item']->item_name, $prNumber),
+                            'created_at' => $prDate,
+                            'updated_at' => $poDate,
+                        ]
+                    );
+                }
+
+                // 2.3 Purchase Order (PO)
+                $poNumber = sprintf('PO-%d-%02d-%04d', $year, $month, $i);
+                $poTotal = 0;
+
+                $po = PurchaseOrder::query()->updateOrCreate(
+                    ['po_number' => $poNumber],
+                    [
+                        'purchase_request_id' => $pr->purchase_request_id,
+                        'supply_request_id' => $supplyRequest->supply_request_id,
+                        'supplier_id' => $supplier->supplier_id,
+                        'created_by' => $procUser->id,
+                        'approved_by' => $procUser->id,
+                        'procurement_method' => $method,
+                        'status' => 'COMPLETED',
+                        'expected_delivery_date' => $delDate,
+                        'date_approved' => $poDate,
+                        'total_amount' => 0,
+                        'terms_notes' => 'Standard 30-day payment terms upon COA inspection and acceptance.',
+                        'remarks' => sprintf('Delivered Purchase Order for %s (%s, FY %d).', $officeCode, $planDef['title'], $year),
+                        'created_at' => $poDate,
+                        'updated_at' => $delDate,
+                    ]
+                );
+
+                $poItemsList = [];
+                foreach ($srItems as $srItemData) {
+                    $sItem = $srItemData['sr_item'];
+                    $itObj = $srItemData['item'];
+                    $lineTotal = round($srItemData['qty'] * $srItemData['unit_cost'], 2);
+                    $poTotal += $lineTotal;
+
+                    $poItem = PurchaseOrderItem::query()->updateOrCreate(
+                        [
+                            'purchase_order_id' => $po->purchase_order_id,
+                            'supply_request_item_id' => $sItem->supply_request_item_id,
+                        ],
+                        [
+                            'item_id' => $itObj->item_id,
+                            'item_name_snapshot' => $itObj->item_name,
+                            'specification' => sprintf('%s - Standard Certified Grade (%s)', $itObj->item_name, $itObj->default_unit),
+                            'quantity_ordered' => $srItemData['qty'],
+                            'unit' => $itObj->default_unit,
+                            'unit_price' => $srItemData['unit_cost'],
+                            'total_price' => $lineTotal,
+                            'created_at' => $poDate,
                             'updated_at' => $poDate,
                         ]
                     );
 
-                    // Create Purchase Request Items (never leave PRs empty!)
-                    foreach ($srItems as $srItemData) {
-                        PurchaseRequestItem::query()->updateOrCreate(
-                            [
-                                'purchase_request_id' => $pr->purchase_request_id,
-                                'item_id' => $srItemData['item']->item_id,
-                            ],
-                            [
-                                'quantity_requested' => $srItemData['qty'],
-                                'remarks' => sprintf('Procured allocation for %s Q%d %d.', $srItemData['item']->item_name, $qData['q'], $year),
-                                'created_at' => $reqDate->copy()->addDays(3),
-                                'updated_at' => $poDate,
-                            ]
-                        );
-                    }
+                    $poItemsList[] = [
+                        'po_item' => $poItem,
+                        'item' => $itObj,
+                        'qty' => $srItemData['qty'],
+                        'unit_cost' => $srItemData['unit_cost'],
+                    ];
+                }
 
-                    // Audit Status History for Supply Request & Purchase Request
-                    StatusHistory::query()->create([
-                        'reference_type' => SupplyRequest::class,
-                        'reference_id' => $supplyRequest->supply_request_id,
-                        'old_status' => 'DRAFT',
-                        'new_status' => 'SUBMITTED',
-                        'changed_by' => $user->id,
-                        'remarks' => 'Submitted by office for review.',
-                        'changed_at' => $reqDate,
-                    ]);
-                    StatusHistory::query()->create([
-                        'reference_type' => SupplyRequest::class,
-                        'reference_id' => $supplyRequest->supply_request_id,
-                        'old_status' => 'SUBMITTED',
-                        'new_status' => 'COMPLETED',
-                        'changed_by' => $gsoUser->id,
-                        'remarks' => 'Fulfillment and distribution completed.',
-                        'changed_at' => $distDate,
-                    ]);
-                    ApprovalHistory::query()->create([
-                        'reference_type' => SupplyRequest::class,
-                        'reference_id' => $supplyRequest->supply_request_id,
-                        'approved_by' => $gsoUser->id,
-                        'status' => 'APPROVED',
-                        'remarks' => 'Approved by GSO Property Officer against PPMP allocation.',
-                        'approved_at' => $reqDate->copy()->addDays(2),
-                    ]);
+                $po->update(['total_amount' => $poTotal]);
 
-                    StatusHistory::query()->create([
-                        'reference_type' => PurchaseRequest::class,
-                        'reference_id' => $pr->purchase_request_id,
-                        'old_status' => 'DRAFT',
-                        'new_status' => 'OPEN',
-                        'changed_by' => $user->id,
-                        'remarks' => 'Purchase request forwarded to BAC.',
-                        'changed_at' => $reqDate->copy()->addDays(3),
-                    ]);
-                    StatusHistory::query()->create([
-                        'reference_type' => PurchaseRequest::class,
-                        'reference_id' => $pr->purchase_request_id,
-                        'old_status' => 'OPEN',
-                        'new_status' => 'COMPLETED',
-                        'changed_by' => $procUser->id,
-                        'remarks' => 'Procurement and delivery finalized.',
-                        'changed_at' => $distDate,
-                    ]);
-                    ApprovalHistory::query()->create([
-                        'reference_type' => PurchaseRequest::class,
-                        'reference_id' => $pr->purchase_request_id,
-                        'approved_by' => $procUser->id,
-                        'status' => 'APPROVED',
-                        'remarks' => 'Approved by BAC Procurement Officer.',
-                        'approved_at' => $poDate,
-                    ]);
+                // 2.4 Delivery & Verification (IAR)
+                $deliveryCode = sprintf('DEL-%d-%02d-%04d', $year, $month, $i);
+                $drNumber = sprintf('DR-%d-%02d-%04d', $year, $month, $i);
+                $siNumber = sprintf('SI-%d-%02d-%04d', $year, $month, $i);
 
-                    $poNumber = sprintf('PO-%d-%02d-%04d', $year, $qData['month'], (int) $office->id);
-                    $poTotal = 0;
+                $delivery = Delivery::query()->updateOrCreate(
+                    ['delivery_code' => $deliveryCode],
+                    [
+                        'purchase_order_id' => $po->purchase_order_id,
+                        'supplier_id' => $supplier->supplier_id,
+                        'actual_delivery_date' => $delDate,
+                        'expected_arrival_date' => $delDate,
+                        'delivery_receipt_no' => $drNumber,
+                        'sales_invoice_no' => $siNumber,
+                        'sales_invoice_date' => $delDate,
+                        'sales_invoice_amount' => $poTotal,
+                        'received_by' => $gsoUser->id,
+                        'receipt_status' => 'VERIFIED',
+                        'remarks' => sprintf('Full delivery received, verified, and accepted by GSO Property for FY %d.', $year),
+                        'created_at' => $delDate,
+                        'updated_at' => $delDate,
+                    ]
+                );
 
-                    $po = PurchaseOrder::query()->updateOrCreate(
-                        ['po_number' => $poNumber],
+                foreach ($poItemsList as $poLine) {
+                    DeliveryItem::query()->updateOrCreate(
                         [
-                            'purchase_request_id' => $pr->purchase_request_id,
-                            'supply_request_id' => $supplyRequest->supply_request_id,
-                            'supplier_id' => $supplier->supplier_id,
-                            'created_by' => $procUser->id,
-                            'approved_by' => $procUser->id,
-                            'procurement_method' => 'SHOPPING',
-                            'status' => 'COMPLETED',
-                            'expected_delivery_date' => $delDate,
-                            'date_approved' => $poDate,
-                            'total_amount' => 0,
-                            'terms_notes' => 'Standard 30-day payment terms upon inspection and acceptance.',
-                            'remarks' => sprintf('Completed Purchase Order for %s FY %d.', $officeCode, $year),
-                            'created_at' => $poDate,
-                            'updated_at' => $delDate,
-                        ]
-                    );
-
-                    $poItemsList = [];
-                    foreach ($srItems as $srItemData) {
-                        $sItem = $srItemData['sr_item'];
-                        $itObj = $srItemData['item'];
-                        $lineTotal = round($srItemData['qty'] * $srItemData['unit_cost'], 2);
-                        $poTotal += $lineTotal;
-
-                        $poItem = PurchaseOrderItem::query()->updateOrCreate(
-                            [
-                                'purchase_order_id' => $po->purchase_order_id,
-                                'supply_request_item_id' => $sItem->supply_request_item_id,
-                            ],
-                            [
-                                'item_id' => $itObj->item_id,
-                                'item_name_snapshot' => $itObj->item_name,
-                                'specification' => sprintf('%s - Standard Packaging (%s)', $itObj->item_name, $itObj->default_unit),
-                                'quantity_ordered' => $srItemData['qty'],
-                                'unit' => $itObj->default_unit,
-                                'unit_price' => $srItemData['unit_cost'],
-                                'total_price' => $lineTotal,
-                                'created_at' => $poDate,
-                                'updated_at' => $poDate,
-                            ]
-                        );
-
-                        $poItemsList[] = ['po_item' => $poItem, 'item' => $itObj, 'qty' => $srItemData['qty'], 'unit_cost' => $srItemData['unit_cost']];
-                    }
-
-                    $po->update(['total_amount' => $poTotal]);
-
-                    // 4. Delivery & Verification (IAR)
-                    $deliveryCode = sprintf('DEL-%d-%02d-%03d', $year, $qData['month'], $po->purchase_order_id);
-                    $drNumber = sprintf('DR-%d-%02d-%03d', $year, $qData['month'], $po->purchase_order_id);
-                    $siNumber = sprintf('SI-%d-%02d-%03d', $year, $qData['month'], $po->purchase_order_id);
-
-                    $delivery = Delivery::query()->updateOrCreate(
-                        ['delivery_code' => $deliveryCode],
-                        [
-                            'purchase_order_id' => $po->purchase_order_id,
-                            'supplier_id' => $supplier->supplier_id,
-                            'actual_delivery_date' => $delDate,
-                            'expected_arrival_date' => $delDate,
-                            'delivery_receipt_no' => $drNumber,
-                            'sales_invoice_no' => $siNumber,
-                            'sales_invoice_date' => $delDate,
-                            'sales_invoice_amount' => $poTotal,
-                            'received_by' => $gsoUser->id,
-                            'receipt_status' => 'VERIFIED',
-                            'remarks' => sprintf('Full delivery received and inspected by GSO Property for FY %d.', $year),
-                            'created_at' => $delDate,
-                            'updated_at' => $delDate,
-                        ]
-                    );
-
-                    foreach ($poItemsList as $poLine) {
-                        DeliveryItem::query()->updateOrCreate(
-                            [
-                                'delivery_id' => $delivery->delivery_id,
-                                'purchase_order_item_id' => $poLine['po_item']->purchase_order_item_id,
-                            ],
-                            [
-                                'expected_quantity' => $poLine['qty'],
-                                'received_quantity' => $poLine['qty'],
-                                'damaged_quantity' => 0,
-                                'missing_quantity' => 0,
-                                'item_condition' => 'GOOD',
-                                'remarks' => 'Verified intact commercial packaging.',
-                                'created_at' => $delDate,
-                                'updated_at' => $delDate,
-                            ]
-                        );
-                    }
-
-                    DeliveryVerification::query()->updateOrCreate(
-                        ['delivery_id' => $delivery->delivery_id],
-                        [
-                            'verified_by' => $gsoUser->id,
-                            'verification_date' => $delDate,
-                            'verification_status' => 'APPROVED',
-                            'remarks' => 'COA Inspection & Acceptance Report (IAR) verified complete.',
-                            'created_at' => $delDate,
-                            'updated_at' => $delDate,
-                        ]
-                    );
-
-                    // 5. Distribution Record to Office
-                    $distCode = sprintf('DIST-%d-%02d-%03d', $year, $qData['month'], $delivery->delivery_id);
-
-                    $distribution = DistributionRecord::query()->updateOrCreate(
-                        ['distribution_code' => $distCode],
-                        [
-                            'supply_request_id' => $supplyRequest->supply_request_id,
                             'delivery_id' => $delivery->delivery_id,
-                            'office_id' => $office->id,
-                            'prepared_by' => $gsoUser->id,
-                            'received_by' => $user->id,
-                            'release_date' => $distDate,
-                            'storage_location' => 'Main Warehouse Storage',
-                            'status' => 'RECEIVED',
-                            'notes' => sprintf('Released and acknowledged by %s representative for FY %d.', $officeCode, $year),
+                            'purchase_order_item_id' => $poLine['po_item']->purchase_order_item_id,
+                        ],
+                        [
+                            'expected_quantity' => $poLine['qty'],
+                            'received_quantity' => $poLine['qty'],
+                            'damaged_quantity' => 0,
+                            'missing_quantity' => 0,
+                            'item_condition' => 'GOOD',
+                            'remarks' => 'Verified intact commercial packaging.',
+                            'created_at' => $delDate,
+                            'updated_at' => $delDate,
+                        ]
+                    );
+                }
+
+                DeliveryVerification::query()->updateOrCreate(
+                    ['delivery_id' => $delivery->delivery_id],
+                    [
+                        'verified_by' => $gsoUser->id,
+                        'verification_date' => $delDate,
+                        'verification_status' => 'APPROVED',
+                        'remarks' => 'COA Inspection & Acceptance Report (IAR) verified complete and compliant.',
+                        'created_at' => $delDate,
+                        'updated_at' => $delDate,
+                    ]
+                );
+
+                // 2.5 Distribution Record to Office
+                $distCode = sprintf('DIST-%d-%02d-%04d', $year, $month, $i);
+
+                $distribution = DistributionRecord::query()->updateOrCreate(
+                    ['distribution_code' => $distCode],
+                    [
+                        'supply_request_id' => $supplyRequest->supply_request_id,
+                        'delivery_id' => $delivery->delivery_id,
+                        'office_id' => $office->id,
+                        'prepared_by' => $gsoUser->id,
+                        'received_by' => $officeUser->id,
+                        'release_date' => $distDate,
+                        'storage_location' => 'Main Warehouse Storage',
+                        'status' => 'RECEIVED',
+                        'notes' => sprintf('Issued and formally acknowledged by %s representative for FY %d.', $officeCode, $year),
+                        'created_at' => $distDate,
+                        'updated_at' => $distDate,
+                    ]
+                );
+
+                foreach ($poItemsList as $poLine) {
+                    DistributionItem::query()->updateOrCreate(
+                        [
+                            'distribution_record_id' => $distribution->distribution_record_id,
+                            'item_id' => $poLine['item']->item_id,
+                        ],
+                        [
+                            'received_by' => $officeUser->id,
+                            'item_name_snapshot' => $poLine['item']->item_name,
+                            'quantity_released' => $poLine['qty'],
+                            'quantity_received' => $poLine['qty'],
+                            'quantity_damaged' => 0,
+                            'quantity_missing' => 0,
+                            'receipt_condition' => 'GOOD',
+                            'receipt_notes' => 'Acknowledged in good order and condition.',
+                            'unit' => $poLine['item']->default_unit,
+                            'remarks' => 'Issued against approved PPMP allocation.',
                             'created_at' => $distDate,
                             'updated_at' => $distDate,
                         ]
                     );
-
-                    foreach ($poItemsList as $poLine) {
-                        DistributionItem::query()->updateOrCreate(
-                            [
-                                'distribution_record_id' => $distribution->distribution_record_id,
-                                'item_id' => $poLine['item']->item_id,
-                            ],
-                            [
-                                'received_by' => $user->id,
-                                'item_name_snapshot' => $poLine['item']->item_name,
-                                'quantity_released' => $poLine['qty'],
-                                'quantity_received' => $poLine['qty'],
-                                'quantity_damaged' => 0,
-                                'quantity_missing' => 0,
-                                'receipt_condition' => 'GOOD',
-                                'receipt_notes' => 'Acknowledged in good order and condition.',
-                                'unit' => $poLine['item']->default_unit,
-                                'remarks' => 'Stock issued against approved PPMP allocation.',
-                                'created_at' => $distDate,
-                                'updated_at' => $distDate,
-                            ]
-                        );
-                    }
-
-                    // Audit Status History for PO, Delivery, and Distribution
-                    StatusHistory::query()->create([
-                        'reference_type' => PurchaseOrder::class,
-                        'reference_id' => $po->purchase_order_id,
-                        'old_status' => 'DRAFT',
-                        'new_status' => 'COMPLETED',
-                        'changed_by' => $procUser->id,
-                        'remarks' => 'Purchase order delivered, inspected and closed.',
-                        'changed_at' => $distDate,
-                    ]);
-                    StatusHistory::query()->create([
-                        'reference_type' => Delivery::class,
-                        'reference_id' => $delivery->delivery_id,
-                        'old_status' => 'PENDING',
-                        'new_status' => 'RECEIVED',
-                        'changed_by' => $gsoUser->id,
-                        'remarks' => 'Items physically received, DR/SI verified and accepted.',
-                        'changed_at' => $delDate,
-                    ]);
-                    StatusHistory::query()->create([
-                        'reference_type' => DistributionRecord::class,
-                        'reference_id' => $distribution->distribution_record_id,
-                        'old_status' => 'PENDING',
-                        'new_status' => 'RECEIVED',
-                        'changed_by' => $user->id,
-                        'remarks' => 'Supplies officially received and acknowledged by office.',
-                        'changed_at' => $distDate,
-                    ]);
                 }
+
+                // 2.6 Audit Status History & Approval History
+                $this->recordWorkflowHistories(
+                    supplyRequest: $supplyRequest,
+                    purchaseRequest: $pr,
+                    purchaseOrder: $po,
+                    delivery: $delivery,
+                    distribution: $distribution,
+                    officeUser: $officeUser,
+                    gsoUser: $gsoUser,
+                    procUser: $procUser,
+                    reqDate: $reqDate,
+                    approvedDate: $approvedDate,
+                    prDate: $prDate,
+                    poDate: $poDate,
+                    delDate: $delDate,
+                    distDate: $distDate
+                );
             }
 
-            // 6. Public Transparency Disclosures for the Fiscal Year
+            // -------------------------------------------------------------------------
+            // 3. Public Transparency Disclosures for the Fiscal Year
+            // -------------------------------------------------------------------------
             $pubDate = Carbon::create($year, 12, 28);
             $yearPpmp = Ppmp::query()->where('fiscal_year', $year)->first();
             $yearPo = PurchaseOrder::query()->whereYear('created_at', $year)->first();
@@ -667,34 +657,335 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
                 }
             }
 
-            // 7. Resolved Historical Claim for realism
-            $sampleDist = DistributionRecord::query()->whereYear('created_at', $year)->first();
-            $sampleDistItem = $sampleDist ? $sampleDist->items()->first() : null;
+            // -------------------------------------------------------------------------
+            // 4. Resolved Historical Claims for Realism
+            // -------------------------------------------------------------------------
+            $sampleDists = DistributionRecord::query()
+                ->whereYear('created_at', $year)
+                ->limit(2)
+                ->get();
 
-            if ($sampleDist && $sampleDistItem) {
-                Claim::query()->updateOrCreate(
-                    ['claim_code' => sprintf('CLM-%d-00001', $year)],
-                    [
-                        'distribution_record_id' => $sampleDist->distribution_record_id,
-                        'distribution_item_id' => $sampleDistItem->distribution_item_id,
-                        'claimed_by' => $sampleDist->received_by,
-                        'office_id' => $sampleDist->office_id,
-                        'claim_type' => 'DAMAGED_ITEM',
-                        'claim_date' => Carbon::create($year, 3, 14),
-                        'claim_location' => 'Office Supply Receiving Station',
-                        'quantity_disputed' => 1.0,
-                        'quantity_damaged' => 1.0,
-                        'quantity_missing' => 0,
-                        'remarks' => sprintf('Defective packaging discovered on delivery inspection during FY %d Q1.', $year),
-                        'status' => 'RESOLVED',
-                        'resolution_type' => 'REPLACEMENT_RELEASED',
-                        'replacement_quantity' => 1.0,
-                        'created_at' => Carbon::create($year, 3, 14),
-                        'updated_at' => Carbon::create($year, 3, 16),
-                    ]
-                );
+            foreach ($sampleDists as $idx => $sampleDist) {
+                $sampleDistItem = $sampleDist->items()->first();
+                if ($sampleDistItem) {
+                    Claim::query()->updateOrCreate(
+                        ['claim_code' => sprintf('CLM-%d-%05d', $year, $idx + 1)],
+                        [
+                            'distribution_record_id' => $sampleDist->distribution_record_id,
+                            'distribution_item_id' => $sampleDistItem->distribution_item_id,
+                            'claimed_by' => $sampleDist->received_by,
+                            'office_id' => $sampleDist->office_id,
+                            'claim_type' => $idx === 0 ? 'DAMAGED_ITEM' : 'DEFECTIVE_PACKAGING',
+                            'claim_date' => Carbon::create($year, 3 + ($idx * 4), 14),
+                            'claim_location' => 'Office Supply Receiving Station',
+                            'quantity_disputed' => 1.0,
+                            'quantity_damaged' => 1.0,
+                            'quantity_missing' => 0,
+                            'remarks' => sprintf('Disputed packaging inspected during FY %d Q%d fulfillment.', $year, $idx + 1),
+                            'status' => 'RESOLVED',
+                            'resolution_type' => 'REPLACEMENT_RELEASED',
+                            'replacement_quantity' => 1.0,
+                            'created_at' => Carbon::create($year, 3 + ($idx * 4), 14),
+                            'updated_at' => Carbon::create($year, 3 + ($idx * 4), 16),
+                        ]
+                    );
+                }
             }
         });
+    }
+
+    /**
+     * Define 50 realistic, diverse PPMP allocations across the 6 municipal offices.
+     *
+     * @return array<int, array{office_code: string, prep_month: int, title: string, category: string, fund_source: FundSource, items: array<int, array{name: string, qty: int, sched: string, base_cost: float}>}>
+     */
+    private function getPpmpDefinitions(int $year): array
+    {
+        $fundSources = [
+            FundSource::APPROPRIATION_ORDINANCE,
+            FundSource::TRUST_FUND,
+            FundSource::SPECIAL_PURPOSE_FUND,
+            FundSource::IGI,
+            FundSource::GAA_CURRENT,
+        ];
+
+        // 50 program blueprints covering all 6 municipal offices and all 12 calendar months
+        $rawPrograms = [
+            // Month 1 (January)
+            1  => ['office_code' => 'MAYOR_OFFICE', 'cat' => 'Office Supplies', 'title' => 'Executive Governance & Public Administration Consumables',
+                   'items' => [['Bond Paper', 30, 'Q1', 950], ['Ballpen', 20, 'Q1', 300], ['Folder', 15, 'Q1', 420]]],
+            2  => ['office_code' => 'MPDO', 'cat' => 'Office Supplies', 'title' => 'Comprehensive Land Use & Spatial Planning Consumables',
+                   'items' => [['Bond Paper', 25, 'Q1', 950], ['Logbook', 10, 'Q1', 160], ['Folder', 12, 'Q1', 420]]],
+            3  => ['office_code' => 'MSWDO', 'cat' => 'Medical & Safety', 'title' => 'Community Social Welfare & Relief Operations Supplies',
+                   'items' => [['Rubbing Alcohol', 30, 'Q1', 380], ['Safety Gloves', 25, 'Q1', 75], ['Detergent Powder', 20, 'Q1', 130]]],
+            4  => ['office_code' => 'MHO', 'cat' => 'Medical & Safety', 'title' => 'Rural Health Unit Clinical Sanitization & Protective Gear',
+                   'items' => [['Rubbing Alcohol', 40, 'Q1', 380], ['Safety Gloves', 50, 'Q1', 75], ['Trash Bag', 30, 'Q1', 220]]],
+
+            // Month 2 (February)
+            5  => ['office_code' => 'ENG', 'cat' => 'Office Supplies', 'title' => 'Municipal Infrastructure Survey Drafting & Blueprint Documentation',
+                   'items' => [['Bond Paper', 35, 'Q1', 950], ['Logbook', 15, 'Q1', 160], ['Staple Wire', 20, 'Q1', 180]]],
+            6  => ['office_code' => 'GSO', 'cat' => 'Janitorial Supplies', 'title' => 'Central Municipal Building Custodial & Janitorial Logistics',
+                   'items' => [['Detergent Powder', 45, 'Q1', 130], ['Trash Bag', 40, 'Q1', 220], ['Utility Cutter', 15, 'Q1', 95]]],
+            7  => ['office_code' => 'MAYOR_OFFICE', 'cat' => 'Office Supplies', 'title' => 'Sangguniang Bayan & Executive Council Session Materials',
+                   'items' => [['Bond Paper', 20, 'Q1', 950], ['Folder', 25, 'Q1', 420], ['Ballpen', 15, 'Q1', 300]]],
+            8  => ['office_code' => 'MSWDO', 'cat' => 'Office Supplies', 'title' => 'Senior Citizens & PWD Assistance Program Registration Supplies',
+                   'items' => [['Logbook', 20, 'Q1', 160], ['Ballpen', 25, 'Q1', 300], ['Folder', 30, 'Q1', 420]]],
+
+            // Month 3 (March)
+            9  => ['office_code' => 'MPDO', 'cat' => 'IT Equipment', 'title' => 'Geographic Information Systems (GIS) Mapping Consumables',
+                   'items' => [['Flash Drive', 15, 'Q1', 480], ['Mouse', 10, 'Q1', 350], ['Printer Ink', 8, 'Q1', 650]]],
+            10 => ['office_code' => 'MHO', 'cat' => 'Medical & Safety', 'title' => 'Maternal & Neonatal Healthcare Community Outreach Supplies',
+                   'items' => [['Rubbing Alcohol', 25, 'Q1', 380], ['Safety Gloves', 35, 'Q1', 75], ['Logbook', 12, 'Q1', 160]]],
+            11 => ['office_code' => 'ENG', 'cat' => 'Office Supplies', 'title' => 'Flood Mitigation & Drainage Inspection Project Documentation',
+                   'items' => [['Bond Paper', 25, 'Q1', 950], ['Utility Cutter', 10, 'Q1', 95], ['Folder', 15, 'Q1', 420]]],
+            12 => ['office_code' => 'GSO', 'cat' => 'Office Supplies', 'title' => 'Property Tagging, Asset Inventory Audit & Barcoding Supplies',
+                   'items' => [['Logbook', 25, 'Q1', 160], ['Staple Wire', 15, 'Q1', 180], ['Ballpen', 20, 'Q1', 300]]],
+
+            // Month 4 (April)
+            13 => ['office_code' => 'MAYOR_OFFICE', 'cat' => 'Medical & Safety', 'title' => 'Municipal Disaster Risk Reduction & Emergency Preparedness Plan',
+                   'items' => [['Safety Gloves', 40, 'Q2', 75], ['Rubbing Alcohol', 30, 'Q2', 380], ['Flash Drive', 10, 'Q2', 480]]],
+            14 => ['office_code' => 'MPDO', 'cat' => 'Office Supplies', 'title' => 'Annual Investment Program (AIP) Documentation Materials',
+                   'items' => [['Bond Paper', 40, 'Q2', 950], ['Folder', 35, 'Q2', 420], ['Printer Ink', 10, 'Q2', 650]]],
+            15 => ['office_code' => 'MSWDO', 'cat' => 'Office Supplies', 'title' => 'Child & Youth Development Welfare Assistance Supplies',
+                   'items' => [['Bond Paper', 20, 'Q2', 950], ['Ballpen', 30, 'Q2', 300], ['Folder', 20, 'Q2', 420]]],
+            16 => ['office_code' => 'MHO', 'cat' => 'Medical & Safety', 'title' => 'Community Immunization Campaign & Clinical Hygiene Materials',
+                   'items' => [['Rubbing Alcohol', 35, 'Q2', 380], ['Safety Gloves', 45, 'Q2', 75], ['Trash Bag', 25, 'Q2', 220]]],
+
+            // Month 5 (May)
+            17 => ['office_code' => 'ENG', 'cat' => 'IT Equipment', 'title' => 'Public Works CAD Design & Structural Calculation Materials',
+                   'items' => [['Mouse', 12, 'Q2', 350], ['Flash Drive', 12, 'Q2', 480], ['Printer Ink', 10, 'Q2', 650]]],
+            18 => ['office_code' => 'GSO', 'cat' => 'Janitorial Supplies', 'title' => 'Municipal Grounds & Solid Waste Management Logistics',
+                   'items' => [['Trash Bag', 60, 'Q2', 220], ['Safety Gloves', 30, 'Q2', 75], ['Detergent Powder', 35, 'Q2', 130]]],
+            19 => ['office_code' => 'MAYOR_OFFICE', 'cat' => 'Office Supplies', 'title' => 'Public Information, Civic Outreach & Citizen Services',
+                   'items' => [['Bond Paper', 30, 'Q2', 950], ['Ballpen', 25, 'Q2', 300], ['Folder', 20, 'Q2', 420]]],
+            20 => ['office_code' => 'MSWDO', 'cat' => 'Janitorial Supplies', 'title' => 'Crisis Center & Daycare Sanitation Facilities Support',
+                   'items' => [['Detergent Powder', 30, 'Q2', 130], ['Rubbing Alcohol', 20, 'Q2', 380], ['Trash Bag', 25, 'Q2', 220]]],
+
+            // Month 6 (June)
+            21 => ['office_code' => 'MPDO', 'cat' => 'Office Supplies', 'title' => 'Socio-Economic Survey & Demographic Profiling Consumables',
+                   'items' => [['Bond Paper', 30, 'Q2', 950], ['Ballpen', 40, 'Q2', 300], ['Folder', 30, 'Q2', 420]]],
+            22 => ['office_code' => 'MHO', 'cat' => 'Medical & Safety', 'title' => 'Tuberculosis & Infectious Disease Prevention Program Logistics',
+                   'items' => [['Rubbing Alcohol', 40, 'Q2', 380], ['Safety Gloves', 40, 'Q2', 75], ['Logbook', 10, 'Q2', 160]]],
+            23 => ['office_code' => 'ENG', 'cat' => 'Office Supplies', 'title' => 'Bridge & Culvert Maintenance Inspection Consumables',
+                   'items' => [['Logbook', 15, 'Q2', 160], ['Bond Paper', 20, 'Q2', 950], ['Utility Cutter', 8, 'Q2', 95]]],
+            24 => ['office_code' => 'GSO', 'cat' => 'Office Supplies', 'title' => 'Warehouse Packaging, Stacking & Central Dispatch Supplies',
+                   'items' => [['Utility Cutter', 20, 'Q2', 95], ['Staple Wire', 25, 'Q2', 180], ['Logbook', 15, 'Q2', 160]]],
+
+            // Month 7 (July)
+            25 => ['office_code' => 'MAYOR_OFFICE', 'cat' => 'IT Equipment', 'title' => 'Municipal Peace & Order Council Operations Technology Supplies',
+                   'items' => [['Flash Drive', 15, 'Q3', 480], ['Mouse', 8, 'Q3', 350], ['Printer Ink', 8, 'Q3', 650]]],
+            26 => ['office_code' => 'MPDO', 'cat' => 'Office Supplies', 'title' => 'Community-Based Monitoring System (CBMS) Field Supplies',
+                   'items' => [['Bond Paper', 35, 'Q3', 950], ['Ballpen', 35, 'Q3', 300], ['Folder', 25, 'Q3', 420]]],
+            27 => ['office_code' => 'MSWDO', 'cat' => 'Office Supplies', 'title' => 'Sustainable Livelihood & Community Skills Training Consumables',
+                   'items' => [['Bond Paper', 25, 'Q3', 950], ['Folder', 30, 'Q3', 420], ['Ballpen', 20, 'Q3', 300]]],
+            28 => ['office_code' => 'MHO', 'cat' => 'Janitorial Supplies', 'title' => 'Barangay Health Stations Cleanliness & Disinfection Logistics',
+                   'items' => [['Detergent Powder', 40, 'Q3', 130], ['Rubbing Alcohol', 30, 'Q3', 380], ['Trash Bag', 35, 'Q3', 220]]],
+
+            // Month 8 (August)
+            29 => ['office_code' => 'ENG', 'cat' => 'Office Supplies', 'title' => 'Municipal Water System Expansion Field Survey Materials',
+                   'items' => [['Bond Paper', 25, 'Q3', 950], ['Logbook', 12, 'Q3', 160], ['Staple Wire', 15, 'Q3', 180]]],
+            30 => ['office_code' => 'GSO', 'cat' => 'Office Supplies', 'title' => 'Inter-Agency Government Logistics Coordination Consumables',
+                   'items' => [['Bond Paper', 25, 'Q3', 950], ['Folder', 20, 'Q3', 420], ['Ballpen', 20, 'Q3', 300]]],
+            31 => ['office_code' => 'MAYOR_OFFICE', 'cat' => 'Office Supplies', 'title' => 'Local Economic Development & Tourism Promotion Materials',
+                   'items' => [['Bond Paper', 25, 'Q3', 950], ['Folder', 20, 'Q3', 420], ['Flash Drive', 8, 'Q3', 480]]],
+            32 => ['office_code' => 'MSWDO', 'cat' => 'Medical & Safety', 'title' => 'Emergency Relief Aid Stockpiling for Calamity Response',
+                   'items' => [['Safety Gloves', 35, 'Q3', 75], ['Rubbing Alcohol', 25, 'Q3', 380], ['Detergent Powder', 25, 'Q3', 130]]],
+
+            // Month 9 (September)
+            33 => ['office_code' => 'MPDO', 'cat' => 'Office Supplies', 'title' => 'Municipal Monitoring & Evaluation System Reports Supplies',
+                   'items' => [['Bond Paper', 30, 'Q3', 950], ['Folder', 25, 'Q3', 420], ['Printer Ink', 8, 'Q3', 650]]],
+            34 => ['office_code' => 'MHO', 'cat' => 'Office Supplies', 'title' => 'Clinical Record-Keeping & Vital Statistics Data Registry',
+                   'items' => [['Logbook', 25, 'Q3', 160], ['Bond Paper', 20, 'Q3', 950], ['Ballpen', 30, 'Q3', 300]]],
+            35 => ['office_code' => 'ENG', 'cat' => 'Janitorial Supplies', 'title' => 'Engineering Motorpool & Heavy Equipment Maintenance Sanitation',
+                   'items' => [['Trash Bag', 35, 'Q3', 220], ['Detergent Powder', 30, 'Q3', 130], ['Safety Gloves', 25, 'Q3', 75]]],
+            36 => ['office_code' => 'GSO', 'cat' => 'IT Equipment', 'title' => 'Property Inventory Scanner & Terminal IT Maintenance',
+                   'items' => [['Mouse', 10, 'Q3', 350], ['Flash Drive', 12, 'Q3', 480], ['Toner Cartridge', 3, 'Q3', 2400]]],
+
+            // Month 10 (October)
+            37 => ['office_code' => 'MAYOR_OFFICE', 'cat' => 'Office Supplies', 'title' => 'Executive Legislative Agenda (ELA) Mid-Term Consumables',
+                   'items' => [['Bond Paper', 35, 'Q4', 950], ['Folder', 25, 'Q4', 420], ['Ballpen', 20, 'Q4', 300]]],
+            38 => ['office_code' => 'MPDO', 'cat' => 'Office Supplies', 'title' => 'Development Project Feasibility & Assessment Documentation',
+                   'items' => [['Bond Paper', 25, 'Q4', 950], ['Folder', 20, 'Q4', 420], ['Logbook', 10, 'Q4', 160]]],
+            39 => ['office_code' => 'MSWDO', 'cat' => 'Office Supplies', 'title' => 'Women Empowerment & Gender and Development (GAD) Plan Materials',
+                   'items' => [['Bond Paper', 25, 'Q4', 950], ['Ballpen', 25, 'Q4', 300], ['Folder', 20, 'Q4', 420]]],
+            40 => ['office_code' => 'MHO', 'cat' => 'Medical & Safety', 'title' => 'Dental Health & Oral Hygiene Community Outreach Consumables',
+                   'items' => [['Rubbing Alcohol', 30, 'Q4', 380], ['Safety Gloves', 40, 'Q4', 75], ['Trash Bag', 20, 'Q4', 220]]],
+
+            // Month 11 (November)
+            41 => ['office_code' => 'ENG', 'cat' => 'Office Supplies', 'title' => 'Municipal Infrastructure Completion Reports & Blueprint Archiving',
+                   'items' => [['Bond Paper', 35, 'Q4', 950], ['Folder', 30, 'Q4', 420], ['Staple Wire', 15, 'Q4', 180]]],
+            42 => ['office_code' => 'GSO', 'cat' => 'Office Supplies', 'title' => 'Annual Physical Inventory Inspection & Equipment Tagging Consumables',
+                   'items' => [['Logbook', 20, 'Q4', 160], ['Utility Cutter', 15, 'Q4', 95], ['Ballpen', 20, 'Q4', 300]]],
+            43 => ['office_code' => 'MAYOR_OFFICE', 'cat' => 'Office Supplies', 'title' => 'Barangay Support & Community Extension Services Supplies',
+                   'items' => [['Bond Paper', 30, 'Q4', 950], ['Ballpen', 25, 'Q4', 300], ['Folder', 25, 'Q4', 420]]],
+            44 => ['office_code' => 'MSWDO', 'cat' => 'Medical & Safety', 'title' => 'Year-End Calamity Relief & Vulnerable Sector Assistance Logistics',
+                   'items' => [['Rubbing Alcohol', 25, 'Q4', 380], ['Safety Gloves', 30, 'Q4', 75], ['Detergent Powder', 25, 'Q4', 130]]],
+            45 => ['office_code' => 'MHO', 'cat' => 'Office Supplies', 'title' => 'Community Nutrition Program & Supplementary Feeding Documentation',
+                   'items' => [['Bond Paper', 20, 'Q4', 950], ['Logbook', 15, 'Q4', 160], ['Ballpen', 20, 'Q4', 300]]],
+
+            // Month 12 (December)
+            46 => ['office_code' => 'MPDO', 'cat' => 'IT Equipment', 'title' => 'Annual Planning Spatial Database Consolidation & Media Storage',
+                   'items' => [['Flash Drive', 15, 'Q4', 480], ['Mouse', 8, 'Q4', 350], ['HP 680 Tri-Color Ink', 5, 'Q4', 850]]],
+            47 => ['office_code' => 'ENG', 'cat' => 'Office Supplies', 'title' => 'Subdivision & Commercial Building Code Permitting Documentation',
+                   'items' => [['Bond Paper', 30, 'Q4', 950], ['Folder', 25, 'Q4', 420], ['Staple Wire', 15, 'Q4', 180]]],
+            48 => ['office_code' => 'GSO', 'cat' => 'Janitorial Supplies', 'title' => 'Year-End Municipal Facilities Deep Cleaning & Sanitation Consumables',
+                   'items' => [['Detergent Powder', 40, 'Q4', 130], ['Trash Bag', 45, 'Q4', 220], ['Rubbing Alcohol', 25, 'Q4', 380]]],
+            49 => ['office_code' => 'MAYOR_OFFICE', 'cat' => 'Office Supplies', 'title' => 'Annual Accomplishment Report & Town Hall Assembly Supplies',
+                   'items' => [['Bond Paper', 40, 'Q4', 950], ['Folder', 30, 'Q4', 420], ['Ballpen', 30, 'Q4', 300]]],
+            50 => ['office_code' => 'MHO', 'cat' => 'Medical & Safety', 'title' => 'Municipal Health Office Annual Sanitary & First-Aid Replenishment',
+                   'items' => [['Rubbing Alcohol', 35, 'Q4', 380], ['Safety Gloves', 45, 'Q4', 75], ['Trash Bag', 30, 'Q4', 220]]],
+        ];
+
+        $result = [];
+        foreach ($rawPrograms as $id => $prog) {
+            $month = (int) ceil($id / 4);
+            if ($id > 48) {
+                $month = 12;
+            }
+
+            $fundSource = $fundSources[($id - 1) % count($fundSources)];
+
+            $items = [];
+            foreach ($prog['items'] as $item) {
+                $items[] = [
+                    'name' => $item[0],
+                    'qty' => $item[1],
+                    'sched' => $item[2],
+                    'base_cost' => (float) $item[3],
+                ];
+            }
+
+            $result[$id] = [
+                'office_code' => $prog['office_code'],
+                'prep_month' => min(12, $month),
+                'title' => sprintf('FY %d %s', $year, $prog['title']),
+                'category' => $prog['cat'],
+                'fund_source' => $fundSource,
+                'items' => $items,
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Record comprehensive status histories and approvals for the transaction flow.
+     */
+    private function recordWorkflowHistories(
+        SupplyRequest $supplyRequest,
+        PurchaseRequest $purchaseRequest,
+        PurchaseOrder $purchaseOrder,
+        Delivery $delivery,
+        DistributionRecord $distribution,
+        User $officeUser,
+        User $gsoUser,
+        User $procUser,
+        Carbon $reqDate,
+        Carbon $approvedDate,
+        Carbon $prDate,
+        Carbon $poDate,
+        Carbon $delDate,
+        Carbon $distDate
+    ): void {
+        // Supply Request Audit
+        StatusHistory::query()->create([
+            'reference_type' => SupplyRequest::class,
+            'reference_id' => $supplyRequest->supply_request_id,
+            'old_status' => 'DRAFT',
+            'new_status' => 'SUBMITTED',
+            'changed_by' => $officeUser->id,
+            'remarks' => 'Submitted by requesting office.',
+            'changed_at' => $reqDate,
+            'created_at' => $reqDate,
+        ]);
+        StatusHistory::query()->create([
+            'reference_type' => SupplyRequest::class,
+            'reference_id' => $supplyRequest->supply_request_id,
+            'old_status' => 'SUBMITTED',
+            'new_status' => 'COMPLETED',
+            'changed_by' => $gsoUser->id,
+            'remarks' => 'Requisition fulfilled and supplies issued.',
+            'changed_at' => $distDate,
+            'created_at' => $distDate,
+        ]);
+        ApprovalHistory::query()->create([
+            'reference_type' => SupplyRequest::class,
+            'reference_id' => $supplyRequest->supply_request_id,
+            'approved_by' => $gsoUser->id,
+            'status' => 'APPROVED',
+            'remarks' => 'Approved by GSO Officer against approved PPMP.',
+            'approved_at' => $approvedDate,
+            'created_at' => $approvedDate,
+            'updated_at' => $approvedDate,
+        ]);
+
+        // Purchase Request Audit
+        StatusHistory::query()->create([
+            'reference_type' => PurchaseRequest::class,
+            'reference_id' => $purchaseRequest->purchase_request_id,
+            'old_status' => 'DRAFT',
+            'new_status' => 'OPEN',
+            'changed_by' => $officeUser->id,
+            'remarks' => 'Purchase request endorsed to BAC Secretariat.',
+            'changed_at' => $prDate,
+            'created_at' => $prDate,
+        ]);
+        StatusHistory::query()->create([
+            'reference_type' => PurchaseRequest::class,
+            'reference_id' => $purchaseRequest->purchase_request_id,
+            'old_status' => 'OPEN',
+            'new_status' => 'COMPLETED',
+            'changed_by' => $procUser->id,
+            'remarks' => 'Procurement awarded and verified.',
+            'changed_at' => $distDate,
+            'created_at' => $distDate,
+        ]);
+        ApprovalHistory::query()->create([
+            'reference_type' => PurchaseRequest::class,
+            'reference_id' => $purchaseRequest->purchase_request_id,
+            'approved_by' => $procUser->id,
+            'status' => 'APPROVED',
+            'remarks' => 'Approved for purchase ordering by BAC Officer.',
+            'approved_at' => $poDate,
+            'created_at' => $poDate,
+            'updated_at' => $poDate,
+        ]);
+
+        // Purchase Order Audit
+        StatusHistory::query()->create([
+            'reference_type' => PurchaseOrder::class,
+            'reference_id' => $purchaseOrder->purchase_order_id,
+            'old_status' => 'DRAFT',
+            'new_status' => 'COMPLETED',
+            'changed_by' => $procUser->id,
+            'remarks' => 'Purchase order delivered and inspected.',
+            'changed_at' => $distDate,
+            'created_at' => $distDate,
+        ]);
+
+        // Delivery Audit
+        StatusHistory::query()->create([
+            'reference_type' => Delivery::class,
+            'reference_id' => $delivery->delivery_id,
+            'old_status' => 'PENDING',
+            'new_status' => 'RECEIVED',
+            'changed_by' => $gsoUser->id,
+            'remarks' => 'Supplier items physically accepted and verified.',
+            'changed_at' => $delDate,
+            'created_at' => $delDate,
+        ]);
+
+        // Distribution Audit
+        StatusHistory::query()->create([
+            'reference_type' => DistributionRecord::class,
+            'reference_id' => $distribution->distribution_record_id,
+            'old_status' => 'PENDING',
+            'new_status' => 'RECEIVED',
+            'changed_by' => $officeUser->id,
+            'remarks' => 'Supplies officially acknowledged by receiving office.',
+            'changed_at' => $distDate,
+            'created_at' => $distDate,
+        ]);
     }
 
     private function publicDisk(): string

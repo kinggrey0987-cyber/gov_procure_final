@@ -298,7 +298,11 @@ class ExecutiveMonitoringService
                 'pr_statuses' => PurchaseRequest::query()->select('status')->whereNotNull('status')->distinct()->orderBy('status')->pluck('status')->values(),
                 'po_statuses' => PurchaseOrder::query()->select('status')->whereNotNull('status')->distinct()->orderBy('status')->pluck('status')->values(),
                 'years' => $this->buildYearOptions(
-                    $this->buildYearRows((clone $purchaseRequestBase)->get(['created_at']), (clone $purchaseOrderBase)->get(['created_at']), 'created_at')
+                    $this->buildYearRows(
+                        PurchaseRequest::query()->whereNotNull('created_at')->select('created_at')->get(),
+                        PurchaseOrder::query()->whereNotNull('created_at')->select('created_at')->get(),
+                        'created_at'
+                    )
                 ),
             ],
             'totals' => [
@@ -533,7 +537,11 @@ class ExecutiveMonitoringService
                     ->unique()
                     ->values(),
                 'years' => $this->buildYearOptions(
-                    $this->buildYearRows((clone $anomalyBase)->get(['detected_at']), (clone $alertBase)->get(['detected_at']), 'detected_at')
+                    $this->buildYearRows(
+                        Anomaly::query()->whereNotNull('detected_at')->select('detected_at')->get(),
+                        Alert::query()->whereNotNull('detected_at')->select('detected_at')->get(),
+                        'detected_at'
+                    )
                 ),
             ],
             'totals' => [
@@ -701,7 +709,11 @@ class ExecutiveMonitoringService
                 'statuses' => PublicDisclosure::query()->select('status')->whereNotNull('status')->distinct()->orderBy('status')->pluck('status')->values(),
                 'types' => PublicDisclosure::query()->select('type')->whereNotNull('type')->distinct()->orderBy('type')->pluck('type')->values(),
                 'years' => $this->buildYearOptions(
-                    $this->buildYearRows((clone $base)->get(['published_at', 'created_at']), collect(), 'published_at')
+                    $this->buildYearRows(
+                        PublicDisclosure::query()->whereNotNull('published_at')->orWhereNotNull('created_at')->select(['published_at', 'created_at'])->get(),
+                        collect(),
+                        'published_at'
+                    )
                 ),
             ],
             'totals' => [

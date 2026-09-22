@@ -182,7 +182,7 @@ class ConsolidationTraceabilityService
                 ->whereIn('new_status', ['PROCESSING', 'APPROVED'])
                 ->whereHas('changedBy.role', fn ($q) => $q->where('code', 'PROC_OFFICER'))
                 ->with('changedBy.role')
-                ->latest('status_history_id')
+                ->latest('id')
                 ->first();
 
             if ($procHistory && $procHistory->changedBy instanceof User) {
@@ -228,7 +228,7 @@ class ConsolidationTraceabilityService
                 ->where('reference_id', (int) $purchaseRequest->purchase_request_id)
                 ->whereHas('changedBy.role', fn ($q) => $q->where('code', 'GSO_OFFICER'))
                 ->with('changedBy.role')
-                ->latest('status_history_id')
+                ->latest('id')
                 ->first();
 
             if ($gsoHistory && $gsoHistory->changedBy instanceof User) {
@@ -246,7 +246,7 @@ class ConsolidationTraceabilityService
                 ->where('new_status', 'FOR_PROCUREMENT')
                 ->whereHas('changedBy.role', fn ($q) => $q->where('code', 'GSO_OFFICER'))
                 ->with('changedBy.role')
-                ->latest('status_history_id')
+                ->latest('id')
                 ->first();
 
             if ($srHistory && $srHistory->changedBy instanceof User) {

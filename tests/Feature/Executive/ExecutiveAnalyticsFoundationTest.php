@@ -121,14 +121,16 @@ class ExecutiveAnalyticsFoundationTest extends TestCase
             'created_at' => now(),
         ])->save();
 
+        $expectedPrRef = $purchaseRequest->pr_number ?: 'PR-'.str_pad((string) $purchaseRequest->purchase_request_id, 6, '0', STR_PAD_LEFT);
+
         $this->actingAs($this->executive)
             ->get(route('executive.procurement-analytics'))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('Executive/ProcurementAnalytics/Index')
                 ->where('recent.procurement_records.data.0.reference', 'PO-2026-00050')
-                ->where('recent.procurement_records.data.0.details.linked_request', 'PR-'.str_pad((string) $purchaseRequest->purchase_request_id, 6, '0', STR_PAD_LEFT))
-                ->where('recent.procurement_records.data.1.reference', 'PR-'.str_pad((string) $purchaseRequest->purchase_request_id, 6, '0', STR_PAD_LEFT))
+                ->where('recent.procurement_records.data.0.details.linked_request', $expectedPrRef)
+                ->where('recent.procurement_records.data.1.reference', $expectedPrRef)
             );
     }
 
@@ -156,6 +158,24 @@ class ExecutiveAnalyticsFoundationTest extends TestCase
                 ->where('attachmentPermissions.delete', true)
                 ->where('backLink.label', 'Back to Procurement Insights')
                 ->where('showProcurementDocumentsLink', false)
+            );
+    }
+
+    public function test_procurement_analytics_year_filter_options_preserves_all_available_years(): void
+    {
+        $context1 = $this->createSupplyAndOrderContext($this->officeA, $this->procurementUser, $this->officeUser, 9310);
+        $context1['purchaseOrder']->forceFill(['created_at' => now()->setYear(2024)])->save();
+
+        $context2 = $this->createSupplyAndOrderContext($this->officeB, $this->procurementUser, $this->officeUser, 9311);
+        $context2['purchaseOrder']->forceFill(['created_at' => now()->setYear(2025)])->save();
+
+        $this->actingAs($this->executive)
+            ->get(route('executive.procurement-analytics', ['year' => '2024']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Executive/ProcurementAnalytics/Index')
+                ->where('filters.year', '2024')
+                ->where('filter_options.years', fn ($years) => collect($years)->contains(2024) && collect($years)->contains(2025))
             );
     }
 

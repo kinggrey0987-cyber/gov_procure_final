@@ -26,17 +26,17 @@ export function TrendGroupedBarChart({
         return <EmptyState text={emptyText} />;
     }
 
-    const width = 580;
-    const height = 220;
+    const width = Math.max(760, data.length * 44);
+    const height = 230;
     const chartTop = 22;
-    const chartBottom = 180;
+    const chartBottom = 185;
     const plotHeight = chartBottom - chartTop;
     const max = Math.max(1, ...data.map((item) => Math.max(item.first, item.second)));
     const paddingLeft = 45;
     const paddingRight = 15;
     const plotWidth = width - paddingLeft - paddingRight;
     const groupWidth = plotWidth / data.length;
-    const barWidth = Math.max(8, Math.min(18, groupWidth * 0.28));
+    const barWidth = Math.max(7, Math.min(15, (groupWidth - 8) / 2));
 
     return (
         <div className="space-y-3 flex-1 flex flex-col justify-between">
@@ -45,14 +45,15 @@ export function TrendGroupedBarChart({
                 <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" />{secondLabel}</span>
             </div>
 
-            <div className="w-full flex-1 flex items-center justify-center pt-2">
-                <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto max-h-[220px] overflow-visible">
+            <div className="w-full flex-1 flex items-center justify-center pt-2 overflow-x-auto min-w-0">
+                <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto max-h-[230px] min-w-[580px] overflow-visible">
                     <line x1={paddingLeft} y1={chartBottom} x2={width - paddingRight} y2={chartBottom} stroke="rgb(203 213 225)" strokeWidth="1.5" />
 
                     {data.map((item, index) => {
                         const x = paddingLeft + index * groupWidth + (groupWidth - (barWidth * 2 + 4)) / 2;
                         const firstHeight = (item.first / max) * plotHeight;
                         const secondHeight = (item.second / max) * plotHeight;
+                        const labelX = x + barWidth + 2;
 
                         return (
                             <g key={item.label}>
@@ -74,8 +75,8 @@ export function TrendGroupedBarChart({
                                     fill="rgb(245 158 11)"
                                     className="transition-opacity hover:opacity-80"
                                 />
-                                <text x={x + barWidth + 2} y={chartBottom + 15} textAnchor="middle" className="fill-slate-600 text-[9px] font-semibold">
-                                    {item.label.length > 11 ? `${item.label.slice(0, 11)}...` : item.label}
+                                <text x={labelX} y={chartBottom + 15} textAnchor="middle" className="fill-slate-600 text-[9px] font-semibold">
+                                    {item.label}
                                 </text>
                                 <title>{`${item.label} - ${firstLabel}: ${item.first} | ${secondLabel}: ${item.second}`}</title>
                             </g>
@@ -639,17 +640,17 @@ export function SpendTrendBarChart({
         return `${currencySymbol}${val.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
 
-    const width = 580;
-    const height = 220;
+    const width = Math.max(760, data.length * 44);
+    const height = 230;
     const paddingLeft = 48;
     const paddingRight = 16;
     const chartTop = 22;
-    const chartBottom = 180;
+    const chartBottom = 185;
     const plotWidth = width - paddingLeft - paddingRight;
     const plotHeight = chartBottom - chartTop;
 
     const groupWidth = plotWidth / data.length;
-    const barWidth = Math.max(10, Math.min(28, groupWidth * 0.44));
+    const barWidth = Math.max(12, Math.min(26, groupWidth * 0.46));
 
     const ySteps = [1, 0.75, 0.5, 0.25, 0];
 
@@ -678,8 +679,8 @@ export function SpendTrendBarChart({
             </div>
 
             {/* SVG Bar Chart - 100% Fluid & Responsive, Zero Scrollbars */}
-            <div className="w-full flex-1 flex items-center justify-center pt-2">
-                <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto max-h-[220px] overflow-visible">
+            <div className="w-full flex-1 flex items-center justify-center pt-2 overflow-x-auto min-w-0">
+                <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto max-h-[230px] min-w-[580px] overflow-visible">
                     <defs>
                         <linearGradient id="spendBarGradient" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="0%" stopColor="rgb(220 38 38)" />
@@ -742,13 +743,13 @@ export function SpendTrendBarChart({
                                     className="transition-all duration-300 group-hover:opacity-85"
                                 />
 
-                                {/* Value label above bar */}
-                                {barHeight > 12 ? (
+                                {/* Value label above bar - only render when there is enough horizontal room OR it is the peak bar */}
+                                {barHeight > 14 && (groupWidth >= 38 || isPeak || data.length <= 12) ? (
                                     <text
                                         x={x + barWidth / 2}
                                         y={y - 5}
                                         textAnchor="middle"
-                                        className="fill-slate-700 text-[9px] font-bold"
+                                        className={`text-[9px] ${isPeak ? 'fill-red-800 font-extrabold' : 'fill-slate-700 font-bold'}`}
                                     >
                                         {formatShort(item.value)}
                                     </text>
@@ -765,7 +766,7 @@ export function SpendTrendBarChart({
                                 </text>
 
                                 {/* Order Count Badge below Month */}
-                                {item.orderCount !== undefined ? (
+                                {item.orderCount !== undefined && (groupWidth >= 32 || data.length <= 14) ? (
                                     <text
                                         x={x + barWidth / 2}
                                         y={chartBottom + 26}
