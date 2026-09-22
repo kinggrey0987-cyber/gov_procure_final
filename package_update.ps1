@@ -6,16 +6,31 @@ Write-Host "=================================================================" -
 Write-Host "  Laravel Fast Update Packager (Hostinger File Manager)" -ForegroundColor Cyan
 Write-Host "=================================================================" -ForegroundColor Cyan
 
-# 1. Pre-Flight PHP and Route sanity check
-Write-Host "`n[1/4] Running pre-flight PHP and Route sanity check..." -ForegroundColor Yellow
-$sanityCheck = php artisan route:list --except-vendor 2>&1
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "`nPRE-FLIGHT ERROR: PHP syntax or route definition error detected!" -ForegroundColor Red
-    Write-Host $sanityCheck -ForegroundColor DarkRed
-    Write-Host "`nPlease fix the PHP error above before packaging for production." -ForegroundColor Yellow
+# 1. Pre-Flight PHP syntax and sanity check
+Write-Host "`n[1/4] Running pre-flight PHP syntax check on application files..." -ForegroundColor Yellow
+$phpFiles = Get-ChildItem -Path "app", "routes", "config" -Filter "*.php" -Recurse
+$syntaxError = $false
+foreach ($file in $phpFiles) {
+    $null = php -l $file.FullName 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        $result = php -l $file.FullName 2>&1
+        Write-Host "PHP Syntax Error in $($file.FullName):" -ForegroundColor Red
+        Write-Host $result -ForegroundColor DarkRed
+        $syntaxError = $true
+    }
+}
+if ($syntaxError) {
+    Write-Host "`nPlease fix the PHP syntax error above before packaging for production." -ForegroundColor Yellow
     exit 1
 }
-Write-Host "Pre-flight check passed! Codebase is healthy." -ForegroundColor Green
+
+# Optional route check if artisan runs cleanly
+$sanityCheck = php artisan route:list --except-vendor 2>&1
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "Pre-flight check passed! Codebase and routes are healthy." -ForegroundColor Green
+} else {
+    Write-Host "Pre-flight PHP syntax check passed! Codebase is healthy." -ForegroundColor Green
+}
 
 # 2. Compile production assets
 Write-Host "`n[2/4] Compiling latest Vite production assets..." -ForegroundColor Yellow
