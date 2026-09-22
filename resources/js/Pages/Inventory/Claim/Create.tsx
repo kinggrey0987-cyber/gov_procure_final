@@ -98,6 +98,7 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
         remarks: '',
         attachment_title: '',
         attachment_file: null as File | null,
+        attachments: [] as File[],
     });
     const [issueLines, setIssueLines] = useState<IssueLine[]>(() => buildInitialIssueLines(initialItem));
 
@@ -309,7 +310,7 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                         </div>
 
                         <div>
-                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Discrepancy Details & Findings</label>
+                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-700">Discrepancy Details & Findings <span className="text-rose-600 font-bold">* Required</span></label>
                             <textarea className="min-h-[90px] w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Describe what was observed and what quantity/item was affected." value={form.data.remarks} onChange={(e) => form.setData('remarks', e.target.value)} />
                             {form.errors.remarks ? <p className="mt-1 text-xs text-rose-600">{form.errors.remarks}</p> : null}
                         </div>
@@ -323,20 +324,73 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                             </div>
                         ) : null}
 
-                        <div className="grid gap-3 sm:grid-cols-2">
-                            <div>
-                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Attachment Title {derivedClaimType ? <span className="normal-case text-rose-600">(Required)</span> : '(Optional)'}</label>
-                                <input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Photo evidence or issue report" value={form.data.attachment_title} onChange={(e) => form.setData('attachment_title', e.target.value)} />
+                        <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+                            <div className="flex items-center justify-between">
+                                <label className="block text-xs font-semibold uppercase tracking-wide text-slate-700">
+                                    Evidence Attachments {derivedClaimType ? <span className="text-rose-600 font-bold">* Required</span> : '(Optional)'}
+                                </label>
+                                <span className="text-[11px] text-slate-500">Max 10MB per file (PDF, PNG, JPG, WEBP, DOC)</span>
                             </div>
-                            <div>
-                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Attachment File {derivedClaimType ? <span className="normal-case text-rose-600">(Required)</span> : '(Optional)'}</label>
-                                <input
-                                    type="file"
-                                    className={`w-full rounded-lg border px-3 py-2 text-sm ${derivedClaimType && !form.data.attachment_file ? 'border-rose-300 bg-rose-50/50' : 'border-slate-300'}`}
-                                    onChange={(e) => form.setData('attachment_file', e.target.files?.[0] ?? null)}
-                                />
-                                {form.errors.attachment_file ? <p className="mt-1 text-xs text-rose-600">{form.errors.attachment_file}</p> : null}
+
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <div>
+                                    <label className="mb-1 block text-xs font-medium text-slate-600">Attachment Title</label>
+                                    <input
+                                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                                        placeholder="E.g. Inspection photos, discrepancy memo"
+                                        value={form.data.attachment_title}
+                                        onChange={(e) => form.setData('attachment_title', e.target.value)}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="mb-1 block text-xs font-medium text-slate-600">Upload Files</label>
+                                    <input
+                                        type="file"
+                                        multiple
+                                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-red-50 file:px-2 file:py-1 file:text-xs file:font-semibold file:text-red-700 hover:file:bg-red-100"
+                                        onChange={(e) => {
+                                            const newFiles = Array.from(e.target.files ?? []);
+                                            const validFiles = newFiles.filter((f) => f.size <= 10 * 1024 * 1024);
+                                            if (validFiles.length < newFiles.length) {
+                                                alert('Some files exceed the 10MB limit and were skipped.');
+                                            }
+                                            const combined = [...form.data.attachments, ...validFiles];
+                                            form.setData('attachments', combined);
+                                            form.setData('attachment_file', combined[0] ?? null);
+                                        }}
+                                    />
+                                </div>
                             </div>
+
+                            {form.data.attachments.length > 0 && (
+                                <div className="space-y-1.5 pt-2">
+                                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Selected Files ({form.data.attachments.length}):</p>
+                                    <div className="grid gap-1.5 sm:grid-cols-2">
+                                        {form.data.attachments.map((file, idx) => (
+                                            <div key={idx} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs shadow-2xs">
+                                                <div className="truncate pr-2">
+                                                    <p className="truncate font-medium text-slate-800">{file.name}</p>
+                                                    <p className="text-[10px] text-slate-400">{(file.size / 1024).toFixed(0)} KB</p>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const updated = form.data.attachments.filter((_, i) => i !== idx);
+                                                        form.setData('attachments', updated);
+                                                        form.setData('attachment_file', updated[0] ?? null);
+                                                    }}
+                                                    className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
+                                                    title="Remove attachment"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {form.errors.attachment_file ? <p className="text-xs text-rose-600">{form.errors.attachment_file}</p> : null}
                         </div>
 
                         {form.hasErrors ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">Please review the highlighted claim form fields before submitting.</p> : null}

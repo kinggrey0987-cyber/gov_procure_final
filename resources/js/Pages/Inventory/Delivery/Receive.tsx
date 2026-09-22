@@ -11,6 +11,9 @@ type DeliveryItem = {
     item?: {
         item_name: string;
         item_id: number;
+        default_unit?: string;
+        pieces_per_box?: number;
+        sub_unit?: string;
     } | null;
 };
 
@@ -25,6 +28,8 @@ type Delivery = {
     sales_invoice_amount?: number | null;
     estimated_po_total?: number | null;
     remarks?: string | null;
+    has_existing_dr?: boolean;
+    has_existing_si?: boolean;
     purchase_order?: {
         purchase_order_id: number;
         po_number: string;
@@ -160,8 +165,22 @@ export default function DeliveryReceive({ delivery }: Props) {
 
     const hasLineWarnings = lineWarnings.length > 0;
 
+    const [fileError, setFileError] = useState<string | null>(null);
+
     const submit = (e: FormEvent) => {
         e.preventDefault();
+        setFileError(null);
+
+        if (!delivery.has_existing_dr && !data.delivery_receipt_file) {
+            setFileError('Mandatory: Scanned copy or camera photo of the Supplier Delivery Receipt (DR) is required.');
+            return;
+        }
+
+        if (!delivery.has_existing_si && !data.sales_invoice_file) {
+            setFileError('Mandatory: Scanned copy or camera photo of the Supplier Sales Invoice (SI) is required.');
+            return;
+        }
+
         transform((formData) => ({
             ...formData,
             _method: 'PUT',
@@ -274,13 +293,29 @@ export default function DeliveryReceive({ delivery }: Props) {
 
                                 {/* Scanned File Upload Area */}
                                 <div className="border-t border-slate-200 pt-5">
-                                    <p className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-3">Scanned Attachments (Audit Readiness)</p>
+                                    <div className="mb-3 flex items-center justify-between">
+                                        <p className="text-xs font-bold uppercase tracking-wider text-slate-600">Scanned Attachments (Audit Readiness)</p>
+                                        <span className="text-xs font-semibold text-rose-600">* DR and SI photos are mandatory for inspection compliance</span>
+                                    </div>
+                                    {fileError && (
+                                        <div className="mb-4 rounded-lg border border-rose-300 bg-rose-50 p-3 text-xs font-bold text-rose-700 flex items-center gap-2">
+                                            <span>⚠️</span>
+                                            <span>{fileError}</span>
+                                        </div>
+                                    )}
                                     <div className="grid gap-4 sm:grid-cols-2">
                                         {/* Upload Delivery Receipt */}
-                                        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-4 transition hover:border-indigo-400">
+                                        <div className={`rounded-xl border border-dashed p-4 transition ${!delivery.has_existing_dr && !data.delivery_receipt_file ? 'border-rose-300 bg-rose-50/30' : 'border-slate-300 bg-slate-50/70 hover:border-indigo-400'}`}>
                                             <div className="flex items-start justify-between">
                                                 <div className="space-y-1">
-                                                    <p className="text-xs font-bold text-slate-800">Scanned Delivery Receipt (DR)</p>
+                                                    <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                                                        <span>Scanned Delivery Receipt (DR)</span>
+                                                        {!delivery.has_existing_dr ? (
+                                                            <span className="rounded bg-rose-100 border border-rose-300 px-1.5 py-0.5 text-[10px] font-black text-rose-700 uppercase">* Required</span>
+                                                        ) : (
+                                                            <span className="rounded bg-emerald-100 border border-emerald-300 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">✓ On File</span>
+                                                        )}
+                                                    </p>
                                                     <p className="text-[11px] text-slate-500">Take a photo with your phone camera or browse file</p>
                                                 </div>
                                                 <span className="text-lg">📷</span>
@@ -328,10 +363,17 @@ export default function DeliveryReceive({ delivery }: Props) {
                                         </div>
 
                                         {/* Upload Sales Invoice */}
-                                        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-4 transition hover:border-indigo-400">
+                                        <div className={`rounded-xl border border-dashed p-4 transition ${!delivery.has_existing_si && !data.sales_invoice_file ? 'border-rose-300 bg-rose-50/30' : 'border-slate-300 bg-slate-50/70 hover:border-indigo-400'}`}>
                                             <div className="flex items-start justify-between">
                                                 <div className="space-y-1">
-                                                    <p className="text-xs font-bold text-slate-800">Scanned Sales Invoice (SI)</p>
+                                                    <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                                                        <span>Scanned Sales Invoice (SI)</span>
+                                                        {!delivery.has_existing_si ? (
+                                                            <span className="rounded bg-rose-100 border border-rose-300 px-1.5 py-0.5 text-[10px] font-black text-rose-700 uppercase">* Required</span>
+                                                        ) : (
+                                                            <span className="rounded bg-emerald-100 border border-emerald-300 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">✓ On File</span>
+                                                        )}
+                                                    </p>
                                                     <p className="text-[11px] text-slate-500">Take a photo with your phone camera or browse file</p>
                                                 </div>
                                                 <span className="text-lg">🧾</span>
@@ -393,9 +435,9 @@ export default function DeliveryReceive({ delivery }: Props) {
                                 <div className="space-y-0.5">
                                     <p className="font-bold">Dock Intake Counting Guide:</p>
                                     <p className="text-indigo-900 leading-relaxed">
-                                        • <strong>Total Delivered</strong> is the complete physical count of all boxes/units delivered by the supplier truck (good + damaged).<br />
-                                        • <strong>Damaged</strong> is how many of those delivered units are broken or defective.<br />
-                                        • The system automatically computes <span className="font-semibold text-emerald-800">Net Accepted</span> into inventory (<code className="rounded bg-white/80 px-1 py-0.5 font-mono text-indigo-900">Total Delivered - Damaged</code>) and <span className="font-semibold text-amber-800">Missing Shortage</span> (<code className="rounded bg-white/80 px-1 py-0.5 font-mono text-indigo-900">Expected - Total Delivered</code>).
+                                        • <strong>Packaging Unit Policy:</strong> All counts are in whole packaging units (e.g., box, pad, ream) as contracted. Damaged units must be recorded as whole boxes for contractor warranty replacement under COA rules.<br />
+                                        • <strong>Total Delivered:</strong> Gross dock count of units delivered by supplier truck (good + damaged).<br />
+                                        • <strong>Damaged:</strong> Count of broken or defective units. System computes <span className="font-semibold text-emerald-800">Net Accepted</span> (<code className="rounded bg-white/80 px-1 py-0.5 font-mono text-indigo-900">Delivered - Damaged</code>) and <span className="font-semibold text-amber-800">Missing Shortage</span> (<code className="rounded bg-white/80 px-1 py-0.5 font-mono text-indigo-900">Expected - Delivered</code>).
                                     </p>
                                 </div>
                             </div>
@@ -439,11 +481,20 @@ export default function DeliveryReceive({ delivery }: Props) {
                                             const damaged = toWholeQuantity(data.items[index]?.damaged_quantity || 0);
                                             const accepted = Math.max(received - damaged, 0);
                                             const missing = Math.max(expected - received, 0);
+                                            const unit = item.item?.default_unit || 'unit';
+                                            const pPerBox = item.item?.pieces_per_box ?? 1;
+                                            const subUnit = item.item?.sub_unit || 'pcs';
 
                                             return (
                                                 <tr key={item.delivery_item_id} className="hover:bg-slate-50/50">
                                                     <td className="px-5 py-4 font-medium text-slate-800">
-                                                        <div>{item.item?.item_name ?? 'Unknown Item'}</div>
+                                                        <div className="font-semibold text-slate-900">{item.item?.item_name ?? 'Unknown Item'}</div>
+                                                        <div className="mt-0.5 text-xs text-slate-500 font-normal">
+                                                            Unit: <strong className="text-slate-700 uppercase">{unit}</strong>
+                                                            {pPerBox > 1 && (
+                                                                <span className="ml-1 text-slate-500 font-medium">({pPerBox} {subUnit}/{unit})</span>
+                                                            )}
+                                                        </div>
                                                         <button
                                                             type="button"
                                                             onClick={() => {
@@ -454,40 +505,49 @@ export default function DeliveryReceive({ delivery }: Props) {
                                                             }}
                                                             className="mt-1 text-[11px] font-medium text-indigo-600 hover:text-indigo-800 hover:underline"
                                                         >
-                                                            Pre-fill full expected ({expected})
+                                                            Pre-fill full expected ({expected} {unit})
                                                         </button>
                                                     </td>
-                                                    <td className="px-4 py-4 text-center font-semibold text-slate-700">{expected}</td>
-                                                    <td className="px-4 py-4 text-center">
-                                                        <input
-                                                            type="number"
-                                                            step="1"
-                                                            min="0"
-                                                            inputMode="numeric"
-                                                            value={data.items[index]?.received_quantity ?? ''}
-                                                            onChange={(e) => handleItemChange(index, 'received_quantity', e.target.value)}
-                                                            className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-center text-sm font-bold text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                                        />
+                                                    <td className="px-4 py-4 text-center font-semibold text-slate-700">
+                                                        <div>{expected}</div>
+                                                        <div className="text-[10px] font-normal text-slate-500">{unit}</div>
                                                     </td>
                                                     <td className="px-4 py-4 text-center">
-                                                        <input
-                                                            type="number"
-                                                            step="1"
-                                                            min="0"
-                                                            inputMode="numeric"
-                                                            value={data.items[index]?.damaged_quantity ?? ''}
-                                                            onChange={(e) => handleItemChange(index, 'damaged_quantity', e.target.value)}
-                                                            className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-center text-sm font-bold text-rose-700 focus:border-rose-500 focus:outline-none focus:ring-1 focus:ring-rose-500"
-                                                        />
+                                                        <div className="inline-flex items-center gap-1">
+                                                            <input
+                                                                type="number"
+                                                                step="1"
+                                                                min="0"
+                                                                inputMode="numeric"
+                                                                value={data.items[index]?.received_quantity ?? ''}
+                                                                onChange={(e) => handleItemChange(index, 'received_quantity', e.target.value)}
+                                                                className="w-20 rounded-lg border border-slate-300 px-2 py-2 text-center text-sm font-bold text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                                            />
+                                                            <span className="text-[11px] text-slate-500 font-medium">{unit}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-4 text-center">
+                                                        <div className="inline-flex items-center gap-1">
+                                                            <input
+                                                                type="number"
+                                                                step="1"
+                                                                min="0"
+                                                                inputMode="numeric"
+                                                                value={data.items[index]?.damaged_quantity ?? ''}
+                                                                onChange={(e) => handleItemChange(index, 'damaged_quantity', e.target.value)}
+                                                                className="w-20 rounded-lg border border-slate-300 px-2 py-2 text-center text-sm font-bold text-rose-700 focus:border-rose-500 focus:outline-none focus:ring-1 focus:ring-rose-500"
+                                                            />
+                                                            <span className="text-[11px] text-rose-600 font-medium">{unit}</span>
+                                                        </div>
                                                     </td>
                                                     <td className="px-4 py-4 text-center">
                                                         <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${accepted > 0 ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-300' : 'bg-slate-100 text-slate-500'}`}>
-                                                            {accepted}
+                                                            {accepted} {unit}
                                                         </span>
                                                     </td>
                                                     <td className="px-4 py-4 text-center">
                                                         <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${missing > 0 ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-300' : 'bg-slate-50 text-slate-400'}`}>
-                                                            {missing}
+                                                            {missing} {unit}
                                                         </span>
                                                     </td>
                                                 </tr>

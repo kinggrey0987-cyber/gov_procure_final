@@ -751,11 +751,12 @@ class PublicDisclosurePackageService
         }
 
         if ($record instanceof PurchaseRequest) {
-            return sprintf('PR-%d | %s', (int) $record->purchase_request_id, $record->office?->name ?? 'Unknown Office');
+            $code = (string) ($record->pr_number ?: ('PR-'.str_pad((string) $record->purchase_request_id, 4, '0', STR_PAD_LEFT)));
+            return sprintf('%s | %s', $code, $record->office?->name ?? 'Unknown Office');
         }
 
         if ($record instanceof Ppmp) {
-            return sprintf('PPMP-%d | %s | FY %d', (int) $record->ppmp_id, $record->office?->name ?? 'Unknown Office', (int) $record->fiscal_year);
+            return sprintf('PPMP-%d-%04d | %s | FY %d', (int) $record->fiscal_year, (int) $record->ppmp_id, $record->office?->name ?? 'Unknown Office', (int) $record->fiscal_year);
         }
 
         if ($record instanceof SupplyRequest) {
@@ -795,8 +796,9 @@ class PublicDisclosurePackageService
         }
 
         if ($record instanceof PurchaseRequest) {
+            $prCode = (string) ($record->pr_number ?: ('PR-'.str_pad((string) $record->purchase_request_id, 4, '0', STR_PAD_LEFT)));
             return [
-                'pr_number' => 'PR-'.(int) $record->purchase_request_id,
+                'pr_number' => $prCode,
                 'office' => (string) ($record->office?->name ?? 'Unknown Office'),
                 'status' => (string) $record->status,
                 'item_count' => $record->items->count(),
@@ -809,7 +811,7 @@ class PublicDisclosurePackageService
 
         if ($record instanceof Ppmp) {
             return [
-                'ppmp_number' => 'PPMP-'.(int) $record->ppmp_id,
+                'ppmp_number' => sprintf('PPMP-%d-%04d', (int) $record->fiscal_year, (int) $record->ppmp_id),
                 'office' => (string) ($record->office?->name ?? 'Unknown Office'),
                 'fiscal_year' => (int) $record->fiscal_year,
                 'status' => (string) $record->status,

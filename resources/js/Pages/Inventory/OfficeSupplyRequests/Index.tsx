@@ -458,6 +458,8 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
                                         className={`group relative flex cursor-pointer flex-col justify-between rounded-xl border p-4 transition-all duration-200 ${
                                             isSelected
                                                 ? 'border-red-400 bg-red-50/30 ring-2 ring-red-400/25 shadow-xs'
+                                                : request.priority_level?.toUpperCase() === 'URGENT'
+                                                ? 'border-red-300 bg-red-50/25 shadow-2xs'
                                                 : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50'
                                         }`}
                                     >
@@ -474,9 +476,16 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
                                                         {request.request_code}
                                                     </span>
                                                 </div>
-                                                <span className="inline-flex rounded-full border border-rose-200/60 bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-rose-700">
-                                                    Needs Procurement
-                                                </span>
+                                                <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                                                    {request.priority_level?.toUpperCase() === 'URGENT' && (
+                                                        <span className="inline-flex items-center gap-0.5 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-black text-white shadow-2xs tracking-wide uppercase">
+                                                            🔥 Urgent
+                                                        </span>
+                                                    )}
+                                                    <span className="inline-flex rounded-full border border-rose-200/60 bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-rose-700">
+                                                        Needs Procurement
+                                                    </span>
+                                                </div>
                                             </div>
 
                                             <div className="mt-2 text-xs text-slate-600">
@@ -555,6 +564,18 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
                     </div>
                 )}
 
+                {requests.data.some((r) => r.priority_level?.toUpperCase() === 'URGENT') && (
+                    <div className="rounded-xl border border-red-200 bg-red-50/90 px-4 py-2.5 text-xs text-red-900 flex items-center justify-between shadow-2xs">
+                        <div className="flex items-center gap-2">
+                            <span className="text-base">🔥</span>
+                            <span><strong>Urgent Supply Requests Pinned to Top:</strong> Requests marked urgent are prioritized for immediate review and procurement processing.</span>
+                        </div>
+                        <span className="rounded-full bg-red-200/80 px-2.5 py-0.5 text-[10px] font-bold text-red-900 border border-red-300">
+                            {requests.data.filter((r) => r.priority_level?.toUpperCase() === 'URGENT').length} Urgent Pinned
+                        </span>
+                    </div>
+                )}
+
                 <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
                     <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-slate-200 text-xs">
@@ -571,11 +592,19 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
                         <tbody className="divide-y divide-slate-100">
                             {requests.data.map((request) => {
                                 const queueBlockReason = procurementQueueBlockReason(request);
+                                const isUrgent = request.priority_level?.toUpperCase() === 'URGENT';
 
                                 return (
-                                    <tr key={request.supply_request_id} className="hover:bg-slate-50/60">
+                                    <tr key={request.supply_request_id} className={`hover:bg-slate-50/60 ${isUrgent ? 'border-l-4 border-l-red-600 bg-red-50/20' : ''}`}>
                                         <td className="px-4 py-3">
-                                            <p className="font-mono text-xs text-slate-700">{request.request_code}</p>
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className="font-mono text-xs text-slate-800 font-semibold">{request.request_code}</span>
+                                                {isUrgent && (
+                                                    <span className="inline-flex items-center gap-0.5 rounded-full bg-red-100 border border-red-300 px-2 py-0.5 text-[10px] font-black text-red-700 shadow-2xs tracking-wide uppercase">
+                                                        🔥 Urgent
+                                                    </span>
+                                                )}
+                                            </div>
                                             <p className="mt-1 text-xs text-slate-500">
                                                 {request.item_count} item(s) • {request.requested_total.toFixed(2)} requested
                                             </p>

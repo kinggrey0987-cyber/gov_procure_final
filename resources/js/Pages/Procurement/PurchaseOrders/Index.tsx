@@ -21,6 +21,11 @@ type PurchaseOrderRow = {
         } | null;
     } | null;
     deliveries_count?: number;
+    is_zero_cost_replacement?: boolean;
+    parent_po?: {
+        purchase_order_id: number;
+        po_number?: string | null;
+    } | null;
 };
 
 type Props = {
@@ -156,13 +161,38 @@ export default function PurchaseOrdersIndex({ purchaseOrders, filters }: Props) 
                         <tbody className="divide-y divide-slate-100">
                             {purchaseOrders.data.map((row) => (
                                 <tr key={row.purchase_order_id} className="hover:bg-slate-50/60 transition-colors">
-                                    <td className="px-3.5 py-2 font-semibold text-red-700">{row.po_number}</td>
+                                    <td className="px-3.5 py-2 font-semibold text-red-700">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                            <span>{row.po_number}</span>
+                                            {row.is_zero_cost_replacement && (
+                                                <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 border border-emerald-300 px-2 py-0.5 text-[10px] font-black text-emerald-800 shadow-2xs uppercase tracking-wide">
+                                                    🛡️ Warranty Replacement
+                                                </span>
+                                            )}
+                                        </div>
+                                        {row.parent_po && (
+                                            <p className="text-[11px] text-slate-500 mt-0.5 font-normal">
+                                                Ref Parent:{' '}
+                                                <Link href={route('procurement.purchase-orders.show', row.parent_po.purchase_order_id)} className="text-blue-600 hover:underline font-medium">
+                                                    {row.parent_po.po_number || `PO #${row.parent_po.purchase_order_id}`}
+                                                </Link>
+                                            </p>
+                                        )}
+                                    </td>
                                     <td className="px-3.5 py-2 text-slate-700 font-medium">{row.supplier?.supplier_name ?? '-'}</td>
                                     <td className="px-3.5 py-2 text-slate-700">
                                         <div>{row.purchase_request?.pr_number || (row.purchase_request?.purchase_request_id ? `PR-${String(row.purchase_request.purchase_request_id).padStart(6, '0')}` : '-')}</div>
                                         <p className="text-[11px] text-slate-500">{row.purchase_request?.office?.name ?? '-'}</p>
                                     </td>
-                                    <td className="px-3.5 py-2 font-semibold text-slate-800">{formatMoney(Number(row.total_amount || 0))}</td>
+                                    <td className="px-3.5 py-2 font-semibold text-slate-800">
+                                        {row.is_zero_cost_replacement ? (
+                                            <span className="inline-flex items-center gap-1 rounded bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-xs font-bold text-emerald-700">
+                                                ₱0.00 (Warranty)
+                                            </span>
+                                        ) : (
+                                            formatMoney(Number(row.total_amount || 0))
+                                        )}
+                                    </td>
                                     <td className="px-3.5 py-2">
                                         <span className={statusClass(row.status)}>{displayPurchaseOrderStatus(row.status)}</span>
                                     </td>
@@ -181,6 +211,19 @@ export default function PurchaseOrdersIndex({ purchaseOrders, filters }: Props) 
                                                 <Link href={route('procurement.purchase-orders.items.index', row.purchase_order_id)} className="rounded border border-red-200 bg-red-50/50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 transition">
                                                     Manage Items
                                                 </Link>
+                                            ) : null}
+                                            {row.status === 'DRAFT' && row.is_zero_cost_replacement ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (confirm(`Issue zero-cost warranty replacement purchase order ${row.po_number}?`)) {
+                                                            router.post(route('procurement.purchase-orders.place', row.purchase_order_id));
+                                                        }
+                                                    }}
+                                                    className="rounded bg-emerald-700 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-800 transition shadow-2xs"
+                                                >
+                                                    Issue PO
+                                                </button>
                                             ) : null}
                                             <span
                                                 className={`rounded px-2.5 py-1 text-xs font-semibold ${Number(row.deliveries_count ?? 0) > 0 ? 'border border-blue-200 bg-blue-50 text-blue-700' : 'border border-slate-200 bg-slate-50 text-slate-500'}`}

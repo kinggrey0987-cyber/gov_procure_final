@@ -67,6 +67,7 @@ class SupplyRequestController extends Controller
                         ->orWhereLikeInsensitive('purpose', $search);
                 });
             })
+            ->orderByRaw("CASE WHEN UPPER(priority_level) = 'URGENT' THEN 0 ELSE 1 END ASC")
             ->latest('supply_request_id')
             ->paginate(5)
             ->through(function (SupplyRequest $supplyRequest): array {
@@ -78,6 +79,7 @@ class SupplyRequestController extends Controller
                     'request_code' => (string) $supplyRequest->request_code,
                     'status' => $trackingStatus,
                     'raw_status' => (string) $supplyRequest->status,
+                    'priority_level' => strtoupper((string) ($supplyRequest->priority_level ?? 'NORMAL')),
                     'request_date' => optional($supplyRequest->request_date)?->toDateString(),
                     'items_count' => (int) $supplyRequest->items->count(),
                     'items_summary' => $supplyRequest->items->take(2)->pluck('item_name_snapshot')->implode(', '),
@@ -1119,17 +1121,27 @@ class SupplyRequestController extends Controller
             ->whereIn('status', ['RELEASED', 'RECEIVED'])
             ->latest('distribution_record_id')
             ->paginate(5)
-            ->through(fn (DistributionRecord $record): array => [
-                'distribution_record_id' => (int) $record->distribution_record_id,
-                'request_id' => (string) ($record->supplyRequest?->request_code ?? 'N/A'),
-                'request_date' => optional($record->supplyRequest?->request_date)?->toDateString(),
-                'items_summary' => (string) ($record->items->take(2)->pluck('item_name_snapshot')->implode(', ') ?: 'No released items listed'),
-                'items_count' => (int) $record->items->count(),
-                'location' => (string) ($record->storage_location ?? 'GSO Storage'),
-                'ready_since' => optional($record->release_date)?->toDateString(),
-                'status' => (string) $record->status,
-                'supply_request_id' => (int) ($record->supply_request_id ?? 0),
-            ])
+            ->through(function (DistributionRecord $record): array {
+                // Check if this distribution record belongs to a resolved replacement claim
+                $isClaimReplacement = (string) ($record->supplyRequest?->request_category ?? '') === 'REPLACEMENT'
+                    || \App\Models\Claim::query()->where('office_id', (int) $record->office_id)
+                        ->where('status', 'RESOLVED')
+                        ->where('updated_at', '>=', $record->created_at->subMinutes(5))
+                        ->exists();
+
+                return [
+                    'distribution_record_id' => (int) $record->distribution_record_id,
+                    'request_id' => (string) ($record->supplyRequest?->request_code ?? 'N/A'),
+                    'request_date' => optional($record->supplyRequest?->request_date)?->toDateString(),
+                    'items_summary' => (string) ($record->items->take(2)->pluck('item_name_snapshot')->implode(', ') ?: 'No released items listed'),
+                    'items_count' => (int) $record->items->count(),
+                    'location' => (string) ($record->storage_location ?? 'GSO Storage'),
+                    'ready_since' => optional($record->release_date)?->toDateString(),
+                    'status' => (string) $record->status,
+                    'supply_request_id' => (int) ($record->supply_request_id ?? 0),
+                    'is_claim_replacement' => $isClaimReplacement,
+                ];
+            })
             ->withQueryString();
 
         return Inertia::render('Office/SuppliesReadyForClaim/Index', [

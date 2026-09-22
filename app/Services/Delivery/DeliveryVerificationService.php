@@ -158,6 +158,34 @@ class DeliveryVerificationService
 
             $this->recordAudit($actor, 'RESOLVE_PARTIAL_DELIVERY_FROM_FOLLOW_UP', $sourceDelivery);
 
+            // Cascading completion:
+            // 1. Mark follow-up replacement PO as COMPLETED
+            $followUpPo = $delivery->purchaseOrder;
+            if ($followUpPo && !in_array((string) $followUpPo->status, ['COMPLETED', 'CLOSED'], true)) {
+                $followUpPoOld = (string) $followUpPo->status;
+                $followUpPo->forceFill(['status' => 'COMPLETED'])->save();
+                $this->recordStatus($delivery, $followUpPoOld, 'COMPLETED', $actor, 'Replacement order completed.');
+            }
+
+            // 2. Mark follow-up PR as COMPLETED
+            if ($purchaseRequest && !in_array((string) $purchaseRequest->status, ['COMPLETED'], true)) {
+                $purchaseRequest->forceFill(['status' => 'COMPLETED'])->save();
+            }
+
+            // 3. Mark parent PO as COMPLETED if all its deliveries are now resolved
+            $parentPo = $sourceDelivery->purchaseOrder;
+            if ($parentPo && !in_array((string) $parentPo->status, ['COMPLETED', 'CLOSED'], true)) {
+                $hasUnverifiedDeliveries = $parentPo->deliveries()
+                    ->whereNotIn('receipt_status', ['VERIFIED', 'COMPLETED', 'CANCELLED'])
+                    ->exists();
+
+                if (!$hasUnverifiedDeliveries) {
+                    $parentOld = (string) $parentPo->status;
+                    $parentPo->forceFill(['status' => 'COMPLETED'])->save();
+                    $this->recordStatus($sourceDelivery, $parentOld, 'COMPLETED', $actor, 'Parent order deliveries and replacement items verified.');
+                }
+            }
+
             $resolvedByDelivery = $sourceDelivery->fresh() ?? $sourceDelivery;
         }
     }

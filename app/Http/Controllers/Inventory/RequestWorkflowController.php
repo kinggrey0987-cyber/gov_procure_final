@@ -111,6 +111,7 @@ class RequestWorkflowController
             ->with(['office', 'requester', 'items.item.inventory', 'purchaseRequests', 'distributionRecords.items'])
             ->whereHas('office', fn ($officeQuery) => $officeQuery->where('code', '!=', 'GSO'))
             ->withCount('distributionRecords')
+            ->orderByRaw("CASE WHEN UPPER(priority_level) = 'URGENT' THEN 0 ELSE 1 END ASC")
             ->latest('supply_request_id');
 
         if ($search !== '') {

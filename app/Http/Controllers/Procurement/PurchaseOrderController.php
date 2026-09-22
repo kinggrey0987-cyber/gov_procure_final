@@ -35,7 +35,7 @@ class PurchaseOrderController extends Controller
         $search = trim((string) $request->input('search', ''));
 
         $purchaseOrders = PurchaseOrder::query()
-            ->with(['purchaseRequest.office', 'supplyRequest', 'supplier'])
+            ->with(['purchaseRequest.office', 'purchaseRequest.sourceDelivery.purchaseOrder', 'supplyRequest', 'supplier'])
             ->withCount('deliveries')
             ->when($status !== '', fn ($query) => $query->where('status', $status))
             ->when($search !== '', function ($query) use ($search): void {
@@ -113,6 +113,7 @@ class PurchaseOrderController extends Controller
                         'item_name' => (string) ($item->item?->item_name ?? 'Unknown item'),
                         'category_name' => (string) ($item->item?->category?->category_name ?? 'Uncategorized'),
                         'quantity_requested' => (float) ($item->quantity_requested ?? 0),
+                        'unit' => (string) ($item->item?->default_unit ?? 'piece'),
                         'remarks' => $item->remarks,
                     ])->values(),
                 ];
@@ -266,6 +267,12 @@ class PurchaseOrderController extends Controller
     public function update(UpdatePurchaseOrderRequest $request, PurchaseOrder $purchaseOrder): RedirectResponse
     {
         abort_unless($request->user()?->can('procurement.purchase-order.update', $purchaseOrder), 403);
+
+        if ($purchaseOrder->is_zero_cost_replacement && (int) $request->validated('supplier_id') !== (int) $purchaseOrder->supplier_id) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'supplier_id' => 'Cannot change supplier for a warranty replacement purchase order. It is locked to the original contractor.',
+            ]);
+        }
 
         $this->service->update($purchaseOrder, $request->user(), $request->validated());
 

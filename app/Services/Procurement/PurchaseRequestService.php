@@ -623,6 +623,7 @@ class PurchaseRequestService
                 ),
             ]);
 
+            $groupedDiscrepancies = [];
             foreach ($discrepancyItems as $deliveryItem) {
                 if (! $deliveryItem instanceof DeliveryItem) {
                     continue;
@@ -633,12 +634,35 @@ class PurchaseRequestService
                     continue;
                 }
 
-                $catalogItem = $purchaseOrderItem->item;
+                $spec = trim((string) ($purchaseOrderItem->specification ?? ''));
+                $key = ((int) $purchaseOrderItem->item_id) . '::' . $spec;
                 $quantityRequested = round((float) $deliveryItem->missing_quantity + (float) $deliveryItem->damaged_quantity, 2);
 
                 if ($quantityRequested <= 0) {
                     continue;
                 }
+
+                if (isset($groupedDiscrepancies[$key])) {
+                    $groupedDiscrepancies[$key]['quantity_requested'] += $quantityRequested;
+                    $groupedDiscrepancies[$key]['missing'] += (float) $deliveryItem->missing_quantity;
+                    $groupedDiscrepancies[$key]['damaged'] += (float) $deliveryItem->damaged_quantity;
+                } else {
+                    $groupedDiscrepancies[$key] = [
+                        'delivery_item' => $deliveryItem,
+                        'purchase_order_item' => $purchaseOrderItem,
+                        'specification' => $spec,
+                        'quantity_requested' => $quantityRequested,
+                        'missing' => (float) $deliveryItem->missing_quantity,
+                        'damaged' => (float) $deliveryItem->damaged_quantity,
+                    ];
+                }
+            }
+
+            foreach ($groupedDiscrepancies as $grouped) {
+                $deliveryItem = $grouped['delivery_item'];
+                $purchaseOrderItem = $grouped['purchase_order_item'];
+                $catalogItem = $purchaseOrderItem->item;
+                $quantityRequested = round((float) $grouped['quantity_requested'], 2);
 
                 $sourceSupplyRequestItem = $purchaseOrderItem->supplyRequestItem;
                 $ppmpItemId = $sourceSupplyRequestItem?->ppmp_item_id;
@@ -670,10 +694,11 @@ class PurchaseRequestService
                     'source_delivery_item_id' => (int) $deliveryItem->delivery_item_id,
                     'quantity_requested' => $quantityRequested,
                     'remarks' => sprintf(
-                        'Follow-up quantity from delivery %s discrepancy (missing: %.2f, damaged: %.2f).',
+                        'Follow-up quantity from delivery %s discrepancy (missing: %.2f, damaged: %.2f)%s.',
                         (string) $delivery->delivery_code,
-                        (float) $deliveryItem->missing_quantity,
-                        (float) $deliveryItem->damaged_quantity,
+                        (float) $grouped['missing'],
+                        (float) $grouped['damaged'],
+                        $grouped['specification'] !== '' ? ' | Spec: '.$grouped['specification'] : ''
                     ),
                 ]);
             }
@@ -1112,20 +1137,26 @@ class PurchaseRequestService
             ]);
         }
 
-        // Merge items by item_id, summing quantities
+        // Merge items strictly by (item_id + specification), summing quantities for identical specs
         $mergedItems = [];
         foreach ($eligible as $supplyRequest) {
+            $supplyRequest->loadMissing(['items.item', 'items.ppmpItem']);
             foreach ($supplyRequest->items as $item) {
                 $itemId = (int) $item->item_id;
+                $spec = trim((string) ($item->ppmpItem?->remarks ?? ''));
+                $key = $itemId . '::' . $spec;
                 $requested = (float) $item->quantity_requested;
 
-                if (isset($mergedItems[$itemId])) {
-                    $mergedItems[$itemId]['quantity_requested'] += $requested;
+                if (isset($mergedItems[$key])) {
+                    $mergedItems[$key]['quantity_requested'] += $requested;
+                    $mergedItems[$key]['source_item_ids'][] = (int) $item->supply_request_item_id;
                 } else {
-                    $mergedItems[$itemId] = [
+                    $mergedItems[$key] = [
                         'item_id' => $itemId,
+                        'specification' => $spec,
                         'quantity_requested' => $requested,
                         'item_name_snapshot' => (string) ($item->item?->item_name ?? $item->item_name_snapshot ?? 'Unknown Item'),
+                        'source_item_ids' => [(int) $item->supply_request_item_id],
                     ];
                 }
             }
@@ -1160,6 +1191,7 @@ class PurchaseRequestService
             $itemRows = [];
             foreach ($mergedItems as $merged) {
                 $itemId = (int) $merged['item_id'];
+                $spec = (string) ($merged['specification'] ?? '');
                 $totalRequested = (float) $merged['quantity_requested'];
 
                 /** @var Inventory|null $inventory */
@@ -1170,13 +1202,21 @@ class PurchaseRequestService
                 $reserveAmount = min($totalRequested, $available);
 
                 if ($shortage > 0) {
+                    $remarkParts = [];
+                    if ($spec !== '') {
+                        $remarkParts[] = "Spec: {$spec}";
+                    }
+                    if ($reserveAmount > 0) {
+                        $remarkParts[] = sprintf('Consolidated net shortage (%.2f requested, %.2f reserved from warehouse).', $totalRequested, $reserveAmount);
+                    } else {
+                        $remarkParts[] = 'Consolidated from office supply requests.';
+                    }
+
                     $itemRows[] = [
                         'purchase_request_id' => (int) $purchaseRequest->purchase_request_id,
                         'item_id' => $itemId,
                         'quantity_requested' => round($shortage, 2),
-                        'remarks' => $reserveAmount > 0
-                            ? sprintf('Consolidated net shortage (%.2f requested, %.2f reserved from warehouse).', $totalRequested, $reserveAmount)
-                            : 'Consolidated from office supply requests.',
+                        'remarks' => implode(' | ', $remarkParts),
                         'created_at' => now(),
                         'updated_at' => now(),
                     ];

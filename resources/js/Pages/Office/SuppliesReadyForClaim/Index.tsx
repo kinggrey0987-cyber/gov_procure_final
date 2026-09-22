@@ -12,6 +12,7 @@ type ReadyRecord = {
     ready_since?: string | null;
     status: string;
     supply_request_id: number;
+    is_claim_replacement?: boolean;
 };
 
 type Props = {
@@ -56,7 +57,16 @@ export default function SuppliesReadyForClaimIndex({ records }: Props) {
                                 <tbody className="divide-y divide-slate-100">
                                     {records.data.map((record) => (
                                         <tr key={record.distribution_record_id} className="hover:bg-slate-50/60 transition-colors">
-                                            <td className="px-3.5 py-2 font-semibold text-red-700">{record.request_id}</td>
+                                            <td className="px-3.5 py-2 font-semibold text-red-700">
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <span>{record.request_id}</span>
+                                                    {record.is_claim_replacement && (
+                                                        <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 border border-amber-300 px-2 py-0.5 text-[10px] font-black text-amber-800 shadow-2xs uppercase">
+                                                            🛡️ Claim Replacement
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
                                             <td className="px-3.5 py-2 text-slate-700">{record.request_date ?? '-'}</td>
                                             <td className="px-3.5 py-2 text-slate-700">
                                                 <p className="font-medium">{record.items_count} item(s)</p>

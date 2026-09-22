@@ -53,7 +53,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
         needed_by_date: today,
         request_category: 'GENERAL',
         purpose: '',
-        priority_level: 'MEDIUM',
+        priority_level: 'NORMAL',
         review_notes: '',
         submit_after_save: false,
         items: [emptyItem()],
@@ -351,10 +351,8 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                 onChange={(event) => form.setData('priority_level', event.target.value)}
                                 required
                             >
-                                <option value="LOW">Low</option>
-                                <option value="MEDIUM">Medium</option>
-                                <option value="HIGH">High</option>
-                                <option value="URGENT">Urgent</option>
+                                <option value="NORMAL">Normal</option>
+                                <option value="URGENT">🔥 Urgent (Priority Need)</option>
                             </select>
                         </label>
                     </div>

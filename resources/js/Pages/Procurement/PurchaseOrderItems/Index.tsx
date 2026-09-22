@@ -7,6 +7,11 @@ type PurchaseOrder = {
     purchase_order_id: number;
     po_number?: string;
     status?: string;
+    is_zero_cost_replacement?: boolean;
+    parent_po?: {
+        purchase_order_id: number;
+        po_number?: string | null;
+    } | null;
 };
 
 type PurchaseOrderItem = {
@@ -60,7 +65,8 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
     const remainingCount = unencodedItems.length;
 
     const isAllItemsEncoded = hasSourceItems ? remainingCount === 0 : items.data.length > 0;
-    const canProcess = isDraft && isAllItemsEncoded;
+        const isWarranty = Boolean(purchaseOrder.is_zero_cost_replacement);
+    const canProcess = isDraft && (isWarranty ? items.data.length > 0 : isAllItemsEncoded);
 
     const form = useForm({
         supply_request_item_id: 0,

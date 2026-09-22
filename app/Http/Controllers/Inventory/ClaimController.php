@@ -179,10 +179,26 @@ class ClaimController
                 'claims',
                 (int) $claim->claims_id,
                 [
-                    'title' => (string) ($validated['attachment_title'] ?? ($validated['claim_type'].' Issue Attachment')),
+                    'title' => (string) ($validated['attachment_title'] ?? ($validated['claim_type'].' Evidence')),
                     'file' => $request->file('attachment_file'),
                 ],
             );
+        }
+
+        if ($request->hasFile('attachments')) {
+            foreach ($request->file('attachments') as $idx => $file) {
+                if ($file && $file->isValid()) {
+                    $this->documentService->upload(
+                        request()->user(),
+                        'claims',
+                        (int) $claim->claims_id,
+                        [
+                            'title' => sprintf('%s Evidence #%d', $validated['claim_type'], $idx + 1),
+                            'file' => $file,
+                        ],
+                    );
+                }
+            }
         }
 
         $showRoute = request()->user()->isOfficeUser() ? 'office.claims.show' : 'inventory.claims.show';

@@ -33,6 +33,7 @@ type PurchaseRequestOption = {
         item_name: string;
         category_name: string;
         quantity_requested: number;
+        unit?: string;
         remarks?: string | null;
     }>;
 };
@@ -260,6 +261,7 @@ export default function PurchaseOrdersCreate({ eligiblePurchaseRequests, supplie
                                             <th className="px-3 py-2 text-left font-semibold text-slate-700">Item</th>
                                             <th className="px-3 py-2 text-left font-semibold text-slate-700">Category</th>
                                             <th className="px-3 py-2 text-left font-semibold text-slate-700">Qty Requested</th>
+                                            <th className="px-3 py-2 text-left font-semibold text-slate-700">Unit</th>
                                             <th className="px-3 py-2 text-left font-semibold text-slate-700">Cost</th>
                                         </tr>
                                     </thead>
@@ -272,12 +274,13 @@ export default function PurchaseOrdersCreate({ eligiblePurchaseRequests, supplie
                                                 </td>
                                                 <td className="px-3 py-2 text-slate-700">{row.category_name || 'Uncategorized'}</td>
                                                 <td className="px-3 py-2 text-slate-700">{Number(row.quantity_requested ?? 0).toFixed(2)}</td>
+                                                <td className="px-3 py-2 text-slate-700 font-medium">{row.unit || 'piece'}</td>
                                                 <td className="px-3 py-2 text-slate-600">To be encoded upon supplier quote (Manage Items)</td>
                                             </tr>
                                         ))}
                                         {selectedItems.length === 0 ? (
                                             <tr>
-                                                <td colSpan={4} className="px-3 py-6 text-center text-slate-500">
+                                                <td colSpan={5} className="px-3 py-6 text-center text-slate-500">
                                                     No request items loaded for this source.
                                                 </td>
                                             </tr>

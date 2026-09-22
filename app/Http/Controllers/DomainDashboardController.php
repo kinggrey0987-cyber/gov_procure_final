@@ -67,6 +67,18 @@ class DomainDashboardController extends Controller
                 'occurred_at' => optional($log->created_at)?->toIso8601String(),
             ])->values();
 
+        $dbStart = microtime(true);
+        \Illuminate\Support\Facades\DB::select('SELECT 1');
+        $dbLatencyMs = round((microtime(true) - $dbStart) * 1000, 1);
+
+        $diskFree = @disk_free_space(base_path());
+        $diskTotal = @disk_total_space(base_path());
+        $diskUsedPercent = ($diskTotal > 0 && $diskFree !== false)
+            ? round((($diskTotal - $diskFree) / $diskTotal) * 100, 1)
+            : 0.0;
+        $diskFreeGb = $diskFree !== false ? round($diskFree / (1024 * 1024 * 1024), 1) : 0.0;
+        $memoryUsageMb = round(memory_get_usage(true) / (1024 * 1024), 1);
+
         $response = Inertia::render('Dashboard/AdminDashboard', [
             'summary' => [
                 'total_users' => User::query()->count(),
@@ -75,6 +87,14 @@ class DomainDashboardController extends Controller
                 'unread_notification_count' => $user
                     ? Notification::query()->forUser((int) $user->id)->unread()->count()
                     : 0,
+                'telemetry' => [
+                    'db_latency_ms' => $dbLatencyMs,
+                    'memory_usage_mb' => $memoryUsageMb,
+                    'disk_used_percent' => $diskUsedPercent,
+                    'disk_free_gb' => $diskFreeGb,
+                    'php_version' => PHP_VERSION,
+                    'environment' => app()->environment(),
+                ],
             ],
             'activities' => $activities,
             'pagination' => [

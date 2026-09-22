@@ -246,78 +246,93 @@ class DeliveryController
         ]);
     }
 
-    public function receive(Delivery $delivery): Response
-    {
-        abort_unless(request()->user()->can('delivery.update', $delivery), 403);
-
-        if ((string) $delivery->receipt_status !== 'PENDING') {
-            abort(403, 'Only PENDING deliveries can be received.');
-        }
-
-        $delivery = $this->deliveryService->ensureItemsFromPurchaseOrder($delivery);
-        $delivery->load(['purchaseOrder', 'supplier', 'items.purchaseOrderItem.item']);
-
-        $poPlacedDate = null;
-        if ($delivery->purchaseOrder instanceof PurchaseOrder) {
-            $poPlacedDate = StatusHistory::query()
-                ->where('reference_type', PurchaseOrder::class)
-                ->where('reference_id', (int) $delivery->purchaseOrder->purchase_order_id)
-                ->where('new_status', 'PLACED')
-                ->orderBy('changed_at')
-                ->value('changed_at')?->toDateString()
-                ?? optional($delivery->purchaseOrder->updated_at)?->toDateString()
-                ?? optional($delivery->purchaseOrder->created_at)?->toDateString();
-        }
-
-        $items = collect();
-        if ($delivery->relationLoaded('items') && $delivery->items instanceof \Illuminate\Database\Eloquent\Collection) {
-            $items = $delivery->items->map(fn ($item): array => [
-                'delivery_item_id' => (int) $item->delivery_item_id,
-                'expected_quantity' => (float) $item->expected_quantity,
-                'received_quantity' => (float) $item->received_quantity,
-                'item_condition' => (string) ($item->item_condition ?? 'GOOD'),
-                'item' => ($item->relationLoaded('purchaseOrderItem') && $item->purchaseOrderItem && $item->purchaseOrderItem->relationLoaded('item') && $item->purchaseOrderItem->item) ? [
-                    'item_name' => (string) $item->purchaseOrderItem->item->item_name,
-                    'item_id' => (int) $item->purchaseOrderItem->item->item_id,
-                ] : null,
-            ])->values();
-        }
-
-        $estimatedPoTotal = 0.0;
-        if ($delivery->purchaseOrder instanceof PurchaseOrder) {
-            $delivery->purchaseOrder->loadMissing('items');
-            $estimatedPoTotal = (float) $delivery->purchaseOrder->items->sum(function ($poItem): float {
-                return (float) $poItem->quantity_ordered * (float) $poItem->unit_price;
-            });
-        }
-
-        return Inertia::render('Inventory/Delivery/Receive', [
-            'delivery' => [
-                'delivery_id' => (int) $delivery->delivery_id,
-                'delivery_code' => (string) $delivery->delivery_code,
-                'receipt_status' => (string) $delivery->receipt_status,
-                'actual_delivery_date' => optional($delivery->actual_delivery_date)?->toDateString(),
-                'expected_arrival_date' => optional($delivery->expected_arrival_date)?->toDateString(),
-                'delivery_receipt_no' => (string) ($delivery->delivery_receipt_no ?? ''),
-                'sales_invoice_no' => (string) ($delivery->sales_invoice_no ?? ''),
-                'sales_invoice_date' => optional($delivery->sales_invoice_date)?->toDateString(),
-                'sales_invoice_amount' => $delivery->sales_invoice_amount !== null ? (float) $delivery->sales_invoice_amount : ($estimatedPoTotal > 0 ? $estimatedPoTotal : null),
-                'estimated_po_total' => $estimatedPoTotal,
-                'remarks' => $delivery->remarks,
-                'purchase_order' => $delivery->purchaseOrder ? [
-                    'purchase_order_id' => (int) $delivery->purchaseOrder->purchase_order_id,
-                    'po_number' => (string) ($delivery->purchaseOrder->po_number ?? ''),
-                    'placed_date' => $poPlacedDate,
-                ] : null,
-                'supplier' => $delivery->supplier ? [
-                    'supplier_name' => (string) ($delivery->supplier->supplier_name ?? ''),
-                ] : null,
-                'items' => $items->values(),
-            ],
-        ]);
-    }
-
-    public function edit(Delivery $delivery): Response
+            public function receive(Delivery $delivery): Response
+    {
+        abort_unless(request()->user()->can('delivery.update', $delivery), 403);
+
+        if ((string) $delivery->receipt_status !== 'PENDING') {
+            abort(403, 'Only PENDING deliveries can be received.');
+        }
+
+        $delivery = $this->deliveryService->ensureItemsFromPurchaseOrder($delivery);
+        $delivery->load(['purchaseOrder', 'supplier', 'items.purchaseOrderItem.item']);
+
+        $poPlacedDate = null;
+        if ($delivery->purchaseOrder instanceof PurchaseOrder) {
+            $poPlacedDate = StatusHistory::query()
+                ->where('reference_type', PurchaseOrder::class)
+                ->where('reference_id', (int) $delivery->purchaseOrder->purchase_order_id)
+                ->where('new_status', 'PLACED')
+                ->orderBy('changed_at')
+                ->value('changed_at')?->toDateString()
+                ?? optional($delivery->purchaseOrder->updated_at)?->toDateString()
+                ?? optional($delivery->purchaseOrder->created_at)?->toDateString();
+        }
+
+        $existingDocuments = Document::query()
+            ->where('related_module', 'deliveries')
+            ->where('related_reference_id', (int) $delivery->delivery_id)
+            ->get();
+        $hasExistingDr = $existingDocuments->contains(fn ($doc) => $doc->document_kind === 'delivery_receipt'
+            || str_contains(strtolower((string) $doc->title), 'delivery receipt')
+            || str_contains(strtolower((string) $doc->title), ' dr '));
+        $hasExistingSi = $existingDocuments->contains(fn ($doc) => $doc->document_kind === 'sales_invoice'
+            || str_contains(strtolower((string) $doc->title), 'sales invoice')
+            || str_contains(strtolower((string) $doc->title), 'invoice'));
+
+        $items = collect();
+        if ($delivery->relationLoaded('items') && $delivery->items instanceof \Illuminate\Database\Eloquent\Collection) {
+            $items = $delivery->items->map(fn ($item): array => [
+                'delivery_item_id' => (int) $item->delivery_item_id,
+                'expected_quantity' => (float) $item->expected_quantity,
+                'received_quantity' => (float) $item->received_quantity,
+                'item_condition' => (string) ($item->item_condition ?? 'GOOD'),
+                'item' => ($item->relationLoaded('purchaseOrderItem') && $item->purchaseOrderItem && $item->purchaseOrderItem->relationLoaded('item') && $item->purchaseOrderItem->item) ? [
+                    'item_name' => (string) $item->purchaseOrderItem->item->item_name,
+                    'item_id' => (int) $item->purchaseOrderItem->item->item_id,
+                    'default_unit' => (string) ($item->purchaseOrderItem->unit ?: ($item->purchaseOrderItem->item->default_unit ?? 'piece')),
+                    'pieces_per_box' => (int) ($item->purchaseOrderItem->item->pieces_per_box ?? 1),
+                    'sub_unit' => (string) ($item->purchaseOrderItem->item->sub_unit ?? 'piece'),
+                ] : null,
+            ])->values();
+        }
+
+        $estimatedPoTotal = 0.0;
+        if ($delivery->purchaseOrder instanceof PurchaseOrder) {
+            $delivery->purchaseOrder->loadMissing('items');
+            $estimatedPoTotal = (float) $delivery->purchaseOrder->items->sum(function ($poItem): float {
+                return (float) $poItem->quantity_ordered * (float) $poItem->unit_price;
+            });
+        }
+
+        return Inertia::render('Inventory/Delivery/Receive', [
+            'delivery' => [
+                'delivery_id' => (int) $delivery->delivery_id,
+                'delivery_code' => (string) $delivery->delivery_code,
+                'receipt_status' => (string) $delivery->receipt_status,
+                'actual_delivery_date' => optional($delivery->actual_delivery_date)?->toDateString(),
+                'expected_arrival_date' => optional($delivery->expected_arrival_date)?->toDateString(),
+                'delivery_receipt_no' => (string) ($delivery->delivery_receipt_no ?? ''),
+                'sales_invoice_no' => (string) ($delivery->sales_invoice_no ?? ''),
+                'sales_invoice_date' => optional($delivery->sales_invoice_date)?->toDateString(),
+                'sales_invoice_amount' => $delivery->sales_invoice_amount !== null ? (float) $delivery->sales_invoice_amount : ($estimatedPoTotal > 0 ? $estimatedPoTotal : null),
+                'estimated_po_total' => $estimatedPoTotal,
+                'remarks' => $delivery->remarks,
+                'has_existing_dr' => $hasExistingDr,
+                'has_existing_si' => $hasExistingSi,
+                'purchase_order' => $delivery->purchaseOrder ? [
+                    'purchase_order_id' => (int) $delivery->purchaseOrder->purchase_order_id,
+                    'po_number' => (string) ($delivery->purchaseOrder->po_number ?? ''),
+                    'placed_date' => $poPlacedDate,
+                ] : null,
+                'supplier' => $delivery->supplier ? [
+                    'supplier_name' => (string) ($delivery->supplier->supplier_name ?? ''),
+                ] : null,
+                'items' => $items->values(),
+            ],
+        ]);
+    }
+public function edit(Delivery $delivery): Response
     {
         abort_unless(request()->user()->can('delivery.update', $delivery), 403);
 

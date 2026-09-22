@@ -36,13 +36,19 @@ class StoreClaimRequest extends FormRequest
             'quantity_disputed' => ['nullable', 'integer', 'min:0'],
             'quantity_damaged' => ['nullable', 'integer', 'min:0'],
             'quantity_missing' => ['nullable', 'integer', 'min:0'],
-            'remarks' => ['nullable', 'string'],
+            'remarks' => ['required', 'string', 'min:5'],
             'attachment_title' => ['nullable', 'string', 'max:200'],
             'attachment_file' => [
-                'required_if:claim_type,DAMAGED_ITEM,MISSING_ITEM,MISSING_AND_DAMAGED',
+                'nullable',
                 'file',
                 'max:10240',
-                'mimes:pdf,doc,docx,xls,xlsx,csv,png,jpg,jpeg',
+                'mimes:pdf,doc,docx,xls,xlsx,csv,png,jpg,jpeg,webp',
+            ],
+            'attachments' => ['nullable', 'array'],
+            'attachments.*' => [
+                'file',
+                'max:10240',
+                'mimes:pdf,doc,docx,xls,xlsx,csv,png,jpg,jpeg,webp',
             ],
         ];
     }
@@ -50,6 +56,20 @@ class StoreClaimRequest extends FormRequest
     /**
      * @return array<string, string>
      */
+    public function withValidator(\Illuminate\Validation\Validator $validator): void
+    {
+        $validator->after(function ($validator) {
+            $claimType = (string) $this->input('claim_type');
+            if (in_array($claimType, ['DAMAGED_ITEM', 'MISSING_ITEM', 'MISSING_AND_DAMAGED'], true)) {
+                $hasSingle = $this->hasFile('attachment_file');
+                $hasMulti = $this->hasFile('attachments') && count($this->file('attachments')) > 0;
+                if (! $hasSingle && ! $hasMulti) {
+                    $validator->errors()->add('attachment_file', 'Evidence (photo or document) is required for damaged or missing item claims.');
+                }
+            }
+        });
+    }
+
     public function messages(): array
     {
         return [

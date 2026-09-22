@@ -62,7 +62,13 @@ class PurchaseOrder extends Model
 
     protected $appends = [
         'is_zero_cost_replacement',
+        'parent_po',
     ];
+
+    public function getParentPoAttribute(): ?self
+    {
+        return $this->purchaseRequest?->sourceDelivery?->purchaseOrder;
+    }
 
     public function getIsZeroCostReplacementAttribute(): bool
     {

@@ -63,10 +63,33 @@ export default function InventoryOfficeSupplyRequestShow({ request, backFilters 
 
             <div className="space-y-5 py-8">
                 <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                    {request.priority_level?.toUpperCase() === 'URGENT' && (
+                        <div className="mb-4 flex items-center gap-3.5 rounded-xl border-2 border-red-500 bg-red-50 p-4 text-red-900 shadow-xs">
+                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-600 text-xl text-white shadow">🔥</span>
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <h4 className="text-sm font-extrabold uppercase tracking-wide text-red-900">URGENT PRIORITY SUPPLY REQUEST</h4>
+                                    <span className="rounded bg-red-600 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-white shadow-2xs">EXPEDITE PROCESSING</span>
+                                </div>
+                                <p className="mt-0.5 text-xs text-red-700">This request is marked Urgent and pinned for priority assessment, shortage review, and procurement fulfillment.</p>
+                            </div>
+                        </div>
+                    )}
                     <p className="font-mono text-sm text-slate-700">{request.request_code}</p>
                     <div className="mt-3 grid gap-3 text-sm text-slate-700 md:grid-cols-2 lg:grid-cols-3">
                         <p><span className="font-semibold">Status:</span> {request.status}</p>
-                        <p><span className="font-semibold">Priority:</span> {request.priority_level}</p>
+                        <p className="flex items-center gap-1.5">
+                            <span className="font-semibold">Priority:</span>
+                            {request.priority_level?.toUpperCase() === 'URGENT' ? (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-red-300 bg-red-100 px-2.5 py-0.5 text-xs font-bold text-red-800 shadow-2xs">
+                                    <span>🔥</span> URGENT
+                                </span>
+                            ) : (
+                                <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">
+                                    Normal
+                                </span>
+                            )}
+                        </p>
                         <p><span className="font-semibold">Needed By:</span> {request.needed_by_date ?? '-'}</p>
                         <p><span className="font-semibold">Request Date:</span> {request.request_date ?? '-'}</p>
                         <p><span className="font-semibold">Office:</span> {request.office?.name ?? '-'}</p>

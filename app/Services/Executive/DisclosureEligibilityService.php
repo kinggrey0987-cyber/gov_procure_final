@@ -23,14 +23,15 @@ class DisclosureEligibilityService
             ->get(['ppmp_id', 'office_id', 'fiscal_year', 'total_estimated_budget', 'updated_at'])
             ->map(static fn (Ppmp $ppmp): array => [
                 'label' => sprintf(
-                    'PPMP-%d | %s | FY %d | %s',
+                    'PPMP-%d-%04d | %s | FY %d | %s',
+                    (int) $ppmp->fiscal_year,
                     (int) $ppmp->ppmp_id,
                     $ppmp->office?->name ?? 'Unknown Office',
                     (int) $ppmp->fiscal_year,
                     number_format((float) $ppmp->total_estimated_budget, 2)
                 ),
                 'source_group' => 'Approved PPMP',
-                'source_code' => sprintf('PPMP-%d', (int) $ppmp->ppmp_id),
+                'source_code' => sprintf('PPMP-%d-%04d', (int) $ppmp->fiscal_year, (int) $ppmp->ppmp_id),
                 'office' => $ppmp->office?->name ?? 'Unknown Office',
                 'release_date' => optional($ppmp->updated_at)?->format('Y-m-d'),
                 'reference_type' => Ppmp::class,
@@ -69,23 +70,26 @@ class DisclosureEligibilityService
             ->whereIn('status', ['OPEN', 'PROCESSING'])
             ->orderByDesc('updated_at')
             ->limit(20)
-            ->get(['purchase_request_id', 'office_id', 'status', 'updated_at'])
-            ->map(static fn (PurchaseRequest $purchaseRequest): array => [
-                'label' => sprintf(
-                    'PR-%d | %s | %s',
-                    (int) $purchaseRequest->purchase_request_id,
-                    $purchaseRequest->office?->name ?? 'Unknown Office',
-                    (string) $purchaseRequest->status
-                ),
-                'source_group' => 'Purchase Request',
-                'source_code' => sprintf('PR-%d', (int) $purchaseRequest->purchase_request_id),
-                'office' => $purchaseRequest->office?->name ?? 'Unknown Office',
-                'release_date' => optional($purchaseRequest->updated_at)?->format('Y-m-d'),
-                'reference_type' => PurchaseRequest::class,
-                'reference_id' => (int) $purchaseRequest->purchase_request_id,
-                'suggested_type' => 'PROCUREMENT_SUMMARY',
-                'suggested_title' => sprintf('Procurement Summary - PR-%d', (int) $purchaseRequest->purchase_request_id),
-            ])
+            ->get(['purchase_request_id', 'pr_number', 'office_id', 'status', 'updated_at'])
+            ->map(static function (PurchaseRequest $purchaseRequest): array {
+                $code = (string) ($purchaseRequest->pr_number ?: ('PR-'.str_pad((string) $purchaseRequest->purchase_request_id, 4, '0', STR_PAD_LEFT)));
+                return [
+                    'label' => sprintf(
+                        '%s | %s | %s',
+                        $code,
+                        $purchaseRequest->office?->name ?? 'Unknown Office',
+                        (string) $purchaseRequest->status
+                    ),
+                    'source_group' => 'Purchase Request',
+                    'source_code' => $code,
+                    'office' => $purchaseRequest->office?->name ?? 'Unknown Office',
+                    'release_date' => optional($purchaseRequest->updated_at)?->format('Y-m-d'),
+                    'reference_type' => PurchaseRequest::class,
+                    'reference_id' => (int) $purchaseRequest->purchase_request_id,
+                    'suggested_type' => 'PROCUREMENT_SUMMARY',
+                    'suggested_title' => sprintf('Procurement Summary - %s', $code),
+                ];
+            })
             ->values();
 
         $distributionSummaries = DistributionRecord::query()

@@ -186,7 +186,27 @@ class PurchaseOrderService
             }
         }
 
-        if ($allSourceItemIds->isNotEmpty()) {
+        if ($purchaseOrder->is_zero_cost_replacement) {
+            if ($purchaseOrder->items()->count() === 0) {
+                throw ValidationException::withMessages([
+                    'items' => 'Warranty replacement purchase order must have items to place.',
+                ]);
+            }
+        } elseif ($purchaseOrder->purchaseRequest && $purchaseOrder->purchaseRequest->items()->exists()) {
+            $requiredItemIds = $purchaseOrder->purchaseRequest->items()->pluck('item_id')->map(fn ($id) => (int) $id)->unique();
+            $encodedItemIds = $purchaseOrder->items()->pluck('item_id')->map(fn ($id) => (int) $id)->unique();
+            $missingItemIds = $requiredItemIds->diff($encodedItemIds);
+
+            if ($missingItemIds->isNotEmpty()) {
+                throw ValidationException::withMessages([
+                    'items' => sprintf(
+                        'All %d approved item(s) from the purchase request must be encoded before issuing the purchase order (%d item line(s) remaining).',
+                        $requiredItemIds->count(),
+                        $missingItemIds->count()
+                    ),
+                ]);
+            }
+        } elseif ($allSourceItemIds->isNotEmpty()) {
             $encodedItemIds = $purchaseOrder->items()
                 ->whereNotNull('supply_request_item_id')
                 ->where('supply_request_item_id', '>', 0)
@@ -204,21 +224,6 @@ class PurchaseOrderService
                         $missingItemIds->count()
                     ),
                 ]);
-            }
-        } elseif ($purchaseOrder->purchaseRequest) {
-            $purchaseOrder->loadMissing('purchaseRequest.items');
-            $prItemCount = $purchaseOrder->purchaseRequest?->items?->count() ?? 0;
-            if ($prItemCount > 0) {
-                $poItemCount = $purchaseOrder->items()->count();
-                if ($poItemCount < $prItemCount) {
-                    throw ValidationException::withMessages([
-                        'items' => sprintf(
-                            'All %d items from the purchase request must be encoded before issuing the purchase order (%d encoded).',
-                            $prItemCount,
-                            $poItemCount
-                        ),
-                    ]);
-                }
             }
         }
 
@@ -348,6 +353,12 @@ class PurchaseOrderService
             ]);
         }
 
+        if ($purchaseOrder->is_zero_cost_replacement) {
+            throw ValidationException::withMessages([
+                'purchase_order_id' => 'Cannot add items to a zero-cost warranty replacement purchase order. Items are auto-populated from the delivery discrepancy.',
+            ]);
+        }
+
         $supplyRequestItem = SupplyRequestItem::query()
             ->with('ppmpItem:ppmp_item_id,remarks')
             ->where('supply_request_item_id', $incomingSupplyRequestItemId)
@@ -356,9 +367,16 @@ class PurchaseOrderService
         $this->assertItemMatchesOrderContext($purchaseOrder, $supplyRequestItem);
 
         return DB::transaction(function () use ($purchaseOrder, $actor, $payload, $supplyRequestItem): PurchaseOrderItem {
-            $quantity = max((int) $supplyRequestItem->quantity_requested, 1);
+            $purchaseRequestItem = $purchaseOrder->purchaseRequest?->items
+                ?->firstWhere('item_id', $supplyRequestItem->item_id);
+            $approvedShortage = $purchaseRequestItem ? (float) $purchaseRequestItem->quantity_requested : null;
+
+            $quantity = isset($payload['quantity_ordered']) && (float) $payload['quantity_ordered'] > 0
+                ? (float) $payload['quantity_ordered']
+                : ($approvedShortage ?? max((int) $supplyRequestItem->quantity_requested, 1));
+
             $unitPrice = (float) $payload['unit_price'];
-            $unit = trim((string) ($supplyRequestItem->item?->default_unit ?? ''));
+            $unit = trim((string) ($payload['unit'] ?? ($supplyRequestItem->item?->default_unit ?? '')));
 
             $item = $purchaseOrder->items()->create([
                 'supply_request_item_id' => (int) $supplyRequestItem->supply_request_item_id,
@@ -366,7 +384,7 @@ class PurchaseOrderService
                 'item_name_snapshot' => $supplyRequestItem->item_name_snapshot ?: ($supplyRequestItem->item?->item_name ?? 'Unknown item'),
                 'specification' => $this->resolveItemSpecification($payload, $supplyRequestItem),
                 'quantity_ordered' => $quantity,
-                'unit' => $unit !== '' ? $unit : (string) $payload['unit'],
+                'unit' => $unit !== '' ? $unit : 'piece',
                 'unit_price' => $unitPrice,
                 'total_price' => round($quantity * $unitPrice, 2),
             ]);
@@ -394,6 +412,12 @@ class PurchaseOrderService
             ]);
         }
 
+        if ($purchaseOrder->is_zero_cost_replacement) {
+            throw ValidationException::withMessages([
+                'purchase_order_id' => 'Cannot update items on a zero-cost warranty replacement purchase order.',
+            ]);
+        }
+
         $supplyRequestItem = SupplyRequestItem::query()
             ->with('ppmpItem:ppmp_item_id,remarks')
             ->where('supply_request_item_id', (int) $payload['supply_request_item_id'])
@@ -402,9 +426,16 @@ class PurchaseOrderService
         $this->assertItemMatchesOrderContext($purchaseOrder, $supplyRequestItem);
 
         return DB::transaction(function () use ($purchaseOrder, $item, $actor, $payload, $supplyRequestItem): PurchaseOrderItem {
-            $quantity = max((int) $supplyRequestItem->quantity_requested, 1);
+            $purchaseRequestItem = $purchaseOrder->purchaseRequest?->items
+                ?->firstWhere('item_id', $supplyRequestItem->item_id);
+            $approvedShortage = $purchaseRequestItem ? (float) $purchaseRequestItem->quantity_requested : null;
+
+            $quantity = isset($payload['quantity_ordered']) && (float) $payload['quantity_ordered'] > 0
+                ? (float) $payload['quantity_ordered']
+                : ($approvedShortage ?? max((int) $supplyRequestItem->quantity_requested, 1));
+
             $unitPrice = (float) $payload['unit_price'];
-            $unit = trim((string) ($supplyRequestItem->item?->default_unit ?? ''));
+            $unit = trim((string) ($payload['unit'] ?? ($supplyRequestItem->item?->default_unit ?? '')));
 
             $item->fill([
                 'supply_request_item_id' => (int) $supplyRequestItem->supply_request_item_id,
@@ -412,7 +443,7 @@ class PurchaseOrderService
                 'item_name_snapshot' => $supplyRequestItem->item_name_snapshot ?: ($supplyRequestItem->item?->item_name ?? 'Unknown item'),
                 'specification' => $this->resolveItemSpecification($payload, $supplyRequestItem),
                 'quantity_ordered' => $quantity,
-                'unit' => $unit !== '' ? $unit : (string) $payload['unit'],
+                'unit' => $unit !== '' ? $unit : 'piece',
                 'unit_price' => $unitPrice,
                 'total_price' => round($quantity * $unitPrice, 2),
             ])->save();
@@ -430,6 +461,12 @@ class PurchaseOrderService
     {
         $this->assertProcurementActor($actor);
         $this->assertOrderIsMutable($purchaseOrder);
+
+        if ($purchaseOrder->is_zero_cost_replacement) {
+            throw ValidationException::withMessages([
+                'purchase_order_id' => 'Cannot remove items from a zero-cost warranty replacement purchase order.',
+            ]);
+        }
 
         if ((int) $item->purchase_order_id !== (int) $purchaseOrder->purchase_order_id) {
             throw ValidationException::withMessages([

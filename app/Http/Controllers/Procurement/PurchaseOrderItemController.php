@@ -34,69 +34,67 @@ class PurchaseOrderItemController extends Controller
 
         $sourceSupplyRequests = $this->traceabilityService->getSourceSupplyRequests($purchaseOrder);
 
-        $purchaseRequestItems = $purchaseOrder->purchaseRequest?->items ?? collect();
-        $prItemsByItemId = $purchaseRequestItems->keyBy('item_id');
-        $validItemIds = $prItemsByItemId->keys()->map(fn ($id) => (int) $id)->all();
-
         $sourceItems = collect();
-        foreach ($sourceSupplyRequests as $sr) {
-            $sr->loadMissing(['items.item', 'items.ppmpItem', 'office']);
-            foreach ($sr->items ?? [] as $row) {
-                if ($validItemIds !== [] && ! in_array((int) $row->item_id, $validItemIds, true)) {
-                    continue;
+        $purchaseRequest = $purchaseOrder->purchaseRequest;
+
+        if ($purchaseRequest && $purchaseRequest->items()->exists()) {
+            $purchaseRequest->loadMissing(['items.item', 'office']);
+            foreach ($purchaseRequest->items as $prItem) {
+                // Resolve matching supply request item id if available
+                $srItem = null;
+                foreach ($sourceSupplyRequests as $sr) {
+                    $match = $sr->items->firstWhere('item_id', $prItem->item_id);
+                    if ($match) {
+                        $srItem = $match;
+                        break;
+                    }
+                }
+                if (! $srItem && $purchaseOrder->supplyRequest) {
+                    $srItem = $purchaseOrder->supplyRequest->items->firstWhere('item_id', $prItem->item_id);
                 }
 
-                $prItem = $prItemsByItemId->get((int) $row->item_id);
-                $qtyRequested = $prItem ? (float) $prItem->quantity_requested : (float) ($row->quantity_requested ?? 0);
-
                 $sourceItems->push([
-                    'supply_request_item_id' => (int) $row->supply_request_item_id,
-                    'supply_request_id' => (int) $row->supply_request_id,
-                    'request_code' => (string) $sr->request_code,
-                    'office_code' => (string) ($sr->office?->code ?? ''),
-                    'item_id' => (int) $row->item_id,
-                    'item_name_snapshot' => (string) ($row->item_name_snapshot ?: ($row->item?->item_name ?? 'Unknown item')),
-                    'item_specification' => (string) ($row->ppmpItem?->remarks ?? ''),
-                    'default_unit' => (string) ($row->item?->default_unit ?? ''),
-                    'quantity_requested' => $qtyRequested,
+                    'supply_request_item_id' => (int) ($srItem?->supply_request_item_id ?? $prItem->purchase_request_item_id),
+                    'supply_request_id' => (int) ($srItem?->supply_request_id ?? 0),
+                    'request_code' => (string) ($purchaseRequest->pr_number ?? 'PR'),
+                    'office_code' => (string) ($purchaseRequest->office?->code ?? 'GSO'),
+                    'item_id' => (int) $prItem->item_id,
+                    'item_name_snapshot' => (string) ($prItem->item?->item_name ?? 'Unknown item'),
+                    'item_specification' => (string) ($prItem->remarks ?? ''),
+                    'default_unit' => (string) ($prItem->item?->default_unit ?? 'piece'),
+                    'quantity_requested' => (float) $prItem->quantity_requested,
                 ]);
+            }
+        } else {
+            foreach ($sourceSupplyRequests as $sr) {
+                $sr->loadMissing(['items.item', 'items.ppmpItem', 'office']);
+                foreach ($sr->items ?? [] as $row) {
+                    $sourceItems->push([
+                        'supply_request_item_id' => (int) $row->supply_request_item_id,
+                        'supply_request_id' => (int) $row->supply_request_id,
+                        'request_code' => (string) $sr->request_code,
+                        'office_code' => (string) ($sr->office?->code ?? ''),
+                        'item_id' => (int) $row->item_id,
+                        'item_name_snapshot' => (string) ($row->item_name_snapshot ?: ($row->item?->item_name ?? 'Unknown item')),
+                        'item_specification' => (string) ($row->ppmpItem?->remarks ?? ''),
+                        'default_unit' => (string) ($row->item?->default_unit ?? 'piece'),
+                        'quantity_requested' => (float) ($row->quantity_requested ?? 0),
+                    ]);
+                }
             }
         }
 
-        if ($sourceItems->isEmpty() && $purchaseOrder->supplyRequest) {
-            $purchaseOrder->loadMissing(['supplyRequest.items.item', 'supplyRequest.items.ppmpItem', 'supplyRequest.office']);
-            foreach ($purchaseOrder->supplyRequest->items ?? [] as $row) {
-                if ($validItemIds !== [] && ! in_array((int) $row->item_id, $validItemIds, true)) {
-                    continue;
-                }
-
-                $prItem = $prItemsByItemId->get((int) $row->item_id);
-                $qtyRequested = $prItem ? (float) $prItem->quantity_requested : (float) ($row->quantity_requested ?? 0);
-
-                $sourceItems->push([
-                    'supply_request_item_id' => (int) $row->supply_request_item_id,
-                    'supply_request_id' => (int) $row->supply_request_id,
-                    'request_code' => (string) $purchaseOrder->supplyRequest->request_code,
-                    'office_code' => (string) ($purchaseOrder->supplyRequest->office?->code ?? ''),
-                    'item_id' => (int) $row->item_id,
-                    'item_name_snapshot' => (string) ($row->item_name_snapshot ?: ($row->item?->item_name ?? 'Unknown item')),
-                    'item_specification' => (string) ($row->ppmpItem?->remarks ?? ''),
-                    'default_unit' => (string) ($row->item?->default_unit ?? ''),
-                    'quantity_requested' => $qtyRequested,
-                ]);
-            }
-        }
+        $encodedItemIds = $purchaseOrder->items()->pluck('item_id')->map(fn ($id) => (int) $id)->all();
+        $encodedSourceItemIds = $sourceItems->filter(fn ($si) => in_array((int) $si['item_id'], $encodedItemIds, true))
+            ->pluck('supply_request_item_id')
+            ->map(fn ($id) => (int) $id)
+            ->values();
 
         return Inertia::render('Procurement/PurchaseOrderItems/Index', [
             'purchaseOrder' => $purchaseOrder,
             'items' => $purchaseOrder->items()->latest('purchase_order_item_id')->paginate(5)->withQueryString(),
             'sourceItems' => $sourceItems->values(),
-            'encodedSourceItemIds' => $purchaseOrder->items()
-                ->whereNotNull('supply_request_item_id')
-                ->where('supply_request_item_id', '>', 0)
-                ->pluck('supply_request_item_id')
-                ->map(fn ($id) => (int) $id)
-                ->values(),
+            'encodedSourceItemIds' => $encodedSourceItemIds,
         ]);
     }
 

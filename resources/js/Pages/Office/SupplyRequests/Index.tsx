@@ -11,6 +11,7 @@ type RequestRow = {
     request_code: string;
     status: string;
     raw_status?: string;
+    priority_level?: string;
     request_date?: string | null;
     items_count?: number;
 };
@@ -190,6 +191,22 @@ export default function SupplyRequestsIndex({ supplyRequests, filters, filter_op
                     </div>
                 </section>
 
+                                {/* Urgent Pinned Banner */}
+                {supplyRequests.data.some((r) => r.priority_level === 'URGENT') && (
+                    <div className="rounded-xl border-2 border-red-300 bg-red-50 p-3.5 shadow-xs">
+                        <div className="flex items-center gap-2 font-bold text-red-900 text-xs sm:text-sm">
+                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-sm text-white shadow-2xs">🔥</span>
+                            <span className="uppercase tracking-wider">Urgent Requests Pinned to Top</span>
+                            <span className="ml-auto rounded-full bg-red-600 px-2.5 py-0.5 text-[10px] text-white font-black tracking-wider uppercase">
+                                {supplyRequests.data.filter((r) => r.priority_level === 'URGENT').length} URGENT PINNED
+                            </span>
+                        </div>
+                        <p className="mt-1 text-xs text-red-700 pl-8">
+                            Items tagged as Urgent are prioritized at the top of your request history and expedited for review.
+                        </p>
+                    </div>
+                )}
+
                 {/* Snug Table Container with Pagination Attached Directly Below Records */}
                 <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
                     {supplyRequests.data.length === 0 ? (
@@ -200,6 +217,7 @@ export default function SupplyRequestsIndex({ supplyRequests, filters, filter_op
                                 <thead className="bg-slate-50 shadow-xs">
                                     <tr>
                                         <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Request ID</th>
+                                        <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Priority</th>
                                         <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Date Submitted</th>
                                         <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Status</th>
                                         <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Items</th>
@@ -207,9 +225,31 @@ export default function SupplyRequestsIndex({ supplyRequests, filters, filter_op
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 bg-white">
-                                    {supplyRequests.data.map((row) => (
-                                        <tr key={row.supply_request_id} className="hover:bg-slate-50/60 transition-colors">
-                                            <td className="px-3.5 py-2 font-semibold text-red-700">{row.request_code}</td>
+                                    {supplyRequests.data.map((row) => {
+                                        const isUrgent = row.priority_level === 'URGENT';
+                                        return (
+                                            <tr key={row.supply_request_id} className={`hover:bg-slate-50/60 transition-colors ${isUrgent ? 'border-l-4 border-l-red-600 bg-red-50/20' : ''}`}>
+                                                <td className="px-3.5 py-2 font-semibold text-red-700">
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                        <span>{row.request_code}</span>
+                                                        {isUrgent && (
+                                                            <span className="inline-flex items-center gap-0.5 rounded-full bg-red-100 border border-red-300 px-2 py-0.5 text-[10px] font-black text-red-700 shadow-2xs tracking-wide uppercase">
+                                                                🔥 Urgent
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            <td className="px-3.5 py-2">
+                                                {isUrgent ? (
+                                                    <span className="inline-flex items-center gap-1 rounded-full border border-red-300 bg-red-100 px-2 py-0.5 text-[10px] font-black text-red-800 shadow-2xs uppercase tracking-wide">
+                                                        <span>🔥</span> Urgent
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+                                                        Normal
+                                                    </span>
+                                                )}
+                                            </td>
                                             <td className="px-3.5 py-2 text-slate-700">{formatDate(row.request_date)}</td>
                                             <td className="px-3.5 py-2">
                                                 <StatusBadge status={row.status} />
@@ -245,7 +285,8 @@ export default function SupplyRequestsIndex({ supplyRequests, filters, filter_op
                                                 </div>
                                             </td>
                                         </tr>
-                                    ))}
+                                    );
+                                    })}
                                 </tbody>
                             </table>
                         </div>

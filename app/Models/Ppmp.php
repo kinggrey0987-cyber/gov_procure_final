@@ -47,6 +47,15 @@ class Ppmp extends Model
         'date_approved' => 'date',
     ];
 
+    protected $appends = [
+        'ppmp_code',
+    ];
+
+    public function getPpmpCodeAttribute(): string
+    {
+        return sprintf('PPMP-%d-%04d', (int) ($this->fiscal_year ?: date('Y')), (int) $this->ppmp_id);
+    }
+
     public function office(): BelongsTo
     {
         return $this->belongsTo(Office::class);
