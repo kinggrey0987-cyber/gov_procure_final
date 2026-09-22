@@ -51,8 +51,15 @@ $datedZipName = "update_$timestamp.zip"
 $datedZipPath = Join-Path $outputDir $datedZipName
 $latestZipPath = "update.zip"
 
-if (Test-Path $datedZipPath) { Remove-Item $datedZipPath -Force }
-if (Test-Path $latestZipPath) { Remove-Item $latestZipPath -Force }
+if (Test-Path $datedZipPath) { Remove-Item $datedZipPath -Force -ErrorAction SilentlyContinue }
+if (Test-Path $latestZipPath) {
+    try {
+        Remove-Item $latestZipPath -Force -ErrorAction Stop
+    } catch {
+        Start-Sleep -Milliseconds 400
+        Remove-Item $latestZipPath -Force -ErrorAction SilentlyContinue
+    }
+}
 
 # 4. Create lightweight zip (excluding vendor, node_modules, .env, storage)
 Write-Host "`n[3/4] Packaging updated application files..." -ForegroundColor Yellow
@@ -76,7 +83,18 @@ $existingItems = $includeItems | Where-Object { Test-Path $_ }
 
 # Archive files using native Windows PowerShell / tar
 tar -a -c -f $datedZipPath --exclude="public/storage" --exclude="database/*.sqlite" --exclude="bootstrap/cache/*.php" $existingItems
-Copy-Item $datedZipPath -Destination $latestZipPath -Force
+
+# Copy to update.zip with retry handling for Windows file locks
+$copiedToLatest = $false
+for ($attempt = 1; $attempt -le 3; $attempt++) {
+    try {
+        Copy-Item $datedZipPath -Destination $latestZipPath -Force -ErrorAction Stop
+        $copiedToLatest = $true
+        break
+    } catch {
+        Start-Sleep -Milliseconds 500
+    }
+}
 
 # 5. Auto-prune old archives (keeps latest 10)
 Write-Host "`n[4/4] Auto-pruning old archives (keeping latest 10)..." -ForegroundColor Yellow
