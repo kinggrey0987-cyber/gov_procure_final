@@ -133,16 +133,14 @@ export default function AdminDashboard({ summary, activities, pagination, filter
             ),
         },
         {
-            label: 'System Telemetry',
-            value: summary.telemetry ? `${summary.telemetry.memory_usage_mb} MB RAM` : `${summary.active_role_count} Roles`,
+            label: 'System Monitoring',
+            value: `${summary.active_role_count} Active Roles`,
             accent: 'bg-emerald-600',
-            href: route('admin-tech.audit.technical'),
+            href: route('admin-tech.roles.index'),
             icon: (
                 <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
-                    <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
-                    <line x1="6" y1="6" x2="6.01" y2="6" />
-                    <line x1="6" y1="18" x2="6.01" y2="18" />
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 0 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h.1A1.7 1.7 0 0 0 10 3.2V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.4 1z" />
                 </svg>
             ),
         },
@@ -183,41 +181,6 @@ export default function AdminDashboard({ summary, activities, pagination, filter
                         </Link>
                     ))}
                 </section>
-
-                                {/* Live System Telemetry Bar */}
-                {summary.telemetry && (
-                    <section className="shrink-0 rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
-                        <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
-                            <div className="flex items-center gap-2">
-                                <span className="relative flex h-2.5 w-2.5">
-                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-                                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
-                                </span>
-                                <span className="font-bold text-slate-800 uppercase tracking-wide">Live Telemetry & Diagnostics</span>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-4 text-slate-600">
-                                <div>
-                                    <span className="font-semibold text-slate-500">DB Latency:</span>{' '}
-                                    <span className={summary.telemetry.db_latency_ms < 50 ? 'font-bold text-emerald-700' : 'font-bold text-amber-600'}>
-                                        {summary.telemetry.db_latency_ms} ms
-                                    </span>
-                                </div>
-                                <div>
-                                    <span className="font-semibold text-slate-500">Memory:</span>{' '}
-                                    <span className="font-bold text-slate-800">{summary.telemetry.memory_usage_mb} MB</span>
-                                </div>
-                                <div>
-                                    <span className="font-semibold text-slate-500">Storage:</span>{' '}
-                                    <span className="font-bold text-slate-800">{summary.telemetry.disk_free_gb} GB Free ({100 - summary.telemetry.disk_used_percent}% free)</span>
-                                </div>
-                                <div>
-                                    <span className="font-semibold text-slate-500">Runtime:</span>{' '}
-                                    <span className="font-mono text-[11px] text-slate-700">PHP {summary.telemetry.php_version} ({summary.telemetry.environment})</span>
-                                </div>
-                            </div>
-                        </div>
-                    </section>
-                )}
 
                 {/* Streamlined Quick Access Grid */}
                 <section className="shrink-0 rounded-xl border border-slate-200 bg-white p-2 shadow-xs">

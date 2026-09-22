@@ -10,11 +10,22 @@ type RoleRow = {
     is_active: boolean;
 };
 
-type Props = {
-    roles: RoleRow[];
+type TelemetryData = {
+    db_latency_ms: number;
+    memory_usage_mb: number;
+    disk_used_percent: number;
+    disk_free_gb: number;
+    disk_total_gb: number;
+    php_version: string;
+    environment: string;
 };
 
-export default function RoleIndex({ roles }: Props) {
+type Props = {
+    roles: RoleRow[];
+    telemetry?: TelemetryData;
+};
+
+export default function RoleIndex({ roles, telemetry }: Props) {
     const totalRoles = roles.length;
     const activeRoles = roles.filter((role) => role.is_active).length;
     const inactiveRoles = totalRoles - activeRoles;
@@ -24,9 +35,122 @@ export default function RoleIndex({ roles }: Props) {
         <AuthenticatedLayout header="System Monitoring">
             <Head title="System Monitoring" />
 
-            <div className="space-y-3">
-                {/* High-Density System Health Telemetry Cockpit */}
-                <section className="shrink-0 rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
+            <div className="space-y-4">
+                {/* Live System Diagnostics & Server Telemetry */}
+                {telemetry && (
+                    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/70 px-4 py-2.5">
+                            <div className="flex items-center gap-2">
+                                <span className="relative flex h-2.5 w-2.5">
+                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+                                </span>
+                                <div>
+                                    <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                                        Live System Diagnostics & Server Telemetry
+                                    </h2>
+                                    <p className="text-[10px] text-slate-500">Real-time health, server performance, and active runtime telemetry</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 border border-emerald-200">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                                    System Healthy
+                                </span>
+                                <span className="text-[11px] font-mono text-slate-500">
+                                    PHP {telemetry.php_version} ({telemetry.environment})
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 p-3 gap-3 sm:gap-0">
+                            {/* DB Latency */}
+                            <div className="flex items-start gap-3 px-3 py-1">
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                                    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <ellipse cx="12" cy="5" rx="9" ry="3" />
+                                        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+                                        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+                                    </svg>
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Database Latency</p>
+                                    <p className="text-xl font-black text-slate-900 leading-tight">
+                                        {telemetry.db_latency_ms} <span className="text-xs font-semibold text-slate-500">ms</span>
+                                    </p>
+                                    <p className={`mt-0.5 text-[10px] font-medium ${telemetry.db_latency_ms < 50 ? 'text-emerald-700' : 'text-amber-600'}`}>
+                                        {telemetry.db_latency_ms < 50 ? 'Optimal response time' : 'Acceptable latency'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Memory RAM */}
+                            <div className="flex items-start gap-3 px-3 py-1">
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
+                                    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
+                                        <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
+                                        <line x1="6" y1="6" x2="6.01" y2="6" />
+                                        <line x1="6" y1="18" x2="6.01" y2="18" />
+                                    </svg>
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Memory Allocation</p>
+                                    <p className="text-xl font-black text-slate-900 leading-tight">
+                                        {telemetry.memory_usage_mb} <span className="text-xs font-semibold text-slate-500">MB</span>
+                                    </p>
+                                    <p className="mt-0.5 text-[10px] font-medium text-slate-500">PHP process heap</p>
+                                </div>
+                            </div>
+
+                            {/* Storage Capacity */}
+                            <div className="flex items-start gap-3 px-3 py-1">
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700">
+                                    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <rect x="4" y="4" width="16" height="16" rx="2" />
+                                        <rect x="9" y="9" width="6" height="6" />
+                                        <line x1="9" y1="1" x2="9" y2="4" />
+                                        <line x1="15" y1="1" x2="15" y2="4" />
+                                        <line x1="9" y1="20" x2="9" y2="23" />
+                                        <line x1="15" y1="20" x2="15" y2="23" />
+                                    </svg>
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Disk Storage</p>
+                                    <p className="text-xl font-black text-slate-900 leading-tight">
+                                        {telemetry.disk_free_gb} <span className="text-xs font-semibold text-slate-500">GB Free</span>
+                                    </p>
+                                    <p className="mt-0.5 text-[10px] font-medium text-slate-500">
+                                        {(100 - telemetry.disk_used_percent).toFixed(1)}% available capacity
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Runtime Environment */}
+                            <div className="flex items-start gap-3 px-3 py-1">
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
+                                    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                                        <path d="M2 17l10 5 10-5" />
+                                        <path d="M2 12l10 5 10-5" />
+                                    </svg>
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Environment</p>
+                                    <p className="text-xl font-black text-slate-900 leading-tight uppercase">
+                                        {telemetry.environment}
+                                    </p>
+                                    <p className="mt-0.5 text-[10px] font-medium text-slate-500">
+                                        PHP {telemetry.php_version} Runtime
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                )}
+
+                {/* Access Control Registry Statistics */}
+                <section className="shrink-0 rounded-xl border border-slate-200 bg-white p-2 shadow-xs">
                     <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
                         <div className="flex items-center gap-2.5 px-3 py-1.5">
                             <span className="h-2 w-2 shrink-0 rounded-full bg-slate-400" />
