@@ -4,6 +4,7 @@ namespace App\Http\Controllers\AdminTech;
 
 use App\Http\Controllers\Controller;
 use App\Models\Role;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -16,6 +17,12 @@ class RoleManagementController extends Controller
             ->withCount('users')
             ->orderBy('name')
             ->get();
+
+        $userCounts = [
+            'total' => User::query()->count(),
+            'active' => User::query()->where('is_active', true)->count(),
+            'inactive' => User::query()->where('is_active', false)->count(),
+        ];
 
         $dbStart = microtime(true);
         try {
@@ -36,6 +43,7 @@ class RoleManagementController extends Controller
 
         return Inertia::render('AdminTech/Roles/Index', [
             'roles' => $roles,
+            'user_counts' => $userCounts,
             'telemetry' => [
                 'db_latency_ms' => $dbLatencyMs,
                 'memory_usage_mb' => $memoryUsageMb,

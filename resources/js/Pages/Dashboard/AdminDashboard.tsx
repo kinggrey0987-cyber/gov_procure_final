@@ -133,8 +133,16 @@ export default function AdminDashboard({ summary, activities, pagination, filter
             ),
         },
         {
-            label: 'System Monitoring',
-            value: `${summary.active_role_count} Active Roles`,
+            label: 'System Health',
+            value: (
+                <span className="inline-flex items-center gap-1.5 text-emerald-700">
+                    <span className="relative flex h-2.5 w-2.5">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+                    </span>
+                    <span>Operational</span>
+                </span>
+            ),
             accent: 'bg-emerald-600',
             href: route('admin-tech.roles.index'),
             icon: (
@@ -173,7 +181,7 @@ export default function AdminDashboard({ summary, activities, pagination, filter
                         >
                             <div>
                                 <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 group-hover:text-slate-700 transition">{card.label}</p>
-                                <p className="mt-0.5 text-xl font-bold tracking-tight text-slate-900 group-hover:text-red-700 transition sm:text-2xl">{card.value}</p>
+                                <div className="mt-0.5 text-xl font-bold tracking-tight text-slate-900 group-hover:text-red-700 transition sm:text-2xl">{card.value}</div>
                             </div>
                             <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white shadow-xs transition group-hover:scale-105 ${card.accent}`}>
                                 {card.icon}
