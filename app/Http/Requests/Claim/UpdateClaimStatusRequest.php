@@ -11,6 +11,8 @@ class UpdateClaimStatusRequest extends FormRequest
         'RESOLVED',
         'REJECTED',
         'PENDING_REPLACEMENT',
+        'REPLACEMENT_RELEASED',
+        'PARTIALLY_RESOLVED',
     ];
 
     private const RESOLUTION_TYPES = [
@@ -34,6 +36,7 @@ class UpdateClaimStatusRequest extends FormRequest
 
         if ($resolutionType === '') {
             $resolutionType = match ($status) {
+                'REPLACEMENT_RELEASED' => 'REPLACEMENT_RELEASED',
                 'RESOLVED' => 'REPLACEMENT_RELEASED',
                 'PENDING_REPLACEMENT' => 'PENDING_REPLACEMENT',
                 'REJECTED' => 'OTHER_RESOLUTION',
@@ -53,7 +56,7 @@ class UpdateClaimStatusRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'status' => ['required', 'string', 'in:RESOLVED,REJECTED,PENDING_REPLACEMENT'],
+            'status' => ['required', 'string', 'in:REPLACEMENT_RELEASED,RESOLVED,REJECTED,PENDING_REPLACEMENT,PARTIALLY_RESOLVED'],
             'resolution_type' => ['nullable', 'string', 'in:'.implode(',', self::RESOLUTION_TYPES)],
             'replacement_quantity' => ['nullable', 'integer', 'min:0'],
             'remarks' => ['nullable', 'string'],
@@ -68,7 +71,7 @@ class UpdateClaimStatusRequest extends FormRequest
             $replacementQuantity = (float) $this->input('replacement_quantity', 0);
 
             if (in_array($status, self::CLOSING_STATUSES, true) && trim((string) $this->input('remarks')) === '') {
-                $validator->errors()->add('remarks', 'Remarks are required when closing or deferring a claim.');
+                $validator->errors()->add('remarks', 'Remarks are required when updating claim status or releasing replacement.');
             }
 
             if ($resolutionType === '') {
@@ -77,8 +80,8 @@ class UpdateClaimStatusRequest extends FormRequest
                 return;
             }
 
-            if ($status === 'RESOLVED' && $resolutionType !== 'REPLACEMENT_RELEASED') {
-                $validator->errors()->add('resolution_type', 'Resolved claims require released replacement stock.');
+            if (in_array($status, ['RESOLVED', 'REPLACEMENT_RELEASED'], true) && ! in_array($resolutionType, ['REPLACEMENT_RELEASED', 'PARTIAL_REPLACEMENT'], true)) {
+                $validator->errors()->add('resolution_type', 'Released claims require released replacement stock.');
             }
 
             if ($status === 'PENDING_REPLACEMENT' && $resolutionType !== 'PENDING_REPLACEMENT') {

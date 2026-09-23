@@ -4,6 +4,7 @@ namespace App\Services\Inventory;
 
 use App\Models\ApprovalHistory;
 use App\Models\Claim;
+use App\Models\DistributionItem;
 use App\Models\DistributionRecord;
 use App\Models\Inventory;
 use App\Models\StatusHistory;
@@ -283,6 +284,51 @@ class ClaimService
                 'resolution_type' => $claim->resolution_type ?: 'REPLACEMENT_RELEASED',
                 'remarks' => $remarks,
             ])->save();
+
+            $claim->loadMissing(['distributionItem', 'distributionRecord.items']);
+
+            $distributionItem = $claim->distributionItem;
+            if ($distributionItem instanceof DistributionItem) {
+                $replacementQty = (float) $claim->replacement_quantity;
+                if ($replacementQty > 0) {
+                    $newReceived = min((float) $distributionItem->quantity_released, (float) $distributionItem->quantity_received + $replacementQty);
+                    $newMissing = max(0.0, (float) $distributionItem->quantity_missing - $replacementQty);
+                    $remainingReplAfterMissing = max(0.0, $replacementQty - (float) $distributionItem->quantity_missing);
+                    $newDamaged = max(0.0, (float) $distributionItem->quantity_damaged - $remainingReplAfterMissing);
+
+                    $distributionItem->forceFill([
+                        'quantity_received' => $newReceived,
+                        'quantity_missing' => $newMissing,
+                        'quantity_damaged' => $newDamaged,
+                        'receipt_condition' => ($newMissing > 0 || $newDamaged > 0) ? 'DISCREPANCY' : 'GOOD',
+                    ])->save();
+                }
+            }
+
+            $distributionRecord = $claim->distributionRecord;
+            if ($distributionRecord instanceof DistributionRecord) {
+                $distributionRecord->loadMissing('items');
+                $allFullyReceived = $distributionRecord->items->every(fn ($item): bool =>
+                    (float) $item->quantity_received >= (float) $item->quantity_released
+                );
+                if ($allFullyReceived && (string) $distributionRecord->status !== 'RECEIVED') {
+                    $oldDistStatus = (string) $distributionRecord->status;
+                    $distributionRecord->forceFill([
+                        'status' => 'RECEIVED',
+                        'received_by' => (int) $actor->id,
+                    ])->save();
+
+                    StatusHistory::query()->create([
+                        'reference_type' => DistributionRecord::class,
+                        'reference_id' => (int) $distributionRecord->distribution_record_id,
+                        'old_status' => $oldDistStatus,
+                        'new_status' => 'RECEIVED',
+                        'changed_by' => (int) $actor->id,
+                        'remarks' => 'Distribution record marked as fully received following claim replacement acceptance.',
+                        'changed_at' => now(),
+                    ]);
+                }
+            }
 
             $this->recordStatus($claim, $currentStatus, 'RESOLVED', $actor, 'Replacement verified and claim resolved by office.');
             $this->recordApproval($claim, $actor, 'RESOLVED', 'Office accepted replacement items in good condition.');

@@ -101,23 +101,42 @@ export default function SuppliesReadyForClaimIndex({ records }: Props) {
                                                         <button
                                                             type="button"
                                                             onClick={() => {
-                                                                router.post(route('office.distribution-records.receive', record.distribution_record_id), {}, {
-                                                                    preserveScroll: true,
-                                                                });
+                                                                if (record.is_claim_replacement && record.claim_id) {
+                                                                    router.post(route('office.claims.verify-replacement', record.claim_id), {}, {
+                                                                        preserveScroll: true,
+                                                                    });
+                                                                } else {
+                                                                    router.post(route('office.distribution-records.receive', record.distribution_record_id), {}, {
+                                                                        preserveScroll: true,
+                                                                    });
+                                                                }
                                                             }}
                                                             className="rounded bg-red-700 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-800 transition"
                                                         >
                                                             Confirm Received
                                                         </button>
                                                     ) : null}
-                                                    <Link
-                                                        href={route('office.distribution-records.show', record.distribution_record_id)}
-                                                        className="rounded border border-red-200 bg-red-50/50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 transition"
-                                                    >
-                                                        View
-                                                    </Link>
+                                                    {record.is_claim_replacement && record.claim_id ? (
+                                                        <Link
+                                                            href={route('office.claims.show', record.claim_id)}
+                                                            className="rounded border border-red-200 bg-red-50/50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 transition"
+                                                        >
+                                                            View Claim
+                                                        </Link>
+                                                    ) : (
+                                                        <Link
+                                                            href={route('office.distribution-records.show', record.distribution_record_id)}
+                                                            className="rounded border border-red-200 bg-red-50/50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 transition"
+                                                        >
+                                                            View
+                                                        </Link>
+                                                    )}
                                                     {record.status.toUpperCase() === 'RECEIVED' ? (
-                                                        record.has_existing_claim ? (
+                                                        record.is_claim_replacement ? (
+                                                            <span className="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">
+                                                                Replacement Verified
+                                                            </span>
+                                                        ) : record.has_existing_claim ? (
                                                             <Link
                                                                 href={record.existing_claim_id ? route('office.claims.show', record.existing_claim_id) : route('office.claims.index')}
                                                                 className="rounded border border-indigo-200 bg-indigo-50/70 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition"

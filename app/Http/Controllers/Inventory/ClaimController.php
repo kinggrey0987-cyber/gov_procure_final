@@ -233,6 +233,13 @@ class ClaimController
                 'uploader_name' => $document->uploader?->name,
             ])->values();
 
+        $followUpPurchaseRequest = \App\Models\PurchaseRequest::query()
+            ->with(['purchaseOrders', 'statusHistory.changedBy', 'requester', 'office'])
+            ->where('source_claim_id', (int) $claim->claims_id)
+            ->where('source_type', 'CLAIM_REPLACEMENT_FOLLOW_UP')
+            ->latest('purchase_request_id')
+            ->first();
+
         return Inertia::render('Inventory/Claim/Show', [
             'claim' => [
                 'claims_id' => (int) $claim->claims_id,
@@ -256,6 +263,32 @@ class ClaimController
                 'claims_id' => (int) $claim->parentClaim->claims_id,
                 'claim_code' => (string) $claim->parentClaim->claim_code,
                 'status' => (string) $claim->parentClaim->status,
+            ] : null,
+            'followUpPurchaseRequest' => $followUpPurchaseRequest ? [
+                'purchase_request_id' => (int) $followUpPurchaseRequest->purchase_request_id,
+                'pr_number' => (string) $followUpPurchaseRequest->pr_number,
+                'status' => (string) $followUpPurchaseRequest->status,
+                'source_type' => (string) ($followUpPurchaseRequest->source_type ?? ''),
+                'remarks' => $followUpPurchaseRequest->remarks,
+                'created_at' => optional($followUpPurchaseRequest->created_at)?->toIso8601String(),
+                'purchase_order_count' => (int) $followUpPurchaseRequest->purchaseOrders->count(),
+                'purchase_orders' => $followUpPurchaseRequest->purchaseOrders->map(fn ($po): array => [
+                    'purchase_order_id' => (int) $po->purchase_order_id,
+                    'po_number' => (string) ($po->po_number ?? ''),
+                    'status' => (string) ($po->status ?? ''),
+                ])->values(),
+                'status_history' => $followUpPurchaseRequest->statusHistory
+                    ->sortBy('changed_at')
+                    ->values()
+                    ->map(fn ($history): array => [
+                        'old_status' => $history->old_status,
+                        'new_status' => $history->new_status,
+                        'remarks' => $history->remarks,
+                        'changed_at' => optional($history->changed_at)?->toIso8601String(),
+                        'changed_by' => $history->changedBy ? [
+                            'name' => (string) $history->changedBy->name,
+                        ] : null,
+                    ])->values(),
             ] : null,
             'followUpClaims' => $claim->followUpClaims->map(fn (Claim $followUp): array => [
                 'claims_id' => (int) $followUp->claims_id,
@@ -291,9 +324,11 @@ class ClaimController
                 'show' => $routePrefix.'.show',
                 'updateStatus' => 'inventory.claims.update-status',
                 'verifyReplacement' => 'office.claims.verify-replacement',
+                'followUpPurchaseRequest' => 'inventory.claims.follow-up-purchase-request.store',
             ],
             'permissions' => [
                 'update' => $user->can('claim.update', $claim),
+                'can_create_follow_up_purchase_request' => $user->can('claim.follow-up-pr.create', $claim),
                 'verifyReplacement' => $user->isOfficeUser()
                     && (int) $user->office_id === (int) $claim->office_id
                     && in_array((string) $claim->status, ['REPLACEMENT_RELEASED', 'PARTIALLY_RESOLVED'], true),
@@ -352,7 +387,7 @@ class ClaimController
 
         $this->claimService->verifyAndResolveClaim($claim, request()->user(), $request->only('remarks'));
 
-        return Redirect::route('office.claims.show', $claim->claims_id)
+        return Redirect::back()
             ->with('success', 'Replacement items verified and accepted. Claim is now resolved.');
     }
 }

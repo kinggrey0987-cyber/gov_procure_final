@@ -219,6 +219,28 @@ class AppServiceProvider extends ServiceProvider
             return $user->isGsoOfficer() || ($user->isOfficeUser() && (int) $claim->office_id === (int) $user->office_id);
         });
         Gate::define('claim.update', fn (User $user, Claim $claim): bool => $user->isGsoOfficer());
+        Gate::define('claim.follow-up-pr.create', function (User $user, Claim $claim): bool {
+            if (! $user->isGsoOfficer()) {
+                return false;
+            }
+
+            if ($claim->distribution_item_id === null) {
+                return false;
+            }
+
+            $remainingDisputed = round(max((float) $claim->quantity_disputed - (float) $claim->replacement_quantity, 0), 2);
+            if ($remainingDisputed <= 0) {
+                return false;
+            }
+
+            $hasActivePr = \App\Models\PurchaseRequest::query()
+                ->where('source_claim_id', (int) $claim->claims_id)
+                ->where('source_type', 'CLAIM_REPLACEMENT_FOLLOW_UP')
+                ->whereIn('status', ['OPEN', 'PROCESSING', 'RETURNED_FOR_REVISION'])
+                ->exists();
+
+            return ! $hasActivePr;
+        });
         Gate::define('claim.attachments.manage', function (User $user, Claim $claim): bool {
             return $user->isOfficeUser()
                 && (int) $claim->office_id === (int) $user->office_id

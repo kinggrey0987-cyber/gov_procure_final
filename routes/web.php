@@ -18,6 +18,7 @@ use App\Http\Controllers\Procurement\PurchaseRequestController as ProcurementPur
 use App\Http\Controllers\Procurement\PurchaseRequestItemController as ProcurementPurchaseRequestItemController;
 use App\Http\Controllers\Procurement\SupplierController as ProcurementSupplierController;
 use App\Http\Controllers\Inventory\ClaimController;
+use App\Http\Controllers\Inventory\ClaimFollowUpPurchaseRequestController;
 use App\Http\Controllers\Inventory\DeliveryController;
 use App\Http\Controllers\Inventory\DeliveryFollowUpPurchaseRequestController;
 use App\Http\Controllers\Inventory\DeliveryItemController;
@@ -592,6 +593,9 @@ Route::middleware(['auth', 'twofactor', 'must-change-password'])->group(function
                 Route::put('/{claim}/status', [ClaimController::class, 'updateStatus'])
                     ->middleware('can:claim.update,claim')
                     ->name('update-status');
+                Route::post('/{claim}/follow-up-purchase-request', [ClaimFollowUpPurchaseRequestController::class, 'store'])
+                    ->middleware('can:claim.follow-up-pr.create,claim')
+                    ->name('follow-up-purchase-request.store');
             });
 
             Route::prefix('office-supply-requests')->name('office-supply-requests.')->group(function () {

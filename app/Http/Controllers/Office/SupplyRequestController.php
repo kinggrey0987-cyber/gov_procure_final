@@ -1115,7 +1115,7 @@ class SupplyRequestController extends Controller
 
         $officeId = (int) $request->user()?->office_id;
 
-        $records = DistributionRecord::query()
+        $distributionRecords = DistributionRecord::query()
             ->with([
                 'items',
                 'supplyRequest.purchaseRequests.sourceClaim',
@@ -1124,8 +1124,8 @@ class SupplyRequestController extends Controller
             ->forOffice($officeId)
             ->whereIn('status', ['RELEASED', 'RECEIVED'])
             ->latest('distribution_record_id')
-            ->paginate(5)
-            ->through(function (DistributionRecord $record): array {
+            ->get()
+            ->map(function (DistributionRecord $record): array {
                 $sourceClaim = $record->delivery?->purchaseOrder?->purchaseRequest?->sourceClaim
                     ?? $record->supplyRequest?->purchaseRequests?->firstWhere('source_claim_id')?->sourceClaim;
 
@@ -1140,12 +1140,10 @@ class SupplyRequestController extends Controller
                     || (string) ($record->delivery?->purchaseOrder?->purchaseRequest?->source_type ?? '') === 'CLAIM_REPLACEMENT_FOLLOW_UP'
                     || str_contains(strtolower((string) ($record->supplyRequest?->purpose ?? '')), 'claim replacement');
 
-                // Check if a claim has already been filed for this distribution record
                 $existingClaim = \App\Models\Claim::query()
                     ->where('distribution_record_id', (int) $record->distribution_record_id)
                     ->first();
 
-                // 2-day (48 hours) inspection window check from receipt
                 $receivedAt = $record->status === 'RECEIVED' ? $record->updated_at : null;
                 $isClaimExpired = $receivedAt !== null && now()->diffInHours($receivedAt) > 48;
 
@@ -1168,11 +1166,61 @@ class SupplyRequestController extends Controller
                     'existing_claim_id' => $existingClaim?->claims_id,
                     'is_claim_expired' => $isClaimExpired,
                 ];
-            })
-            ->withQueryString();
+            });
+
+        $claimReplacements = \App\Models\Claim::query()
+            ->with(['distributionItem.item', 'distributionRecord.supplyRequest'])
+            ->where('office_id', $officeId)
+            ->whereIn('status', ['REPLACEMENT_RELEASED', 'RESOLVED'])
+            ->latest('claims_id')
+            ->get()
+            ->map(function (\App\Models\Claim $claim): array {
+                $itemName = (string) ($claim->distributionItem?->item?->item_name
+                    ?? $claim->distributionItem?->item_name_snapshot
+                    ?? 'Replacement Item');
+                $qty = (int) ($claim->replacement_quantity > 0 ? $claim->replacement_quantity : $claim->quantity_disputed);
+                $isReleased = (string) $claim->status === 'REPLACEMENT_RELEASED';
+
+                return [
+                    'distribution_record_id' => 0,
+                    'request_id' => (string) ($claim->distributionRecord?->supplyRequest?->request_code ?? $claim->claim_code) . ' (Repl.)',
+                    'claim_code' => (string) $claim->claim_code,
+                    'claim_id' => (int) $claim->claims_id,
+                    'request_date' => optional($claim->claim_date)?->toDateString(),
+                    'items_summary' => sprintf('%d item(s) %s (Replacement for %s)', $qty, $itemName, $claim->claim_code),
+                    'items_count' => 1,
+                    'location' => (string) ($claim->claim_location ?: 'GSO Storage'),
+                    'ready_since' => optional($claim->updated_at)?->toDateString(),
+                    'received_at' => ! $isReleased ? optional($claim->updated_at)?->toIso8601String() : null,
+                    'status' => $isReleased ? 'RELEASED' : 'RECEIVED',
+                    'supply_request_id' => (int) ($claim->distributionRecord?->supply_request_id ?? 0),
+                    'is_claim_replacement' => true,
+                    'has_existing_claim' => false,
+                    'existing_claim_code' => null,
+                    'existing_claim_id' => null,
+                    'is_claim_expired' => false,
+                ];
+            });
+
+        $combined = $claimReplacements->concat($distributionRecords)
+            ->sortBy([
+                fn (array $a, array $b): int => ($a['status'] === 'RELEASED' ? 0 : 1) <=> ($b['status'] === 'RELEASED' ? 0 : 1),
+                fn (array $a, array $b): int => ($b['ready_since'] ?? '') <=> ($a['ready_since'] ?? ''),
+            ])
+            ->values();
+
+        $page = (int) $request->input('page', 1);
+        $perPage = 5;
+        $paginatedRecords = new \Illuminate\Pagination\LengthAwarePaginator(
+            $combined->forPage($page, $perPage)->values(),
+            $combined->count(),
+            $perPage,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
 
         return Inertia::render('Office/SuppliesReadyForClaim/Index', [
-            'records' => $records,
+            'records' => $paginatedRecords,
         ]);
     }
 

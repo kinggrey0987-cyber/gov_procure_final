@@ -431,18 +431,28 @@ class PurchaseRequestService
             ]);
         }
 
-        $officeId = (int) ($actor->office_id ?? 0);
-        if ($officeId <= 0) {
-            throw ValidationException::withMessages([
-                'office_id' => 'GSO officer must belong to an office before creating claim replacement purchase requests.',
-            ]);
-        }
+        $officeId = (int) (
+            $claim->office_id
+            ?? $claim->distributionRecord?->office_id
+            ?? $actor->office_id
+            ?? 1
+        );
 
         $baseRemarks = trim((string) $remarks) !== ''
             ? trim((string) $remarks)
             : 'Generated from claim pending replacement due to insufficient GSO stock.';
 
         return DB::transaction(function () use ($actor, $claim, $itemId, $itemName, $officeId, $quantityToProcure, $baseRemarks): PurchaseRequest {
+            if ((string) $claim->status !== 'PENDING_REPLACEMENT') {
+                $oldClaimStatus = (string) $claim->status;
+                $claim->forceFill([
+                    'status' => 'PENDING_REPLACEMENT',
+                    'resolution_type' => 'PENDING_REPLACEMENT',
+                ])->save();
+
+                $this->recordStatus($claim, $oldClaimStatus, 'PENDING_REPLACEMENT', $actor, 'Claim placed in pending replacement awaiting procurement.');
+            }
+
             $supplyRequest = SupplyRequest::query()->create([
                 'request_code' => $this->buildRequestCode($officeId),
                 'office_id' => $officeId,

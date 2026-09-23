@@ -106,11 +106,23 @@ class PurchaseOrderItemController extends Controller
             }
         }
 
-        // Duplicate detection: use supply_request_item_id directly, not item_id.
-        // Using item_id would incorrectly mark ALL entries for the same catalog item
-        // as "Already Added" when only one specific SR line has been encoded.
+        // Duplicate detection: mark source items as "encoded" when either:
+        // 1. Their supply_request_item_id is directly on a PO line, OR
+        // 2. Their item_id + specification matches an existing PO line (auto-merge).
+        // This ensures merged items are correctly shown as "Already Added".
         $encodedSrItemIds = $purchaseOrder->items()->pluck('supply_request_item_id')->map(fn ($id) => (int) $id)->all();
-        $encodedSourceItemIds = $sourceItems->filter(fn ($si) => in_array((int) $si['supply_request_item_id'], $encodedSrItemIds, true))
+        $encodedItemSpecs = $purchaseOrder->items()
+            ->get(['item_id', 'specification'])
+            ->map(fn ($row) => ((int) $row->item_id) . '::' . trim((string) $row->specification))
+            ->all();
+        $encodedSourceItemIds = $sourceItems->filter(function ($si) use ($encodedSrItemIds, $encodedItemSpecs) {
+            if (in_array((int) $si['supply_request_item_id'], $encodedSrItemIds, true)) {
+                return true;
+            }
+            $key = ((int) $si['item_id']) . '::' . trim((string) ($si['item_specification'] ?? ''));
+
+            return in_array($key, $encodedItemSpecs, true);
+        })
             ->pluck('supply_request_item_id')
             ->map(fn ($id) => (int) $id)
             ->values();
