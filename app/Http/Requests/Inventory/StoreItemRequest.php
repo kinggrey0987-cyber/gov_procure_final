@@ -14,6 +14,13 @@ class StoreItemRequest extends FormRequest
                 'default_unit' => strtolower(trim((string) $this->input('default_unit'))),
             ]);
         }
+
+        if ($this->has('specification') && ! $this->has('specifications')) {
+            $spec = trim((string) $this->input('specification'));
+            $this->merge([
+                'specifications' => $spec !== '' ? [$spec] : [],
+            ]);
+        }
     }
 
     public function authorize(): bool
@@ -34,6 +41,7 @@ class StoreItemRequest extends FormRequest
             'pieces_per_box' => ['nullable', 'integer', 'min:1'],
             'sub_unit' => ['nullable', 'string', 'max:50'],
             'status' => ['nullable', Rule::in(['active', 'inactive'])],
+            'specification' => ['nullable', 'string', 'max:255'],
             'specifications' => ['nullable', 'array'],
             'specifications.*' => ['nullable', 'string', 'max:255'],
         ];

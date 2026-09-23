@@ -68,9 +68,28 @@ class ItemCatalogController
     {
         abort_unless($request->user()?->can('inventory.catalog.manage'), 403);
 
+        $cloneItem = null;
+        $cloneId = (int) $request->query('clone_item_id', 0);
+        if ($cloneId > 0) {
+            $source = Item::query()->with('specifications')->find($cloneId);
+            if ($source) {
+                $cloneItem = [
+                    'item_id' => (int) $source->item_id,
+                    'item_name' => (string) $source->item_name,
+                    'item_category_id' => (int) $source->item_category_id,
+                    'default_unit' => (string) $source->default_unit,
+                    'pieces_per_box' => (int) ($source->pieces_per_box ?? 1),
+                    'sub_unit' => (string) ($source->sub_unit ?? 'piece'),
+                    'description' => (string) ($source->description ?? ''),
+                    'specification' => (string) ($source->specifications->first()?->specification ?? ''),
+                ];
+            }
+        }
+
         return Inertia::render('Inventory/Items/Create', [
             'categories' => $this->categoryOptions(),
             'units' => $this->unitOptions(),
+            'cloneItem' => $cloneItem,
         ]);
     }
 

@@ -41,26 +41,8 @@ export default function EditItem({ item, categories, units }: Props) {
         sub_unit: item.sub_unit ?? 'piece',
         description: item.description ?? '',
         status: item.status,
-        specifications: item.specifications && item.specifications.length > 0 ? item.specifications : [''],
+        specification: item.specifications && item.specifications.length > 0 ? item.specifications[0] : '',
     });
-
-    const addSpecification = () => {
-        setData('specifications', [...data.specifications, '']);
-    };
-
-    const updateSpecification = (index: number, value: string) => {
-        const next = [...data.specifications];
-        next[index] = value;
-        setData('specifications', next);
-    };
-
-    const removeSpecification = (index: number) => {
-        if (data.specifications.length <= 1) {
-            setData('specifications', ['']);
-            return;
-        }
-        setData('specifications', data.specifications.filter((_, i) => i !== index));
-    };
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
@@ -69,29 +51,46 @@ export default function EditItem({ item, categories, units }: Props) {
 
     return (
         <AuthenticatedLayout
-            header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Edit Catalog Item</h2>}
+            header={
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h2 className="text-xl font-semibold leading-tight text-gray-800">Edit Catalog Item</h2>
+                    <Link
+                        href={route('inventory.items.create', { clone_item_id: item.item_id })}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition shadow-2xs"
+                    >
+                        <svg className="w-3.5 h-3.5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                        </svg>
+                        Add Variant SKU
+                    </Link>
+                </div>
+            }
         >
-            <Head title="Edit Catalog Item" />
+            <Head title={`Edit ${item.item_name}`} />
 
             <div className="py-8">
                 <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
                     <form onSubmit={submit} className="grid gap-4 md:grid-cols-2">
                         <div className="md:col-span-2">
-                            <label className="mb-1 block text-sm font-medium text-slate-700">Item Name</label>
+                            <label className="mb-1 block text-sm font-medium text-slate-700">
+                                Item Name <span className="text-rose-600">*</span>
+                            </label>
                             <input
                                 value={data.item_name}
                                 onChange={(event) => setData('item_name', event.target.value)}
                                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                required
                             />
                             <InputError message={errors.item_name} className="mt-1" />
                         </div>
 
                         <div>
-                            <label className="mb-1 block text-sm font-medium text-slate-700">Category</label>
+                            <label className="mb-1 block text-sm font-medium text-slate-700">Category <span className="text-rose-600">*</span></label>
                             <select
                                 value={data.item_category_id}
                                 onChange={(event) => setData('item_category_id', event.target.value)}
                                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                required
                             >
                                 <option value="">Select category</option>
                                 {categories.map((category) => (
@@ -104,11 +103,12 @@ export default function EditItem({ item, categories, units }: Props) {
                         </div>
 
                         <div>
-                            <label className="mb-1 block text-sm font-medium text-slate-700">Packaging Unit (Outer Container / Unit of Issue)</label>
+                            <label className="mb-1 block text-sm font-medium text-slate-700">Packaging Unit (Outer Container / Unit of Issue) <span className="text-rose-600">*</span></label>
                             <select
                                 value={data.default_unit}
                                 onChange={(event) => setData('default_unit', event.target.value)}
                                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                required
                             >
                                 <option value="">Select unit</option>
                                 {units.map((unit) => (
@@ -121,7 +121,7 @@ export default function EditItem({ item, categories, units }: Props) {
                         </div>
 
                         <div>
-                            <label className="mb-1 block text-sm font-medium text-slate-700">Count / Pieces per Package</label>
+                            <label className="mb-1 block text-sm font-medium text-slate-700">Count / Pieces per Package <span className="text-rose-600">*</span></label>
                             <input
                                 type="number"
                                 min="1"
@@ -135,11 +135,12 @@ export default function EditItem({ item, categories, units }: Props) {
                         </div>
 
                         <div>
-                            <label className="mb-1 block text-sm font-medium text-slate-700">Content Sub-Unit (Inner Item Type)</label>
+                            <label className="mb-1 block text-sm font-medium text-slate-700">Content Sub-Unit (Inner Item Type) <span className="text-rose-600">*</span></label>
                             <select
                                 value={data.sub_unit}
                                 onChange={(event) => setData('sub_unit', event.target.value)}
                                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                required
                             >
                                 <option value="piece">piece / pcs</option>
                                 <option value="ream">ream</option>
@@ -177,62 +178,45 @@ export default function EditItem({ item, categories, units }: Props) {
                             <InputError message={errors.status} className="mt-1" />
                         </div>
 
-                        {/* Standard Item Specifications */}
-                        <div className="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-3">
+                        {/* Standard Item Specification (Single Approved Technical Sheet) */}
+                        <div className="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-2">
                             <div className="flex flex-wrap items-center justify-between gap-2">
                                 <div>
-                                    <label className="text-sm font-semibold text-slate-800">Standard Item Specifications</label>
+                                    <label className="text-sm font-semibold text-slate-800">
+                                        Standard Technical Specification <span className="text-rose-600">*</span>
+                                    </label>
                                     <p className="text-xs text-slate-500">
-                                        Technical specifications and compliance details for this item.
-                                    </p>
-                                    <p className="mt-1 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1 leading-snug">
-                                        ℹ️ <strong>Stock Tracking:</strong> Inventory is tracked per Catalog Item. If a physical variation requires separate warehouse stock levels (e.g. Legal vs A4, or distinct colors/models), create it as a separate Catalog Item.
+                                        Official technical compliance specification sheet for this discrete item.
                                     </p>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={addSpecification}
-                                    className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700 transition shadow-xs"
+                                <Link
+                                    href={route('inventory.items.create', { clone_item_id: item.item_id })}
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition shadow-2xs"
                                 >
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                                    <svg className="w-3.5 h-3.5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
                                     </svg>
-                                    Add Specification
-                                </button>
+                                    + Add Variant SKU
+                                </Link>
                             </div>
-
-                            <div className="space-y-2">
-                                {data.specifications.map((spec, index) => (
-                                    <div key={index} className="flex items-center gap-2">
-                                        <span className="text-xs font-semibold text-slate-400 w-6 text-center">#{index + 1}</span>
-                                        <input
-                                            type="text"
-                                            value={spec}
-                                            onChange={(e) => updateSpecification(index, e.target.value)}
-                                            placeholder="e.g. Black (0.5mm), A4 80gsm, 500ml Ethyl 70%"
-                                            className="flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm bg-white focus:border-red-500 focus:ring-1 focus:ring-red-500"
-                                        />
-                                        {data.specifications.length > 1 ? (
-                                            <button
-                                                type="button"
-                                                onClick={() => removeSpecification(index)}
-                                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition"
-                                                title="Remove specification"
-                                            >
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                </svg>
-                                            </button>
-                                        ) : null}
-                                    </div>
-                                ))}
-                            </div>
+                            <input
+                                type="text"
+                                value={data.specification}
+                                onChange={(e) => setData('specification', e.target.value)}
+                                placeholder="e.g. Heavy-duty retractable cutter with auto-lock blade (Box of 12 pcs)"
+                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                                required
+                            />
+                            <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1 leading-snug">
+                                ℹ️ <strong>Stock Tracking Note:</strong> Each catalog item tracks its own independent warehouse inventory. If you need a different size, color, or model, click <strong>"+ Add Variant SKU"</strong> above to create a dedicated SKU with its own inventory lane.
+                            </p>
+                            <InputError message={errors.specification} className="mt-1" />
                         </div>
 
                         <div className="md:col-span-2">
                             <label className="mb-1 block text-sm font-medium text-slate-700">Description</label>
                             <textarea
-                                rows={4}
+                                rows={3}
                                 value={data.description}
                                 onChange={(event) => setData('description', event.target.value)}
                                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
@@ -240,16 +224,27 @@ export default function EditItem({ item, categories, units }: Props) {
                             <InputError message={errors.description} className="mt-1" />
                         </div>
 
-                        <div className="md:col-span-2 flex items-center gap-3">
-                            <button
-                                type="submit"
-                                disabled={processing}
-                                className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-60"
+                        <div className="md:col-span-2 flex items-center justify-between gap-3 pt-2">
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="submit"
+                                    disabled={processing}
+                                    className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-60"
+                                >
+                                    {processing ? 'Saving…' : 'Update Item'}
+                                </button>
+                                <Link href={route('inventory.items.index')} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                                    Cancel
+                                </Link>
+                            </div>
+                            <Link
+                                href={route('inventory.items.create', { clone_item_id: item.item_id })}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3.5 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition shadow-2xs"
                             >
-                                Update Item
-                            </button>
-                            <Link href={route('inventory.items.index')} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                                Cancel
+                                <svg className="w-3.5 h-3.5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                                </svg>
+                                Add Variant SKU
                             </Link>
                         </div>
                     </form>
@@ -258,8 +253,3 @@ export default function EditItem({ item, categories, units }: Props) {
         </AuthenticatedLayout>
     );
 }
-
-
-
-
-

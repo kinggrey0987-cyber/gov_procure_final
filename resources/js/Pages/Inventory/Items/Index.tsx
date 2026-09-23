@@ -228,6 +228,13 @@ export default function ItemCatalogIndex({ items, categories, filters, canManage
                                                         <Link href={route('inventory.items.edit', item.item_id)} className="font-semibold text-slate-600 hover:text-slate-900">
                                                             Edit
                                                         </Link>
+                                                        <Link
+                                                            href={route('inventory.items.create', { clone_item_id: item.item_id })}
+                                                            className="font-semibold text-indigo-600 hover:text-indigo-800"
+                                                            title="Create a new variant of this item"
+                                                        >
+                                                            + Variant
+                                                        </Link>
                                                         <button
                                                             type="button"
                                                             onClick={() => toggleStatus(item.item_id)}
