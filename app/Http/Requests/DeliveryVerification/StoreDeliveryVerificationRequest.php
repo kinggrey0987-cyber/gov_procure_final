@@ -63,6 +63,10 @@ class StoreDeliveryVerificationRequest extends FormRequest
                     $validator->errors()->add('verification_status', 'Deliveries without discrepancies (0 damaged, 0 missing) cannot be rejected. All item quantities match the purchase order.');
                 }
 
+                if (trim((string) $this->input('discrepancy_notes')) === '') {
+                    $validator->errors()->add('discrepancy_notes', 'Discrepancy notes / findings are required when rejecting a delivery.');
+                }
+
                 $hasSingle = $this->hasFile('evidence_file');
                 $hasMulti = $this->hasFile('evidence_files') && count(array_filter((array) $this->file('evidence_files'))) > 0;
                 if (! $hasSingle && ! $hasMulti) {

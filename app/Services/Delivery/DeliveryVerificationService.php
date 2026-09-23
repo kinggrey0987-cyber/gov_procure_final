@@ -70,6 +70,12 @@ class DeliveryVerificationService
             ]);
         }
 
+        if ((string) $payload['verification_status'] === 'REJECTED' && empty(trim((string) ($payload['discrepancy_notes'] ?? '')))) {
+            throw ValidationException::withMessages([
+                'discrepancy_notes' => 'Discrepancy notes / findings are required when rejecting a delivery.',
+            ]);
+        }
+
         return DB::transaction(function () use ($delivery, $actor, $payload): DeliveryVerification {
             $verification = DeliveryVerification::query()->create([
                 'delivery_id' => (int) $delivery->delivery_id,

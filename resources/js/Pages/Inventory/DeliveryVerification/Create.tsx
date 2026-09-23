@@ -100,6 +100,9 @@ export default function DeliveryVerificationCreate({ delivery }: Props) {
         if (!hasDiscrepancy && data.verification_status === 'REJECTED') {
             return;
         }
+        if (data.verification_status === 'REJECTED' && !data.discrepancy_notes.trim()) {
+            return;
+        }
         post(route('inventory.delivery-verifications.store', delivery.delivery_id), { forceFormData: true });
     };
 
@@ -206,17 +209,29 @@ export default function DeliveryVerificationCreate({ delivery }: Props) {
                             </FormField>
                         </div>
 
-                        <FormField label={isRejected ? 'Discrepancy Notes / Findings' : 'Inspection Notes (Optional)'} error={errors.discrepancy_notes || errors.remarks}>
+                        <FormField
+                            label={isRejected ? 'Discrepancy Notes / Findings' : 'Inspection Notes (Optional)'}
+                            required={isRejected}
+                            error={errors.discrepancy_notes || errors.remarks}
+                        >
                             <textarea
                                 rows={4}
                                 value={data.discrepancy_notes}
+                                required={isRejected}
                                 onChange={(e) => {
                                     setData('discrepancy_notes', e.target.value);
                                     setData('remarks', e.target.value);
                                 }}
-                                className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none"
+                                className={`w-full rounded-lg border px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none ${
+                                    isRejected && !data.discrepancy_notes.trim() ? 'border-amber-300' : 'border-slate-300'
+                                }`}
                                 placeholder={isRejected ? 'Describe the discrepancies found (e.g. damaged packaging, missing units, broken seals)...' : 'Optional inspection notes regarding delivery condition...'}
                             />
+                            <p className="mt-1 text-xs text-slate-500">
+                                {isRejected
+                                    ? 'Required: Detail the specific damages, missing items, or physical condition observed during verification.'
+                                    : 'Optional inspection notes regarding delivery condition.'}
+                            </p>
                         </FormField>
 
                         {(isRejected || hasDiscrepancy) ? (

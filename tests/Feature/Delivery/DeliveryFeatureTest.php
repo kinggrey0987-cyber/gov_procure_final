@@ -331,6 +331,13 @@ class DeliveryFeatureTest extends TestCase
         $this->actingAs($this->gsoOfficer)->post(route('inventory.delivery-verifications.store', $delivery->delivery_id), [
             'verification_date' => now()->toDateString(),
             'verification_status' => 'REJECTED',
+            'discrepancy_notes' => '',
+            'evidence_file' => UploadedFile::fake()->image('evidence.png'),
+        ])->assertSessionHasErrors('discrepancy_notes');
+
+        $this->actingAs($this->gsoOfficer)->post(route('inventory.delivery-verifications.store', $delivery->delivery_id), [
+            'verification_date' => now()->toDateString(),
+            'verification_status' => 'REJECTED',
             'discrepancy_notes' => 'One damaged and one missing item for BAC/procurement follow-up.',
             'evidence_file' => UploadedFile::fake()->image('evidence.png'),
         ])->assertRedirect();
