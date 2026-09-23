@@ -161,19 +161,14 @@ export default function ExecutiveAnomalyShow({ anomaly, evidence }: Props) {
                                     <span className="font-bold text-slate-900 text-right leading-tight break-words">{anomaly.office?.name ?? 'General Services / Central'}</span>
                                 </div>
 
-                                {anomaly.item && (
+                                {Boolean(anomaly.item?.name?.trim()) && (
                                     <div className="flex items-start justify-between gap-2.5 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5">
                                         <span className="shrink-0 font-medium text-slate-500">Item:</span>
-                                        <span className="font-bold text-slate-900 text-right leading-tight break-words" title={anomaly.item.name}>
-                                            {anomaly.item.name} {anomaly.item.item_code ? `(${anomaly.item.item_code})` : ''}
+                                        <span className="font-bold text-slate-900 text-right leading-tight break-words" title={anomaly.item!.name}>
+                                            {anomaly.item!.name} {anomaly.item!.item_code ? `(${anomaly.item!.item_code})` : ''}
                                         </span>
                                     </div>
                                 )}
-
-                                <div className="flex items-start justify-between gap-2.5 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5">
-                                    <span className="shrink-0 font-medium text-slate-500">Method:</span>
-                                    <span className="font-bold text-slate-900 text-right leading-tight break-words">{anomaly.detection_method ?? 'Statistical Baseline'}</span>
-                                </div>
 
                                 {anomaly.detected_at && (
                                     <div className="flex items-start justify-between gap-2.5 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5">

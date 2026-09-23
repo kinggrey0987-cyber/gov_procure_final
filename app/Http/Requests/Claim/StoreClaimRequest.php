@@ -36,7 +36,7 @@ class StoreClaimRequest extends FormRequest
             'quantity_disputed' => ['nullable', 'integer', 'min:0'],
             'quantity_damaged' => ['nullable', 'integer', 'min:0'],
             'quantity_missing' => ['nullable', 'integer', 'min:0'],
-            'remarks' => ['required', 'string', 'min:5'],
+            'remarks' => ['nullable', 'string'],
             'attachment_title' => ['nullable', 'string', 'max:200'],
             'attachment_file' => [
                 'nullable',

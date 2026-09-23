@@ -94,19 +94,23 @@ type Props = {
         create?: string;
         show: string;
         updateStatus?: string;
+        verifyReplacement?: string;
     };
     permissions?: {
         update: boolean;
         createFollowUp?: boolean;
+        verifyReplacement?: boolean;
     };
 };
 
 export default function ClaimShow({ claim, parentClaim, followUpClaims = [], linkedDistribution, attachments, attachmentPermissions, statusHistory, approvalHistory, routes, permissions }: Props) {
     const [activeTab, setActiveTab] = useState<'overview' | 'items' | 'status' | 'related' | 'notes'>('overview');
-    const routeNames = routes ?? {
-        index: 'inventory.claims.index',
-        show: 'inventory.claims.show',
-        updateStatus: 'inventory.claims.update-status',
+    const routeNames = {
+        index: routes?.index ?? 'inventory.claims.index',
+        create: routes?.create,
+        show: routes?.show ?? 'inventory.claims.show',
+        updateStatus: routes?.updateStatus ?? 'inventory.claims.update-status',
+        verifyReplacement: routes?.verifyReplacement ?? 'office.claims.verify-replacement',
     };
     const nextStatusOptions = getNextStatusOptions(claim.status);
     const canUpdate = (permissions?.update ?? false) && nextStatusOptions.length > 0;
@@ -117,7 +121,7 @@ export default function ClaimShow({ claim, parentClaim, followUpClaims = [], lin
         remarks: '',
     });
     const remainingReplacementQuantity = Math.max((claim.quantity_disputed ?? 0) - (claim.replacement_quantity ?? 0), 0);
-    const usesReplacement = statusForm.data.status === 'RESOLVED';
+    const usesReplacement = statusForm.data.status === 'RESOLVED' || statusForm.data.status === 'REPLACEMENT_RELEASED';
     const claimedItems = linkedDistribution?.items.filter((item) => {
         if (!claim.distribution_item_id) {
             return true;
@@ -132,7 +136,7 @@ export default function ClaimShow({ claim, parentClaim, followUpClaims = [], lin
     const applyStatusDecision = (status: string) => {
         statusForm.setData('status', status);
 
-        if (status === 'RESOLVED') {
+        if (status === 'RESOLVED' || status === 'REPLACEMENT_RELEASED') {
             statusForm.setData('resolution_type', 'REPLACEMENT_RELEASED');
             statusForm.setData('replacement_quantity', String(Math.trunc(remainingReplacementQuantity)));
             return;
@@ -224,6 +228,26 @@ export default function ClaimShow({ claim, parentClaim, followUpClaims = [], lin
                         <Info label="Available Replacement Stock" value={claim.replacement_available_stock === null || claim.replacement_available_stock === undefined ? '-' : formatQuantity(claim.replacement_available_stock)} />
                         <Info label="Remarks" value={claim.remarks ?? 'No remarks provided.'} />
                     </div>
+                    {permissions?.verifyReplacement ? (
+                        <div className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <h4 className="text-sm font-semibold text-emerald-900">Replacement Received by Office?</h4>
+                                    <p className="text-xs text-emerald-700">
+                                        If GSO has physically released or delivered the replacement items and they are inspected, confirm to close this claim.
+                                    </p>
+                                </div>
+                                <Link
+                                    as="button"
+                                    method="post"
+                                    href={route(routeNames.verifyReplacement, claim.claims_id)}
+                                    className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-emerald-700 transition"
+                                >
+                                    ✓ Confirm &amp; Accept Replacement
+                                </Link>
+                            </div>
+                        </div>
+                    ) : null}
                     {canCreateFollowUp && routeNames.create ? (
                         <div className="mt-5">
                             <Link
@@ -287,7 +311,7 @@ export default function ClaimShow({ claim, parentClaim, followUpClaims = [], lin
                                             onChange={(event) => statusForm.setData('replacement_quantity', event.target.value.replace(/\D/g, ''))}
                                         />
                                         {statusForm.errors.replacement_quantity ? <p className="mt-1 text-xs text-rose-600">{statusForm.errors.replacement_quantity}</p> : null}
-                                        {statusForm.data.status === 'RESOLVED' && (claim.replacement_available_stock ?? 0) < remainingReplacementQuantity ? (
+                                        {usesReplacement && (claim.replacement_available_stock ?? 0) < remainingReplacementQuantity ? (
                                             <p className="mt-1 text-xs text-amber-600">Available stock is below the remaining disputed quantity.</p>
                                         ) : null}
                                     </div>
@@ -464,6 +488,7 @@ function displayClaimStatus(status: string): string {
         OPEN: 'Pending Review',
         IN_REVIEW: 'In Claim Review',
         PENDING_REPLACEMENT: 'Pending Replacement',
+        REPLACEMENT_RELEASED: 'Replacement Released (Pending Office Verification)',
         PARTIALLY_RESOLVED: 'Partially Resolved',
         RESOLVED: 'Resolved',
         REJECTED: 'Rejected',
@@ -498,10 +523,11 @@ function formatQuantity(value: number): string {
 
 function getNextStatusOptions(status: string): Array<{ value: string; label: string }> {
     const transitions: Record<string, string[]> = {
-        OPEN: ['PENDING_REPLACEMENT', 'RESOLVED', 'REJECTED'],
-        IN_REVIEW: ['PENDING_REPLACEMENT', 'RESOLVED', 'REJECTED'],
-        PENDING_REPLACEMENT: ['RESOLVED', 'REJECTED'],
-        PARTIALLY_RESOLVED: ['PENDING_REPLACEMENT', 'RESOLVED', 'REJECTED'],
+        OPEN: ['PENDING_REPLACEMENT', 'REPLACEMENT_RELEASED', 'RESOLVED', 'REJECTED'],
+        IN_REVIEW: ['PENDING_REPLACEMENT', 'REPLACEMENT_RELEASED', 'RESOLVED', 'REJECTED'],
+        PENDING_REPLACEMENT: ['REPLACEMENT_RELEASED', 'RESOLVED', 'REJECTED'],
+        REPLACEMENT_RELEASED: ['RESOLVED', 'REJECTED'],
+        PARTIALLY_RESOLVED: ['PENDING_REPLACEMENT', 'REPLACEMENT_RELEASED', 'RESOLVED', 'REJECTED'],
     };
 
     return (transitions[status] ?? []).map((value) => ({

@@ -16,7 +16,7 @@ use Illuminate\Validation\ValidationException;
 
 class ClaimService
 {
-    private const ACTIVE_STATUSES = ['OPEN', 'IN_REVIEW', 'PENDING_REPLACEMENT', 'PARTIALLY_RESOLVED'];
+    private const ACTIVE_STATUSES = ['OPEN', 'IN_REVIEW', 'PENDING_REPLACEMENT', 'REPLACEMENT_RELEASED', 'PARTIALLY_RESOLVED'];
 
     private const FOLLOW_UP_SOURCE_TYPE = 'CLAIM_REPLACEMENT_FOLLOW_UP';
 
@@ -119,6 +119,12 @@ class ClaimService
             ]);
         }
 
+        if ($distributionRecord->updated_at && now()->diffInHours($distributionRecord->updated_at) > 48) {
+            throw ValidationException::withMessages([
+                'distribution_record_id' => 'Claims must be filed within 2 days (48 hours) of receiving the supplies.',
+            ]);
+        }
+
         $claimCode = $payload['claim_code'] ?? $this->generateClaimCode();
 
         $claimType = $this->resolveClaimType($submittedClaimType, $damagedQuantity, $missingQuantity);
@@ -177,10 +183,11 @@ class ClaimService
         $currentStatus = (string) $claim->status;
 
         $validTransitions = [
-            'OPEN' => ['REJECTED', 'RESOLVED', 'PENDING_REPLACEMENT'],
-            'IN_REVIEW' => ['REJECTED', 'RESOLVED', 'PENDING_REPLACEMENT'],
-            'PENDING_REPLACEMENT' => ['REJECTED', 'RESOLVED'],
-            'PARTIALLY_RESOLVED' => ['REJECTED', 'RESOLVED', 'PENDING_REPLACEMENT', 'PARTIALLY_RESOLVED'],
+            'OPEN' => ['REJECTED', 'RESOLVED', 'PENDING_REPLACEMENT', 'REPLACEMENT_RELEASED'],
+            'IN_REVIEW' => ['REJECTED', 'RESOLVED', 'PENDING_REPLACEMENT', 'REPLACEMENT_RELEASED'],
+            'PENDING_REPLACEMENT' => ['REJECTED', 'RESOLVED', 'REPLACEMENT_RELEASED'],
+            'REPLACEMENT_RELEASED' => ['REJECTED', 'RESOLVED', 'PENDING_REPLACEMENT'],
+            'PARTIALLY_RESOLVED' => ['REJECTED', 'RESOLVED', 'PENDING_REPLACEMENT', 'REPLACEMENT_RELEASED', 'PARTIALLY_RESOLVED'],
             'REJECTED' => [],
             'RESOLVED' => [],
         ];
@@ -194,12 +201,15 @@ class ClaimService
         return DB::transaction(function () use ($claim, $actor, $payload, $currentStatus, $newStatus): Claim {
             $resolutionType = isset($payload['resolution_type']) ? strtoupper((string) $payload['resolution_type']) : null;
             $replacementQuantity = round((float) ($payload['replacement_quantity'] ?? 0), 2);
-            $appliedReplacementQuantity = in_array($resolutionType, ['REPLACEMENT_RELEASED', 'PARTIAL_REPLACEMENT'], true)
+            $isReleasingReplacement = in_array($resolutionType, ['REPLACEMENT_RELEASED', 'PARTIAL_REPLACEMENT'], true)
+                || $newStatus === 'REPLACEMENT_RELEASED';
+
+            $appliedReplacementQuantity = $isReleasingReplacement
                 ? $replacementQuantity
                 : 0.0;
 
-            if (in_array($resolutionType, ['REPLACEMENT_RELEASED', 'PARTIAL_REPLACEMENT'], true)) {
-                $this->releaseClaimReplacement($claim, $actor, $resolutionType, $replacementQuantity, (string) ($payload['remarks'] ?? ''));
+            if ($isReleasingReplacement) {
+                $this->releaseClaimReplacement($claim, $actor, $resolutionType ?: 'REPLACEMENT_RELEASED', $replacementQuantity, (string) ($payload['remarks'] ?? ''));
             }
 
             if ($newStatus === 'PENDING_REPLACEMENT') {
@@ -235,6 +245,63 @@ class ClaimService
                     user: $claim->claimant,
                     title: 'Claim Status Updated',
                     message: sprintf('Your claim %s is now %s.', $claim->claim_code, $newStatus),
+                    notificationType: 'CLAIM_STATUS_UPDATED',
+                    referenceType: Claim::class,
+                    referenceId: (int) $claim->claims_id,
+                );
+            }
+
+            return $claim->fresh(['distributionRecord', 'claimant', 'office', 'parentClaim']) ?? $claim;
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    public function verifyAndResolveClaim(Claim $claim, User $actor, array $payload = []): Claim
+    {
+        if (! $actor->isOfficeUser() || (int) $actor->office_id !== (int) $claim->office_id) {
+            throw ValidationException::withMessages([
+                'role' => 'Only office users of the claimant office can verify and accept replacement claims.',
+            ]);
+        }
+
+        if (! in_array((string) $claim->status, ['REPLACEMENT_RELEASED', 'PARTIALLY_RESOLVED', 'OPEN'], true)) {
+            throw ValidationException::withMessages([
+                'status' => 'Claim is not currently awaiting office verification of released replacement.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($claim, $actor, $payload): Claim {
+            $currentStatus = (string) $claim->status;
+            $remarks = trim((string) ($payload['remarks'] ?? '')) !== ''
+                ? (string) $payload['remarks']
+                : 'Replacement items verified and accepted by requesting office.';
+
+            $claim->forceFill([
+                'status' => 'RESOLVED',
+                'resolution_type' => $claim->resolution_type ?: 'REPLACEMENT_RELEASED',
+                'remarks' => $remarks,
+            ])->save();
+
+            $this->recordStatus($claim, $currentStatus, 'RESOLVED', $actor, 'Replacement verified and claim resolved by office.');
+            $this->recordApproval($claim, $actor, 'RESOLVED', 'Office accepted replacement items in good condition.');
+            $this->recordAudit($actor, 'OFFICE_RESOLVE_CLAIM', $claim, [
+                'old_status' => $currentStatus,
+                'new_status' => 'RESOLVED',
+            ]);
+
+            $this->resolveParentClaimFromFollowUp($claim, $actor, $remarks);
+
+            $gsoUsers = User::query()
+                ->whereHas('role', fn ($q) => $q->where('code', \App\Enums\UserRole::GSO_OFFICER->value))
+                ->get();
+
+            foreach ($gsoUsers as $gso) {
+                $this->notificationService->notifyUser(
+                    user: $gso,
+                    title: 'Claim Replacement Accepted',
+                    message: sprintf('Office %s has verified and accepted replacement for %s.', $claim->office?->name ?? 'Office', $claim->claim_code),
                     notificationType: 'CLAIM_STATUS_UPDATED',
                     referenceType: Claim::class,
                     referenceId: (int) $claim->claims_id,

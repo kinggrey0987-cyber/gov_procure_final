@@ -378,6 +378,8 @@ export default function ExecutiveApprovalsIndex({ records, recordsExport, summar
                     <ExecutiveChartCard title="Office Queue Distribution" subtitle="Workflow records by office" tone="neutral">
                         <HorizontalBarChart
                             data={office_breakdown.map((row) => ({ label: row.office_name, value: row.total }))}
+                            palette="multi"
+                            showPercentage={true}
                             emptyText="No office-level queue data is available."
                         />
                     </ExecutiveChartCard>

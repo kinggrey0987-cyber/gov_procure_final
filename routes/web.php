@@ -315,6 +315,8 @@ Route::middleware(['auth', 'twofactor', 'must-change-password'])->group(function
                 Route::get('/{claim}', [ClaimController::class, 'show'])
                     ->middleware('can:claim.view,claim')
                     ->name('show');
+                Route::post('/{claim}/verify-replacement', [ClaimController::class, 'verifyReplacement'])
+                    ->name('verify-replacement');
             });
         });
 

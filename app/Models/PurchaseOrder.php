@@ -72,8 +72,9 @@ class PurchaseOrder extends Model
 
     public function getIsZeroCostReplacementAttribute(): bool
     {
-        return (string) ($this->purchaseRequest?->source_type ?? '') === 'PARTIAL_DELIVERY_FOLLOW_UP'
-            || (int) ($this->purchaseRequest?->source_delivery_id ?? 0) > 0;
+        return in_array((string) ($this->purchaseRequest?->source_type ?? ''), ['PARTIAL_DELIVERY_FOLLOW_UP', 'CLAIM_REPLACEMENT_FOLLOW_UP'], true)
+            || (int) ($this->purchaseRequest?->source_delivery_id ?? 0) > 0
+            || (int) ($this->purchaseRequest?->source_claim_id ?? 0) > 0;
     }
 
     public function purchaseRequest(): BelongsTo

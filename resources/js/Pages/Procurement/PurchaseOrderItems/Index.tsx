@@ -132,14 +132,24 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
         });
     };
 
+    const [removalError, setRemovalError] = useState<string | null>(null);
+
     const confirmItemRemoval = () => {
         if (!itemPendingRemoval) {
             return;
         }
 
+        setRemovalError(null);
         deleteForm.delete(route('procurement.purchase-orders.items.destroy', [purchaseOrder.purchase_order_id, itemPendingRemoval.purchase_order_item_id]), {
             preserveScroll: true,
-            onSuccess: () => setItemPendingRemoval(null),
+            onSuccess: () => {
+                setItemPendingRemoval(null);
+                setRemovalError(null);
+            },
+            onError: (errs) => {
+                const message = Object.values(errs)[0] || 'Unable to remove purchase order item.';
+                setRemovalError(String(message));
+            },
         });
     };
 
@@ -161,6 +171,19 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                         </div>
                     </section>
 
+                    {isWarranty ? (
+                        <section className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-6 shadow-sm">
+                            <div className="flex items-center gap-3">
+                                <span className="text-2xl">🛡️</span>
+                                <div>
+                                    <h4 className="text-sm font-bold text-indigo-950">Zero-Cost Warranty Replacement Purchase Order</h4>
+                                    <p className="mt-0.5 text-xs text-indigo-700">
+                                        Items are automatically populated from the delivery discrepancy under supplier warranty rectification (RA 9184). Item lines and pricing are locked to ₱0.00.
+                                    </p>
+                                </div>
+                            </div>
+                        </section>
+                    ) : (
                     <form onSubmit={submit} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                         <div className="md:col-span-4">
                             <p className="text-xl font-semibold text-slate-800">Source Request Line</p>
@@ -253,6 +276,7 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                             <p className="text-xs font-semibold text-amber-700 md:col-span-4">This source request line is already encoded below. Remove the old line first or update it instead of adding again.</p>
                         ) : null}
                     </form>
+                    )}
 
                     <div className="responsive-table-wrap rounded-2xl border border-slate-200 bg-white shadow-sm">
                         <table className="min-w-full text-sm">
@@ -279,13 +303,22 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                                         <td className="px-3 py-2">{row.unit_price}</td>
                                         <td className="px-3 py-2">{row.total_price}</td>
                                         <td className="px-3 py-2 text-right">
-                                            <button
-                                                type="button"
-                                                onClick={() => setItemPendingRemoval(row)}
-                                                className="rounded border border-rose-300 px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50"
-                                            >
-                                                Remove
-                                            </button>
+                                            {isWarranty ? (
+                                                <span className="inline-flex items-center gap-1 rounded bg-slate-100 border border-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
+                                                    🔒 Locked (Warranty)
+                                                </span>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setRemovalError(null);
+                                                        setItemPendingRemoval(row);
+                                                    }}
+                                                    className="rounded border border-rose-300 px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50"
+                                                >
+                                                    Remove
+                                                </button>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}
@@ -402,6 +435,11 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                             <p className="mt-2 text-sm text-slate-600">
                                 Remove {itemPendingRemoval?.item_name_snapshot ?? 'this item line'} from this purchase order? This action will update the encoded line list.
                             </p>
+                            {removalError ? (
+                                <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">
+                                    {removalError}
+                                </div>
+                            ) : null}
                             <div className="mt-6 flex flex-wrap justify-end gap-3">
                                 <button
                                     type="button"

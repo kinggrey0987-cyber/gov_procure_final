@@ -153,9 +153,11 @@ class DeliveryService
                 'delivery_receipt_no' => $payload['delivery_receipt_no'] ?? $delivery->delivery_receipt_no,
                 'sales_invoice_no' => $payload['sales_invoice_no'] ?? $delivery->sales_invoice_no,
                 'sales_invoice_date' => $payload['sales_invoice_date'] ?? $delivery->sales_invoice_date,
-                'sales_invoice_amount' => array_key_exists('sales_invoice_amount', $payload) && $payload['sales_invoice_amount'] !== null && $payload['sales_invoice_amount'] !== ''
-                    ? (float) $payload['sales_invoice_amount']
-                    : $delivery->sales_invoice_amount,
+                'sales_invoice_amount' => ($delivery->purchaseOrder?->is_zero_cost_replacement ?? false)
+                    ? 0.00
+                    : (array_key_exists('sales_invoice_amount', $payload) && $payload['sales_invoice_amount'] !== null && $payload['sales_invoice_amount'] !== ''
+                        ? (float) $payload['sales_invoice_amount']
+                        : $delivery->sales_invoice_amount),
                 'remarks' => $payload['remarks'] ?? $delivery->remarks,
             ])->save();
 

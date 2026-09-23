@@ -13,6 +13,12 @@ type ReadyRecord = {
     status: string;
     supply_request_id: number;
     is_claim_replacement?: boolean;
+    claim_code?: string | null;
+    claim_id?: number | null;
+    has_existing_claim?: boolean;
+    existing_claim_code?: string | null;
+    existing_claim_id?: number | null;
+    is_claim_expired?: boolean;
 };
 
 type Props = {
@@ -59,11 +65,23 @@ export default function SuppliesReadyForClaimIndex({ records }: Props) {
                                         <tr key={record.distribution_record_id} className="hover:bg-slate-50/60 transition-colors">
                                             <td className="px-3.5 py-2 font-semibold text-red-700">
                                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                                    <span>{record.request_id}</span>
+                                                    {record.claim_code ? (
+                                                        <Link
+                                                            href={record.claim_id ? route('office.claims.show', record.claim_id) : '#'}
+                                                            className="font-bold text-red-700 hover:text-red-900 underline decoration-red-300"
+                                                        >
+                                                            {record.claim_code}
+                                                        </Link>
+                                                    ) : (
+                                                        <span>{record.request_id}</span>
+                                                    )}
                                                     {record.is_claim_replacement && (
                                                         <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 border border-amber-300 px-2 py-0.5 text-[10px] font-black text-amber-800 shadow-2xs uppercase">
                                                             🛡️ Claim Replacement
                                                         </span>
+                                                    )}
+                                                    {record.claim_code && record.request_id && record.request_id !== 'N/A' && (
+                                                        <span className="text-[10px] text-slate-400 font-normal">({record.request_id})</span>
                                                     )}
                                                 </div>
                                             </td>
@@ -99,14 +117,31 @@ export default function SuppliesReadyForClaimIndex({ records }: Props) {
                                                         View
                                                     </Link>
                                                     {record.status.toUpperCase() === 'RECEIVED' ? (
-                                                        <Link
-                                                            href={route('office.claims.create', {
-                                                                supply_request_id: record.supply_request_id,
-                                                            })}
-                                                            className="rounded border border-red-200 bg-red-50/50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 transition"
-                                                        >
-                                                            File Claim
-                                                        </Link>
+                                                        record.has_existing_claim ? (
+                                                            <Link
+                                                                href={record.existing_claim_id ? route('office.claims.show', record.existing_claim_id) : route('office.claims.index')}
+                                                                className="rounded border border-indigo-200 bg-indigo-50/70 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition"
+                                                            >
+                                                                Claim Filed {record.existing_claim_code ? `(${record.existing_claim_code})` : ''}
+                                                            </Link>
+                                                        ) : record.is_claim_expired ? (
+                                                            <span
+                                                                className="rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-400 cursor-not-allowed"
+                                                                title="Claims must be filed within 2 days (48 hours) of receiving supplies."
+                                                            >
+                                                                Claim expired (2 days)
+                                                            </span>
+                                                        ) : (
+                                                            <Link
+                                                                href={route('office.claims.create', {
+                                                                    supply_request_id: record.supply_request_id,
+                                                                    distribution_record_id: record.distribution_record_id,
+                                                                })}
+                                                                className="rounded border border-red-200 bg-red-50/50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 transition"
+                                                            >
+                                                                File Claim
+                                                            </Link>
+                                                        )
                                                     ) : (
                                                         <span className="rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-400">
                                                             Claim after receipt

@@ -606,25 +606,40 @@ export default function ProcurementAnalyticsIndex({
                         </ExecutiveChartCard>
                     </div>
 
-                    {/* PR Status Mix (xl:col-span-3) */}
-                    <div className="xl:col-span-3 flex flex-col">
-                        <ExecutiveChartCard title="PR Status Mix" subtitle="Request lifecycle" tone="default" className="h-full">
-                            <DonutChart
-                                data={statusMixPr}
-                                centerLabel="PR"
-                                emptyText="No data in current filter scope"
-                            />
-                        </ExecutiveChartCard>
-                    </div>
-
-                    {/* PO Status Mix (xl:col-span-3) */}
-                    <div className="xl:col-span-3 flex flex-col">
-                        <ExecutiveChartCard title="PO Status Mix" subtitle="Order progression" tone="default" className="h-full">
-                            <DonutChart
-                                data={statusMixPo}
-                                centerLabel="PO"
-                                emptyText="No data in current filter scope"
-                            />
+                    {/* Requisition & Purchase Order Status Mix (xl:col-span-6) */}
+                    <div className="xl:col-span-6 flex flex-col">
+                        <ExecutiveChartCard
+                            title="Requisition & Order Status Mix"
+                            subtitle="Procurement workflow progression and lifecycle distribution"
+                            tone="default"
+                            className="h-full"
+                        >
+                            <div className="flex flex-col h-full divide-y divide-slate-100">
+                                <div className="pb-4">
+                                    <div className="mb-2 flex items-center justify-between">
+                                        <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                                            Purchase Request (PR) Mix
+                                        </span>
+                                    </div>
+                                    <DonutChart
+                                        data={statusMixPr}
+                                        centerLabel="PR"
+                                        emptyText="No PR data in current filter scope"
+                                    />
+                                </div>
+                                <div className="pt-4">
+                                    <div className="mb-2 flex items-center justify-between">
+                                        <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                                            Purchase Order (PO) Mix
+                                        </span>
+                                    </div>
+                                    <DonutChart
+                                        data={statusMixPo}
+                                        centerLabel="PO"
+                                        emptyText="No PO data in current filter scope"
+                                    />
+                                </div>
+                            </div>
                         </ExecutiveChartCard>
                     </div>
                 </div>

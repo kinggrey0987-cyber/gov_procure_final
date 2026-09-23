@@ -301,14 +301,9 @@ class PublicDisclosurePackageService
             ->values();
 
         if ($selected->isEmpty()) {
-            $fallbackDocs = Document::query()
-                ->whereIn('document_id', $documentIds)
-                ->get();
-            $selected = $fallbackDocs;
-        }
-
-        if ($selected->isEmpty()) {
-            return [];
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'document_ids' => 'Select at least one procurement document that belongs to this disclosure source.',
+            ]);
         }
 
         $disks = array_unique([$this->publicDisk(), 'public', 'local']);

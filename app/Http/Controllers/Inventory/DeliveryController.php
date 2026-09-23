@@ -305,6 +305,8 @@ class DeliveryController
             });
         }
 
+        $isZeroCost = (bool) ($delivery->purchaseOrder?->is_zero_cost_replacement ?? false);
+
         return Inertia::render('Inventory/Delivery/Receive', [
             'delivery' => [
                 'delivery_id' => (int) $delivery->delivery_id,
@@ -315,8 +317,9 @@ class DeliveryController
                 'delivery_receipt_no' => (string) ($delivery->delivery_receipt_no ?? ''),
                 'sales_invoice_no' => (string) ($delivery->sales_invoice_no ?? ''),
                 'sales_invoice_date' => optional($delivery->sales_invoice_date)?->toDateString(),
-                'sales_invoice_amount' => $delivery->sales_invoice_amount !== null ? (float) $delivery->sales_invoice_amount : ($estimatedPoTotal > 0 ? $estimatedPoTotal : null),
+                'sales_invoice_amount' => $delivery->sales_invoice_amount !== null ? (float) $delivery->sales_invoice_amount : ($isZeroCost ? 0.0 : ($estimatedPoTotal > 0 ? $estimatedPoTotal : null)),
                 'estimated_po_total' => $estimatedPoTotal,
+                'is_zero_cost_replacement' => $isZeroCost,
                 'remarks' => $delivery->remarks,
                 'has_existing_dr' => $hasExistingDr,
                 'has_existing_si' => $hasExistingSi,
@@ -324,6 +327,7 @@ class DeliveryController
                     'purchase_order_id' => (int) $delivery->purchaseOrder->purchase_order_id,
                     'po_number' => (string) ($delivery->purchaseOrder->po_number ?? ''),
                     'placed_date' => $poPlacedDate,
+                    'is_zero_cost_replacement' => $isZeroCost,
                 ] : null,
                 'supplier' => $delivery->supplier ? [
                     'supplier_name' => (string) ($delivery->supplier->supplier_name ?? ''),

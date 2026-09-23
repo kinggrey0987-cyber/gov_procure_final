@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import Modal from '@/Components/Modal';
 import PaginationNav from '@/Components/PaginationNav';
 import useDebouncedValue from '@/hooks/useDebouncedValue';
 import { Head, Link, router } from '@inertiajs/react';
@@ -48,6 +49,28 @@ export default function PurchaseOrdersIndex({ purchaseOrders, filters }: Props) 
     const [search, setSearch] = useState(filters?.search ?? '');
     const debouncedSearch = useDebouncedValue(search, 450);
     const hasMountedRef = useRef(false);
+
+    const [poToIssue, setPoToIssue] = useState<PurchaseOrderRow | null>(null);
+    const [issueRemarks, setIssueRemarks] = useState('');
+    const [isIssuing, setIsIssuing] = useState(false);
+
+    const handleConfirmIssue = () => {
+        if (!poToIssue) return;
+        setIsIssuing(true);
+        router.post(route('procurement.purchase-orders.place', poToIssue.purchase_order_id), {
+            remarks: issueRemarks,
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setPoToIssue(null);
+                setIssueRemarks('');
+                setIsIssuing(false);
+            },
+            onError: () => {
+                setIsIssuing(false);
+            },
+        });
+    };
 
     useEffect(() => {
         setStatus(filters?.status ?? '');
@@ -216,9 +239,8 @@ export default function PurchaseOrdersIndex({ purchaseOrders, filters }: Props) 
                                                 <button
                                                     type="button"
                                                     onClick={() => {
-                                                        if (confirm(`Issue zero-cost warranty replacement purchase order ${row.po_number}?`)) {
-                                                            router.post(route('procurement.purchase-orders.place', row.purchase_order_id));
-                                                        }
+                                                        setIssueRemarks('');
+                                                        setPoToIssue(row);
                                                     }}
                                                     className="rounded bg-emerald-700 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-800 transition shadow-2xs"
                                                 >
@@ -258,6 +280,53 @@ export default function PurchaseOrdersIndex({ purchaseOrders, filters }: Props) 
                 )}
             </section>
         </div>
+
+        <Modal show={Boolean(poToIssue)} maxWidth="md" onClose={() => !isIssuing && setPoToIssue(null)}>
+            <div className="p-6">
+                <div className="flex items-center gap-2">
+                    <span className="text-xl">🛡️</span>
+                    <p className="text-xs font-bold uppercase tracking-wider text-emerald-800">Issue Purchase Order</p>
+                </div>
+                <h3 className="mt-2 text-lg font-bold text-slate-900">
+                    Issue Zero-Cost Warranty Replacement PO {poToIssue?.po_number}?
+                </h3>
+                <p className="mt-2 text-sm text-slate-600">
+                    This will formally place the purchase order under supplier warranty rectification (₱0.00) and generate the incoming delivery record for inspection.
+                </p>
+
+                <div className="mt-4">
+                    <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">
+                        Remarks (Optional)
+                    </label>
+                    <textarea
+                        value={issueRemarks}
+                        onChange={(e) => setIssueRemarks(e.target.value)}
+                        placeholder="Add any instructions or warranty reference notes…"
+                        className="w-full rounded-lg border border-slate-300 p-2 text-sm focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
+                        rows={2}
+                    />
+                </div>
+
+                <div className="mt-6 flex flex-wrap justify-end gap-3">
+                    <button
+                        type="button"
+                        onClick={() => setPoToIssue(null)}
+                        disabled={isIssuing}
+                        className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleConfirmIssue}
+                        disabled={isIssuing}
+                        className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60 flex items-center gap-1.5"
+                    >
+                        {isIssuing ? 'Issuing PO…' : 'Confirm & Issue PO'}
+                    </button>
+                </div>
+            </div>
+        </Modal>
         </AuthenticatedLayout>
     );
 }

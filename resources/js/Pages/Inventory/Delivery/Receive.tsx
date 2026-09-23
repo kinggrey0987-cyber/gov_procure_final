@@ -30,10 +30,12 @@ type Delivery = {
     remarks?: string | null;
     has_existing_dr?: boolean;
     has_existing_si?: boolean;
+    is_zero_cost_replacement?: boolean;
     purchase_order?: {
         purchase_order_id: number;
         po_number: string;
         placed_date?: string | null;
+        is_zero_cost_replacement?: boolean;
     } | null;
     supplier?: {
         supplier_name: string;
@@ -92,6 +94,11 @@ export default function DeliveryReceive({ delivery }: Props) {
     const [siPreview, setSiPreview] = useState<string | null>(null);
 
     const initialDeliveryDate = delivery.actual_delivery_date || todayDate();
+    const isZeroCost = Boolean(
+        delivery.is_zero_cost_replacement
+        || delivery.purchase_order?.is_zero_cost_replacement
+        || (delivery.estimated_po_total !== undefined && delivery.estimated_po_total !== null && Number(delivery.estimated_po_total) === 0)
+    );
 
     const { data, setData, post, processing, errors, transform } = useForm<ReceiveFormData>({
         _method: 'PUT',
@@ -99,9 +106,11 @@ export default function DeliveryReceive({ delivery }: Props) {
         delivery_receipt_no: delivery.delivery_receipt_no || '',
         sales_invoice_no: delivery.sales_invoice_no || '',
         sales_invoice_date: delivery.sales_invoice_date || initialDeliveryDate,
-        sales_invoice_amount: delivery.sales_invoice_amount !== undefined && delivery.sales_invoice_amount !== null
-            ? String(delivery.sales_invoice_amount)
-            : (delivery.estimated_po_total ? String(delivery.estimated_po_total) : ''),
+        sales_invoice_amount: isZeroCost
+            ? '0.00'
+            : (delivery.sales_invoice_amount !== undefined && delivery.sales_invoice_amount !== null
+                ? String(delivery.sales_invoice_amount)
+                : (delivery.estimated_po_total ? String(delivery.estimated_po_total) : '')),
         delivery_receipt_file: null,
         sales_invoice_file: null,
         remarks: delivery.remarks || '',
@@ -281,13 +290,26 @@ export default function DeliveryReceive({ delivery }: Props) {
                                                 type="number"
                                                 step="0.01"
                                                 min="0"
-                                                value={data.sales_invoice_amount}
-                                                onChange={(e) => setData('sales_invoice_amount', e.target.value)}
+                                                value={isZeroCost ? '0.00' : data.sales_invoice_amount}
+                                                readOnly={isZeroCost}
+                                                onChange={(e) => !isZeroCost && setData('sales_invoice_amount', e.target.value)}
                                                 placeholder="0.00"
-                                                className="w-full rounded-lg border border-slate-300 pl-8 pr-4 py-2.5 text-sm font-semibold text-slate-900 placeholder-slate-400 focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600"
+                                                className={`w-full rounded-lg border pl-8 pr-4 py-2.5 text-sm font-semibold placeholder-slate-400 focus:outline-none ${
+                                                    isZeroCost
+                                                        ? 'border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed'
+                                                        : 'border-slate-300 text-slate-900 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600'
+                                                }`}
                                             />
                                         </div>
-                                        <p className="mt-1 text-xs text-slate-500">Total gross amount billed on the supplier's invoice.</p>
+                                        {isZeroCost ? (
+                                            <div className="mt-1.5 flex items-center gap-1.5">
+                                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
+                                                    🛡️ ₱0.00 — Zero-Cost Warranty / Claim Replacement (Non-billable)
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <p className="mt-1 text-xs text-slate-500">Total gross amount billed on the supplier's invoice.</p>
+                                        )}
                                     </FormField>
                                 </div>
 

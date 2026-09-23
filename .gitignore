@@ -44,3 +44,4 @@ tests/api/
 phpstan.neon
 .phpstan.cache/
 run_all_tests.*
+test-evidence/

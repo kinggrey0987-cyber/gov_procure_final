@@ -290,12 +290,17 @@ class ClaimController
                 'create' => $routePrefix.'.create',
                 'show' => $routePrefix.'.show',
                 'updateStatus' => 'inventory.claims.update-status',
+                'verifyReplacement' => 'office.claims.verify-replacement',
             ],
             'permissions' => [
                 'update' => $user->can('claim.update', $claim),
+                'verifyReplacement' => $user->isOfficeUser()
+                    && (int) $user->office_id === (int) $claim->office_id
+                    && in_array((string) $claim->status, ['REPLACEMENT_RELEASED', 'PARTIALLY_RESOLVED'], true),
                 'createFollowUp' => $user->can('claim.create')
                     && $user->isOfficeUser()
-                    && (string) $claim->status === 'RESOLVED'
+                    && (int) $user->office_id === (int) $claim->office_id
+                    && in_array((string) $claim->status, ['RESOLVED', 'REPLACEMENT_RELEASED', 'PARTIALLY_RESOLVED'], true)
                     && $claim->parent_claim_id === null
                     && $claim->followUpClaims->isEmpty()
                     && $claim->distribution_record_id !== null
@@ -339,5 +344,15 @@ class ClaimController
 
         return Redirect::route($showRoute, $claim->claims_id)
             ->with('success', 'Claim status updated successfully.');
+    }
+
+    public function verifyReplacement(Request $request, Claim $claim): RedirectResponse
+    {
+        abort_unless(request()->user()->isOfficeUser() && (int) request()->user()->office_id === (int) $claim->office_id, 403);
+
+        $this->claimService->verifyAndResolveClaim($claim, request()->user(), $request->only('remarks'));
+
+        return Redirect::route('office.claims.show', $claim->claims_id)
+            ->with('success', 'Replacement items verified and accepted. Claim is now resolved.');
     }
 }

@@ -1116,30 +1116,57 @@ class SupplyRequestController extends Controller
         $officeId = (int) $request->user()?->office_id;
 
         $records = DistributionRecord::query()
-            ->with(['items', 'supplyRequest'])
+            ->with([
+                'items',
+                'supplyRequest.purchaseRequests.sourceClaim',
+                'delivery.purchaseOrder.purchaseRequest.sourceClaim',
+            ])
             ->forOffice($officeId)
             ->whereIn('status', ['RELEASED', 'RECEIVED'])
             ->latest('distribution_record_id')
             ->paginate(5)
             ->through(function (DistributionRecord $record): array {
-                // Check if this distribution record belongs to a resolved replacement claim
-                $isClaimReplacement = (string) ($record->supplyRequest?->request_category ?? '') === 'REPLACEMENT'
-                    || \App\Models\Claim::query()->where('office_id', (int) $record->office_id)
-                        ->where('status', 'RESOLVED')
-                        ->where('updated_at', '>=', $record->created_at->subMinutes(5))
-                        ->exists();
+                $sourceClaim = $record->delivery?->purchaseOrder?->purchaseRequest?->sourceClaim
+                    ?? $record->supplyRequest?->purchaseRequests?->firstWhere('source_claim_id')?->sourceClaim;
+
+                if (! $sourceClaim && ($record->supplyRequest?->purpose || $record->notes)) {
+                    if (preg_match('/(CLM-\d{4}-\d{5})/', ($record->supplyRequest?->purpose ?? '') . ' ' . ($record->notes ?? ''), $matches)) {
+                        $sourceClaim = \App\Models\Claim::query()->where('claim_code', $matches[1])->first();
+                    }
+                }
+
+                $isClaimReplacement = $sourceClaim !== null
+                    || (string) ($record->supplyRequest?->request_category ?? '') === 'REPLACEMENT'
+                    || (string) ($record->delivery?->purchaseOrder?->purchaseRequest?->source_type ?? '') === 'CLAIM_REPLACEMENT_FOLLOW_UP'
+                    || str_contains(strtolower((string) ($record->supplyRequest?->purpose ?? '')), 'claim replacement');
+
+                // Check if a claim has already been filed for this distribution record
+                $existingClaim = \App\Models\Claim::query()
+                    ->where('distribution_record_id', (int) $record->distribution_record_id)
+                    ->first();
+
+                // 2-day (48 hours) inspection window check from receipt
+                $receivedAt = $record->status === 'RECEIVED' ? $record->updated_at : null;
+                $isClaimExpired = $receivedAt !== null && now()->diffInHours($receivedAt) > 48;
 
                 return [
                     'distribution_record_id' => (int) $record->distribution_record_id,
                     'request_id' => (string) ($record->supplyRequest?->request_code ?? 'N/A'),
+                    'claim_code' => $sourceClaim?->claim_code,
+                    'claim_id' => $sourceClaim?->claims_id,
                     'request_date' => optional($record->supplyRequest?->request_date)?->toDateString(),
                     'items_summary' => (string) ($record->items->take(2)->pluck('item_name_snapshot')->implode(', ') ?: 'No released items listed'),
                     'items_count' => (int) $record->items->count(),
                     'location' => (string) ($record->storage_location ?? 'GSO Storage'),
                     'ready_since' => optional($record->release_date)?->toDateString(),
+                    'received_at' => optional($receivedAt)?->toIso8601String(),
                     'status' => (string) $record->status,
                     'supply_request_id' => (int) ($record->supply_request_id ?? 0),
                     'is_claim_replacement' => $isClaimReplacement,
+                    'has_existing_claim' => $existingClaim !== null,
+                    'existing_claim_code' => $existingClaim?->claim_code,
+                    'existing_claim_id' => $existingClaim?->claims_id,
+                    'is_claim_expired' => $isClaimExpired,
                 ];
             })
             ->withQueryString();
