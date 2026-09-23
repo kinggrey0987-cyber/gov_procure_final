@@ -28,7 +28,26 @@ export default function CreateItem({ categories, units }: Props) {
         sub_unit: 'piece',
         description: '',
         status: 'active',
+        specifications: [''],
     });
+
+    const addSpecification = () => {
+        setData('specifications', [...data.specifications, '']);
+    };
+
+    const updateSpecification = (index: number, value: string) => {
+        const next = [...data.specifications];
+        next[index] = value;
+        setData('specifications', next);
+    };
+
+    const removeSpecification = (index: number) => {
+        if (data.specifications.length <= 1) {
+            setData('specifications', ['']);
+            return;
+        }
+        setData('specifications', data.specifications.filter((_, i) => i !== index));
+    };
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
@@ -141,6 +160,55 @@ export default function CreateItem({ categories, units }: Props) {
                                 </span>
                             </div>
                             <p className="mt-1 text-xs text-slate-500">New catalog items are always created as active. You can deactivate them later from the edit screen.</p>
+                        </div>
+
+                        {/* Standard Item Specifications */}
+                        <div className="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                    <label className="text-sm font-semibold text-slate-800">Standard Item Specifications</label>
+                                    <p className="text-xs text-slate-500">
+                                        Define variants and specifications for this item (e.g. ink color, paper size, storage capacity).
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={addSpecification}
+                                    className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700 transition shadow-xs"
+                                >
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    Add Specification
+                                </button>
+                            </div>
+
+                            <div className="space-y-2">
+                                {data.specifications.map((spec, index) => (
+                                    <div key={index} className="flex items-center gap-2">
+                                        <span className="text-xs font-semibold text-slate-400 w-6 text-center">#{index + 1}</span>
+                                        <input
+                                            type="text"
+                                            value={spec}
+                                            onChange={(e) => updateSpecification(index, e.target.value)}
+                                            placeholder="e.g. Black (0.5mm), A4 80gsm, 500ml Ethyl 70%"
+                                            className="flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm bg-white focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                                        />
+                                        {data.specifications.length > 1 ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => removeSpecification(index)}
+                                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition"
+                                                title="Remove specification"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                            </button>
+                                        ) : null}
+                                    </div>
+                                ))}
+                            </div>
                         </div>
 
                         <div className="md:col-span-2">

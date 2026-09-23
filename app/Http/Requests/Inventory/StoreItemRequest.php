@@ -34,6 +34,8 @@ class StoreItemRequest extends FormRequest
             'pieces_per_box' => ['nullable', 'integer', 'min:1'],
             'sub_unit' => ['nullable', 'string', 'max:50'],
             'status' => ['nullable', Rule::in(['active', 'inactive'])],
+            'specifications' => ['nullable', 'array'],
+            'specifications.*' => ['nullable', 'string', 'max:255'],
         ];
     }
 }

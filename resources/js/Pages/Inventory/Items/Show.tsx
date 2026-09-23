@@ -14,6 +14,10 @@ type Item = {
         category_name: string;
         standard_delivery_days: number;
     };
+    specifications?: {
+        item_specification_id: number;
+        specification: string;
+    }[];
 };
 
 type Props = {
@@ -79,6 +83,26 @@ export default function ShowItem({ item, canManage }: Props) {
                                         {item.pieces_per_box} {item.sub_unit || 'piece'}s / {item.default_unit || 'box'}
                                     </span>
                                 ) : null}
+                            </dd>
+                        </div>
+                        <div className="md:col-span-2">
+                            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Standard Specifications / Variants</dt>
+                            <dd className="mt-2">
+                                {item.specifications && item.specifications.length > 0 ? (
+                                    <div className="flex flex-wrap gap-2">
+                                        {item.specifications.map((spec) => (
+                                            <span
+                                                key={spec.item_specification_id}
+                                                className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-800 shadow-2xs"
+                                            >
+                                                <span className="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+                                                {spec.specification}
+                                            </span>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <span className="text-sm text-slate-500 italic">No specific variants recorded (Standard / General supply).</span>
+                                )}
                             </dd>
                         </div>
                         <div className="md:col-span-2">

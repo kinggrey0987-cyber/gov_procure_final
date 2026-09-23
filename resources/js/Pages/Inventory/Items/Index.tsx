@@ -17,6 +17,10 @@ type ItemRow = {
         item_category_id: number;
         category_name: string;
     };
+    specifications?: {
+        item_specification_id: number;
+        specification: string;
+    }[];
 };
 
 type CategoryOption = {
@@ -185,7 +189,21 @@ export default function ItemCatalogIndex({ items, categories, filters, canManage
                             <tbody className="divide-y divide-slate-100">
                                 {items.data.map((item) => (
                                     <tr key={item.item_id} className="hover:bg-slate-50/60">
-                                        <td className="px-3.5 py-2 font-medium text-slate-900">{item.item_name}</td>
+                                        <td className="px-3.5 py-2">
+                                            <div className="font-semibold text-slate-900">{item.item_name}</div>
+                                            {item.specifications && item.specifications.length > 0 ? (
+                                                <div className="mt-1 flex flex-wrap gap-1">
+                                                    {item.specifications.map((spec) => (
+                                                        <span
+                                                            key={spec.item_specification_id}
+                                                            className="inline-flex items-center rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 border border-slate-200"
+                                                        >
+                                                            {spec.specification}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            ) : null}
+                                        </td>
                                         <td className="px-3.5 py-2 text-slate-600">{item.category?.category_name || '-'}</td>
                                         <td className="px-3.5 py-2 text-slate-700">
                                             <span className="capitalize">{item.default_unit || '-'}</span>

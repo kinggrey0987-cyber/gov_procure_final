@@ -1041,7 +1041,7 @@ class SupplyRequestController extends Controller
         $selectedPpmpId = (int) ($supplyRequest->ppmp_id ?? 0);
 
         return Inertia::render('Office/SupplyRequests/Edit', [
-            'supplyRequest' => $supplyRequest->load('items'),
+            'supplyRequest' => $supplyRequest->load(['items.ppmpItem', 'items.item']),
             'ppmpOptions' => $this->service->ppmpOptionsForOffice($officeId),
             'selectedPpmpId' => $selectedPpmpId > 0 ? $selectedPpmpId : null,
             'ppmpItemOptions' => $selectedPpmpId > 0

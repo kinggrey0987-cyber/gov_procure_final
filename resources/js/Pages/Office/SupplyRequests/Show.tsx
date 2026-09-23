@@ -701,7 +701,15 @@ export default function SupplyRequestShow({
                                         return (
                                         <tr key={item.supply_request_item_id}>
                                             <td className="px-4 py-3 text-slate-700 font-medium">{item.item_name_snapshot ?? '-'}</td>
-                                            <td className="px-4 py-3 text-slate-700">{item.item_specification || '-'}</td>
+                                            <td className="px-4 py-3 text-slate-700">
+                                                {item.item_specification ? (
+                                                    <span className="inline-flex items-center rounded-md bg-blue-50 border border-blue-200 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                                                        {item.item_specification}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-slate-400">-</span>
+                                                )}
+                                            </td>
                                             <td className="px-4 py-3 text-slate-700">#{item.ppmp_item_id}</td>
                                             <td className="px-4 py-3 text-right font-semibold text-slate-800">
                                                 <span>{formatNumber(item.quantity_requested)} {unit}</span>

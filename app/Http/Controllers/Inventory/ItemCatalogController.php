@@ -22,7 +22,10 @@ class ItemCatalogController
         abort_unless($user?->can('inventory.catalog.view-any'), 403);
 
         $query = Item::query()
-            ->with('category:item_category_id,category_name')
+            ->with([
+                'category:item_category_id,category_name',
+                'specifications:item_specification_id,item_id,specification',
+            ])
             ->latest('item_id');
 
         $search = trim((string) $request->query('q', ''));
@@ -76,8 +79,23 @@ class ItemCatalogController
         abort_unless($request->user()?->can('inventory.catalog.manage'), 403);
 
         $payload = $request->validated();
+        $specifications = $payload['specifications'] ?? [];
+        unset($payload['specifications']);
         $payload['status'] = 'active';
+
         $item = Item::query()->create($payload);
+
+        if (is_array($specifications)) {
+            foreach ($specifications as $spec) {
+                $specText = trim((string) $spec);
+                if ($specText !== '') {
+                    $item->specifications()->create([
+                        'specification' => $specText,
+                        'is_active' => true,
+                    ]);
+                }
+            }
+        }
 
         return Redirect::route('inventory.items.show', $item->item_id)
             ->with('success', 'Item created successfully.');
@@ -89,7 +107,10 @@ class ItemCatalogController
 
         abort_unless($user?->can('inventory.catalog.view-any'), 403);
 
-        $item->load('category:item_category_id,category_name,standard_delivery_days');
+        $item->load([
+            'category:item_category_id,category_name,standard_delivery_days',
+            'specifications',
+        ]);
 
         return Inertia::render('Inventory/Items/Show', [
             'item' => [
@@ -106,6 +127,10 @@ class ItemCatalogController
                 'pieces_per_box' => (int) ($item->pieces_per_box ?? 1),
                 'sub_unit' => (string) ($item->sub_unit ?? 'piece'),
                 'status' => (string) $item->status,
+                'specifications' => $item->specifications->map(fn ($s): array => [
+                    'item_specification_id' => (int) $s->item_specification_id,
+                    'specification' => (string) $s->specification,
+                ])->values()->all(),
                 'created_at' => optional($item->created_at)?->toIso8601String(),
                 'updated_at' => optional($item->updated_at)?->toIso8601String(),
             ],
@@ -117,6 +142,8 @@ class ItemCatalogController
     {
         abort_unless($request->user()?->can('inventory.catalog.manage'), 403);
 
+        $item->load('specifications');
+
         return Inertia::render('Inventory/Items/Edit', [
             'item' => [
                 'item_id' => (int) $item->item_id,
@@ -127,6 +154,7 @@ class ItemCatalogController
                 'pieces_per_box' => (int) ($item->pieces_per_box ?? 1),
                 'sub_unit' => (string) ($item->sub_unit ?? 'piece'),
                 'status' => (string) $item->status,
+                'specifications' => $item->specifications->pluck('specification')->all(),
             ],
             'categories' => $this->categoryOptions(),
             'units' => $this->unitOptions((string) $item->default_unit),
@@ -137,7 +165,27 @@ class ItemCatalogController
     {
         abort_unless($request->user()?->can('inventory.catalog.manage'), 403);
 
-        $item->fill($request->validated())->save();
+        $payload = $request->validated();
+        $specifications = $payload['specifications'] ?? null;
+        unset($payload['specifications']);
+
+        $item->fill($payload)->save();
+
+        if (is_array($specifications)) {
+            $cleanSpecs = collect($specifications)
+                ->map(fn ($s) => trim((string) $s))
+                ->filter(fn ($s) => $s !== '')
+                ->unique()
+                ->values();
+
+            $item->specifications()->delete();
+            foreach ($cleanSpecs as $specText) {
+                $item->specifications()->create([
+                    'specification' => $specText,
+                    'is_active' => true,
+                ]);
+            }
+        }
 
         return Redirect::route('inventory.items.show', $item->item_id)
             ->with('success', 'Item updated successfully.');

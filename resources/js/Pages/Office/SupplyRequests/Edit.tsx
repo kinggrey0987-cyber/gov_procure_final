@@ -15,6 +15,7 @@ type Option = {
     ppmp_id: number;
     item_id: number;
     item_name: string;
+    item_specification?: string | null;
     default_unit?: string | null;
     planned_quantity: number;
     requested_quantity: number;
@@ -32,6 +33,8 @@ type ExistingItem = {
     item_id: number;
     item_name_snapshot: string;
     quantity_requested: number;
+    item_specification?: string | null;
+    ppmp_item?: { remarks?: string | null } | null;
 };
 
 type Props = {
@@ -244,11 +247,19 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                                 const row = editingRows[item.supply_request_item_id];
                                 const context = optionById.get(String(row.ppmp_item_id));
                                 const unit = context?.default_unit || '-';
+                                const itemSpec = context?.item_specification || item.item_specification || item.ppmp_item?.remarks;
                                 return (
                                     <div key={item.supply_request_item_id} className="rounded-xl border border-slate-200 p-4">
                                         <div className="grid gap-3 md:grid-cols-6">
                                             <label className="md:col-span-2">
-                                                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Item Snapshot</span>
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <span className="block text-xs font-semibold uppercase tracking-wide text-slate-600">Item Snapshot</span>
+                                                    {itemSpec ? (
+                                                        <span className="inline-flex items-center rounded-md bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
+                                                            {itemSpec}
+                                                        </span>
+                                                    ) : null}
+                                                </div>
                                                 <input
                                                     className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700"
                                                     value={row.item_name_snapshot}
@@ -287,12 +298,16 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                                         </div>
 
                                         {context ? (
-                                            <div className="mt-2 grid gap-2 text-xs text-slate-600 md:grid-cols-4">
+                                            <div className="mt-2 grid gap-2 text-xs text-slate-600 md:grid-cols-5">
                                                 <div>Planned: <strong>{context.planned_quantity} {context.default_unit || ''}</strong></div>
                                                 <div>Already requested: <strong>{context.requested_quantity} {context.default_unit || ''}</strong></div>
                                                 <div>Remaining before this line: <strong>{context.remaining_quantity} {context.default_unit || ''}</strong></div>
-                                                <div>PPMP reference unit cost: <strong>{context.suggested_unit_cost}</strong></div>
                                                 <div>Schedule: <strong>{context.procurement_schedule || '-'}</strong></div>
+                                                <div>Specification: <strong className="text-blue-700">{itemSpec || 'Standard'}</strong></div>
+                                            </div>
+                                        ) : itemSpec ? (
+                                            <div className="mt-2 text-xs text-slate-600">
+                                                Specification: <strong className="text-blue-700">{itemSpec}</strong>
                                             </div>
                                         ) : null}
 
@@ -321,9 +336,14 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                             disabled={!hasPpmp}
                         >
                             <option value="">{hasPpmp ? 'Select PPMP Item' : 'Select PPMP first'}</option>
-                            {itemOptions.map((option) => (
-                                <option key={option.ppmp_item_id} value={option.ppmp_item_id}>{option.item_name} {option.procurement_schedule ? `- ${option.procurement_schedule}` : ''} (remaining: {option.remaining_quantity})</option>
-                            ))}
+                            {itemOptions.map((option) => {
+                                const specTag = option.item_specification ? ` — ${option.item_specification}` : '';
+                                return (
+                                    <option key={option.ppmp_item_id} value={option.ppmp_item_id}>
+                                        {option.item_name}{specTag} {option.procurement_schedule ? `[${option.procurement_schedule}]` : ''} (remaining: {option.remaining_quantity})
+                                    </option>
+                                );
+                            })}
                         </select>
                         <input
                             className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
@@ -342,6 +362,13 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                             Add Item
                         </button>
                     </div>
+
+                    {newItemOption?.item_specification ? (
+                        <div className="flex items-center gap-1.5 text-xs text-blue-800 bg-blue-50/80 border border-blue-200 rounded-md px-3 py-1.5">
+                            <span className="font-semibold uppercase tracking-wider text-[11px] text-blue-700">Specification:</span>
+                            <span className="font-bold">{newItemOption.item_specification}</span>
+                        </div>
+                    ) : null}
 
                     {newItem.ppmp_item_id ? (
                         <div className="text-xs text-slate-600">

@@ -16,6 +16,7 @@ type Option = {
     ppmp_id: number;
     item_id: number;
     item_name: string;
+    item_specification?: string | null;
     default_unit?: string | null;
     pieces_per_box?: number | null;
     sub_unit?: string | null;
@@ -453,6 +454,11 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                                     {item.item_name_snapshot}
                                                 </span>
                                             ) : null}
+                                            {option?.item_specification ? (
+                                                <span className="inline-flex items-center rounded-md bg-blue-50 border border-blue-200 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
+                                                    {option.item_specification}
+                                                </span>
+                                            ) : null}
                                         </div>
 
                                         {form.data.items.length > 1 ? (
@@ -492,19 +498,28 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                                         statusTag = `⏰ [Schedule: ${entry.procurement_schedule || 'Later Quarter'}] (Remaining: ${entry.remaining_quantity})`;
                                                     }
 
+                                                    const specTag = entry.item_specification ? ` — ${entry.item_specification}` : '';
+
                                                     return (
                                                         <option
                                                             key={entry.ppmp_item_id}
                                                             value={entry.ppmp_item_id}
                                                             className={isExhausted ? 'text-amber-800 bg-amber-50 font-medium' : ''}
                                                         >
-                                                            {entry.item_name} {entry.procurement_schedule ? `[${entry.procurement_schedule}]` : ''} {statusTag}
+                                                            {entry.item_name}{specTag} {entry.procurement_schedule ? `[${entry.procurement_schedule}]` : ''} {statusTag}
                                                         </option>
                                                     );
                                                 })}
                                             </select>
                                             {form.errors[`items.${index}.ppmp_item_id`] ? <p className="mt-0.5 text-[10px] text-rose-600">{form.errors[`items.${index}.ppmp_item_id`]}</p> : null}
                                         </label>
+
+                                        {option?.item_specification ? (
+                                            <div className="flex items-center gap-1.5 text-xs text-slate-600 bg-blue-50/60 border border-blue-200/80 rounded-md px-2.5 py-1">
+                                                <span className="text-[11px] font-semibold uppercase tracking-wider text-blue-700">Specification:</span>
+                                                <span className="font-semibold text-blue-900">{option.item_specification}</span>
+                                            </div>
+                                        ) : null}
 
                                         {/* Quantity & Packaging Unit in 2-col row */}
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
