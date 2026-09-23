@@ -85,6 +85,18 @@ class ItemCatalogController
 
         $item = Item::query()->create($payload);
 
+        $item->inventory()->firstOrCreate(
+            ['item_id' => $item->item_id],
+            [
+                'available_stock' => 0,
+                'stock_on_hand' => 0,
+                'reserved_quantity' => 0,
+                'released_quantity' => 0,
+                'low_stock_threshold' => 10,
+                'last_updated' => now(),
+            ],
+        );
+
         if (is_array($specifications)) {
             foreach ($specifications as $spec) {
                 $specText = trim((string) $spec);

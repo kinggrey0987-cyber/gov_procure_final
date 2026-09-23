@@ -168,7 +168,10 @@ export default function CreateItem({ categories, units }: Props) {
                                 <div>
                                     <label className="text-sm font-semibold text-slate-800">Standard Item Specifications</label>
                                     <p className="text-xs text-slate-500">
-                                        Define variants and specifications for this item (e.g. ink color, paper size, storage capacity).
+                                        Technical specifications and compliance details for this item.
+                                    </p>
+                                    <p className="mt-1 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1 leading-snug">
+                                        ℹ️ <strong>Stock Tracking:</strong> Inventory is tracked per Catalog Item. If a physical variation requires separate warehouse stock levels (e.g. Legal vs A4, or distinct colors/models), create it as a separate Catalog Item.
                                     </p>
                                 </div>
                                 <button
