@@ -94,26 +94,34 @@ class CleanWorkflowSeeder extends Seeder
         // =========================================================================
         $this->command?->info('1/5 Initializing GSO Central Warehouse inventory baseline...');
 
-        // Realistic stock profiles:
-        // Stock-ready items (plentiful for direct distribution):
-        // Shortage items (low stock so office requests trigger shortage & consolidation):
+        // Realistic stock profiles for all 23 discrete physical items:
         $stockProfiles = [
-            'Ballpen'              => ['on_hand' => 45.0,  'available' => 45.0,  'threshold' => 10.0, 'reorder' => 15.0],
-            'Folder'               => ['on_hand' => 30.0,  'available' => 30.0,  'threshold' => 10.0, 'reorder' => 15.0],
-            'Staple Wire'          => ['on_hand' => 25.0,  'available' => 25.0,  'threshold' => 5.0,  'reorder' => 8.0],
-            'Rubbing Alcohol'      => ['on_hand' => 2.0,   'available' => 2.0,   'threshold' => 6.0,  'reorder' => 10.0],
-            'Detergent Powder'     => ['on_hand' => 1.0,   'available' => 1.0,   'threshold' => 5.0,  'reorder' => 8.0],
-            'Trash Bag'            => ['on_hand' => 25.0,  'available' => 25.0,  'threshold' => 8.0,  'reorder' => 12.0],
-            'Safety Gloves'        => ['on_hand' => 12.0,  'available' => 12.0,  'threshold' => 4.0,  'reorder' => 6.0],
-            'Utility Cutter'       => ['on_hand' => 15.0,  'available' => 15.0,  'threshold' => 5.0,  'reorder' => 8.0],
-            'Logbook'              => ['on_hand' => 10.0,  'available' => 10.0,  'threshold' => 4.0,  'reorder' => 6.0],
-            // Low stock / shortages:
-            'Bond Paper'           => ['on_hand' => 4.0,   'available' => 4.0,   'threshold' => 20.0, 'reorder' => 25.0],
-            'Printer Ink'          => ['on_hand' => 2.0,   'available' => 2.0,   'threshold' => 10.0, 'reorder' => 12.0],
-            'Toner Cartridge'      => ['on_hand' => 1.0,   'available' => 1.0,   'threshold' => 5.0,  'reorder' => 6.0],
-            'Flash Drive'          => ['on_hand' => 3.0,   'available' => 3.0,   'threshold' => 8.0,  'reorder' => 10.0],
-            'Mouse'                => ['on_hand' => 2.0,   'available' => 2.0,   'threshold' => 6.0,  'reorder' => 8.0],
-            'HP 680 Tri-Color Ink' => ['on_hand' => 1.0,   'available' => 1.0,   'threshold' => 5.0,  'reorder' => 6.0],
+            // Plentiful / Stock-Ready items:
+            'Ballpen, Black'                => ['on_hand' => 45.0,  'available' => 45.0,  'threshold' => 10.0, 'reorder' => 15.0],
+            'Ballpen, Blue'                 => ['on_hand' => 30.0,  'available' => 30.0,  'threshold' => 10.0, 'reorder' => 15.0],
+            'Ballpen, Red'                  => ['on_hand' => 15.0,  'available' => 15.0,  'threshold' => 5.0,  'reorder' => 8.0],
+            'Folder, Tagboard (Legal size)'  => ['on_hand' => 30.0,  'available' => 30.0,  'threshold' => 10.0, 'reorder' => 15.0],
+            'Folder, Tagboard (A4 size)'     => ['on_hand' => 25.0,  'available' => 25.0,  'threshold' => 10.0, 'reorder' => 15.0],
+            'Staple Wire'                   => ['on_hand' => 25.0,  'available' => 25.0,  'threshold' => 5.0,  'reorder' => 8.0],
+            'Heavy Duty Stapler'            => ['on_hand' => 8.0,   'available' => 8.0,   'threshold' => 2.0,  'reorder' => 4.0],
+            'Trash Bag, Black XL'           => ['on_hand' => 25.0,  'available' => 25.0,  'threshold' => 8.0,  'reorder' => 12.0],
+            'Trash Bag, Yellow Biohazard XL' => ['on_hand' => 15.0,  'available' => 15.0,  'threshold' => 5.0,  'reorder' => 8.0],
+            'Safety Gloves'                 => ['on_hand' => 12.0,  'available' => 12.0,  'threshold' => 4.0,  'reorder' => 6.0],
+            'Utility Cutter'                => ['on_hand' => 15.0,  'available' => 15.0,  'threshold' => 5.0,  'reorder' => 8.0],
+            'Logbook'                       => ['on_hand' => 10.0,  'available' => 10.0,  'threshold' => 4.0,  'reorder' => 6.0],
+            'Flash Drive, 32GB'             => ['on_hand' => 10.0,  'available' => 10.0,  'threshold' => 4.0,  'reorder' => 6.0],
+            'Printer Ink, Color Set'        => ['on_hand' => 12.0,  'available' => 12.0,  'threshold' => 4.0,  'reorder' => 6.0],
+
+            // Low-Stock items (triggers active Proactive GSO Demand Forecast Signals):
+            'Bond Paper, A4 (80 GSM)'       => ['on_hand' => 4.0,   'available' => 4.0,   'threshold' => 20.0, 'reorder' => 25.0],
+            'Bond Paper, Legal (80 GSM)'    => ['on_hand' => 5.0,   'available' => 5.0,   'threshold' => 15.0, 'reorder' => 20.0],
+            'Printer Ink, Black'            => ['on_hand' => 2.0,   'available' => 2.0,   'threshold' => 10.0, 'reorder' => 12.0],
+            'Toner Cartridge'               => ['on_hand' => 1.0,   'available' => 1.0,   'threshold' => 5.0,  'reorder' => 6.0],
+            'Flash Drive, 64GB'             => ['on_hand' => 3.0,   'available' => 3.0,   'threshold' => 8.0,  'reorder' => 10.0],
+            'Mouse, USB Optical'            => ['on_hand' => 2.0,   'available' => 2.0,   'threshold' => 6.0,  'reorder' => 8.0],
+            'HP 680 Tri-Color Ink'          => ['on_hand' => 1.0,   'available' => 1.0,   'threshold' => 5.0,  'reorder' => 6.0],
+            'Rubbing Alcohol (70%)'         => ['on_hand' => 2.0,   'available' => 2.0,   'threshold' => 6.0,  'reorder' => 10.0],
+            'Detergent Powder'              => ['on_hand' => 1.0,   'available' => 1.0,   'threshold' => 5.0,  'reorder' => 8.0],
         ];
 
         foreach ($items as $name => $item) {
@@ -170,13 +178,16 @@ class CleanWorkflowSeeder extends Seeder
 
             // Seed standard PPMP items with realistic unit costs & schedules
             $standardPpmpCatalog = [
-                ['name' => 'Bond Paper', 'qty' => 120, 'cost' => 1250.00, 'sched' => 'Q1'],
-                ['name' => 'Ballpen', 'qty' => 60, 'cost' => 450.00, 'sched' => 'Q1'],
-                ['name' => 'Folder', 'qty' => 40, 'cost' => 380.00, 'sched' => 'Q2'],
-                ['name' => 'Printer Ink', 'qty' => 24, 'cost' => 1850.00, 'sched' => 'Q1'],
-                ['name' => 'Rubbing Alcohol', 'qty' => 30, 'cost' => 780.00, 'sched' => 'Q2'],
-                ['name' => 'Flash Drive', 'qty' => 15, 'cost' => 650.00, 'sched' => 'Q3'],
-                ['name' => 'Trash Bag', 'qty' => 40, 'cost' => 420.00, 'sched' => 'Q2'],
+                ['name' => 'Bond Paper, A4 (80 GSM)', 'qty' => 120, 'cost' => 1250.00, 'sched' => 'Q1'],
+                ['name' => 'Bond Paper, Legal (80 GSM)', 'qty' => 80, 'cost' => 1350.00, 'sched' => 'Q1'],
+                ['name' => 'Ballpen, Black', 'qty' => 60, 'cost' => 450.00, 'sched' => 'Q1'],
+                ['name' => 'Ballpen, Blue', 'qty' => 40, 'cost' => 450.00, 'sched' => 'Q1'],
+                ['name' => 'Folder, Tagboard (Legal size)', 'qty' => 40, 'cost' => 380.00, 'sched' => 'Q2'],
+                ['name' => 'Folder, Tagboard (A4 size)', 'qty' => 30, 'cost' => 350.00, 'sched' => 'Q2'],
+                ['name' => 'Printer Ink, Black', 'qty' => 24, 'cost' => 1850.00, 'sched' => 'Q1'],
+                ['name' => 'Rubbing Alcohol (70%)', 'qty' => 30, 'cost' => 780.00, 'sched' => 'Q2'],
+                ['name' => 'Flash Drive, 32GB', 'qty' => 15, 'cost' => 650.00, 'sched' => 'Q3'],
+                ['name' => 'Trash Bag, Black XL', 'qty' => 40, 'cost' => 420.00, 'sched' => 'Q2'],
                 ['name' => 'Staple Wire', 'qty' => 20, 'cost' => 180.00, 'sched' => 'Q1'],
             ];
 
@@ -223,9 +234,9 @@ class CleanWorkflowSeeder extends Seeder
             ]);
 
             $readyItems = [
-                ['name' => 'Ballpen', 'qty' => 3.0],
-                ['name' => 'Rubbing Alcohol', 'qty' => 2.0],
-                ['name' => 'Trash Bag', 'qty' => 2.0],
+                ['name' => 'Ballpen, Black', 'qty' => 3.0],
+                ['name' => 'Rubbing Alcohol (70%)', 'qty' => 2.0],
+                ['name' => 'Trash Bag, Black XL', 'qty' => 2.0],
             ];
             foreach ($readyItems as $r) {
                 if (isset($items[$r['name']])) {
@@ -258,8 +269,8 @@ class CleanWorkflowSeeder extends Seeder
             ]);
 
             $shortageItems1 = [
-                ['name' => 'Bond Paper', 'qty' => 10.0], // Available: 4 -> Shortage: 6
-                ['name' => 'Printer Ink', 'qty' => 4.0],  // Available: 2 -> Shortage: 2
+                ['name' => 'Bond Paper, A4 (80 GSM)', 'qty' => 10.0], // Available: 4 -> Shortage: 6
+                ['name' => 'Printer Ink, Black', 'qty' => 4.0],        // Available: 2 -> Shortage: 2
             ];
             foreach ($shortageItems1 as $r) {
                 if (isset($items[$r['name']])) {
@@ -290,8 +301,8 @@ class CleanWorkflowSeeder extends Seeder
             ]);
 
             $shortageItems2 = [
-                ['name' => 'Bond Paper', 'qty' => 8.0], // Available: 4 -> Shortage: 4
-                ['name' => 'Printer Ink', 'qty' => 3.0], // Available: 2 -> Shortage: 1
+                ['name' => 'Bond Paper, A4 (80 GSM)', 'qty' => 8.0], // Available: 4 -> Shortage: 4
+                ['name' => 'Printer Ink, Black', 'qty' => 3.0],      // Available: 2 -> Shortage: 1
             ];
             foreach ($shortageItems2 as $r) {
                 if (isset($items[$r['name']])) {
@@ -329,17 +340,17 @@ class CleanWorkflowSeeder extends Seeder
 
             SupplyRequestItem::query()->create([
                 'supply_request_id' => $srConsolidatedSource1->supply_request_id,
-                'item_id' => $items['Bond Paper']->item_id,
-                'ppmp_item_id' => $ppmpItemsByOffice['MPDO']['Bond Paper']->ppmp_item_id ?? null,
-                'item_name_snapshot' => 'Bond Paper',
+                'item_id' => $items['Bond Paper, A4 (80 GSM)']->item_id,
+                'ppmp_item_id' => $ppmpItemsByOffice['MPDO']['Bond Paper, A4 (80 GSM)']->ppmp_item_id ?? null,
+                'item_name_snapshot' => 'Bond Paper, A4 (80 GSM)',
                 'quantity_requested' => 12.0,
             ]);
 
             SupplyRequestItem::query()->create([
                 'supply_request_id' => $srConsolidatedSource1->supply_request_id,
-                'item_id' => $items['Flash Drive']->item_id,
-                'ppmp_item_id' => $ppmpItemsByOffice['MPDO']['Flash Drive']->ppmp_item_id ?? null,
-                'item_name_snapshot' => 'Flash Drive',
+                'item_id' => $items['Flash Drive, 32GB']->item_id,
+                'ppmp_item_id' => $ppmpItemsByOffice['MPDO']['Flash Drive, 32GB']->ppmp_item_id ?? null,
+                'item_name_snapshot' => 'Flash Drive, 32GB',
                 'quantity_requested' => 3.0,
             ]);
 
@@ -360,17 +371,17 @@ class CleanWorkflowSeeder extends Seeder
 
             SupplyRequestItem::query()->create([
                 'supply_request_id' => $srConsolidatedSource2->supply_request_id,
-                'item_id' => $items['Bond Paper']->item_id,
-                'ppmp_item_id' => $ppmpItemsByOffice['ENG']['Bond Paper']->ppmp_item_id ?? null,
-                'item_name_snapshot' => 'Bond Paper',
+                'item_id' => $items['Bond Paper, A4 (80 GSM)']->item_id,
+                'ppmp_item_id' => $ppmpItemsByOffice['ENG']['Bond Paper, A4 (80 GSM)']->ppmp_item_id ?? null,
+                'item_name_snapshot' => 'Bond Paper, A4 (80 GSM)',
                 'quantity_requested' => 8.0,
             ]);
 
             SupplyRequestItem::query()->create([
                 'supply_request_id' => $srConsolidatedSource2->supply_request_id,
-                'item_id' => $items['Flash Drive']->item_id,
-                'ppmp_item_id' => $ppmpItemsByOffice['ENG']['Flash Drive']->ppmp_item_id ?? null,
-                'item_name_snapshot' => 'Flash Drive',
+                'item_id' => $items['Flash Drive, 32GB']->item_id,
+                'ppmp_item_id' => $ppmpItemsByOffice['ENG']['Flash Drive, 32GB']->ppmp_item_id ?? null,
+                'item_name_snapshot' => 'Flash Drive, 32GB',
                 'quantity_requested' => 2.0,
             ]);
 
@@ -392,14 +403,14 @@ class CleanWorkflowSeeder extends Seeder
             // Merged lines: 12 + 8 = 20 Bond Paper, 3 + 2 = 5 Flash Drive
             PurchaseRequestItem::query()->create([
                 'purchase_request_id' => $consolidatedPr->purchase_request_id,
-                'item_id' => $items['Bond Paper']->item_id,
+                'item_id' => $items['Bond Paper, A4 (80 GSM)']->item_id,
                 'quantity_requested' => 20.0,
                 'remarks' => 'Consolidated demand for Planning & Engineering.',
             ]);
 
             PurchaseRequestItem::query()->create([
                 'purchase_request_id' => $consolidatedPr->purchase_request_id,
-                'item_id' => $items['Flash Drive']->item_id,
+                'item_id' => $items['Flash Drive, 32GB']->item_id,
                 'quantity_requested' => 5.0,
                 'remarks' => 'Consolidated demand for Planning & Engineering.',
             ]);
@@ -438,9 +449,9 @@ class CleanWorkflowSeeder extends Seeder
 
             $sriAlcohol = SupplyRequestItem::query()->create([
                 'supply_request_id' => $srMho->supply_request_id,
-                'item_id' => $items['Rubbing Alcohol']->item_id,
-                'ppmp_item_id' => $ppmpItemsByOffice['MHO']['Rubbing Alcohol']->ppmp_item_id ?? null,
-                'item_name_snapshot' => 'Rubbing Alcohol',
+                'item_id' => $items['Rubbing Alcohol (70%)']->item_id,
+                'ppmp_item_id' => $ppmpItemsByOffice['MHO']['Rubbing Alcohol (70%)']->ppmp_item_id ?? null,
+                'item_name_snapshot' => 'Rubbing Alcohol (70%)',
                 'quantity_requested' => 15.0,
             ]);
 
@@ -464,7 +475,7 @@ class CleanWorkflowSeeder extends Seeder
 
             PurchaseRequestItem::query()->create([
                 'purchase_request_id' => $prMho->purchase_request_id,
-                'item_id' => $items['Rubbing Alcohol']->item_id,
+                'item_id' => $items['Rubbing Alcohol (70%)']->item_id,
                 'quantity_requested' => 15.0,
             ]);
 
@@ -491,9 +502,9 @@ class CleanWorkflowSeeder extends Seeder
             PurchaseOrderItem::query()->create([
                 'purchase_order_id' => $poActive->purchase_order_id,
                 'supply_request_item_id' => $sriAlcohol->supply_request_item_id,
-                'item_id' => $items['Rubbing Alcohol']->item_id,
-                'item_name_snapshot' => 'Rubbing Alcohol',
-                'unit' => $items['Rubbing Alcohol']->default_unit ?? 'box',
+                'item_id' => $items['Rubbing Alcohol (70%)']->item_id,
+                'item_name_snapshot' => 'Rubbing Alcohol (70%)',
+                'unit' => $items['Rubbing Alcohol (70%)']->default_unit ?? 'box',
                 'quantity_ordered' => 15.0,
                 'unit_price' => 780.00,
                 'total_price' => 11700.00,
@@ -529,9 +540,9 @@ class CleanWorkflowSeeder extends Seeder
 
             $sriFolder = SupplyRequestItem::query()->create([
                 'supply_request_id' => $srHistorical->supply_request_id,
-                'item_id' => $items['Folder']->item_id,
-                'ppmp_item_id' => $ppmpItemsByOffice['MPDO']['Folder']->ppmp_item_id ?? null,
-                'item_name_snapshot' => 'Folder',
+                'item_id' => $items['Folder, Tagboard (Legal size)']->item_id,
+                'ppmp_item_id' => $ppmpItemsByOffice['MPDO']['Folder, Tagboard (Legal size)']->ppmp_item_id ?? null,
+                'item_name_snapshot' => 'Folder, Tagboard (Legal size)',
                 'quantity_requested' => 10.0,
             ]);
 
@@ -546,7 +557,7 @@ class CleanWorkflowSeeder extends Seeder
 
             PurchaseRequestItem::query()->create([
                 'purchase_request_id' => $prHistorical->purchase_request_id,
-                'item_id' => $items['Folder']->item_id,
+                'item_id' => $items['Folder, Tagboard (Legal size)']->item_id,
                 'quantity_requested' => 10.0,
             ]);
 
@@ -566,9 +577,9 @@ class CleanWorkflowSeeder extends Seeder
             $poiHistorical = PurchaseOrderItem::query()->create([
                 'purchase_order_id' => $poHistorical->purchase_order_id,
                 'supply_request_item_id' => $sriFolder->supply_request_item_id,
-                'item_id' => $items['Folder']->item_id,
-                'item_name_snapshot' => 'Folder',
-                'unit' => $items['Folder']->default_unit ?? 'pack',
+                'item_id' => $items['Folder, Tagboard (Legal size)']->item_id,
+                'item_name_snapshot' => 'Folder, Tagboard (Legal size)',
+                'unit' => $items['Folder, Tagboard (Legal size)']->default_unit ?? 'pack',
                 'quantity_ordered' => 10.0,
                 'unit_price' => 380.00,
                 'total_price' => 3800.00,
@@ -616,9 +627,9 @@ class CleanWorkflowSeeder extends Seeder
 
             DistributionItem::query()->create([
                 'distribution_record_id' => $distributionHistorical->distribution_record_id,
-                'item_id' => $items['Folder']->item_id,
+                'item_id' => $items['Folder, Tagboard (Legal size)']->item_id,
                 'received_by' => $mpdoUser->id,
-                'item_name_snapshot' => 'Folder',
+                'item_name_snapshot' => 'Folder, Tagboard (Legal size)',
                 'quantity_released' => 10.0,
                 'quantity_received' => 10.0,
                 'receipt_condition' => 'GOOD',
@@ -657,8 +668,8 @@ class CleanWorkflowSeeder extends Seeder
         // =========================================================================
         $this->command?->info('6/7 Seeding executive anomaly detection records and governance alerts...');
 
-        $printerInk = $items->get('Printer Ink') ?? $items->first();
-        $bondPaper = $items->get('Bond Paper') ?? $items->first();
+        $printerInk = $items->get('Printer Ink, Black') ?? $items->first();
+        $bondPaper = $items->get('Bond Paper, A4 (80 GSM)') ?? $items->first();
 
         // 1. High Severity Price Z-Score Anomaly
         $priceAnomaly = Anomaly::query()->create([

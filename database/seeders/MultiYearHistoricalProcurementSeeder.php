@@ -202,7 +202,23 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
                 $seededItems = [];
 
                 foreach ($def['items'] as $itemDefIndex => $itemDef) {
-                    $itemModel = $items->get($itemDef['name']) ?? $items->first();
+                    $catalogName = match ($itemDef['name']) {
+                        'Bond Paper' => (($index + $itemDefIndex) % 2 === 0) ? 'Bond Paper, A4 (80 GSM)' : 'Bond Paper, Legal (80 GSM)',
+                        'Ballpen' => match (($index + $itemDefIndex) % 3) {
+                            0 => 'Ballpen, Black',
+                            1 => 'Ballpen, Blue',
+                            default => 'Ballpen, Red',
+                        },
+                        'Folder' => (($index + $itemDefIndex) % 2 === 0) ? 'Folder, Tagboard (Legal size)' : 'Folder, Tagboard (A4 size)',
+                        'Flash Drive' => (($index + $itemDefIndex) % 2 === 0) ? 'Flash Drive, 32GB' : 'Flash Drive, 64GB',
+                        'Printer Ink' => (($index + $itemDefIndex) % 2 === 0) ? 'Printer Ink, Black' : 'Printer Ink, Color Set',
+                        'Trash Bag' => (($index + $itemDefIndex) % 2 === 0) ? 'Trash Bag, Black XL' : 'Trash Bag, Yellow Biohazard XL',
+                        'Mouse' => 'Mouse, USB Optical',
+                        'Rubbing Alcohol' => 'Rubbing Alcohol (70%)',
+                        default => $itemDef['name'],
+                    };
+
+                    $itemModel = $items->get($catalogName) ?? $items->get($itemDef['name']) ?? $items->first();
                     if (! $itemModel) {
                         continue;
                     }
