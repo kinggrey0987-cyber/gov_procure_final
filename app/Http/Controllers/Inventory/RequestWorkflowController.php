@@ -542,7 +542,7 @@ class RequestWorkflowController
     private function lowStockItems(array $activeLowStockQueueByInventoryId): Collection
     {
         return Inventory::query()
-            ->with('item')
+            ->with(['item.specifications'])
             ->whereColumn('available_stock', '<', 'low_stock_threshold')
             ->orderByRaw('(low_stock_threshold - available_stock) DESC')
             ->limit(12)
@@ -565,6 +565,10 @@ class RequestWorkflowController
         return [
             'inventory_id' => $inventoryId,
             'item_name' => (string) ($inventory->item?->item_name ?? 'Unassigned Item'),
+            'specifications' => $inventory->item?->specifications?->map(fn ($spec) => [
+                'item_specification_id' => (int) $spec->item_specification_id,
+                'specification' => (string) $spec->specification,
+            ])->values()->all() ?? [],
             'unit' => (string) ($inventory->item?->default_unit ?? 'box'),
             'pieces_per_box' => (int) ($inventory->item?->pieces_per_box ?? 1),
             'sub_unit' => (string) ($inventory->item?->sub_unit ?? 'piece'),
@@ -583,7 +587,7 @@ class RequestWorkflowController
     private function atReorderItems(): Collection
     {
         return Inventory::query()
-            ->with('item')
+            ->with(['item.specifications'])
             ->whereColumn('available_stock', '=', 'low_stock_threshold')
             ->orderByDesc('last_updated')
             ->limit(8)
@@ -591,6 +595,10 @@ class RequestWorkflowController
             ->map(fn (Inventory $inventory): array => [
                 'inventory_id' => (int) $inventory->inventory_id,
                 'item_name' => (string) ($inventory->item?->item_name ?? 'Unassigned Item'),
+                'specifications' => $inventory->item?->specifications?->map(fn ($spec) => [
+                    'item_specification_id' => (int) $spec->item_specification_id,
+                    'specification' => (string) $spec->specification,
+                ])->values()->all() ?? [],
                 'unit' => (string) ($inventory->item?->default_unit ?? 'box'),
                 'pieces_per_box' => (int) ($inventory->item?->pieces_per_box ?? 1),
                 'sub_unit' => (string) ($inventory->item?->sub_unit ?? 'piece'),

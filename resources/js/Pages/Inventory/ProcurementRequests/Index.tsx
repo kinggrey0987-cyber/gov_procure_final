@@ -35,6 +35,10 @@ type ShortageCandidate = {
 type LowStockItem = {
     inventory_id: number;
     item_name: string;
+    specifications?: Array<{
+        item_specification_id: number;
+        specification: string;
+    }>;
     unit?: string;
     pieces_per_box?: number;
     sub_unit?: string;
@@ -57,6 +61,10 @@ type Props = {
     atReorderItems: Array<{
         inventory_id: number;
         item_name: string;
+        specifications?: Array<{
+            item_specification_id: number;
+            specification: string;
+        }>;
         unit?: string;
         pieces_per_box?: number;
         sub_unit?: string;
@@ -194,7 +202,19 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                                             </span>
                                         ) : null}
                                     </div>
-                                    <p className="text-xs text-slate-600 mt-1">
+                                    {item.specifications && item.specifications.length > 0 ? (
+                                        <div className="mt-1 flex flex-wrap gap-1">
+                                            {item.specifications.map((spec) => (
+                                                <span
+                                                    key={spec.item_specification_id}
+                                                    className="inline-flex items-center rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 border border-blue-200"
+                                                >
+                                                    {spec.specification}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    ) : null}
+                                    <p className="text-xs text-slate-600 mt-1.5">
                                         Available: <span className="font-semibold text-slate-700">{item.available_stock.toFixed(2)} {unit}s</span> {piecesPerBox > 1 ? `(${(item.available_stock * piecesPerBox).toLocaleString()} ${subUnit}s)` : ''} / Reorder Point: <span className="font-semibold text-slate-700">{item.low_stock_threshold.toFixed(2)} {unit}s</span> {piecesPerBox > 1 ? `(${(item.low_stock_threshold * piecesPerBox).toLocaleString()} ${subUnit}s)` : ''}
                                     </p>
                                     <p className="mt-1 text-xs font-semibold text-amber-700">
@@ -234,7 +254,13 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
 
                                     return (
                                     <p key={item.inventory_id} className="text-xs text-slate-700">
-                                        <span className="font-medium">{item.item_name}</span>: Available {item.available_stock.toFixed(2)} {unit}s {piecesPerBox > 1 ? `(${(item.available_stock * piecesPerBox).toLocaleString()} ${subUnit}s)` : ''} / Reorder Point {item.low_stock_threshold.toFixed(2)} {unit}s
+                                        <span className="font-medium">{item.item_name}</span>
+                                        {item.specifications && item.specifications.length > 0 ? (
+                                            <span className="text-slate-500 text-[11px] ml-1">
+                                                ({item.specifications.map((s) => s.specification).join(', ')})
+                                            </span>
+                                        ) : null}
+                                        : Available {item.available_stock.toFixed(2)} {unit}s {piecesPerBox > 1 ? `(${(item.available_stock * piecesPerBox).toLocaleString()} ${subUnit}s)` : ''} / Reorder Point {item.low_stock_threshold.toFixed(2)} {unit}s
                                     </p>
                                     );
                                 })}
@@ -268,6 +294,19 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                                         </span>
                                     ) : null}
                                 </div>
+                                {selectedLowStockItem.specifications && selectedLowStockItem.specifications.length > 0 ? (
+                                    <div className="mt-1 flex flex-wrap items-center gap-1">
+                                        <span className="text-[11px] font-semibold text-slate-500 mr-1">Specs:</span>
+                                        {selectedLowStockItem.specifications.map((spec) => (
+                                            <span
+                                                key={spec.item_specification_id}
+                                                className="inline-flex items-center rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 border border-blue-200"
+                                            >
+                                                {spec.specification}
+                                            </span>
+                                        ))}
+                                    </div>
+                                ) : null}
                                 <p className="text-xs text-slate-600">
                                     Available: <span className="font-semibold text-slate-700">{selectedLowStockItem.available_stock.toFixed(2)} {unit}s</span> {piecesPerBox > 1 ? `(${(selectedLowStockItem.available_stock * piecesPerBox).toLocaleString()} ${subUnit}s)` : ''} / Reorder Threshold: <span className="font-semibold text-slate-700">{selectedLowStockItem.low_stock_threshold.toFixed(2)} {unit}s</span>
                                 </p>
