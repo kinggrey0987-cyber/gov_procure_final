@@ -78,6 +78,19 @@ class ConsolidationTraceabilityService
                 ->pluck('reference_id')
                 ->toArray();
 
+            // Also search by pr_number since consolidated PR status history
+            // uses the full pr_number format (e.g. "PR-2026-09-0015"), not the
+            // zero-padded ID format (e.g. "PR-000103").
+            $prNumber = (string) $purchaseRequest->pr_number;
+            if ($prNumber !== '') {
+                $historySrIdsByPrNumber = StatusHistory::query()
+                    ->where('reference_type', SupplyRequest::class)
+                    ->where('remarks', 'like', "%{$prNumber}%")
+                    ->pluck('reference_id')
+                    ->toArray();
+                $historySrIds = array_unique(array_merge($historySrIds, $historySrIdsByPrNumber));
+            }
+
             if (! empty($historySrIds)) {
                 $historyRequests = SupplyRequest::query()
                     ->whereIn('supply_request_id', $historySrIds)

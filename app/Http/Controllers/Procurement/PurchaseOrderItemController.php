@@ -39,23 +39,45 @@ class PurchaseOrderItemController extends Controller
 
         if ($purchaseRequest && $purchaseRequest->items()->exists()) {
             $purchaseRequest->loadMissing(['items.item', 'office']);
+
+            // Track already-matched SR item IDs so multiple PR items with the
+            // same item_id (from consolidated PRs with different specifications)
+            // are distributed across distinct source SR items instead of all
+            // resolving to the same first match.
+            $matchedSrItemIds = [];
+
             foreach ($purchaseRequest->items as $prItem) {
                 // Resolve matching supply request item id if available
                 $srItem = null;
                 foreach ($sourceSupplyRequests as $sr) {
-                    $match = $sr->items->firstWhere('item_id', $prItem->item_id);
+                    $match = $sr->items
+                        ->where('item_id', $prItem->item_id)
+                        ->whereNotIn('supply_request_item_id', $matchedSrItemIds)
+                        ->first();
                     if ($match) {
                         $srItem = $match;
                         break;
                     }
                 }
                 if (! $srItem && $purchaseOrder->supplyRequest) {
-                    $srItem = $purchaseOrder->supplyRequest->items->firstWhere('item_id', $prItem->item_id);
+                    $srItem = $purchaseOrder->supplyRequest->items
+                        ->where('item_id', $prItem->item_id)
+                        ->whereNotIn('supply_request_item_id', $matchedSrItemIds)
+                        ->first();
                 }
 
+                // Skip items that cannot be traced to a supply request item.
+                // Using purchase_request_item_id as a supply_request_item_id fallback
+                // causes cross-table ID collisions and validation failures.
+                if (! $srItem) {
+                    continue;
+                }
+
+                $matchedSrItemIds[] = (int) $srItem->supply_request_item_id;
+
                 $sourceItems->push([
-                    'supply_request_item_id' => (int) ($srItem?->supply_request_item_id ?? $prItem->purchase_request_item_id),
-                    'supply_request_id' => (int) ($srItem?->supply_request_id ?? 0),
+                    'supply_request_item_id' => (int) $srItem->supply_request_item_id,
+                    'supply_request_id' => (int) $srItem->supply_request_id,
                     'request_code' => (string) ($purchaseRequest->pr_number ?? 'PR'),
                     'office_code' => (string) ($purchaseRequest->office?->code ?? 'GSO'),
                     'item_id' => (int) $prItem->item_id,
@@ -84,8 +106,11 @@ class PurchaseOrderItemController extends Controller
             }
         }
 
-        $encodedItemIds = $purchaseOrder->items()->pluck('item_id')->map(fn ($id) => (int) $id)->all();
-        $encodedSourceItemIds = $sourceItems->filter(fn ($si) => in_array((int) $si['item_id'], $encodedItemIds, true))
+        // Duplicate detection: use supply_request_item_id directly, not item_id.
+        // Using item_id would incorrectly mark ALL entries for the same catalog item
+        // as "Already Added" when only one specific SR line has been encoded.
+        $encodedSrItemIds = $purchaseOrder->items()->pluck('supply_request_item_id')->map(fn ($id) => (int) $id)->all();
+        $encodedSourceItemIds = $sourceItems->filter(fn ($si) => in_array((int) $si['supply_request_item_id'], $encodedSrItemIds, true))
             ->pluck('supply_request_item_id')
             ->map(fn ($id) => (int) $id)
             ->values();

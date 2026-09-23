@@ -372,9 +372,9 @@ HTML;
     {
         $parent = $this->accessService->resolveParentForDocument($document);
 
-        if (! $this->accessService->canManage($actor, (string) $document->related_module, $parent)) {
+        if (! $this->accessService->canDelete($actor, (string) $document->related_module, $parent)) {
             throw ValidationException::withMessages([
-                'authorization' => 'You are not authorized to delete this document.',
+                'authorization' => 'You are not authorized to delete this document, or this official audit record is locked against deletion.',
             ]);
         }
 

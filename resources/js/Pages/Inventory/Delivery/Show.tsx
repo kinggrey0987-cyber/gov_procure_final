@@ -62,6 +62,7 @@ type Delivery = {
     permissions?: {
         can_create_follow_up_purchase_request?: boolean;
         can_upload_documents?: boolean;
+        can_delete_documents?: boolean;
     };
     discrepancy_summary?: {
         has_discrepancy: boolean;
@@ -668,7 +669,7 @@ export default function DeliveryShow({ delivery }: Props) {
                                                         >
                                                             Download
                                                         </a>
-                                                        {delivery.permissions?.can_upload_documents && (
+                                                        {delivery.permissions?.can_delete_documents ? (
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleDeleteDocument(doc.document_id)}
@@ -676,6 +677,13 @@ export default function DeliveryShow({ delivery }: Props) {
                                                             >
                                                                 Delete
                                                             </button>
+                                                        ) : (
+                                                            <span
+                                                                className="inline-flex items-center rounded bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-500"
+                                                                title="Permanent audit evidence. Deletion is locked after delivery receipt."
+                                                            >
+                                                                🔒 Audit Locked
+                                                            </span>
                                                         )}
                                                     </td>
                                                 </tr>

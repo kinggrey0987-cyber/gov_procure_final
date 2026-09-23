@@ -145,6 +145,23 @@ class DocumentAccessService
         return $actor->can($definition['manage_ability'], $parent);
     }
 
+    public function canDelete(?User $actor, string $module, Model $parent): bool
+    {
+        if (! $this->canManage($actor, $module, $parent)) {
+            return false;
+        }
+
+        $module = $this->normalizeModule($module);
+
+        if ($module === 'deliveries') {
+            // Once delivery intake has occurred (RECEIVED, VERIFIED, or PARTIALLY_RECEIVED),
+            // attached supplier invoices and delivery receipts become permanent audit evidence under COA rules.
+            return (string) ($parent->receipt_status ?? '') === 'PENDING';
+        }
+
+        return true;
+    }
+
     public function resolveParentForDocument(Document $document): Model
     {
         return $this->resolveParentOrFail((string) $document->related_module, (int) $document->related_reference_id);

@@ -240,6 +240,57 @@ class DocumentAttachmentFoundationTest extends TestCase
         $this->assertDatabaseMissing('documents', ['document_id' => $document->document_id]);
     }
 
+    public function test_delivery_document_deletion_is_locked_once_delivery_is_received_or_verified(): void
+    {
+        $purchaseOrder = $this->createPurchaseOrder($this->officeA, $this->procurementUser, $this->officeUserA);
+        $delivery = $this->createDelivery($purchaseOrder, $this->gsoUser);
+
+        // Upload document while delivery is in PENDING status
+        $this->actingAs($this->gsoUser)
+            ->post(route('documents.store', ['related_module' => 'deliveries', 'related_reference_id' => $delivery->delivery_id]), [
+                'title' => 'Supplier Sales Invoice',
+                'file' => UploadedFile::fake()->create('invoice.pdf', 20, 'application/pdf'),
+            ])
+            ->assertRedirect();
+
+        $document = Document::query()->where('related_module', 'deliveries')->firstOrFail();
+
+        // While PENDING, deletion is permitted
+        $this->actingAs($this->gsoUser)
+            ->delete(route('documents.destroy', $document->document_id))
+            ->assertRedirect();
+
+        $this->assertDatabaseMissing('documents', ['document_id' => $document->document_id]);
+
+        // Upload another document
+        $this->actingAs($this->gsoUser)
+            ->post(route('documents.store', ['related_module' => 'deliveries', 'related_reference_id' => $delivery->delivery_id]), [
+                'title' => 'Official Delivery Receipt',
+                'file' => UploadedFile::fake()->create('receipt.pdf', 20, 'application/pdf'),
+            ])
+            ->assertRedirect();
+
+        $auditLockedDoc = Document::query()->where('related_module', 'deliveries')->firstOrFail();
+
+        // Once delivery receipt_status transitions to RECEIVED, document deletion is audit locked
+        $delivery->update(['receipt_status' => 'RECEIVED']);
+
+        $this->actingAs($this->gsoUser)
+            ->delete(route('documents.destroy', $auditLockedDoc->document_id))
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('documents', ['document_id' => $auditLockedDoc->document_id]);
+
+        // Same protection when VERIFIED
+        $delivery->update(['receipt_status' => 'VERIFIED']);
+
+        $this->actingAs($this->gsoUser)
+            ->delete(route('documents.destroy', $auditLockedDoc->document_id))
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('documents', ['document_id' => $auditLockedDoc->document_id]);
+    }
+
     public function test_related_module_and_related_reference_listing_is_scoped_correctly(): void
     {
         $purchaseOrder = $this->createPurchaseOrder($this->officeA, $this->procurementUser, $this->officeUserA);

@@ -189,7 +189,8 @@ class DeliveryController
                 ] : null,
                 'permissions' => [
                     'can_create_follow_up_purchase_request' => request()->user()->can('delivery.follow-up-pr.create', $delivery),
-                    'can_upload_documents' => request()->user()->can('delivery.update', $delivery),
+                    'can_upload_documents' => request()->user()->can('delivery.update', $delivery),
+                    'can_delete_documents' => request()->user()->can('delivery.update', $delivery) && (string) $delivery->receipt_status === 'PENDING',
                 ],
                 'delivery_receipt_no' => (string) ($delivery->delivery_receipt_no ?? ''),
                 'sales_invoice_no' => (string) ($delivery->sales_invoice_no ?? ''),
