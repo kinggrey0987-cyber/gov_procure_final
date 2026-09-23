@@ -20,6 +20,10 @@ type Props = {
             category?: {
                 category_name?: string;
             };
+            specifications?: Array<{
+                item_specification_id: number;
+                specification: string;
+            }>;
         };
     };
     recentMovements: Array<{
@@ -65,6 +69,22 @@ export default function InventoryShow({ inventory, recentMovements }: Props) {
                         ) : null}
                     </div>
                     <p className="mt-1 text-sm text-slate-500">Category: {inventory.item?.category?.category_name ?? 'Uncategorized'} • Inventory ID: {inventory.inventory_id}</p>
+
+                    {/* Standard Approved Specifications */}
+                    {inventory.item?.specifications && inventory.item.specifications.length > 0 ? (
+                        <div className="mt-3 flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100">
+                            <span className="text-xs font-semibold text-slate-500 mr-1">Approved Specifications:</span>
+                            {inventory.item.specifications.map((spec) => (
+                                <span
+                                    key={spec.item_specification_id}
+                                    className="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-800"
+                                >
+                                    <span className="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+                                    {spec.specification}
+                                </span>
+                            ))}
+                        </div>
+                    ) : null}
 
                     <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                         <Metric

@@ -30,10 +30,10 @@ class ResetTransactionsCommand extends Command
      */
     public function handle(): int
     {
-        $this->warn('This will purge all workflow transactional data (PPMP, PRs, POs, Deliveries, Distribution, Alerts, Inventory Stock, History).');
-        $this->info('User accounts, roles, offices, items, and item catalog categories will be 100% preserved.');
+        $this->warn('This will purge all workflow transactional data, items, and inventory.');
+        $this->info('User accounts, roles, and offices will be 100% preserved.');
 
-        if (! $this->option('force') && ! $this->confirm('Do you wish to proceed with resetting workflow data?', true)) {
+        if (! $this->option('force') && ! $this->confirm('Do you wish to proceed with resetting workflow and catalog data?', true)) {
             $this->info('Aborted.');
             return 0;
         }
@@ -64,12 +64,16 @@ class ResetTransactionsCommand extends Command
             'ppmp_items',
             'ppmp',
             'documents',
+            'item_specifications',
+            'items',
+            'item_categories',
+            'item_units',
         ];
 
         $this->info('Disabling foreign key constraints...');
         Schema::disableForeignKeyConstraints();
 
-        $this->info('Purging workflow tables...');
+        $this->info('Purging workflow and catalog tables...');
         foreach ($tables as $table) {
             try {
                 if (Schema::hasTable($table)) {
@@ -87,14 +91,26 @@ class ResetTransactionsCommand extends Command
         Schema::enableForeignKeyConstraints();
 
         if (! $this->option('no-seed')) {
-            $this->info('Repopulating system with clean, realistic operational workflow data...');
+            $this->info('Repopulating packaging units...');
+            $this->call('db:seed', [
+                '--class' => \Database\Seeders\ItemUnitSeeder::class,
+                '--force' => true,
+            ]);
+
+            $this->info('Repopulating standardized catalog items and specifications...');
+            $this->call('db:seed', [
+                '--class' => \Database\Seeders\ItemCatalogSeeder::class,
+                '--force' => true,
+            ]);
+
+            $this->info('Repopulating clean, realistic operational workflow data...');
             $this->call('db:seed', [
                 '--class' => CleanWorkflowSeeder::class,
                 '--force' => true,
             ]);
         }
 
-        $this->info('Workflow data successfully reset and repopulated!');
+        $this->info('Catalog, specifications, and workflow data successfully reset and repopulated!');
 
         return 0;
     }

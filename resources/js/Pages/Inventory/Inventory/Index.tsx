@@ -20,6 +20,10 @@ type InventoryRow = {
         category?: {
             category_name?: string;
         };
+        specifications?: Array<{
+            item_specification_id: number;
+            specification: string;
+        }>;
     };
 };
 
@@ -187,7 +191,21 @@ export default function InventoryIndex({ inventories, categories, filters }: Pro
 
                                     return (
                                         <tr key={row.inventory_id} className="hover:bg-slate-50/60">
-                                            <td className="px-3 py-2 font-medium text-slate-900">{row.item?.item_name || `Item #${row.item_id}`}</td>
+                                            <td className="px-3 py-2">
+                                                <div className="font-semibold text-slate-900">{row.item?.item_name || `Item #${row.item_id}`}</div>
+                                                {row.item?.specifications && row.item.specifications.length > 0 ? (
+                                                    <div className="mt-1 flex flex-wrap gap-1">
+                                                        {row.item.specifications.map((spec) => (
+                                                            <span
+                                                                key={spec.item_specification_id}
+                                                                className="inline-flex items-center rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 border border-blue-200"
+                                                            >
+                                                                {spec.specification}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                ) : null}
+                                            </td>
                                             <td className="px-3 py-2 text-slate-600">{row.item?.category?.category_name || '-'}</td>
                                             <td className="px-3 py-2 text-right font-semibold text-slate-900">
                                                 <span>{available.toFixed(2)} {unit}s</span>

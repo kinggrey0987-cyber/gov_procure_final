@@ -24,7 +24,7 @@ class InventoryController
     {
         abort_unless(auth()->user()->can('inventory.view-any'), 403);
 
-        $query = Inventory::query()->with('item.category');
+        $query = Inventory::query()->with(['item.category', 'item.specifications']);
 
         $search = trim((string) $request->query('q', ''));
         if ($search !== '') {
@@ -84,7 +84,7 @@ class InventoryController
     {
         abort_unless(auth()->user()->can('inventory.view', $inventory), 403);
 
-        $inventory->load(['item.category']);
+        $inventory->load(['item.category', 'item.specifications']);
         $inventory = $this->withComputedReservedQuantity($inventory);
 
         $recentMovements = $inventory->movements()
