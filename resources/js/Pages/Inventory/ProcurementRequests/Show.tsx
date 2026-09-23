@@ -24,6 +24,7 @@ type PurchaseRequestDetail = {
         quantity_requested: number;
         unit: string;
         available_stock: number;
+        specifications?: string[];
         remarks?: string | null;
     }>;
     purchase_orders: Array<{
@@ -119,7 +120,21 @@ export default function ProcurementRequestShow({ purchaseRequest, backFilters }:
                         <tbody className="divide-y divide-slate-100">
                             {purchaseRequest.items.map((item) => (
                                 <tr key={item.purchase_request_item_id}>
-                                    <td className="px-4 py-3 text-slate-700">{item.item_name}</td>
+                                    <td className="px-4 py-3 text-slate-700">
+                                        <div className="font-semibold text-slate-900">{item.item_name}</div>
+                                        {item.specifications && item.specifications.length > 0 ? (
+                                            <div className="mt-1 flex flex-wrap gap-1">
+                                                {item.specifications.map((spec, sIdx) => (
+                                                    <span
+                                                        key={sIdx}
+                                                        className="inline-flex items-center rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 border border-blue-200"
+                                                    >
+                                                        {spec}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        ) : null}
+                                    </td>
                                     <td className="px-4 py-3 text-slate-700">{item.category_name}</td>
                                     <td className="px-4 py-3 text-slate-700">{item.quantity_requested.toFixed(2)} {item.unit}</td>
                                     <td className="px-4 py-3 text-slate-700">{item.available_stock.toFixed(2)}</td>

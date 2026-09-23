@@ -74,6 +74,7 @@ class PurchaseRequestController extends Controller
         return Inertia::render('Procurement/PurchaseRequests/Show', [
             'purchaseRequest' => $purchaseRequest->load([
                 'items.item.category',
+                'items.item.specifications',
                 'office',
                 'requester',
                 'supplyRequest.requester',

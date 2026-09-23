@@ -385,6 +385,7 @@ class RequestWorkflowController
             'supplyRequest.requester',
             'supplyRequest.items.item.inventory',
             'items.item.category',
+            'items.item.specifications',
             'purchaseOrders.supplier',
             'purchaseOrders.deliveries.distributionRecords',
         ]);
@@ -421,6 +422,7 @@ class RequestWorkflowController
                         'pieces_per_box' => (int) ($item->item?->pieces_per_box ?? 1),
                         'sub_unit' => (string) ($item->item?->sub_unit ?? 'piece'),
                         'available_stock' => (float) ($item->item?->inventory?->available_stock ?? 0),
+                        'specifications' => $item->item?->specifications->pluck('specification')->all() ?? [],
                         'remarks' => $item->remarks,
                     ])
                     ->values(),

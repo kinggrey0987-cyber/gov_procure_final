@@ -35,6 +35,10 @@ type PurchaseRequest = {
             category?: {
                 category_name?: string | null;
             } | null;
+            specifications?: Array<{
+                item_specification_id: number;
+                specification: string;
+            }>;
         } | null;
     }>;
 };
@@ -388,7 +392,21 @@ export default function PurchaseRequestsShow({ purchaseRequest, traceability, re
                             <tbody className="divide-y divide-slate-100">
                                 {(purchaseRequest.items ?? []).map((row) => (
                                     <tr key={row.purchase_request_item_id}>
-                                        <td className="px-4 py-3 text-slate-900">{row.item?.item_name ?? 'Unknown Item'}</td>
+                                        <td className="px-4 py-3 text-slate-900">
+                                            <div className="font-semibold text-slate-900">{row.item?.item_name ?? 'Unknown Item'}</div>
+                                            {row.item?.specifications && row.item.specifications.length > 0 ? (
+                                                <div className="mt-1 flex flex-wrap gap-1">
+                                                    {row.item.specifications.map((spec) => (
+                                                        <span
+                                                            key={spec.item_specification_id}
+                                                            className="inline-flex items-center rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 border border-blue-200"
+                                                        >
+                                                            {spec.specification}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            ) : null}
+                                        </td>
                                         <td className="px-4 py-3 text-slate-700">{row.item?.category?.category_name ?? 'Uncategorized'}</td>
                                         <td className="px-4 py-3 text-slate-700">{Number(row.quantity_requested ?? 0).toFixed(2)}</td>
                                         <td className="px-4 py-3 text-slate-700">{row.item?.default_unit ?? '-'}</td>
