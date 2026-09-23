@@ -1082,4 +1082,55 @@ class DeliveryFeatureTest extends TestCase
             'document_kind' => 'sales_invoice',
         ]);
     }
+
+    public function test_verification_rejects_rejection_when_received_items_have_no_discrepancy(): void
+    {
+        $delivery = $this->createDelivery(status: 'RECEIVED');
+        DeliveryItem::query()->create([
+            'delivery_id' => $delivery->delivery_id,
+            'purchase_order_item_id' => $this->purchaseOrderItem->purchase_order_item_id,
+            'expected_quantity' => 5,
+            'received_quantity' => 5,
+            'damaged_quantity' => 0,
+            'missing_quantity' => 0,
+            'item_condition' => 'GOOD',
+        ]);
+
+        $response = $this->actingAs($this->gsoOfficer)->post(route('inventory.delivery-verifications.store', $delivery->delivery_id), [
+            'verification_date' => now()->toDateString(),
+            'verification_status' => 'REJECTED',
+            'discrepancy_notes' => 'Attempting to reject despite zero discrepancy.',
+            'evidence_file' => UploadedFile::fake()->image('evidence.png'),
+        ]);
+
+        $response->assertSessionHasErrors('verification_status');
+
+        $this->assertDatabaseMissing('delivery_verifications', [
+            'delivery_id' => $delivery->delivery_id,
+        ]);
+    }
+
+    public function test_delivery_follow_up_pr_blocked_when_no_discrepancies(): void
+    {
+        $delivery = $this->createDelivery(status: 'PARTIALLY_RECEIVED');
+        DeliveryItem::query()->create([
+            'delivery_id' => $delivery->delivery_id,
+            'purchase_order_item_id' => $this->purchaseOrderItem->purchase_order_item_id,
+            'expected_quantity' => 5,
+            'received_quantity' => 5,
+            'damaged_quantity' => 0,
+            'missing_quantity' => 0,
+            'item_condition' => 'GOOD',
+        ]);
+
+        $this->assertFalse(
+            \Illuminate\Support\Facades\Gate::forUser($this->gsoOfficer)->allows('delivery.follow-up-pr.create', $delivery)
+        );
+
+        $response = $this->actingAs($this->gsoOfficer)->post(
+            route('inventory.deliveries.follow-up-purchase-request.store', $delivery->delivery_id)
+        );
+
+        $response->assertForbidden();
+    }
 }

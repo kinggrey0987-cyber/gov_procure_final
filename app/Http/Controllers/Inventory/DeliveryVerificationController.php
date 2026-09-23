@@ -73,8 +73,8 @@ class DeliveryVerificationController
                     'has_discrepancy' => $hasDiscrepancy,
                     'recommended_status' => $hasDiscrepancy ? 'REJECTED' : 'APPROVED',
                     'message' => $hasDiscrepancy
-                        ? 'Discrepancies were found. Reject this delivery verification for Procurement Unit follow-up.'
-                        : 'No quantity discrepancies found. This delivery is ready for approval.',
+                        ? 'Discrepancies were found (damaged or missing quantities). Reject this delivery verification for Procurement Unit follow-up.'
+                        : 'No quantity discrepancies found. All items match purchase order quantities with zero damages or missing items. This delivery cannot be rejected and must be approved.',
                 ],
             ],
         ]);

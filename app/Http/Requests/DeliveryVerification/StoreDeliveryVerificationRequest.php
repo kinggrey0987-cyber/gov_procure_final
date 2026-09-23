@@ -51,12 +51,27 @@ class StoreDeliveryVerificationRequest extends FormRequest
                 $validator->errors()->add('verification_date', 'Verification date cannot be earlier than the actual delivery date.');
             }
 
+            $hasDiscrepancy = $delivery?->items()
+                ->where(function ($query): void {
+                    $query->where('damaged_quantity', '>', 0)
+                        ->orWhere('missing_quantity', '>', 0);
+                })
+                ->exists() ?? false;
+
             if ($this->input('verification_status') === 'REJECTED') {
+                if (! $hasDiscrepancy) {
+                    $validator->errors()->add('verification_status', 'Deliveries without discrepancies (0 damaged, 0 missing) cannot be rejected. All item quantities match the purchase order.');
+                }
+
                 $hasSingle = $this->hasFile('evidence_file');
                 $hasMulti = $this->hasFile('evidence_files') && count(array_filter((array) $this->file('evidence_files'))) > 0;
                 if (! $hasSingle && ! $hasMulti) {
                     $validator->errors()->add('evidence_file', 'Evidence (photo or document) is required when rejecting a delivery due to discrepancies. Upload a file showing the issue.');
                 }
+            }
+
+            if ($this->input('verification_status') === 'APPROVED' && $hasDiscrepancy) {
+                $validator->errors()->add('verification_status', 'Deliveries with damaged or missing quantities must be rejected for Procurement Unit follow-up.');
             }
         });
     }

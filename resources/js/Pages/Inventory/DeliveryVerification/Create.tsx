@@ -97,6 +97,9 @@ export default function DeliveryVerificationCreate({ delivery }: Props) {
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
+        if (!hasDiscrepancy && data.verification_status === 'REJECTED') {
+            return;
+        }
         post(route('inventory.delivery-verifications.store', delivery.delivery_id), { forceFormData: true });
     };
 
@@ -188,10 +191,18 @@ export default function DeliveryVerificationCreate({ delivery }: Props) {
                                     className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none"
                                 >
                                     <option value="">Select status</option>
-                                    <option value="APPROVED">Approved</option>
-                                    <option value="REJECTED">Rejected</option>
+                                    <option value="APPROVED" disabled={hasDiscrepancy}>
+                                        Approved {hasDiscrepancy ? '(Disabled — Discrepancies exist)' : ''}
+                                    </option>
+                                    <option value="REJECTED" disabled={!hasDiscrepancy}>
+                                        Rejected {!hasDiscrepancy ? '(Disabled — No discrepancies found)' : ''}
+                                    </option>
                                 </select>
-                                <p className="mt-1 text-xs text-slate-500">Use Approved only when all item lines match. Use Rejected when damaged or missing quantities need Procurement Unit follow-up.</p>
+                                <p className="mt-1 text-xs text-slate-500">
+                                    {!hasDiscrepancy
+                                        ? 'All items match purchase order quantities with zero damages or missing items. This delivery cannot be rejected and must be approved.'
+                                        : 'Damaged or missing items were identified. Discrepancies must be rejected for Procurement Unit follow-up.'}
+                                </p>
                             </FormField>
                         </div>
 

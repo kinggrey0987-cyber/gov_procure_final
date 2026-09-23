@@ -64,9 +64,9 @@ class DeliveryVerificationService
             ]);
         }
 
-        if ((string) $payload['verification_status'] === 'REJECTED' && ! $hasDiscrepancy && empty($payload['discrepancy_notes'])) {
+        if ((string) $payload['verification_status'] === 'REJECTED' && ! $hasDiscrepancy) {
             throw ValidationException::withMessages([
-                'discrepancy_notes' => 'Discrepancy notes are required when rejecting a delivery without item quantity discrepancies.',
+                'verification_status' => 'Deliveries without discrepancies (0 damaged, 0 missing) cannot be rejected. Please approve the delivery.',
             ]);
         }
 

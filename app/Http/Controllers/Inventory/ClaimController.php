@@ -254,7 +254,7 @@ class ClaimController
                 'quantity_missing' => (float) $claim->quantity_missing,
                 'resolution_type' => $claim->resolution_type,
                 'replacement_quantity' => (float) $claim->replacement_quantity,
-                'replacement_available_stock' => $replacementAvailableStock,
+                'replacement_available_stock' => $user->isOfficeUser() ? null : $replacementAvailableStock,
                 'remarks' => $claim->remarks,
                 'parent_claim_id' => $claim->parent_claim_id ? (int) $claim->parent_claim_id : null,
                 'source_type' => $claim->source_type,

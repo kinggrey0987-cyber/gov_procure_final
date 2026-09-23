@@ -1,6 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { humanizeEnum } from '@/lib/displayLabels';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { PageProps } from '@/types';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { useState, type FormEvent, type ReactNode } from 'react';
 
 type DeliveryItem = {
@@ -111,9 +112,15 @@ type Props = {
 };
 
 export default function DeliveryShow({ delivery }: Props) {
+    const { flash, errors: pageErrors } = usePage<PageProps<{
+        flash?: { success?: string; error?: string };
+        errors?: Record<string, string>;
+    }>>().props;
+
     const canVerify = delivery.receipt_status === 'RECEIVED' && (!delivery.verifications || delivery.verifications.length === 0);
     const canCreateFollowUpPurchaseRequest = delivery.permissions?.can_create_follow_up_purchase_request === true
-        && !delivery.follow_up_purchase_request;
+        && !delivery.follow_up_purchase_request
+        && (delivery.discrepancy_summary?.has_discrepancy ?? false);
     const { post, processing } = useForm({ remarks: '' });
     const [activeTab, setActiveTab] = useState<'overview' | 'items' | 'status' | 'related' | 'notes'>('overview');
     const inventorySyncTotal = Number(delivery.discrepancy_summary?.total_inventory_synced_quantity ?? 0);
@@ -195,6 +202,22 @@ export default function DeliveryShow({ delivery }: Props) {
             <Head title={`Delivery ${delivery.delivery_code}`} />
 
             <div className="space-y-6 py-8">
+                {flash?.success ? (
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                        <span className="font-bold">✓ Success:</span> {flash.success}
+                    </div>
+                ) : null}
+                {flash?.error ? (
+                    <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                        <span className="font-bold">⚠️ Error:</span> {flash.error}
+                    </div>
+                ) : null}
+                {pageErrors && Object.keys(pageErrors).length > 0 && !flash?.error ? (
+                    <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                        <span className="font-bold">⚠️ Error:</span> {Object.values(pageErrors)[0]}
+                    </div>
+                ) : null}
+
                 {/* Tab Navigation */}
                 <section className="rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
                     <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
@@ -341,7 +364,7 @@ export default function DeliveryShow({ delivery }: Props) {
                         </section>
 
                         {/* Discrepancy Alert (if applicable) */}
-                        {delivery.receipt_status === 'PARTIALLY_RECEIVED' ? (
+                        {delivery.receipt_status === 'PARTIALLY_RECEIVED' && ((delivery.discrepancy_summary?.has_discrepancy ?? false) || Boolean(delivery.follow_up_purchase_request)) ? (
                             <section className="overflow-hidden rounded-xl border border-amber-200 bg-white shadow-sm">
                                 <div className="border-b border-amber-200 bg-amber-50 px-5 py-4">
                                     <div className="flex flex-wrap items-start justify-between gap-3">

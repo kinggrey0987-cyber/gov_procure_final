@@ -2,7 +2,8 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import AttachmentsPanel from '@/Components/AttachmentsPanel';
 import WorkflowHistoryTimeline from '@/Components/WorkflowHistoryTimeline';
 import { humanizeEnum } from '@/lib/displayLabels';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import type { PageProps } from '@/types';
 import type { FormEvent } from 'react';
 import { useEffect, useState } from 'react';
 
@@ -129,6 +130,8 @@ type Props = {
 };
 
 export default function ClaimShow({ claim, parentClaim, followUpClaims = [], followUpPurchaseRequest, linkedDistribution, attachments, attachmentPermissions, statusHistory, approvalHistory, routes, permissions }: Props) {
+    const { auth } = usePage<PageProps>().props;
+    const isOfficeUser = auth?.user?.role_code === 'OFFICE_USER';
     const [activeTab, setActiveTab] = useState<'overview' | 'items' | 'status' | 'related' | 'notes'>('overview');
     const [isCreatingPR, setIsCreatingPR] = useState(false);
     const routeNames = {
@@ -263,7 +266,9 @@ export default function ClaimShow({ claim, parentClaim, followUpClaims = [], fol
                         <Info label="Claimed Missing Qty" value={formatQuantity(claimedIssueQuantities.missing)} />
                         <Info label="Resolution Type" value={claim.resolution_type ?? 'Pending review'} />
                         <Info label="Replacement Released" value={formatQuantity(claim.replacement_quantity ?? 0)} />
-                        <Info label="Available Replacement Stock" value={claim.replacement_available_stock === null || claim.replacement_available_stock === undefined ? '-' : formatQuantity(claim.replacement_available_stock)} />
+                        {!isOfficeUser && (
+                            <Info label="Available Replacement Stock" value={claim.replacement_available_stock === null || claim.replacement_available_stock === undefined ? '-' : formatQuantity(claim.replacement_available_stock)} />
+                        )}
                         <Info label="Remarks" value={claim.remarks ?? 'No remarks provided.'} />
                     </div>
 
@@ -293,7 +298,7 @@ export default function ClaimShow({ claim, parentClaim, followUpClaims = [], fol
                                 </span>
                             </div>
                         </div>
-                    ) : (claim.replacement_available_stock !== null && (claim.replacement_available_stock ?? 0) < remainingReplacementQuantity && remainingReplacementQuantity > 0) ? (
+                    ) : (!isOfficeUser && claim.replacement_available_stock !== null && (claim.replacement_available_stock ?? 0) < remainingReplacementQuantity && remainingReplacementQuantity > 0) ? (
                         <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4">
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
