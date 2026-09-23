@@ -147,7 +147,12 @@ class PpmpService
     public function addItem(Ppmp $ppmp, User $actor, array $payload): PpmpItem
     {
         $this->assertDraftAndOwned($ppmp, $actor);
-        $this->assertUniqueItemSchedule($ppmp, (int) $payload['item_id'], (string) $payload['procurement_schedule']);
+        $this->assertUniqueItemSchedule(
+            $ppmp,
+            (int) $payload['item_id'],
+            (string) ($payload['remarks'] ?? ''),
+            (string) $payload['procurement_schedule']
+        );
 
         return DB::transaction(function () use ($ppmp, $actor, $payload): PpmpItem {
             $quantity = (float) $payload['quantity'];
@@ -188,7 +193,13 @@ class PpmpService
             ]);
         }
 
-        $this->assertUniqueItemSchedule($ppmp, (int) $payload['item_id'], (string) $payload['procurement_schedule'], (int) $item->ppmp_item_id);
+        $this->assertUniqueItemSchedule(
+            $ppmp,
+            (int) $payload['item_id'],
+            (string) ($payload['remarks'] ?? $item->remarks ?? ''),
+            (string) $payload['procurement_schedule'],
+            (int) $item->ppmp_item_id
+        );
 
         return DB::transaction(function () use ($ppmp, $item, $actor, $payload): PpmpItem {
             $quantity = (float) $payload['quantity'];
@@ -263,20 +274,27 @@ class PpmpService
         }
     }
 
-    private function assertUniqueItemSchedule(Ppmp $ppmp, int $itemId, string $procurementSchedule, ?int $exceptPpmpItemId = null): void
-    {
+    private function assertUniqueItemSchedule(
+        Ppmp $ppmp,
+        int $itemId,
+        string $specification,
+        string $procurementSchedule,
+        ?int $exceptPpmpItemId = null
+    ): void {
         $normalizedSchedule = strtoupper(trim($procurementSchedule));
+        $normalizedSpec = trim($specification);
 
         $duplicateExists = $ppmp->items()
             ->where('item_id', $itemId)
+            ->where('remarks', $normalizedSpec)
             ->where('procurement_schedule', $normalizedSchedule)
             ->when($exceptPpmpItemId !== null, fn ($query) => $query->where('ppmp_item_id', '!=', $exceptPpmpItemId))
             ->exists();
 
         if ($duplicateExists) {
             throw ValidationException::withMessages([
-                'item_id' => 'This item is already planned for the selected procurement quarter. Update the existing line instead.',
-                'procurement_schedule' => 'Duplicate item and procurement schedule combinations are not allowed.',
+                'item_id' => 'This item with the same specification is already planned for the selected procurement quarter. Update the existing line instead.',
+                'procurement_schedule' => 'Duplicate item, specification, and procurement schedule combinations are not allowed.',
             ]);
         }
     }

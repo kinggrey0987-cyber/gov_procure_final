@@ -66,16 +66,17 @@ class StorePpmpRequest extends FormRequest
                 }
 
                 $itemId = (string) ($item['item_id'] ?? '');
+                $spec = strtoupper(trim((string) ($item['remarks'] ?? '')));
                 $schedule = strtoupper(trim((string) ($item['procurement_schedule'] ?? '')));
 
                 if ($itemId === '' || $schedule === '') {
                     continue;
                 }
 
-                $key = $itemId.'|'.$schedule;
+                $key = $itemId.'|'.$spec.'|'.$schedule;
                 if (isset($seen[$key])) {
-                    $validator->errors()->add("items.$index.item_id", 'This item is already planned for the selected procurement quarter. Update the existing row instead.');
-                    $validator->errors()->add("items.$index.procurement_schedule", 'Duplicate item and procurement schedule combinations are not allowed.');
+                    $validator->errors()->add("items.$index.item_id", 'This item with the same specification is already planned for the selected procurement quarter. Update the existing row instead.');
+                    $validator->errors()->add("items.$index.procurement_schedule", 'Duplicate item, specification, and procurement schedule combinations are not allowed.');
                 }
 
                 $seen[$key] = true;

@@ -174,7 +174,10 @@ class PpmpController extends Controller
     private function itemOptions(): array
     {
         return Item::query()
-            ->with('category:item_category_id,category_name')
+            ->with([
+                'category:item_category_id,category_name',
+                'specifications:item_specification_id,item_id,specification',
+            ])
             ->orderBy('item_name', 'asc')
             ->get(['item_id', 'item_category_id', 'item_name', 'default_unit', 'pieces_per_box', 'sub_unit'])
             ->map(fn (Item $item): array => [
@@ -185,6 +188,13 @@ class PpmpController extends Controller
                 'default_unit' => (string) ($item->default_unit ?? ''),
                 'pieces_per_box' => (int) ($item->pieces_per_box ?? 1),
                 'sub_unit' => (string) ($item->sub_unit ?? 'piece'),
+                'specifications' => $item->specifications
+                    ->map(fn ($spec): array => [
+                        'item_specification_id' => (int) $spec->item_specification_id,
+                        'specification' => (string) $spec->specification,
+                    ])
+                    ->values()
+                    ->all(),
             ])
             ->values()
             ->all();

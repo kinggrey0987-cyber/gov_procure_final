@@ -83,7 +83,7 @@ class CleanWorkflowSeeder extends Seeder
             ]
         );
 
-        $items = Item::query()->with('category')->get()->keyBy('item_name');
+        $items = Item::query()->with(['category', 'specifications'])->get()->keyBy('item_name');
         if ($items->isEmpty()) {
             $this->command?->error('No items found in items table. Please run ItemCatalogSeeder first.');
             return;
@@ -184,6 +184,8 @@ class CleanWorkflowSeeder extends Seeder
                 if (! isset($items[$pItem['name']])) continue;
                 $catItem = $items[$pItem['name']];
 
+                $spec = $catItem->specifications->first()?->specification ?? sprintf('Standard %s specification', $pItem['name']);
+
                 $createdPpmpItem = PpmpItem::query()->create([
                     'ppmp_id' => $ppmp->ppmp_id,
                     'item_id' => $catItem->item_id,
@@ -192,7 +194,7 @@ class CleanWorkflowSeeder extends Seeder
                     'unit_cost' => $pItem['cost'],
                     'estimated_budget' => round($pItem['qty'] * $pItem['cost'], 2),
                     'procurement_schedule' => $pItem['sched'],
-                    'remarks' => sprintf('Annual allocation for %s', $pItem['name']),
+                    'remarks' => $spec,
                 ]);
 
                 $ppmpItemsByOffice[$cfg['office']->code][$pItem['name']] = $createdPpmpItem;

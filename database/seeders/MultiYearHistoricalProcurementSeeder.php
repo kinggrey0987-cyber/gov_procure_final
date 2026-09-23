@@ -104,7 +104,7 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
 
         $suppliers = [$supplier1, $supplier2, $supplier3];
 
-        $items = Item::query()->get()->keyBy('item_name');
+        $items = Item::query()->with('specifications')->get()->keyBy('item_name');
         if ($items->isEmpty()) {
             $this->command?->warn('MultiYearHistoricalProcurementSeeder skipped: No items found in item catalog.');
             return;
@@ -201,7 +201,7 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
                 $totalBudget = 0;
                 $seededItems = [];
 
-                foreach ($def['items'] as $itemDef) {
+                foreach ($def['items'] as $itemDefIndex => $itemDef) {
                     $itemModel = $items->get($itemDef['name']) ?? $items->first();
                     if (! $itemModel) {
                         continue;
@@ -211,6 +211,11 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
                     $qty = $itemDef['qty'];
                     $estBudget = round($qty * $unitCost, 2);
                     $totalBudget += $estBudget;
+
+                    $specs = $itemModel->specifications->pluck('specification')->all();
+                    $spec = ! empty($specs)
+                        ? $specs[($index + $itemDefIndex) % count($specs)]
+                        : sprintf('Standard %s specification', $itemModel->item_name);
 
                     $ppmpItem = PpmpItem::query()->updateOrCreate(
                         [
@@ -223,7 +228,7 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
                             'unit_cost' => $unitCost,
                             'estimated_budget' => $estBudget,
                             'procurement_schedule' => $itemDef['sched'],
-                            'remarks' => sprintf('Allocation for %s under %s (%d).', $itemModel->item_name, $def['title'], $year),
+                            'remarks' => $spec,
                             'created_at' => $datePrepared,
                             'updated_at' => $dateApproved,
                         ]
@@ -353,9 +358,9 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
                 $prNumber = sprintf('PR-%d-%02d-%04d', $year, $month, $i);
 
                 $pr = PurchaseRequest::query()->updateOrCreate(
-                    ['supply_request_id' => $supplyRequest->supply_request_id],
+                    ['pr_number' => $prNumber],
                     [
-                        'pr_number' => $prNumber,
+                        'supply_request_id' => $supplyRequest->supply_request_id,
                         'office_id' => $office->id,
                         'requested_by' => $officeUser->id,
                         'status' => 'COMPLETED',
@@ -419,7 +424,7 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
                         [
                             'item_id' => $itObj->item_id,
                             'item_name_snapshot' => $itObj->item_name,
-                            'specification' => sprintf('%s - Standard Certified Grade (%s)', $itObj->item_name, $itObj->default_unit),
+                            'specification' => (string) ($sItem->ppmpItem?->remarks ?? $itObj->specifications->first()?->specification ?? sprintf('%s - Standard Certified Grade (%s)', $itObj->item_name, $itObj->default_unit)),
                             'quantity_ordered' => $srItemData['qty'],
                             'unit' => $itObj->default_unit,
                             'unit_price' => $srItemData['unit_cost'],
@@ -712,7 +717,7 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
         // 50 program blueprints covering all 6 municipal offices and all 12 calendar months
         $rawPrograms = [
             // Month 1 (January)
-            1  => ['office_code' => 'MAYOR_OFFICE', 'cat' => 'Office Supplies', 'title' => 'Executive Governance & Public Administration Consumables',
+            1  => ['office_code' => 'MPDO', 'cat' => 'Office Supplies', 'title' => 'Municipal Comprehensive Planning & Governance Consumables',
                    'items' => [['Bond Paper', 30, 'Q1', 950], ['Ballpen', 20, 'Q1', 300], ['Folder', 15, 'Q1', 420]]],
             2  => ['office_code' => 'MPDO', 'cat' => 'Office Supplies', 'title' => 'Comprehensive Land Use & Spatial Planning Consumables',
                    'items' => [['Bond Paper', 25, 'Q1', 950], ['Logbook', 10, 'Q1', 160], ['Folder', 12, 'Q1', 420]]],
@@ -724,9 +729,9 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
             // Month 2 (February)
             5  => ['office_code' => 'ENG', 'cat' => 'Office Supplies', 'title' => 'Municipal Infrastructure Survey Drafting & Blueprint Documentation',
                    'items' => [['Bond Paper', 35, 'Q1', 950], ['Logbook', 15, 'Q1', 160], ['Staple Wire', 20, 'Q1', 180]]],
-            6  => ['office_code' => 'GSO', 'cat' => 'Janitorial Supplies', 'title' => 'Central Municipal Building Custodial & Janitorial Logistics',
+            6  => ['office_code' => 'MSWDO', 'cat' => 'Janitorial Supplies', 'title' => 'Community Center Custodial & Sanitation Logistics',
                    'items' => [['Detergent Powder', 45, 'Q1', 130], ['Trash Bag', 40, 'Q1', 220], ['Utility Cutter', 15, 'Q1', 95]]],
-            7  => ['office_code' => 'MAYOR_OFFICE', 'cat' => 'Office Supplies', 'title' => 'Sangguniang Bayan & Executive Council Session Materials',
+            7  => ['office_code' => 'ENG', 'cat' => 'Office Supplies', 'title' => 'Infrastructure Technical Working Committee Session Materials',
                    'items' => [['Bond Paper', 20, 'Q1', 950], ['Folder', 25, 'Q1', 420], ['Ballpen', 15, 'Q1', 300]]],
             8  => ['office_code' => 'MSWDO', 'cat' => 'Office Supplies', 'title' => 'Senior Citizens & PWD Assistance Program Registration Supplies',
                    'items' => [['Logbook', 20, 'Q1', 160], ['Ballpen', 25, 'Q1', 300], ['Folder', 30, 'Q1', 420]]],
@@ -738,11 +743,11 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
                    'items' => [['Rubbing Alcohol', 25, 'Q1', 380], ['Safety Gloves', 35, 'Q1', 75], ['Logbook', 12, 'Q1', 160]]],
             11 => ['office_code' => 'ENG', 'cat' => 'Office Supplies', 'title' => 'Flood Mitigation & Drainage Inspection Project Documentation',
                    'items' => [['Bond Paper', 25, 'Q1', 950], ['Utility Cutter', 10, 'Q1', 95], ['Folder', 15, 'Q1', 420]]],
-            12 => ['office_code' => 'GSO', 'cat' => 'Office Supplies', 'title' => 'Property Tagging, Asset Inventory Audit & Barcoding Supplies',
+            12 => ['office_code' => 'MHO', 'cat' => 'Office Supplies', 'title' => 'Rural Health Archive Tagging, Records Audit & Registry Supplies',
                    'items' => [['Logbook', 25, 'Q1', 160], ['Staple Wire', 15, 'Q1', 180], ['Ballpen', 20, 'Q1', 300]]],
 
             // Month 4 (April)
-            13 => ['office_code' => 'MAYOR_OFFICE', 'cat' => 'Medical & Safety', 'title' => 'Municipal Disaster Risk Reduction & Emergency Preparedness Plan',
+            13 => ['office_code' => 'MPDO', 'cat' => 'Medical & Safety', 'title' => 'Disaster Risk Spatial Planning & Field Assessment Consumables',
                    'items' => [['Safety Gloves', 40, 'Q2', 75], ['Rubbing Alcohol', 30, 'Q2', 380], ['Flash Drive', 10, 'Q2', 480]]],
             14 => ['office_code' => 'MPDO', 'cat' => 'Office Supplies', 'title' => 'Annual Investment Program (AIP) Documentation Materials',
                    'items' => [['Bond Paper', 40, 'Q2', 950], ['Folder', 35, 'Q2', 420], ['Printer Ink', 10, 'Q2', 650]]],
@@ -754,9 +759,9 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
             // Month 5 (May)
             17 => ['office_code' => 'ENG', 'cat' => 'IT Equipment', 'title' => 'Public Works CAD Design & Structural Calculation Materials',
                    'items' => [['Mouse', 12, 'Q2', 350], ['Flash Drive', 12, 'Q2', 480], ['Printer Ink', 10, 'Q2', 650]]],
-            18 => ['office_code' => 'GSO', 'cat' => 'Janitorial Supplies', 'title' => 'Municipal Grounds & Solid Waste Management Logistics',
+            18 => ['office_code' => 'MSWDO', 'cat' => 'Janitorial Supplies', 'title' => 'Social Welfare Evacuation Facility Grounds & Sanitation Logistics',
                    'items' => [['Trash Bag', 60, 'Q2', 220], ['Safety Gloves', 30, 'Q2', 75], ['Detergent Powder', 35, 'Q2', 130]]],
-            19 => ['office_code' => 'MAYOR_OFFICE', 'cat' => 'Office Supplies', 'title' => 'Public Information, Civic Outreach & Citizen Services',
+            19 => ['office_code' => 'ENG', 'cat' => 'Office Supplies', 'title' => 'Engineering Helpdesk, Citizen Inquiries & Permitting Supplies',
                    'items' => [['Bond Paper', 30, 'Q2', 950], ['Ballpen', 25, 'Q2', 300], ['Folder', 20, 'Q2', 420]]],
             20 => ['office_code' => 'MSWDO', 'cat' => 'Janitorial Supplies', 'title' => 'Crisis Center & Daycare Sanitation Facilities Support',
                    'items' => [['Detergent Powder', 30, 'Q2', 130], ['Rubbing Alcohol', 20, 'Q2', 380], ['Trash Bag', 25, 'Q2', 220]]],
@@ -768,11 +773,11 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
                    'items' => [['Rubbing Alcohol', 40, 'Q2', 380], ['Safety Gloves', 40, 'Q2', 75], ['Logbook', 10, 'Q2', 160]]],
             23 => ['office_code' => 'ENG', 'cat' => 'Office Supplies', 'title' => 'Bridge & Culvert Maintenance Inspection Consumables',
                    'items' => [['Logbook', 15, 'Q2', 160], ['Bond Paper', 20, 'Q2', 950], ['Utility Cutter', 8, 'Q2', 95]]],
-            24 => ['office_code' => 'GSO', 'cat' => 'Office Supplies', 'title' => 'Warehouse Packaging, Stacking & Central Dispatch Supplies',
+            24 => ['office_code' => 'MHO', 'cat' => 'Office Supplies', 'title' => 'Clinical Supply Packaging, Sorting & Medical Dispatch Supplies',
                    'items' => [['Utility Cutter', 20, 'Q2', 95], ['Staple Wire', 25, 'Q2', 180], ['Logbook', 15, 'Q2', 160]]],
 
             // Month 7 (July)
-            25 => ['office_code' => 'MAYOR_OFFICE', 'cat' => 'IT Equipment', 'title' => 'Municipal Peace & Order Council Operations Technology Supplies',
+            25 => ['office_code' => 'MPDO', 'cat' => 'IT Equipment', 'title' => 'Socio-Economic Database Infrastructure & GIS Technology Supplies',
                    'items' => [['Flash Drive', 15, 'Q3', 480], ['Mouse', 8, 'Q3', 350], ['Printer Ink', 8, 'Q3', 650]]],
             26 => ['office_code' => 'MPDO', 'cat' => 'Office Supplies', 'title' => 'Community-Based Monitoring System (CBMS) Field Supplies',
                    'items' => [['Bond Paper', 35, 'Q3', 950], ['Ballpen', 35, 'Q3', 300], ['Folder', 25, 'Q3', 420]]],
@@ -784,9 +789,9 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
             // Month 8 (August)
             29 => ['office_code' => 'ENG', 'cat' => 'Office Supplies', 'title' => 'Municipal Water System Expansion Field Survey Materials',
                    'items' => [['Bond Paper', 25, 'Q3', 950], ['Logbook', 12, 'Q3', 160], ['Staple Wire', 15, 'Q3', 180]]],
-            30 => ['office_code' => 'GSO', 'cat' => 'Office Supplies', 'title' => 'Inter-Agency Government Logistics Coordination Consumables',
+            30 => ['office_code' => 'MSWDO', 'cat' => 'Office Supplies', 'title' => 'Inter-Agency Social Services Coordination Consumables',
                    'items' => [['Bond Paper', 25, 'Q3', 950], ['Folder', 20, 'Q3', 420], ['Ballpen', 20, 'Q3', 300]]],
-            31 => ['office_code' => 'MAYOR_OFFICE', 'cat' => 'Office Supplies', 'title' => 'Local Economic Development & Tourism Promotion Materials',
+            31 => ['office_code' => 'ENG', 'cat' => 'Office Supplies', 'title' => 'Public Parks & Municipal Infrastructure Development Documentation',
                    'items' => [['Bond Paper', 25, 'Q3', 950], ['Folder', 20, 'Q3', 420], ['Flash Drive', 8, 'Q3', 480]]],
             32 => ['office_code' => 'MSWDO', 'cat' => 'Medical & Safety', 'title' => 'Emergency Relief Aid Stockpiling for Calamity Response',
                    'items' => [['Safety Gloves', 35, 'Q3', 75], ['Rubbing Alcohol', 25, 'Q3', 380], ['Detergent Powder', 25, 'Q3', 130]]],
@@ -798,11 +803,11 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
                    'items' => [['Logbook', 25, 'Q3', 160], ['Bond Paper', 20, 'Q3', 950], ['Ballpen', 30, 'Q3', 300]]],
             35 => ['office_code' => 'ENG', 'cat' => 'Janitorial Supplies', 'title' => 'Engineering Motorpool & Heavy Equipment Maintenance Sanitation',
                    'items' => [['Trash Bag', 35, 'Q3', 220], ['Detergent Powder', 30, 'Q3', 130], ['Safety Gloves', 25, 'Q3', 75]]],
-            36 => ['office_code' => 'GSO', 'cat' => 'IT Equipment', 'title' => 'Property Inventory Scanner & Terminal IT Maintenance',
+            36 => ['office_code' => 'MHO', 'cat' => 'IT Equipment', 'title' => 'Health Center Telehealth Terminal & Clinic IT Maintenance',
                    'items' => [['Mouse', 10, 'Q3', 350], ['Flash Drive', 12, 'Q3', 480], ['Toner Cartridge', 3, 'Q3', 2400]]],
 
             // Month 10 (October)
-            37 => ['office_code' => 'MAYOR_OFFICE', 'cat' => 'Office Supplies', 'title' => 'Executive Legislative Agenda (ELA) Mid-Term Consumables',
+            37 => ['office_code' => 'MPDO', 'cat' => 'Office Supplies', 'title' => 'Mid-Term Comprehensive Development Plan Review Consumables',
                    'items' => [['Bond Paper', 35, 'Q4', 950], ['Folder', 25, 'Q4', 420], ['Ballpen', 20, 'Q4', 300]]],
             38 => ['office_code' => 'MPDO', 'cat' => 'Office Supplies', 'title' => 'Development Project Feasibility & Assessment Documentation',
                    'items' => [['Bond Paper', 25, 'Q4', 950], ['Folder', 20, 'Q4', 420], ['Logbook', 10, 'Q4', 160]]],
@@ -814,9 +819,9 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
             // Month 11 (November)
             41 => ['office_code' => 'ENG', 'cat' => 'Office Supplies', 'title' => 'Municipal Infrastructure Completion Reports & Blueprint Archiving',
                    'items' => [['Bond Paper', 35, 'Q4', 950], ['Folder', 30, 'Q4', 420], ['Staple Wire', 15, 'Q4', 180]]],
-            42 => ['office_code' => 'GSO', 'cat' => 'Office Supplies', 'title' => 'Annual Physical Inventory Inspection & Equipment Tagging Consumables',
+            42 => ['office_code' => 'MSWDO', 'cat' => 'Office Supplies', 'title' => 'Social Welfare Beneficiary Validation & Case Folder Consumables',
                    'items' => [['Logbook', 20, 'Q4', 160], ['Utility Cutter', 15, 'Q4', 95], ['Ballpen', 20, 'Q4', 300]]],
-            43 => ['office_code' => 'MAYOR_OFFICE', 'cat' => 'Office Supplies', 'title' => 'Barangay Support & Community Extension Services Supplies',
+            43 => ['office_code' => 'ENG', 'cat' => 'Office Supplies', 'title' => 'Barangay Infrastructure Assistance & Field Survey Supplies',
                    'items' => [['Bond Paper', 30, 'Q4', 950], ['Ballpen', 25, 'Q4', 300], ['Folder', 25, 'Q4', 420]]],
             44 => ['office_code' => 'MSWDO', 'cat' => 'Medical & Safety', 'title' => 'Year-End Calamity Relief & Vulnerable Sector Assistance Logistics',
                    'items' => [['Rubbing Alcohol', 25, 'Q4', 380], ['Safety Gloves', 30, 'Q4', 75], ['Detergent Powder', 25, 'Q4', 130]]],
@@ -828,9 +833,9 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
                    'items' => [['Flash Drive', 15, 'Q4', 480], ['Mouse', 8, 'Q4', 350], ['HP 680 Tri-Color Ink', 5, 'Q4', 850]]],
             47 => ['office_code' => 'ENG', 'cat' => 'Office Supplies', 'title' => 'Subdivision & Commercial Building Code Permitting Documentation',
                    'items' => [['Bond Paper', 30, 'Q4', 950], ['Folder', 25, 'Q4', 420], ['Staple Wire', 15, 'Q4', 180]]],
-            48 => ['office_code' => 'GSO', 'cat' => 'Janitorial Supplies', 'title' => 'Year-End Municipal Facilities Deep Cleaning & Sanitation Consumables',
+            48 => ['office_code' => 'MHO', 'cat' => 'Janitorial Supplies', 'title' => 'Year-End Health Facilities Deep Cleaning & Disinfection Consumables',
                    'items' => [['Detergent Powder', 40, 'Q4', 130], ['Trash Bag', 45, 'Q4', 220], ['Rubbing Alcohol', 25, 'Q4', 380]]],
-            49 => ['office_code' => 'MAYOR_OFFICE', 'cat' => 'Office Supplies', 'title' => 'Annual Accomplishment Report & Town Hall Assembly Supplies',
+            49 => ['office_code' => 'MPDO', 'cat' => 'Office Supplies', 'title' => 'Annual Development Accomplishment Report & Planning Assembly Supplies',
                    'items' => [['Bond Paper', 40, 'Q4', 950], ['Folder', 30, 'Q4', 420], ['Ballpen', 30, 'Q4', 300]]],
             50 => ['office_code' => 'MHO', 'cat' => 'Medical & Safety', 'title' => 'Municipal Health Office Annual Sanitary & First-Aid Replenishment',
                    'items' => [['Rubbing Alcohol', 35, 'Q4', 380], ['Safety Gloves', 45, 'Q4', 75], ['Trash Bag', 30, 'Q4', 220]]],

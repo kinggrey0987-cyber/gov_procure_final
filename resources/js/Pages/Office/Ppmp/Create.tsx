@@ -6,6 +6,11 @@ import { FormEvent, useMemo } from 'react';
 import { FUND_SOURCES, DEFAULT_FUND_SOURCE } from '@/constants/fundSources';
 import { todayInputValue } from '@/lib/dateInput';
 
+type SpecificationOption = {
+    item_specification_id: number;
+    specification: string;
+};
+
 type ItemOption = {
     item_id: number;
     item_name: string;
@@ -14,6 +19,7 @@ type ItemOption = {
     default_unit?: string | null;
     pieces_per_box?: number | null;
     sub_unit?: string | null;
+    specifications?: SpecificationOption[];
 };
 
 type ItemDraft = {
@@ -82,10 +88,18 @@ export default function PpmpCreate({ itemOptions }: Props) {
     const chooseItem = (index: number, itemId: string) => {
         const option = itemOptions.find((entry) => String(entry.item_id) === itemId);
         if (!option) {
-            patchItem(index, { item_id: '', item_category_id: '' });
+            patchItem(index, { item_id: '', item_category_id: '', remarks: '' });
             return;
         }
-        patchItem(index, { item_id: String(option.item_id), item_category_id: String(option.item_category_id) });
+
+        const specs = option.specifications ?? [];
+        const autoSpec = specs.length === 1 ? specs[0].specification : '';
+
+        patchItem(index, {
+            item_id: String(option.item_id),
+            item_category_id: String(option.item_category_id),
+            remarks: autoSpec,
+        });
     };
 
     const itemOptionById = new Map(itemOptions.map((option) => [String(option.item_id), option]));
@@ -212,7 +226,7 @@ export default function PpmpCreate({ itemOptions }: Props) {
                             <svg className="w-4 h-4 shrink-0 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                             </svg>
-                            <span>Duplicate PPMP item lines are not allowed. Use one row per item and quarter, then adjust quantity.</span>
+                            <span>Duplicate PPMP item lines are not allowed. Items with the same specification cannot be planned multiple times in the same quarter; adjust the quantity on the existing row instead.</span>
                         </div>
                     ) : null}
 
@@ -223,6 +237,7 @@ export default function PpmpCreate({ itemOptions }: Props) {
                             const unit = selectedItem?.default_unit || 'box';
                             const piecesPerBox = selectedItem?.pieces_per_box || 1;
                             const subUnit = selectedItem?.sub_unit || 'piece';
+                            const specs = selectedItem?.specifications || [];
                             const qtyNum = Number(item.quantity) || 0;
                             const unitCostNum = Number(item.unit_cost) || 0;
                             const totalPieces = qtyNum * piecesPerBox;
@@ -376,21 +391,70 @@ export default function PpmpCreate({ itemOptions }: Props) {
                                             </label>
                                         </div>
 
-                                        {/* Item Specification / Brand Details */}
+                                        {/* Standard Specification / Technical Details */}
                                         <label className="block">
-                                            <span className="mb-0.5 block text-xs font-medium text-slate-700">Item Specification / Brand Details</span>
-                                            <input
-                                                value={item.remarks}
-                                                onChange={(event) => patchItem(index, { remarks: event.target.value })}
-                                                placeholder="e.g. Panda 0.7mm Black, A4 80gsm 500 sheets"
-                                                className={`w-full rounded-lg border px-2.5 py-1 text-xs ${
-                                                    form.errors[`items.${index}.remarks`]
-                                                        ? 'border-rose-400 bg-rose-50/30'
-                                                        : 'border-slate-300'
-                                                }`}
-                                                required
-                                            />
-                                            <span className="mt-0.5 block text-[10px] text-slate-500">Essential technical specification auto-filled into Supply Requests and Purchase Orders.</span>
+                                            <div className="flex items-center justify-between mb-0.5">
+                                                <span className="block text-xs font-medium text-slate-700">
+                                                    Standard Specification / Technical Details <span className="text-rose-600">*</span>
+                                                </span>
+                                                {specs.length === 1 ? (
+                                                    <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 border border-slate-200">
+                                                        <svg className="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                                        </svg>
+                                                        Standard Catalog Specification (Locked)
+                                                    </span>
+                                                ) : specs.length > 1 ? (
+                                                    <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700 border border-indigo-200">
+                                                        {specs.length} GSO Approved Options
+                                                    </span>
+                                                ) : null}
+                                            </div>
+
+                                            {specs.length > 1 ? (
+                                                <select
+                                                    value={item.remarks}
+                                                    onChange={(event) => patchItem(index, { remarks: event.target.value })}
+                                                    className={`w-full rounded-lg border px-2.5 py-1 text-xs ${
+                                                        form.errors[`items.${index}.remarks`]
+                                                            ? 'border-rose-400 bg-rose-50/30'
+                                                            : 'border-slate-300'
+                                                    }`}
+                                                    required
+                                                >
+                                                    <option value="">Select standard specification...</option>
+                                                    {specs.map((s) => (
+                                                        <option key={s.item_specification_id} value={s.specification}>
+                                                            {s.specification}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            ) : specs.length === 1 ? (
+                                                <input
+                                                    value={item.remarks || specs[0].specification}
+                                                    readOnly
+                                                    aria-readonly="true"
+                                                    className="w-full rounded-lg border border-slate-300 bg-slate-100/70 px-2.5 py-1 text-xs text-slate-800 font-medium cursor-not-allowed"
+                                                    required
+                                                />
+                                            ) : (
+                                                <input
+                                                    value={item.remarks}
+                                                    onChange={(event) => patchItem(index, { remarks: event.target.value })}
+                                                    placeholder="Required item specification"
+                                                    className={`w-full rounded-lg border px-2.5 py-1 text-xs ${
+                                                        form.errors[`items.${index}.remarks`]
+                                                            ? 'border-rose-400 bg-rose-50/30'
+                                                            : 'border-slate-300'
+                                                    }`}
+                                                    required
+                                                />
+                                            )}
+                                            <span className="mt-0.5 block text-[10px] text-slate-500">
+                                                {specs.length > 1
+                                                    ? 'Select from GSO pre-approved standardized specifications for this item.'
+                                                    : 'Pre-approved GSO standard technical specification auto-filled into Supply Requests and Purchase Orders.'}
+                                            </span>
                                             <InputError message={form.errors[`items.${index}.remarks`]} className="mt-0.5 text-[10px]" />
                                         </label>
                                     </div>
@@ -429,13 +493,14 @@ function duplicateIndexesForDraftItems(items: ItemDraft[]): Set<number> {
 
     items.forEach((item, index) => {
         const itemId = item.item_id.trim();
+        const spec = item.remarks.trim().toUpperCase();
         const schedule = item.procurement_schedule.trim().toUpperCase();
 
         if (itemId === '' || schedule === '') {
             return;
         }
 
-        const key = `${itemId}|${schedule}`;
+        const key = `${itemId}|${spec}|${schedule}`;
         const firstIndex = firstIndexByKey.get(key);
 
         if (firstIndex !== undefined) {

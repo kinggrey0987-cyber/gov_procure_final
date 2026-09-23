@@ -1934,4 +1934,79 @@ class OfficeTransactionalFlowTest extends TestCase
 
         return [$ppmp, $ppmpItem, $item];
     }
+
+    public function test_ppmp_allows_same_item_in_same_quarter_with_different_specifications_but_rejects_duplicate_specifications(): void
+    {
+        $office = $this->createOffice();
+        $officeUser = $this->createUser(UserRole::OFFICE_USER, $office);
+
+        $category = ItemCategory::query()->create([
+            'category_name' => 'Stationery',
+            'status' => 'active',
+        ]);
+
+        $item = Item::query()->create([
+            'item_category_id' => $category->item_category_id,
+            'item_name' => 'Ballpen',
+            'default_unit' => 'box',
+            'status' => 'active',
+        ]);
+
+        // Creating PPMP with same item, same quarter (Q1), but DIFFERENT specifications -> SHOULD SUCCEED
+        $response = $this->actingAs($officeUser)->post(route('office.ppmp.store'), [
+            'fiscal_year' => 2026,
+            'fund_source' => 'APPROPRIATION_ORDINANCE',
+            'date_prepared' => now()->toDateString(),
+            'remarks' => 'Multi-specification PPMP test',
+            'items' => [
+                [
+                    'item_id' => $item->item_id,
+                    'item_category_id' => $category->item_category_id,
+                    'quantity' => 10,
+                    'unit_cost' => 300,
+                    'procurement_schedule' => 'Q1',
+                    'remarks' => 'Black, 0.5mm ballpoint (Box of 50 pcs)',
+                ],
+                [
+                    'item_id' => $item->item_id,
+                    'item_category_id' => $category->item_category_id,
+                    'quantity' => 5,
+                    'unit_cost' => 300,
+                    'procurement_schedule' => 'Q1',
+                    'remarks' => 'Blue, 0.5mm ballpoint (Box of 50 pcs)',
+                ],
+            ],
+        ]);
+
+        $response->assertRedirect();
+        $this->assertDatabaseCount('ppmp', 1);
+        $this->assertDatabaseCount('ppmp_items', 2);
+
+        $ppmp = Ppmp::query()->firstOrFail();
+
+        // Adding a line with duplicate item, same quarter (Q1), and SAME specification -> SHOULD FAIL VALIDATION
+        $duplicateResponse = $this->actingAs($officeUser)->post(route('office.ppmp.items.store', $ppmp->ppmp_id), [
+            'item_id' => $item->item_id,
+            'item_category_id' => $category->item_category_id,
+            'quantity' => 3,
+            'unit_cost' => 300,
+            'procurement_schedule' => 'Q1',
+            'remarks' => 'Black, 0.5mm ballpoint (Box of 50 pcs)',
+        ]);
+
+        $duplicateResponse->assertSessionHasErrors(['item_id']);
+
+        // Adding same item in same quarter (Q1) with a THIRD different specification (Red) -> SHOULD SUCCEED
+        $thirdSpecResponse = $this->actingAs($officeUser)->post(route('office.ppmp.items.store', $ppmp->ppmp_id), [
+            'item_id' => $item->item_id,
+            'item_category_id' => $category->item_category_id,
+            'quantity' => 2,
+            'unit_cost' => 300,
+            'procurement_schedule' => 'Q1',
+            'remarks' => 'Red, 0.5mm ballpoint (Box of 50 pcs)',
+        ]);
+
+        $thirdSpecResponse->assertRedirect();
+        $this->assertDatabaseCount('ppmp_items', 3);
+    }
 }

@@ -52,4 +52,9 @@ class Item extends Model
     {
         return $this->hasMany(Anomaly::class, 'item_id', 'item_id');
     }
+
+    public function specifications(): HasMany
+    {
+        return $this->hasMany(ItemSpecification::class, 'item_id', 'item_id')->where('is_active', true);
+    }
 }

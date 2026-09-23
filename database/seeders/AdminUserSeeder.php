@@ -39,7 +39,7 @@ class AdminUserSeeder extends Seeder
             ],
         );
 
-        $user = User::query()->where('email', $adminEmail)->first();
+        $user = User::query()->where('email', $adminEmail)->orWhere('emp_id', $adminEmpId)->first();
 
         if (! $user) {
             User::query()->create([

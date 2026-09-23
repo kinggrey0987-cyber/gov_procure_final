@@ -88,14 +88,14 @@ class SampleUsersSeeder extends Seeder
 
         foreach ($users as $user) {
             User::query()->updateOrCreate(
-                ['email' => $user['email']],
+                ['emp_id' => $user['emp_id']],
                 [
                     'name' => $user['name'],
+                    'email' => $user['email'],
                     'password' => Hash::make($defaultPassword),
                     'must_change_password' => true,
                     'role_id' => $roles[$user['role_code']] ?? null,
                     'office_id' => $offices[$user['office_code']] ?? null,
-                    'emp_id' => $user['emp_id'],
                     'email_verified_at' => now(),
                 ],
             );
