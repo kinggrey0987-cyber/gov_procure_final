@@ -450,7 +450,15 @@ class PurchaseRequestService
                     'resolution_type' => 'PENDING_REPLACEMENT',
                 ])->save();
 
-                $this->recordStatus($claim, $oldClaimStatus, 'PENDING_REPLACEMENT', $actor, 'Claim placed in pending replacement awaiting procurement.');
+                \App\Models\StatusHistory::query()->create([
+                    'reference_type' => Claim::class,
+                    'reference_id' => (int) $claim->claims_id,
+                    'old_status' => $oldClaimStatus,
+                    'new_status' => 'PENDING_REPLACEMENT',
+                    'changed_by' => (int) $actor->id,
+                    'remarks' => 'Claim placed in pending replacement awaiting procurement.',
+                    'changed_at' => now(),
+                ]);
             }
 
             $supplyRequest = SupplyRequest::query()->create([

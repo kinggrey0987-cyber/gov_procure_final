@@ -1119,6 +1119,144 @@ class InventoryDistributionFoundationTest extends TestCase
         ]);
     }
 
+    public function test_gso_can_release_claim_replacement_and_office_verifies_receipt_to_resolve_claim(): void
+    {
+        $record = $this->createReleasedDistributionRecordForOffice($this->officeA, 90130);
+        $record->forceFill(['status' => 'RECEIVED'])->save();
+        $distributionItem = $record->items()->firstOrFail();
+        $distributionItem->forceFill([
+            'quantity_released' => 5,
+            'quantity_received' => 3,
+            'quantity_missing' => 2,
+            'receipt_condition' => 'DISCREPANCY',
+        ])->save();
+
+        $this->actingAs($this->officeUserA)
+            ->post(route('office.claims.store'), [
+                'distribution_record_id' => $record->distribution_record_id,
+                'distribution_item_id' => $distributionItem->distribution_item_id,
+                'office_id' => $this->officeA->id,
+                'claim_type' => 'MISSING_ITEM',
+                'attachment_file' => \Illuminate\Http\UploadedFile::fake()->image('evidence.png'),
+                'claim_date' => now()->toDateString(),
+                'claim_location' => 'Office A Storage',
+                'quantity_disputed' => 2,
+                'remarks' => 'Two units missing.',
+            ])
+            ->assertRedirect();
+
+        $claim = Claim::query()->where('distribution_item_id', $distributionItem->distribution_item_id)->firstOrFail();
+
+        Inventory::query()
+            ->where('item_id', (int) $distributionItem->item_id)
+            ->update([
+                'available_stock' => 10,
+                'stock_on_hand' => 10,
+                'released_quantity' => 0,
+            ]);
+
+        // GSO selects REPLACEMENT_RELEASED
+        $this->actingAs($this->gsoOfficer)
+            ->put(route('inventory.claims.update-status', $claim->claims_id), [
+                'status' => 'REPLACEMENT_RELEASED',
+                'resolution_type' => 'REPLACEMENT_RELEASED',
+                'replacement_quantity' => 2,
+                'remarks' => 'Replacement items released by GSO.',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $claim->refresh();
+        $this->assertSame('REPLACEMENT_RELEASED', (string) $claim->status);
+        $this->assertSame('2.00', (string) $claim->replacement_quantity);
+
+        $inventory = Inventory::query()->where('item_id', (int) $distributionItem->item_id)->firstOrFail();
+        $this->assertSame('8.00', (string) $inventory->available_stock);
+
+        // Office sees claim replacement on supplies ready for claim
+        $response = $this->actingAs($this->officeUserA)
+            ->get(route('office.supplies-ready.index'));
+        $response->assertOk();
+
+        // Office verifies and accepts replacement
+        $this->actingAs($this->officeUserA)
+            ->post(route('office.claims.verify-replacement', $claim->claims_id))
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $claim->refresh();
+        $this->assertSame('RESOLVED', (string) $claim->status);
+
+        $distributionItem->refresh();
+        $this->assertSame('5.00', (string) $distributionItem->quantity_received);
+        $this->assertSame('0.00', (string) $distributionItem->quantity_missing);
+        $this->assertSame('GOOD', (string) $distributionItem->receipt_condition);
+
+        $record->refresh();
+        $this->assertSame('RECEIVED', (string) $record->status);
+    }
+
+    public function test_gso_can_forward_claim_follow_up_purchase_request_for_shortage(): void
+    {
+        $record = $this->createReleasedDistributionRecordForOffice($this->officeA, 90131);
+        $record->forceFill(['status' => 'RECEIVED'])->save();
+        $distributionItem = $record->items()->firstOrFail();
+        $distributionItem->forceFill([
+            'quantity_released' => 5,
+            'quantity_received' => 3,
+            'quantity_missing' => 2,
+            'receipt_condition' => 'DISCREPANCY',
+        ])->save();
+
+        $this->actingAs($this->officeUserA)
+            ->post(route('office.claims.store'), [
+                'distribution_record_id' => $record->distribution_record_id,
+                'distribution_item_id' => $distributionItem->distribution_item_id,
+                'office_id' => $this->officeA->id,
+                'claim_type' => 'MISSING_ITEM',
+                'attachment_file' => \Illuminate\Http\UploadedFile::fake()->image('evidence.png'),
+                'claim_date' => now()->toDateString(),
+                'claim_location' => 'Office A Storage',
+                'quantity_disputed' => 2,
+                'remarks' => 'Two units missing.',
+            ])
+            ->assertRedirect();
+
+        $claim = Claim::query()->where('distribution_item_id', $distributionItem->distribution_item_id)->firstOrFail();
+
+        // Inventory is 0 (shortage)
+        Inventory::query()
+            ->where('item_id', (int) $distributionItem->item_id)
+            ->update([
+                'available_stock' => 0,
+                'stock_on_hand' => 0,
+                'released_quantity' => 0,
+            ]);
+
+        // GSO forwards follow-up PR
+        $this->actingAs($this->gsoOfficer)
+            ->post(route('inventory.claims.follow-up-purchase-request.store', $claim->claims_id))
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $claim->refresh();
+        $this->assertSame('PENDING_REPLACEMENT', (string) $claim->status);
+
+        $pr = \App\Models\PurchaseRequest::query()
+            ->where('source_claim_id', (int) $claim->claims_id)
+            ->where('source_type', 'CLAIM_REPLACEMENT_FOLLOW_UP')
+            ->first();
+
+        $this->assertNotNull($pr);
+        $this->assertSame('OPEN', (string) $pr->status);
+        $this->assertSame(2.0, (float) $pr->items()->first()->quantity_requested);
+
+        // Attempting duplicate PR creation is rejected
+        $this->actingAs($this->gsoOfficer)
+            ->post(route('inventory.claims.follow-up-purchase-request.store', $claim->claims_id))
+            ->assertForbidden();
+    }
+
     public function test_gso_queue_procurement_creates_purchase_request_and_items_for_shortage(): void
     {
         $context = $this->createSubmittedSupplyRequestForQueue($this->officeA, $this->officeUserA, 9012, 10, 2);
