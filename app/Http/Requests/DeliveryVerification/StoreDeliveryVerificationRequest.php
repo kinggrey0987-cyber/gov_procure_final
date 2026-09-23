@@ -26,11 +26,16 @@ class StoreDeliveryVerificationRequest extends FormRequest
             'discrepancy_notes' => ['nullable', 'string', 'max:1000'],
             'remarks' => ['nullable', 'string', 'max:500'],
             'evidence_file' => [
-                'required_if:verification_status,REJECTED',
                 'nullable',
                 'file',
                 'max:10240',
-                'mimes:pdf,doc,docx,xls,xlsx,png,jpg,jpeg',
+                'mimes:pdf,doc,docx,xls,xlsx,png,jpg,jpeg,webp',
+            ],
+            'evidence_files' => ['nullable', 'array'],
+            'evidence_files.*' => [
+                'file',
+                'max:10240',
+                'mimes:pdf,doc,docx,xls,xlsx,png,jpg,jpeg,webp',
             ],
         ];
     }
@@ -44,6 +49,14 @@ class StoreDeliveryVerificationRequest extends FormRequest
 
             if ($actualDeliveryDate && $verificationDate && $verificationDate < $actualDeliveryDate) {
                 $validator->errors()->add('verification_date', 'Verification date cannot be earlier than the actual delivery date.');
+            }
+
+            if ($this->input('verification_status') === 'REJECTED') {
+                $hasSingle = $this->hasFile('evidence_file');
+                $hasMulti = $this->hasFile('evidence_files') && count(array_filter((array) $this->file('evidence_files'))) > 0;
+                if (! $hasSingle && ! $hasMulti) {
+                    $validator->errors()->add('evidence_file', 'Evidence (photo or document) is required when rejecting a delivery due to discrepancies. Upload a file showing the issue.');
+                }
             }
         });
     }

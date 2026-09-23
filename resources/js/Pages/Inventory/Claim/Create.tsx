@@ -106,17 +106,79 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
         () => distributionRecords.find((record) => record.distribution_record_id === Number(form.data.distribution_record_id)),
         [distributionRecords, form.data.distribution_record_id],
     );
+    const selectedRecordItems = useMemo(() => selectedRecord?.items ?? [], [selectedRecord]);
+    const primaryDistributionItemId = issueLines[0]?.distribution_item_id || form.data.distribution_item_id;
     const selectedItem = useMemo(
-        () => selectedRecord?.items?.find((item) => item.distribution_item_id === Number(form.data.distribution_item_id)) ?? null,
-        [selectedRecord, form.data.distribution_item_id],
+        () => selectedRecordItems.find((item) => item.distribution_item_id === Number(primaryDistributionItemId)) ?? null,
+        [selectedRecordItems, primaryDistributionItemId],
     );
     const selectedItemReleasedQuantity = Math.trunc(selectedItem?.quantity_released ?? 0);
     const damagedQuantity = issueLines.reduce((total, line) => total + (line.claim_type === 'DAMAGED_ITEM' ? toWholeQuantity(line.quantity) : 0), 0);
     const missingQuantity = issueLines.reduce((total, line) => total + (line.claim_type === 'MISSING_ITEM' ? toWholeQuantity(line.quantity) : 0), 0);
     const totalIssueQuantity = issueLines.reduce((total, line) => total + toWholeQuantity(line.quantity), 0);
     const derivedClaimType = getClaimTypeFromIssueLines(issueLines);
-    const selectedRecordItems = selectedRecord?.items ?? [];
     const backRouteName = isOfficeUser ? 'office.claims.index' : 'inventory.claims.index';
+
+    const isDuplicateCombo = (itemId: string | number, claimType: string, lineId: number) => {
+        return issueLines.some(
+            (other) =>
+                other.id !== lineId &&
+                String(other.distribution_item_id) === String(itemId) &&
+                other.claim_type === claimType,
+        );
+    };
+
+    const nextAvailableCombo = useMemo(() => {
+        const usedCombos = new Set(
+            issueLines
+                .filter((l) => l.distribution_item_id)
+                .map((l) => `${l.distribution_item_id}_${l.claim_type}`),
+        );
+
+        for (const item of selectedRecordItems) {
+            for (const option of claimTypeOptions) {
+                const key = `${item.distribution_item_id}_${option.value}`;
+                if (!usedCombos.has(key)) {
+                    return {
+                        distribution_item_id: String(item.distribution_item_id),
+                        claim_type: option.value,
+                    };
+                }
+            }
+        }
+        return null;
+    }, [selectedRecordItems, issueLines]);
+
+    const hasDuplicateIssues = useMemo(() => {
+        const seen = new Set<string>();
+        for (const line of issueLines) {
+            if (!line.distribution_item_id) continue;
+            const key = `${line.distribution_item_id}_${line.claim_type}`;
+            if (seen.has(key)) return true;
+            seen.add(key);
+        }
+        return false;
+    }, [issueLines]);
+
+    const itemClaimedTotals = useMemo(() => {
+        const totals: Record<string, number> = {};
+        for (const line of issueLines) {
+            if (!line.distribution_item_id) continue;
+            const qty = toWholeQuantity(line.quantity);
+            totals[line.distribution_item_id] = (totals[line.distribution_item_id] ?? 0) + qty;
+        }
+        return totals;
+    }, [issueLines]);
+
+    const hasOverclaimedItems = useMemo(() => {
+        for (const item of selectedRecordItems) {
+            const total = itemClaimedTotals[String(item.distribution_item_id)] ?? 0;
+            if (total > Math.trunc(item.quantity_released ?? 0)) {
+                return true;
+            }
+        }
+        return false;
+    }, [selectedRecordItems, itemClaimedTotals]);
 
     return (
         <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">File Claim</h2>}>
@@ -141,8 +203,24 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                         className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
                         onSubmit={(e) => {
                             e.preventDefault();
+                            if (hasDuplicateIssues) {
+                                alert('Duplicate issue lines found for the same item and reason. Please remove duplicate lines before submitting.');
+                                return;
+                            }
+                            if (hasOverclaimedItems) {
+                                alert('Total claimed quantity exceeds the released quantity for one or more items. Please adjust the quantities before submitting.');
+                                return;
+                            }
+                            if (totalIssueQuantity <= 0) {
+                                alert('Please specify a claimed quantity greater than 0 on at least one issue line.');
+                                return;
+                            }
+
+                            const primaryItemId = issueLines.find((l) => toWholeQuantity(l.quantity) > 0)?.distribution_item_id || issueLines[0]?.distribution_item_id || form.data.distribution_item_id;
+
                             form.transform((data) => ({
                                 ...data,
+                                distribution_item_id: primaryItemId,
                                 claim_type: derivedClaimType,
                                 quantity_disputed: String(totalIssueQuantity),
                                 quantity_damaged: String(damagedQuantity),
@@ -222,8 +300,16 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                 <button
                                     type="button"
                                     className="rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
-                                    disabled={selectedRecordItems.length === 0}
-                                    onClick={() => setIssueLines((lines) => [...lines, createIssueLine('MISSING_ITEM', '', form.data.distribution_item_id ? String(form.data.distribution_item_id) : '')])}
+                                    disabled={selectedRecordItems.length === 0 || nextAvailableCombo === null}
+                                    title={nextAvailableCombo === null ? 'All possible issue combinations for these items have been added' : 'Add another issue line'}
+                                    onClick={() => {
+                                        if (nextAvailableCombo) {
+                                            setIssueLines((lines) => [
+                                                ...lines,
+                                                createIssueLine(nextAvailableCombo.claim_type, '', nextAvailableCombo.distribution_item_id),
+                                            ]);
+                                        }
+                                    }}
                                 >
                                     Add Issue Line
                                 </button>
@@ -233,80 +319,110 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                 {issueLines.map((line) => {
                                     const lineItem = selectedRecordItems.find((item) => item.distribution_item_id === Number(line.distribution_item_id)) ?? selectedItem;
                                     const lineMaxQuantity = Math.trunc(lineItem?.quantity_released ?? 0);
+                                    const lineIsDuplicate = isDuplicateCombo(line.distribution_item_id, line.claim_type, line.id);
+                                    const itemTotal = itemClaimedTotals[line.distribution_item_id] ?? 0;
+                                    const itemOverclaimed = lineMaxQuantity > 0 && itemTotal > lineMaxQuantity;
 
                                     return (
-                                    <div key={line.id} className="grid gap-2 rounded-lg border border-amber-200 bg-white p-3 sm:grid-cols-[1.35fr_1.1fr_0.65fr_auto]">
-                                        <select
-                                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                                            value={line.distribution_item_id}
-                                            onChange={(e) => {
-                                                const distributionItemId = e.target.value;
-                                                const nextItem = selectedRecordItems.find((item) => item.distribution_item_id === Number(distributionItemId));
+                                        <div key={line.id} className="space-y-1.5 rounded-lg border border-amber-200 bg-white p-3">
+                                            <div className="grid gap-2 sm:grid-cols-[1.35fr_1.1fr_0.65fr_auto]">
+                                                <select
+                                                    className={`w-full rounded-lg border px-3 py-2 text-sm ${lineIsDuplicate ? 'border-rose-400 bg-rose-50/50' : 'border-slate-300'}`}
+                                                    value={line.distribution_item_id}
+                                                    onChange={(e) => {
+                                                        const newDistributionItemId = e.target.value;
+                                                        updateIssueLine(setIssueLines, line.id, { distribution_item_id: newDistributionItemId });
+                                                        if (issueLines[0]?.id === line.id) {
+                                                            form.setData('distribution_item_id', newDistributionItemId);
+                                                        }
+                                                    }}
+                                                >
+                                                    <option value="">Select item</option>
+                                                    {selectedRecordItems.map((item) => {
+                                                        const isUsed = isDuplicateCombo(item.distribution_item_id, line.claim_type, line.id);
+                                                        return (
+                                                            <option
+                                                                key={item.distribution_item_id}
+                                                                value={item.distribution_item_id}
+                                                                disabled={isUsed}
+                                                            >
+                                                                {item.item_name} {isUsed ? '(Already added)' : ''}
+                                                            </option>
+                                                        );
+                                                    })}
+                                                </select>
+                                                <select
+                                                    className={`w-full rounded-lg border px-3 py-2 text-sm ${lineIsDuplicate ? 'border-rose-400 bg-rose-50/50' : 'border-slate-300'}`}
+                                                    value={line.claim_type}
+                                                    onChange={(e) => updateIssueLine(setIssueLines, line.id, { claim_type: e.target.value })}
+                                                >
+                                                    {claimTypeOptions.map((option) => {
+                                                        const isUsed = isDuplicateCombo(line.distribution_item_id, option.value, line.id);
+                                                        return (
+                                                            <option
+                                                                key={option.value}
+                                                                value={option.value}
+                                                                disabled={isUsed}
+                                                            >
+                                                                {option.label} {isUsed ? '(Already added)' : ''}
+                                                            </option>
+                                                        );
+                                                    })}
+                                                </select>
+                                                <input
+                                                    className={`w-full rounded-lg border px-3 py-2 text-sm ${itemOverclaimed ? 'border-rose-400 bg-rose-50/50' : 'border-slate-300'}`}
+                                                    type="text"
+                                                    inputMode="numeric"
+                                                    pattern="[0-9]*"
+                                                    placeholder="Qty"
+                                                    value={line.quantity}
+                                                    onChange={(e) => {
+                                                        const wholeQuantity = e.target.value.replace(/\D/g, '');
+                                                        const cappedQuantity = lineMaxQuantity > 0 && Number(wholeQuantity) > lineMaxQuantity ? String(lineMaxQuantity) : wholeQuantity;
 
-                                                form.setData('distribution_item_id', distributionItemId);
-                                                form.setData('quantity_disputed', String(Math.trunc((nextItem?.quantity_missing ?? 0) + (nextItem?.quantity_damaged ?? 0))));
-                                                form.setData('quantity_damaged', String(Math.trunc(nextItem?.quantity_damaged ?? 0)));
-                                                form.setData('quantity_missing', String(Math.trunc(nextItem?.quantity_missing ?? 0)));
-                                                setIssueLines(buildInitialIssueLines(nextItem ?? null));
-                                            }}
-                                        >
-                                            <option value="">Select item</option>
-                                            {selectedRecordItems.map((item) => (
-                                                <option key={item.distribution_item_id} value={item.distribution_item_id}>
-                                                    {item.item_name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <select
-                                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                                            value={line.claim_type}
-                                            onChange={(e) => updateIssueLine(setIssueLines, line.id, { claim_type: e.target.value })}
-                                        >
-                                            {claimTypeOptions.map((option) => (
-                                                <option key={option.value} value={option.value}>{option.label}</option>
-                                            ))}
-                                        </select>
-                                        <input
-                                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                                            type="text"
-                                            inputMode="numeric"
-                                            pattern="[0-9]*"
-                                            placeholder="Qty"
-                                            value={line.quantity}
-                                            onChange={(e) => {
-                                                const wholeQuantity = e.target.value.replace(/\D/g, '');
-                                                const cappedQuantity = lineMaxQuantity > 0 && Number(wholeQuantity) > lineMaxQuantity ? String(lineMaxQuantity) : wholeQuantity;
-
-                                                updateIssueLine(setIssueLines, line.id, { quantity: cappedQuantity });
-                                            }}
-                                        />
-                                        <button
-                                            type="button"
-                                            className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-50"
-                                            disabled={issueLines.length === 1}
-                                            onClick={() => setIssueLines((lines) => lines.filter((current) => current.id !== line.id))}
-                                        >
-                                            Remove
-                                        </button>
-                                    </div>
+                                                        updateIssueLine(setIssueLines, line.id, { quantity: cappedQuantity });
+                                                    }}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-50"
+                                                    disabled={issueLines.length === 1}
+                                                    onClick={() => setIssueLines((lines) => lines.filter((current) => current.id !== line.id))}
+                                                >
+                                                    Remove
+                                                </button>
+                                            </div>
+                                            {lineIsDuplicate && (
+                                                <p className="text-[11px] font-semibold text-rose-600">
+                                                    ⚠ Duplicate issue: An issue line for this item with reason "{claimTypeOptions.find((o) => o.value === line.claim_type)?.label ?? line.claim_type}" is already added.
+                                                </p>
+                                            )}
+                                            {itemOverclaimed && (
+                                                <p className="text-[11px] font-semibold text-rose-600">
+                                                    ⚠ Total claimed quantity for {lineItem?.item_name} ({itemTotal} {lineItem?.unit ?? ''}) exceeds released quantity ({lineMaxQuantity} {lineItem?.unit ?? ''}).
+                                                </p>
+                                            )}
+                                        </div>
                                     );
                                 })}
                             </div>
 
-                            <p className="mt-3 text-xs font-semibold text-amber-900">
-                                Total claimed quantity: {formatQuantity(totalIssueQuantity)} {selectedItem?.unit ?? ''}
-                                {derivedClaimType ? ` - Claim type: ${displayClaimType(derivedClaimType)}` : ''}
-                            </p>
+                            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-amber-200/80 pt-3">
+                                <p className="text-xs font-semibold text-amber-900">
+                                    Total claimed quantity: {formatQuantity(totalIssueQuantity)} {selectedItem?.unit ?? ''}
+                                    {derivedClaimType ? ` - Claim type: ${displayClaimType(derivedClaimType)}` : ''}
+                                </p>
+                                {selectedItem ? (
+                                    <span className="text-[11px] text-amber-800">
+                                        Released quantity for {selectedItem.item_name}: {formatQuantity(selectedItemReleasedQuantity)} {selectedItem.unit}
+                                    </span>
+                                ) : null}
+                            </div>
                             {form.errors.claim_type ? <p className="mt-1 text-xs text-rose-600 sm:col-span-3">{form.errors.claim_type}</p> : null}
                             {form.errors.distribution_item_id ? <p className="mt-1 text-xs text-rose-600 sm:col-span-3">{form.errors.distribution_item_id}</p> : null}
                             {form.errors.quantity_disputed ? <p className="mt-1 text-xs text-rose-600 sm:col-span-3">{form.errors.quantity_disputed}</p> : null}
                             {form.errors.quantity_damaged ? <p className="mt-1 text-xs text-rose-600">{form.errors.quantity_damaged}</p> : null}
                             {form.errors.quantity_missing ? <p className="mt-1 text-xs text-rose-600">{form.errors.quantity_missing}</p> : null}
-                            {selectedItem ? (
-                                <p className="mt-1 text-xs text-slate-500 sm:col-span-3">
-                                    Maximum for this claim: {formatQuantity(selectedItemReleasedQuantity)} {selectedItem.unit}.
-                                </p>
-                            ) : null}
                         </div>
 
                         <div>

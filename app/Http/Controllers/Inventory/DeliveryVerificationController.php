@@ -90,17 +90,39 @@ class DeliveryVerificationController
             payload: $request->validated(),
         );
 
-        // Store evidence file if uploaded (required for REJECTED verifications)
-        if ($request->hasFile('evidence_file')) {
-            app(\App\Services\Documents\DocumentService::class)->upload(
-                auth()->user(),
-                'deliveries',
-                (int) $delivery->delivery_id,
-                [
-                    'title' => 'Delivery Verification Evidence — '.$delivery->delivery_code,
-                    'file' => $request->file('evidence_file'),
-                ],
-            );
+        $documentService = app(\App\Services\Documents\DocumentService::class);
+
+        // Store multiple evidence files if uploaded
+        if ($request->hasFile('evidence_files')) {
+            $files = array_filter((array) $request->file('evidence_files'));
+            foreach ($files as $idx => $file) {
+                if ($file && $file->isValid()) {
+                    $documentService->upload(
+                        auth()->user(),
+                        'deliveries',
+                        (int) $delivery->delivery_id,
+                        [
+                            'title' => count($files) > 1
+                                ? sprintf('Delivery Verification Evidence #%d — %s', $idx + 1, $delivery->delivery_code)
+                                : 'Delivery Verification Evidence — '.$delivery->delivery_code,
+                            'file' => $file,
+                        ],
+                    );
+                }
+            }
+        } elseif ($request->hasFile('evidence_file')) {
+            $file = $request->file('evidence_file');
+            if ($file && $file->isValid()) {
+                $documentService->upload(
+                    auth()->user(),
+                    'deliveries',
+                    (int) $delivery->delivery_id,
+                    [
+                        'title' => 'Delivery Verification Evidence — '.$delivery->delivery_code,
+                        'file' => $file,
+                    ],
+                );
+            }
         }
 
         return Redirect::route('inventory.deliveries.show', $delivery->delivery_id)

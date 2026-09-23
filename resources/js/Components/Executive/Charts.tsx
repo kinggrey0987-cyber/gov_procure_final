@@ -384,10 +384,18 @@ export function TrendLineChart({
                         const isFirst = index === 0;
                         const isLast = index === points.length - 1;
                         const isPeak = point.value === peak?.value && point.value > 0;
-                        const shouldShowLabel = data.length <= 6 || index % 2 === 0 || isLast;
+                        const targetTicks = 5;
+                        const stride = data.length <= 6 ? 1 : Math.max(2, Math.ceil((data.length - 1) / (targetTicks - 1)));
+                        const distanceToLast = points.length - 1 - index;
+                        const shouldShowLabel =
+                            data.length <= 6
+                                ? true
+                                : isFirst || isLast || (index % stride === 0 && distanceToLast >= Math.ceil(stride * 0.75));
+
+                        const displayLabel = point.label.length > 15 ? `${point.label.slice(0, 13)}…` : point.label;
 
                         return (
-                            <g key={point.label}>
+                            <g key={`${point.label}-${index}`}>
                                 {isPeak || isLast ? (
                                     <circle cx={point.x} cy={point.y} r="6" fill="rgb(254 202 202)" opacity="0.6" />
                                 ) : null}
@@ -406,7 +414,7 @@ export function TrendLineChart({
                                         textAnchor={isFirst ? 'start' : isLast ? 'end' : 'middle'}
                                         className="fill-slate-600 text-[10px] font-semibold"
                                     >
-                                        {point.label}
+                                        {displayLabel}
                                     </text>
                                 ) : null}
                                 <title>{`${point.label}: ${valueFormatter ? valueFormatter(point.value) : point.value}`}</title>
@@ -756,14 +764,29 @@ export function SpendTrendBarChart({
                                 ) : null}
 
                                 {/* Month label on X axis */}
-                                <text
-                                    x={x + barWidth / 2}
-                                    y={chartBottom + 15}
-                                    textAnchor="middle"
-                                    className={`text-[9px] font-semibold ${isPeak ? 'fill-red-800 font-bold' : 'fill-slate-600'}`}
-                                >
-                                    {item.label}
-                                </text>
+                                {(() => {
+                                    const barLabelStride = data.length <= 12 ? 1 : Math.max(2, Math.ceil(data.length / 8));
+                                    const distToLast = data.length - 1 - index;
+                                    const showMonthLabel =
+                                        data.length <= 12 ||
+                                        index === 0 ||
+                                        index === data.length - 1 ||
+                                        isPeak ||
+                                        (index % barLabelStride === 0 && distToLast >= Math.ceil(barLabelStride * 0.75));
+
+                                    if (!showMonthLabel) return null;
+
+                                    return (
+                                        <text
+                                            x={x + barWidth / 2}
+                                            y={chartBottom + 15}
+                                            textAnchor="middle"
+                                            className={`text-[9px] font-semibold ${isPeak ? 'fill-red-800 font-bold' : 'fill-slate-600'}`}
+                                        >
+                                            {item.label}
+                                        </text>
+                                    );
+                                })()}
 
                                 {/* Order Count Badge below Month */}
                                 {item.orderCount !== undefined && (groupWidth >= 32 || data.length <= 14) ? (

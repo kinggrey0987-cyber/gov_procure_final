@@ -42,6 +42,7 @@ type VerificationForm = {
     discrepancy_notes: string;
     remarks: string;
     evidence_file: File | null;
+    evidence_files: File[];
 };
 
 type Props = {
@@ -64,10 +65,35 @@ export default function DeliveryVerificationCreate({ delivery }: Props) {
         discrepancy_notes: '',
         remarks: '',
         evidence_file: null,
+        evidence_files: [],
     });
 
     const isRejected = data.verification_status === 'REJECTED';
     const hasDiscrepancy = delivery.verification_summary?.has_discrepancy ?? false;
+
+    const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newFiles = Array.from(e.target.files ?? []);
+        const validFiles = newFiles.filter((f) => f.size <= 10 * 1024 * 1024);
+        if (validFiles.length < newFiles.length) {
+            alert('Some files exceed the 10MB limit and were skipped.');
+        }
+        const combined = [...data.evidence_files, ...validFiles];
+        setData((prev) => ({
+            ...prev,
+            evidence_files: combined,
+            evidence_file: combined[0] ?? null,
+        }));
+        e.target.value = '';
+    };
+
+    const handleRemoveFile = (indexToRemove: number) => {
+        const updated = data.evidence_files.filter((_, idx) => idx !== indexToRemove);
+        setData((prev) => ({
+            ...prev,
+            evidence_files: updated,
+            evidence_file: updated[0] ?? null,
+        }));
+    };
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
@@ -191,18 +217,46 @@ export default function DeliveryVerificationCreate({ delivery }: Props) {
                             </div>
                         ) : null}
 
-                        <FormField label={`Evidence File ${isRejected ? '' : '(Optional)'}`} required={isRejected} error={errors.evidence_file}>
+                        <FormField label={`Evidence Attachments ${isRejected ? '' : '(Optional)'}`} required={isRejected} error={errors.evidence_file}>
                             <input
                                 type="file"
-                                className={`w-full rounded-lg border px-4 py-2.5 text-sm ${isRejected && !data.evidence_file ? 'border-rose-300 bg-rose-50/50' : 'border-slate-300'}`}
-                                onChange={(e) => setData('evidence_file', e.target.files?.[0] ?? null)}
-                                accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                                multiple
+                                className={`w-full rounded-lg border px-4 py-2.5 text-sm file:mr-3 file:rounded file:border-0 file:bg-emerald-50 file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-emerald-700 hover:file:bg-emerald-100 ${isRejected && data.evidence_files.length === 0 ? 'border-rose-300 bg-rose-50/50' : 'border-slate-300'}`}
+                                onChange={handleFilesSelected}
+                                accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.webp"
                             />
                             <p className="mt-1 text-xs text-slate-500">
                                 {isRejected
-                                    ? 'Required: Upload photo or document evidence showing the delivery discrepancy.'
-                                    : 'Optional: Attach supporting evidence if applicable.'}
+                                    ? 'Required: Upload photo or document evidence showing the delivery discrepancy (Max 10MB per file).'
+                                    : 'Optional: Attach supporting evidence if applicable (Max 10MB per file).'}
                             </p>
+
+                            {data.evidence_files.length > 0 && (
+                                <div className="mt-3 space-y-1.5">
+                                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                                        Selected Attachments ({data.evidence_files.length}):
+                                    </p>
+                                    <div className="grid gap-2 sm:grid-cols-2">
+                                        {data.evidence_files.map((file, idx) => (
+                                            <div key={idx} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs shadow-2xs">
+                                                <div className="flex items-center gap-2 min-w-0 pr-2">
+                                                    <span className="text-slate-400">📎</span>
+                                                    <span className="truncate font-medium text-slate-700" title={file.name}>{file.name}</span>
+                                                    <span className="shrink-0 text-[10px] text-slate-400">({formatFileSize(file.size)})</span>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemoveFile(idx)}
+                                                    className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
+                                                    title="Remove attachment"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </FormField>
 
                         <div className="flex flex-wrap gap-3">
@@ -235,6 +289,12 @@ function Info({ label, value }: { label: string; value: string }) {
 
 function formatQty(value: number, unit?: string | null): string {
     return `${Number(value).toFixed(2)}${unit ? ` ${unit}` : ''}`;
+}
+
+function formatFileSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function FormField({

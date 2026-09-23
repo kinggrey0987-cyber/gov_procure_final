@@ -341,6 +341,48 @@ class DeliveryFeatureTest extends TestCase
         ]);
     }
 
+    public function test_verification_accepts_multiple_evidence_files_and_stores_documents(): void
+    {
+        Storage::fake('public');
+        $delivery = $this->createDelivery(status: 'RECEIVED');
+        DeliveryItem::query()->create([
+            'delivery_id' => $delivery->delivery_id,
+            'purchase_order_item_id' => $this->purchaseOrderItem->purchase_order_item_id,
+            'expected_quantity' => 5,
+            'received_quantity' => 3,
+            'damaged_quantity' => 2,
+            'missing_quantity' => 0,
+            'item_condition' => 'DAMAGED',
+        ]);
+
+        $this->actingAs($this->gsoOfficer)->post(route('inventory.delivery-verifications.store', $delivery->delivery_id), [
+            'verification_date' => now()->toDateString(),
+            'verification_status' => 'REJECTED',
+            'discrepancy_notes' => 'Two damaged units needing replacement.',
+            'evidence_files' => [
+                UploadedFile::fake()->create('photo1.jpg', 200, 'image/jpeg'),
+                UploadedFile::fake()->create('count_sheet.pdf', 300, 'application/pdf'),
+            ],
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('deliveries', [
+            'delivery_id' => $delivery->delivery_id,
+            'receipt_status' => 'PARTIALLY_RECEIVED',
+        ]);
+
+        $this->assertDatabaseHas('documents', [
+            'related_module' => 'deliveries',
+            'related_reference_id' => $delivery->delivery_id,
+            'title' => 'Delivery Verification Evidence #1 — '.$delivery->delivery_code,
+        ]);
+
+        $this->assertDatabaseHas('documents', [
+            'related_module' => 'deliveries',
+            'related_reference_id' => $delivery->delivery_id,
+            'title' => 'Delivery Verification Evidence #2 — '.$delivery->delivery_code,
+        ]);
+    }
+
     public function test_accepted_follow_up_delivery_resolves_original_partial_delivery(): void
     {
         $originalDelivery = $this->createDelivery(status: 'RECEIVED');
