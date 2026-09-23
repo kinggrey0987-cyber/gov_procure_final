@@ -1257,6 +1257,39 @@ class InventoryDistributionFoundationTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_delivery_can_be_received_when_all_delivered_items_are_damaged(): void
+    {
+        $context = $this->createVerifiedDeliveryContext($this->officeA, $this->officeUserA, $this->procurementOfficer, $this->gsoOfficer, 9089);
+        $delivery = $context['delivery'];
+        $delivery->forceFill(['receipt_status' => 'PENDING'])->save();
+        $deliveryItem = $delivery->items()->firstOrFail();
+        $deliveryItem->forceFill(['expected_quantity' => 12])->save();
+
+        $this->actingAs($this->gsoOfficer)
+            ->put(route('inventory.deliveries.update', $delivery->delivery_id), [
+                'actual_delivery_date' => now()->toDateString(),
+                'delivery_receipt_no' => 'DR-99881',
+                'sales_invoice_no' => 'SI-99881',
+                'sales_invoice_date' => now()->toDateString(),
+                'sales_invoice_amount' => 500.00,
+                'items' => [
+                    [
+                        'delivery_item_id' => $deliveryItem->delivery_item_id,
+                        'received_quantity' => 5,
+                        'damaged_quantity' => 5,
+                    ],
+                ],
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $deliveryItem->refresh();
+        $this->assertSame(5, (int) $deliveryItem->received_quantity);
+        $this->assertSame(5, (int) $deliveryItem->damaged_quantity);
+        $this->assertSame(7, (int) $deliveryItem->missing_quantity);
+        $this->assertSame('DAMAGED', (string) $deliveryItem->item_condition);
+    }
+
     public function test_gso_queue_procurement_creates_purchase_request_and_items_for_shortage(): void
     {
         $context = $this->createSubmittedSupplyRequestForQueue($this->officeA, $this->officeUserA, 9012, 10, 2);

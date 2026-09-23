@@ -147,32 +147,32 @@ export default function DeliveryReceive({ delivery }: Props) {
         }
     };
 
-    const lineWarnings = data.items.flatMap((item, index) => {
+    const lineErrors: string[] = [];
+    const lineNotices: string[] = [];
+
+    data.items.forEach((item, index) => {
         const deliveryItem = delivery.items[index];
         const itemName = deliveryItem?.item?.item_name ?? `Item ${index + 1}`;
         const expectedQuantity = Number(deliveryItem?.expected_quantity ?? 0);
         const receivedQuantity = Number(item.received_quantity || 0);
         const damagedQuantity = Number(item.damaged_quantity || 0);
-        const warnings: string[] = [];
 
         if (receivedQuantity > expectedQuantity) {
-            warnings.push(`${itemName}: Total delivered (${receivedQuantity}) cannot exceed expected PO quantity (${expectedQuantity}).`);
+            lineErrors.push(`${itemName}: Total delivered (${receivedQuantity}) cannot exceed expected PO quantity (${expectedQuantity}).`);
         }
 
         if (damagedQuantity > receivedQuantity) {
-            warnings.push(`${itemName}: Damaged quantity (${damagedQuantity}) cannot exceed total delivered (${receivedQuantity}).`);
+            lineErrors.push(`${itemName}: Damaged quantity (${damagedQuantity}) cannot exceed total delivered (${receivedQuantity}).`);
         }
 
         if (damagedQuantity > 0 && damagedQuantity === receivedQuantity && expectedQuantity > receivedQuantity) {
-            warnings.push(
+            lineNotices.push(
                 `Notice for ${itemName}: You entered Total Delivered = ${receivedQuantity} and Damaged = ${damagedQuantity}. This results in 0 Accepted units and ${expectedQuantity - receivedQuantity} Missing units. If the supplier physically brought all ${expectedQuantity} items (some good and some damaged), enter ${expectedQuantity} in Total Delivered and ${damagedQuantity} in Damaged.`
             );
         }
-
-        return warnings;
     });
 
-    const hasLineWarnings = lineWarnings.length > 0;
+    const hasLineErrors = lineErrors.length > 0;
 
     const [fileError, setFileError] = useState<string | null>(null);
 
@@ -463,13 +463,25 @@ export default function DeliveryReceive({ delivery }: Props) {
                                     </p>
                                 </div>
                             </div>
-                            {hasLineWarnings ? (
-                                <div className="border-b border-amber-200 bg-amber-50 px-6 py-3 text-sm font-semibold text-amber-800">
+                            {lineErrors.length > 0 ? (
+                                <div className="border-b border-rose-200 bg-rose-50 px-6 py-3 text-sm font-semibold text-rose-800">
                                     <ul className="list-disc space-y-1 pl-5">
-                                        {lineWarnings.map((warning) => (
-                                            <li key={warning}>{warning}</li>
+                                        {lineErrors.map((error) => (
+                                            <li key={error}>{error}</li>
                                         ))}
                                     </ul>
+                                </div>
+                            ) : null}
+                            {lineNotices.length > 0 ? (
+                                <div className="border-b border-amber-200 bg-amber-50 px-6 py-3 text-sm text-amber-900">
+                                    <div className="flex items-start gap-2">
+                                        <span className="font-bold">ℹ️ Note:</span>
+                                        <ul className="list-disc space-y-1 pl-4">
+                                            {lineNotices.map((notice) => (
+                                                <li key={notice}>{notice}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
                                 </div>
                             ) : null}
                             <div className="overflow-x-auto">
@@ -611,7 +623,7 @@ export default function DeliveryReceive({ delivery }: Props) {
                         <div className="flex flex-wrap items-center gap-3">
                             <button
                                 type="submit"
-                                disabled={processing || hasLineWarnings}
+                                disabled={processing || hasLineErrors}
                                 className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-bold text-white shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                                 {processing ? 'Confirming Receipt...' : 'Confirm Delivery Receipt'}
