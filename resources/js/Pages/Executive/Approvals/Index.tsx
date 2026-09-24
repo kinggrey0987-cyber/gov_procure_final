@@ -192,7 +192,7 @@ export default function ExecutiveApprovalsIndex({ records, recordsExport, summar
     };
 
     const { auth } = usePage<PageProps>().props;
-    const recordsExportPages = useMemo(() => chunkRows(recordsExport, 12), [recordsExport]);
+    const recordsExportPages = useMemo(() => chunkRows(recordsExport.slice(0, 36), 12), [recordsExport]);
     const totalPdfPages = 1 + (recordsExportPages.length > 0 ? recordsExportPages.length : 1);
 
     const selectedOfficeName = useMemo(() => {

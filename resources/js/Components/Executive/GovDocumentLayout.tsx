@@ -34,7 +34,6 @@ export function GovLetterhead({
                         src="/logo.jpg"
                         alt="Municipality of Enrique B. Magalona Seal"
                         className="h-16 w-16 rounded-full border border-slate-300 bg-white object-contain shadow-sm"
-                        crossOrigin="anonymous"
                     />
                 </div>
 
@@ -55,7 +54,6 @@ export function GovLetterhead({
                         src="/logo.jpg"
                         alt="Municipality of Enrique B. Magalona Seal"
                         className="h-16 w-16 rounded-full border border-slate-300 bg-white object-contain shadow-sm"
-                        crossOrigin="anonymous"
                     />
                 </div>
             </div>

@@ -229,6 +229,28 @@ export default function ProcurementAnalyticsIndex({
         }));
     }, [monthlyMerged]);
 
+    const [volumeMetric, setVolumeMetric] = useState<'combined' | 'pr' | 'po'>('combined');
+
+    const prActivityTrend = useMemo(() => {
+        return monthlyMerged.map((row) => ({
+            label: row.label,
+            value: row.first,
+        }));
+    }, [monthlyMerged]);
+
+    const poActivityTrend = useMemo(() => {
+        return monthlyMerged.map((row) => ({
+            label: row.label,
+            value: row.second,
+        }));
+    }, [monthlyMerged]);
+
+    const activeVolumeTrend = useMemo(() => {
+        if (volumeMetric === 'pr') return prActivityTrend;
+        if (volumeMetric === 'po') return poActivityTrend;
+        return totalActivityTrend;
+    }, [volumeMetric, prActivityTrend, poActivityTrend, totalActivityTrend]);
+
     const officeValueBreakdown = office_comparison
         .map((row) => ({
             label: row.office_name,
@@ -281,7 +303,7 @@ export default function ProcurementAnalyticsIndex({
     const exportSectionId = 'procurement-insights-export-section';
     const procurementRecords = recent.procurement_records ?? recent.purchase_orders;
     const exportProcurementRecords: ProcurementRecordRow[] = recent.procurement_records_export ?? (procurementRecords.data as unknown as ProcurementRecordRow[]);
-    const procurementExportPages = useMemo(() => chunkRows(exportProcurementRecords, 12), [exportProcurementRecords]);
+    const procurementExportPages = useMemo(() => chunkRows(exportProcurementRecords.slice(0, 36), 12), [exportProcurementRecords]);
     const totalPdfPages = 1 + (procurementExportPages.length > 0 ? procurementExportPages.length : 1);
 
     const selectedOfficeName = useMemo(() => {
@@ -498,39 +520,82 @@ export default function ProcurementAnalyticsIndex({
                     {/* Hero Priority: Procurement Spending & Velocity Trend (Full Width xl:col-span-12) */}
                     <div className="xl:col-span-12 flex flex-col">
                         <ExecutiveChartCard
-                            title={trendView === 'spending' ? 'Procurement Spending Trend' : 'PR vs PO Movement Trend'}
+                            title={trendView === 'spending' ? 'Procurement Spending Trend' : 'Procurement Velocity & Document Trend'}
                             subtitle={
                                 trendView === 'spending'
                                     ? 'Monthly financial procurement expenditure across fiscal periods'
-                                    : 'Monthly document requisition and order fulfillment velocity'
+                                    : volumeMetric === 'combined'
+                                        ? `Total Combined Throughput: ${totals.purchase_request_count} Purchase Requests + ${totals.purchase_order_count} Purchase Orders (${totals.purchase_request_count + totals.purchase_order_count} total documents)`
+                                        : volumeMetric === 'pr'
+                                            ? `Purchase Requests requisition throughput (${totals.purchase_request_count} total PRs)`
+                                            : `Purchase Orders fulfillment throughput (${totals.purchase_order_count} total POs)`
                             }
                             eyebrow={trendView === 'spending' ? 'Financial Signal' : 'Operational Signal'}
                             tone="default"
                             className="h-full shadow-sm hover:shadow-md"
                             action={
-                                <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-xs font-semibold">
-                                    <button
-                                        type="button"
-                                        onClick={() => setTrendView('spending')}
-                                        className={`rounded-md px-2.5 py-1 transition ${
-                                            trendView === 'spending'
-                                                ? 'bg-white text-red-700 shadow-sm font-bold'
-                                                : 'text-slate-600 hover:text-slate-900'
-                                        }`}
-                                    >
-                                        ₱ Expenditure (PHP)
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setTrendView('volume')}
-                                        className={`rounded-md px-2.5 py-1 transition ${
-                                            trendView === 'volume'
-                                                ? 'bg-white text-red-700 shadow-sm font-bold'
-                                                : 'text-slate-600 hover:text-slate-900'
-                                        }`}
-                                    >
-                                        📊 Document Volume
-                                    </button>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {trendView === 'volume' && (
+                                        <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-xs font-semibold">
+                                            <button
+                                                type="button"
+                                                onClick={() => setVolumeMetric('combined')}
+                                                className={`rounded-md px-2 py-1 transition ${
+                                                    volumeMetric === 'combined'
+                                                        ? 'bg-white text-slate-900 shadow-xs font-bold'
+                                                        : 'text-slate-600 hover:text-slate-900'
+                                                }`}
+                                            >
+                                                Combined (PR + PO)
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setVolumeMetric('pr')}
+                                                className={`rounded-md px-2 py-1 transition ${
+                                                    volumeMetric === 'pr'
+                                                        ? 'bg-white text-red-700 shadow-xs font-bold'
+                                                        : 'text-slate-600 hover:text-slate-900'
+                                                }`}
+                                            >
+                                                PRs ({totals.purchase_request_count})
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setVolumeMetric('po')}
+                                                className={`rounded-md px-2 py-1 transition ${
+                                                    volumeMetric === 'po'
+                                                        ? 'bg-white text-amber-700 shadow-xs font-bold'
+                                                        : 'text-slate-600 hover:text-slate-900'
+                                                }`}
+                                            >
+                                                POs ({totals.purchase_order_count})
+                                            </button>
+                                        </div>
+                                    )}
+                                    <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-xs font-semibold">
+                                        <button
+                                            type="button"
+                                            onClick={() => setTrendView('spending')}
+                                            className={`rounded-md px-2.5 py-1 transition ${
+                                                trendView === 'spending'
+                                                    ? 'bg-white text-red-700 shadow-sm font-bold'
+                                                    : 'text-slate-600 hover:text-slate-900'
+                                            }`}
+                                        >
+                                            ₱ Expenditure (PHP)
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setTrendView('volume')}
+                                            className={`rounded-md px-2.5 py-1 transition ${
+                                                trendView === 'volume'
+                                                    ? 'bg-white text-red-700 shadow-sm font-bold'
+                                                    : 'text-slate-600 hover:text-slate-900'
+                                            }`}
+                                        >
+                                            📊 Document Velocity
+                                        </button>
+                                    </div>
                                 </div>
                             }
                         >
@@ -540,11 +605,10 @@ export default function ProcurementAnalyticsIndex({
                                     emptyText="No procurement expenditure recorded in current filter scope"
                                 />
                             ) : (
-                                <TrendGroupedBarChart
-                                    data={monthlyMerged}
-                                    firstLabel="Purchase Requests"
-                                    secondLabel="Purchase Orders"
-                                    emptyText="No data in current filter scope"
+                                <TrendLineChart
+                                    data={activeVolumeTrend}
+                                    emptyText="No procurement document volume recorded in current filter scope"
+                                    valueFormatter={(val) => `${val} docs`}
                                 />
                             )}
                         </ExecutiveChartCard>
@@ -735,29 +799,29 @@ export default function ProcurementAnalyticsIndex({
                         showSignatories={totalPdfPages === 1}
                         showAttestation={totalPdfPages === 1}
                     >
-                        <div className="rounded-lg border border-slate-300 bg-slate-50/50 p-4">
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-2 mb-3">
+                        <div className="rounded-lg border border-slate-300 bg-slate-50/50 p-3">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2.5">
                                 Procurement Activity & Expenditure Totals
                             </h3>
-                            <div className="grid grid-cols-3 gap-3">
-                                <div className="rounded-md border border-slate-300 bg-white p-3 text-center">
+                            <div className="grid grid-cols-3 gap-2.5">
+                                <div className="rounded-md border border-slate-300 bg-white p-2.5 text-center">
                                     <p className="text-[10px] font-bold uppercase text-slate-600">Total Purchase Requests</p>
-                                    <p className="mt-1 text-2xl font-extrabold text-slate-900">{totals.purchase_request_count}</p>
+                                    <p className="mt-0.5 text-xl font-extrabold text-slate-900">{totals.purchase_request_count}</p>
                                 </div>
-                                <div className="rounded-md border border-slate-300 bg-white p-3 text-center">
+                                <div className="rounded-md border border-slate-300 bg-white p-2.5 text-center">
                                     <p className="text-[10px] font-bold uppercase text-slate-600">Total Purchase Orders</p>
-                                    <p className="mt-1 text-2xl font-extrabold text-slate-900">{totals.purchase_order_count}</p>
+                                    <p className="mt-0.5 text-xl font-extrabold text-slate-900">{totals.purchase_order_count}</p>
                                 </div>
-                                <div className="rounded-md border border-slate-300 bg-white p-3 text-center">
+                                <div className="rounded-md border border-slate-300 bg-white p-2.5 text-center">
                                     <p className="text-[10px] font-bold uppercase text-slate-600">Total Committed Spend</p>
-                                    <p className="mt-1 text-xl font-extrabold text-red-800">{formatCurrency(totals.purchase_order_total_amount)}</p>
+                                    <p className="mt-0.5 text-lg font-extrabold text-red-800">{formatCurrency(totals.purchase_order_total_amount)}</p>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <section className="rounded-lg border border-slate-300 bg-white p-3.5">
-                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2.5">
+                        <div className="grid grid-cols-2 gap-3.5">
+                            <section className="rounded-lg border border-slate-300 bg-white p-3">
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2">
                                     Monthly Procurement Expenditure Trend
                                 </h3>
                                 <SpendTrendBarChart
@@ -766,32 +830,47 @@ export default function ProcurementAnalyticsIndex({
                                 />
                             </section>
 
-                            <section className="rounded-lg border border-slate-300 bg-white p-3.5">
-                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2.5">
-                                    Office Procurement Spending Concentration
-                                </h3>
-                                <div className="space-y-2">
-                                    {office_comparison.map((office, idx) => {
-                                        const percent = office.spending_share_percentage ?? (totalProcurementSpend > 0 ? Math.round((office.purchase_order_total_amount / totalProcurementSpend) * 100) : 0);
-                                        const barWidth = Math.max((office.purchase_order_total_amount / maxOfficeSpend) * 100, office.purchase_order_total_amount > 0 ? 6 : 0);
-                                        return (
-                                            <div key={office.office_id} className="text-[11px] border-b border-slate-100 pb-1.5 last:border-b-0">
-                                                <div className="flex justify-between font-semibold">
-                                                    <span className="text-slate-800">#{idx + 1} {office.office_name}</span>
-                                                    <span className="text-slate-900">{formatCurrency(office.purchase_order_total_amount)} ({percent}%)</span>
+                            <section className="rounded-lg border border-slate-300 bg-white p-3 flex flex-col justify-between">
+                                <div>
+                                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2">
+                                        Office Procurement Spending Concentration
+                                    </h3>
+                                    <div className="space-y-2">
+                                        {office_comparison.slice(0, 4).map((office, idx) => {
+                                            const percent = office.spending_share_percentage ?? (totalProcurementSpend > 0 ? Math.round((office.purchase_order_total_amount / totalProcurementSpend) * 100) : 0);
+                                            const barWidth = Math.max((office.purchase_order_total_amount / maxOfficeSpend) * 100, office.purchase_order_total_amount > 0 ? 6 : 0);
+                                            return (
+                                                <div key={office.office_id} className="text-[11px] border-b border-slate-100 pb-1.5 last:border-b-0">
+                                                    <table className="w-full text-[11px] table-fixed mb-1">
+                                                        <tbody>
+                                                            <tr className="font-semibold">
+                                                                <td className="w-[62%] text-left text-slate-800 pr-2 truncate">
+                                                                    #{idx + 1} {office.office_name}
+                                                                </td>
+                                                                <td className="w-[38%] text-right text-slate-900 whitespace-nowrap">
+                                                                    {formatCurrency(office.purchase_order_total_amount)} ({percent}%)
+                                                                </td>
+                                                            </tr>
+                                                        </tbody>
+                                                    </table>
+                                                    <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden block">
+                                                        <div className="h-full bg-red-600 rounded-full block" style={{ width: `${barWidth}%` }} />
+                                                    </div>
                                                 </div>
-                                                <div className="mt-1 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                                                    <div className="h-full bg-red-600 rounded-full" style={{ width: `${barWidth}%` }} />
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
+                                            );
+                                        })}
+                                    </div>
                                 </div>
+                                {office_comparison.length > 4 && (
+                                    <p className="mt-1 text-[10px] text-slate-400 italic text-right">
+                                        Top 4 of {office_comparison.length} procuring offices shown
+                                    </p>
+                                )}
                             </section>
                         </div>
 
-                        <section className="rounded-lg border border-slate-300 bg-white p-3.5 mt-3">
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2.5">
+                        <section className="rounded-lg border border-slate-300 bg-white p-3 mt-2.5">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2">
                                 Procurement Velocity & Activity Volume Trend
                             </h3>
                             <TrendLineChart
