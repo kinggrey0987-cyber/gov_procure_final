@@ -34,16 +34,8 @@ class UpdateItemRequest extends FormRequest
      */
     public function rules(): array
     {
-        /** @var Item|null $item */
-        $item = $this->route('item');
-
         return [
-            'item_name' => [
-                'required',
-                'string',
-                'max:200',
-                Rule::unique('items', 'item_name')->ignore($item?->item_id, 'item_id'),
-            ],
+            'item_name' => ['required', 'string', 'max:200'],
             'item_category_id' => ['required', 'integer', 'exists:item_categories,item_category_id'],
             'description' => ['nullable', 'string'],
             'default_unit' => ['required', 'string', 'max:50', Rule::exists('item_units', 'name')->where('status', 'active')],
@@ -54,5 +46,53 @@ class UpdateItemRequest extends FormRequest
             'specifications' => ['nullable', 'array'],
             'specifications.*' => ['nullable', 'string', 'max:255'],
         ];
+    }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator) {
+            /** @var Item|null $item */
+            $item = $this->route('item');
+            $currentItemId = $item?->item_id;
+
+            $itemName = trim((string) $this->input('item_name'));
+            if ($itemName === '') {
+                return;
+            }
+
+            $rawSpec = $this->input('specification') ?? ($this->input('specifications.0') ?? '');
+            $specText = trim((string) $rawSpec);
+
+            $matchingItems = Item::query()
+                ->whereRaw('LOWER(TRIM(item_name)) = ?', [strtolower($itemName)])
+                ->when($currentItemId, fn ($q) => $q->where('item_id', '!=', $currentItemId))
+                ->with('specifications')
+                ->get();
+
+            if ($matchingItems->isNotEmpty()) {
+                if ($specText === '') {
+                    $validator->errors()->add(
+                        'specification',
+                        "Another catalog item named '{$itemName}' already exists. Please provide a distinct technical specification."
+                    );
+                    return;
+                }
+
+                foreach ($matchingItems as $existing) {
+                    $existingSpecs = $existing->specifications
+                        ->pluck('specification')
+                        ->map(fn ($s) => strtolower(trim((string) $s)))
+                        ->all();
+
+                    if (in_array(strtolower($specText), $existingSpecs, true)) {
+                        $validator->errors()->add(
+                            'specification',
+                            "Another variant of '{$itemName}' with the specification '{$specText}' already exists in the catalog."
+                        );
+                        return;
+                    }
+                }
+            }
+        });
     }
 }

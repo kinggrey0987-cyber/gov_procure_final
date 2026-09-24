@@ -59,9 +59,9 @@ export default function EditItem({ item, categories, units }: Props) {
                         className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition shadow-2xs"
                     >
                         <svg className="w-3.5 h-3.5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
                         </svg>
-                        Add Variant SKU
+                        Add Variant
                     </Link>
                 </div>
             }
@@ -180,24 +180,13 @@ export default function EditItem({ item, categories, units }: Props) {
 
                         {/* Standard Item Specification (Single Approved Technical Sheet) */}
                         <div className="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-2">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                <div>
-                                    <label className="text-sm font-semibold text-slate-800">
-                                        Standard Technical Specification <span className="text-rose-600">*</span>
-                                    </label>
-                                    <p className="text-xs text-slate-500">
-                                        Official technical compliance specification sheet for this discrete item.
-                                    </p>
-                                </div>
-                                <Link
-                                    href={route('inventory.items.create', { clone_item_id: item.item_id })}
-                                    className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition shadow-2xs"
-                                >
-                                    <svg className="w-3.5 h-3.5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
-                                    </svg>
-                                    + Add Variant SKU
-                                </Link>
+                            <div>
+                                <label className="text-sm font-semibold text-slate-800">
+                                    Standard Technical Specification <span className="text-rose-600">*</span>
+                                </label>
+                                <p className="text-xs text-slate-500">
+                                    Official technical compliance specification sheet for this discrete item.
+                                </p>
                             </div>
                             <input
                                 type="text"
@@ -207,8 +196,8 @@ export default function EditItem({ item, categories, units }: Props) {
                                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white focus:border-red-500 focus:ring-1 focus:ring-red-500"
                                 required
                             />
-                            <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1 leading-snug">
-                                ℹ️ <strong>Stock Tracking Note:</strong> Each catalog item tracks its own independent warehouse inventory. If you need a different size, color, or model, click <strong>"+ Add Variant SKU"</strong> above to create a dedicated SKU with its own inventory lane.
+                            <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2.5 py-1.5 leading-snug">
+                                ℹ️ <strong>Item Variants:</strong> If this item comes in different sizes, colors, or specifications, click <strong>"Add Variant"</strong> in the top header to automatically create an item with the same name and a distinct specification.
                             </p>
                             <InputError message={errors.specification} className="mt-1" />
                         </div>
@@ -224,27 +213,16 @@ export default function EditItem({ item, categories, units }: Props) {
                             <InputError message={errors.description} className="mt-1" />
                         </div>
 
-                        <div className="md:col-span-2 flex items-center justify-between gap-3 pt-2">
-                            <div className="flex items-center gap-3">
-                                <button
-                                    type="submit"
-                                    disabled={processing}
-                                    className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-60"
-                                >
-                                    {processing ? 'Saving…' : 'Update Item'}
-                                </button>
-                                <Link href={route('inventory.items.index')} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                                    Cancel
-                                </Link>
-                            </div>
-                            <Link
-                                href={route('inventory.items.create', { clone_item_id: item.item_id })}
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3.5 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition shadow-2xs"
+                        <div className="md:col-span-2 flex items-center gap-3 pt-2">
+                            <button
+                                type="submit"
+                                disabled={processing}
+                                className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-60"
                             >
-                                <svg className="w-3.5 h-3.5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
-                                </svg>
-                                Add Variant SKU
+                                {processing ? 'Saving…' : 'Update Item'}
+                            </button>
+                            <Link href={route('inventory.items.index')} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                                Cancel
                             </Link>
                         </div>
                     </form>
