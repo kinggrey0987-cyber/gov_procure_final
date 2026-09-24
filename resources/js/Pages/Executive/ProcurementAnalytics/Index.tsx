@@ -6,7 +6,7 @@ import PaginationNav from '@/Components/PaginationNav';
 import { downloadSectionAsPdfById } from '@/lib/printSection';
 import { PageProps } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 
 type OfficeOption = { id: number; name: string };
 type BreakdownRow = { status: string; total: number };
@@ -835,31 +835,33 @@ export default function ProcurementAnalyticsIndex({
                                     <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2">
                                         Office Procurement Spending Concentration
                                     </h3>
-                                    <div className="space-y-2">
-                                        {office_comparison.slice(0, 4).map((office, idx) => {
-                                            const percent = office.spending_share_percentage ?? (totalProcurementSpend > 0 ? Math.round((office.purchase_order_total_amount / totalProcurementSpend) * 100) : 0);
-                                            const barWidth = Math.max((office.purchase_order_total_amount / maxOfficeSpend) * 100, office.purchase_order_total_amount > 0 ? 6 : 0);
-                                            return (
-                                                <div key={office.office_id} className="text-[11px] border-b border-slate-100 pb-1.5 last:border-b-0">
-                                                    <table className="w-full text-[11px] table-fixed mb-1">
-                                                        <tbody>
-                                                            <tr className="font-semibold">
-                                                                <td className="w-[62%] text-left text-slate-800 pr-2 truncate">
-                                                                    #{idx + 1} {office.office_name}
-                                                                </td>
-                                                                <td className="w-[38%] text-right text-slate-900 whitespace-nowrap">
-                                                                    {formatCurrency(office.purchase_order_total_amount)} ({percent}%)
-                                                                </td>
-                                                            </tr>
-                                                        </tbody>
-                                                    </table>
-                                                    <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden block">
-                                                        <div className="h-full bg-red-600 rounded-full block" style={{ width: `${barWidth}%` }} />
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
+                                    <table className="w-full text-[11px] table-fixed border-collapse">
+                                        <tbody>
+                                            {office_comparison.slice(0, 4).map((office, idx) => {
+                                                const percent = office.spending_share_percentage ?? (totalProcurementSpend > 0 ? Math.round((office.purchase_order_total_amount / totalProcurementSpend) * 100) : 0);
+                                                const barWidth = Math.max((office.purchase_order_total_amount / maxOfficeSpend) * 100, office.purchase_order_total_amount > 0 ? 6 : 0);
+                                                return (
+                                                    <Fragment key={office.office_id}>
+                                                        <tr className="font-semibold">
+                                                            <td className="w-[60%] text-left text-slate-800 pr-2 truncate pt-1">
+                                                                #{idx + 1} {office.office_name}
+                                                            </td>
+                                                            <td className="w-[40%] text-right text-slate-900 whitespace-nowrap pt-1">
+                                                                {formatCurrency(office.purchase_order_total_amount)} ({percent}%)
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td colSpan={2} className="pt-0.5 pb-2">
+                                                                <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden block">
+                                                                    <div className="h-full bg-red-600 rounded-full block" style={{ width: `${barWidth}%` }} />
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    </Fragment>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
                                 </div>
                                 {office_comparison.length > 4 && (
                                     <p className="mt-1 text-[10px] text-slate-400 italic text-right">

@@ -1,4 +1,4 @@
-import { PropsWithChildren } from 'react';
+import { Fragment, PropsWithChildren } from 'react';
 
 export type ChartPoint = {
     label: string;
@@ -211,21 +211,21 @@ export function HorizontalBarChart({
     };
 
     return (
-        <div className="space-y-1.5 py-0.5 flex-1 overflow-y-auto min-h-0">
-            {data.map((item, index) => {
-                const widthPercent = Math.max((item.value / max) * 100, item.value > 0 ? 5 : 0);
-                const sharePercent = total > 0 ? Math.round((item.value / total) * 100) : 0;
-                const gradientClass = getBarGradient(item.label, index);
+        <div className="py-0.5 flex-1 overflow-y-auto min-h-0">
+            <table className="w-full table-fixed text-xs border-collapse">
+                <tbody>
+                    {data.map((item, index) => {
+                        const widthPercent = Math.max((item.value / max) * 100, item.value > 0 ? 5 : 0);
+                        const sharePercent = total > 0 ? Math.round((item.value / total) * 100) : 0;
+                        const gradientClass = getBarGradient(item.label, index);
 
-                return (
-                    <div key={item.label} className="group min-w-0 space-y-0.5">
-                        <table className="w-full table-fixed text-xs">
-                            <tbody>
-                                <tr>
-                                    <td className="truncate font-semibold text-slate-700 pr-2 group-hover:text-slate-900 transition" title={item.label}>
+                        return (
+                            <Fragment key={item.label}>
+                                <tr className="group">
+                                    <td className="truncate font-semibold text-slate-700 pr-2 group-hover:text-slate-900 transition pt-1" title={item.label}>
                                         {item.label}
                                     </td>
-                                    <td className="text-right whitespace-nowrap w-[40%]">
+                                    <td className="text-right whitespace-nowrap w-[40%] pt-1">
                                         {showPercentage && total > 0 ? (
                                             <span className="text-[10px] font-medium text-slate-500 mr-1.5">
                                                 ({sharePercent}%)
@@ -236,17 +236,21 @@ export function HorizontalBarChart({
                                         </span>
                                     </td>
                                 </tr>
-                            </tbody>
-                        </table>
-                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 block">
-                            <div
-                                className={`h-full rounded-full ${gradientClass} transition-all duration-500 block`}
-                                style={{ width: `${widthPercent}%` }}
-                            />
-                        </div>
-                    </div>
-                );
-            })}
+                                <tr>
+                                    <td colSpan={2} className="pt-0.5 pb-2">
+                                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 block">
+                                            <div
+                                                className={`h-full rounded-full ${gradientClass} transition-all duration-500 block`}
+                                                style={{ width: `${widthPercent}%` }}
+                                            />
+                                        </div>
+                                    </td>
+                                </tr>
+                            </Fragment>
+                        );
+                    })}
+                </tbody>
+            </table>
         </div>
     );
 }
@@ -672,21 +676,21 @@ export function SpendTrendBarChart({
             <div className="grid grid-cols-2 gap-2 rounded-xl border border-red-100 bg-gradient-to-r from-red-50/70 via-white to-slate-50 p-2 text-xs shadow-xs shrink-0">
                 <div className="min-w-0">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Expenditure</p>
-                    <p className="mt-0.5 text-xs font-extrabold text-red-900 truncate" title={formatFull(totalSpend)}>{formatFull(totalSpend)}</p>
+                    <p className="mt-0.5 text-xs font-extrabold text-red-900 leading-normal" title={formatFull(totalSpend)}>{formatFull(totalSpend)}</p>
                 </div>
                 <div className="min-w-0">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Peak Period</p>
-                    <p className="mt-0.5 text-xs font-extrabold text-slate-900 truncate" title={`${peak?.label}: ${formatFull(peak?.value ?? 0)}`}>
+                    <p className="mt-0.5 text-xs font-extrabold text-slate-900 leading-normal" title={`${peak?.label}: ${formatFull(peak?.value ?? 0)}`}>
                         {peak?.label ?? '—'} <span className="text-[10px] font-semibold text-red-700">({formatShort(peak?.value ?? 0)})</span>
                     </p>
                 </div>
                 <div className="min-w-0">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Monthly Average</p>
-                    <p className="mt-0.5 text-xs font-extrabold text-slate-900 truncate" title={formatFull(average)}>{formatFull(average)}</p>
+                    <p className="mt-0.5 text-xs font-extrabold text-slate-900 leading-normal" title={formatFull(average)}>{formatFull(average)}</p>
                 </div>
                 <div className="min-w-0">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Orders Processed</p>
-                    <p className="mt-0.5 text-xs font-extrabold text-slate-900">{totalOrders} <span className="text-[10.5px] font-medium text-slate-500">POs</span></p>
+                    <p className="mt-0.5 text-xs font-extrabold text-slate-900 leading-normal">{totalOrders} <span className="text-[10.5px] font-medium text-slate-500">POs</span></p>
                 </div>
             </div>
 

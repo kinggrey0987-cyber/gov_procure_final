@@ -272,6 +272,17 @@ export default function ExecutiveDashboardIndex({
 
     const totalPdfPages = 1 + anomalyExportPages.length + alertExportPages.length + disclosureExportPages.length + businessLogExportPages.length;
 
+    const filterScopeSummary = useMemo(() => {
+        const parts: string[] = [];
+        parts.push(`Fiscal Year: ${new Date().getFullYear()}`);
+        parts.push('Office: All Offices');
+        if (anomalySeverity !== 'ALL') parts.push(`Anomaly Severity: ${anomalySeverity}`);
+        if (alertSeverity !== 'ALL') parts.push(`Alert Severity: ${alertSeverity}`);
+        if (anomalySearch.trim()) parts.push(`Anomaly Search: "${anomalySearch.trim()}"`);
+        if (alertSearch.trim()) parts.push(`Alert Search: "${alertSearch.trim()}"`);
+        return parts.join(' | ');
+    }, [anomalySeverity, alertSeverity, anomalySearch, alertSearch]);
+
     const baseMetadata: GovDocumentMetadata = {
         title: 'CONSOLIDATED EXECUTIVE OVERSIGHT & MONITORING REPORT',
         formCode: 'FDP Form - Executive Oversight & Procurement Management',
@@ -279,6 +290,7 @@ export default function ExecutiveDashboardIndex({
         fiscalYear: new Date().getFullYear(),
         period: `Fiscal Year ${new Date().getFullYear()}`,
         moduleScope: 'Executive Overview & Comprehensive Risk Monitoring',
+        filterScopeSummary,
         preparedByName,
         preparedByRole,
         preparedAt,

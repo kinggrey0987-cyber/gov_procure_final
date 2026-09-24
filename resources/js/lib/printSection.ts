@@ -235,14 +235,12 @@ async function renderPdfCanvas(
     scale: number,
     paperWidthPx: number,
 ): Promise<HTMLCanvasElement> {
-    const contentHeight = Math.max(source.scrollHeight, source.offsetHeight, 100);
+    const contentHeight = Math.max(source.scrollHeight, source.offsetHeight, Math.ceil(source.getBoundingClientRect().height)) + 8;
     return html2canvas(source, {
         backgroundColor: '#ffffff',
         scale,
         useCORS: true,
         allowTaint: true,
-        x: 0,
-        y: 0,
         scrollX: 0,
         scrollY: 0,
         windowWidth: paperWidthPx,
@@ -250,6 +248,36 @@ async function renderPdfCanvas(
         height: contentHeight,
         imageTimeout: 3000,
         logging: false,
+        onclone: (clonedDoc) => {
+            // Isolate the cloned document so the website shell cannot overlay or clip the capture
+            const app = clonedDoc.getElementById('app');
+            if (app) {
+                app.style.display = 'none';
+            }
+            clonedDoc.querySelectorAll('header, nav, aside').forEach((el) => {
+                (el as HTMLElement).style.display = 'none';
+            });
+            const root = clonedDoc.querySelector<HTMLElement>('[data-pdf-capture-root]');
+            if (root && clonedDoc.body) {
+                clonedDoc.body.prepend(root);
+                root.style.position = 'relative';
+                root.style.top = '0';
+                root.style.left = '0';
+                root.style.margin = '0';
+                root.style.padding = '0';
+                root.style.zIndex = '999999';
+            }
+            if (clonedDoc.body) {
+                clonedDoc.body.style.margin = '0';
+                clonedDoc.body.style.padding = '0';
+                clonedDoc.body.style.overflow = 'visible';
+            }
+            if (clonedDoc.documentElement) {
+                clonedDoc.documentElement.style.margin = '0';
+                clonedDoc.documentElement.style.padding = '0';
+                clonedDoc.documentElement.style.overflow = 'visible';
+            }
+        },
     });
 }
 
@@ -307,27 +335,48 @@ function createPdfCaptureRoot(
 
     const style = document.createElement('style');
     style.textContent = `
-        [data-pdf-capture-root], [data-pdf-capture-root] * { box-sizing: border-box; }
+        [data-pdf-capture-root], [data-pdf-capture-root] * {
+            box-sizing: border-box;
+        }
+        [data-pdf-capture-root] {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+        }
+        [data-pdf-capture-root] p,
+        [data-pdf-capture-root] span,
+        [data-pdf-capture-root] td,
+        [data-pdf-capture-root] th,
+        [data-pdf-capture-root] div,
+        [data-pdf-capture-root] h1,
+        [data-pdf-capture-root] h2,
+        [data-pdf-capture-root] h3,
+        [data-pdf-capture-root] h4 {
+            line-height: 1.35;
+        }
         [data-pdf-capture-root] [class*="overflow-x-auto"],
-        [data-pdf-capture-root] [class*="overflow-auto"] {
+        [data-pdf-capture-root] [class*="overflow-auto"],
+        [data-pdf-capture-root] [class*="overflow-hidden"] {
             overflow: visible !important;
+        }
+        [data-pdf-capture-root] [class*="truncate"] {
+            overflow: visible !important;
+            text-overflow: clip !important;
+            white-space: normal !important;
         }
         [data-pdf-capture-root] table {
             width: 100% !important;
-            table-layout: fixed;
             border-collapse: collapse;
         }
-        [data-pdf-capture-root] th,
-        [data-pdf-capture-root] td {
+        [data-pdf-capture-root] th:not([class*="whitespace-nowrap"]),
+        [data-pdf-capture-root] td:not([class*="whitespace-nowrap"]) {
             overflow-wrap: anywhere;
             word-break: break-word;
         }
         [data-pdf-capture-root] .pdf-page {
             box-shadow: none !important;
             margin: 0 !important;
-            display: block !important;
             visibility: visible !important;
             opacity: 1 !important;
+            overflow: visible !important;
         }
     `;
 

@@ -113,7 +113,7 @@ export function GovDocumentHeader({ metadata, isContinuation = false, pageNumber
             </div>
 
             {/* Structured Government Metadata Grid (Standard LGU Table) */}
-            <div className="overflow-hidden rounded-md border border-slate-300 bg-slate-50/50 text-[11px]">
+            <div className="rounded-md border border-slate-300 bg-slate-50/50 text-[11px]">
                 <div className="grid grid-cols-2 divide-x divide-slate-300 border-b border-slate-300">
                     <div className="px-3 py-1.5">
                         <span className="font-semibold text-slate-600">REGION:</span>{' '}
@@ -151,19 +151,33 @@ export function GovDocumentHeader({ metadata, isContinuation = false, pageNumber
                 </div>
 
                 {metadata.filterScopeSummary && (
-                    <div className="border-t border-slate-300 bg-amber-50/70 px-3 py-1.5 text-[10.5px] text-slate-800 flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                            <span className="font-bold text-red-900 uppercase tracking-wider text-[9.5px] shrink-0">Filter Scope:</span>
-                            <span className="font-semibold text-slate-900 truncate">{metadata.filterScopeSummary}</span>
-                        </div>
-                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider shrink-0 ml-2">Filtered Scope</span>
-                    </div>
+                    <table className="w-full border-t border-slate-300 bg-amber-50/70 text-[11px] text-slate-800 border-collapse">
+                        <tbody>
+                            <tr>
+                                <td className="px-3 py-2 text-left align-middle leading-normal">
+                                    <span className="font-bold text-red-900 uppercase tracking-wider text-[9.5px] mr-1.5">Filter Scope:</span>
+                                    <span className="font-semibold text-slate-900 leading-normal">{metadata.filterScopeSummary}</span>
+                                </td>
+                                <td className="px-3 py-2 text-right align-middle text-[9px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap w-[110px]">
+                                    Filtered Scope
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 )}
 
-                <div className="border-t border-slate-300 bg-slate-100/70 px-3 py-1 text-[10px] text-slate-600 flex justify-between">
-                    <span><strong>PREPARED AT:</strong> {formattedDate}</span>
-                    <span><strong>AUTHENTICATION:</strong> System Verified Official Document</span>
-                </div>
+                <table className="w-full border-t border-slate-300 bg-slate-100/70 text-[10px] text-slate-600 border-collapse">
+                    <tbody>
+                        <tr>
+                            <td className="px-3 py-1.5 text-left align-middle leading-normal">
+                                <strong>PREPARED AT:</strong> {formattedDate}
+                            </td>
+                            <td className="px-3 py-1.5 text-right align-middle leading-normal whitespace-nowrap">
+                                <strong>AUTHENTICATION:</strong> System Verified Official Document
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     );
@@ -326,7 +340,7 @@ export function GovDocumentPage({
     const isContinuation = pageNumber > 1;
 
     return (
-        <section className={`pdf-page overflow-hidden rounded-xl border border-slate-300 bg-white p-6 shadow-sm space-y-3 text-slate-900 ${className}`}>
+        <section className={`pdf-page rounded-xl border border-slate-300 bg-white p-6 shadow-sm space-y-3 text-slate-900 ${className}`}>
             {/* Letterhead */}
             {showLetterhead && <GovLetterhead officeName={letterheadOfficeName || metadata.officeName} />}
 
