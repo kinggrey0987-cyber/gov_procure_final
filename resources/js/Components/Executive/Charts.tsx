@@ -639,7 +639,7 @@ export function SpendTrendBarChart({
     const peak = [...data].sort((a, b) => b.value - a.value)[0];
 
     const formatShort = (val: number): string => {
-        if (val >= 1_000_000) return `${currencySymbol}${(val / 1_000_000).toFixed(1)}M`;
+        if (val >= 1_000_000) return `${currencySymbol}${(val / 1_000_000).toFixed(2)}M`;
         if (val >= 1_000) return `${currencySymbol}${(val / 1_000).toFixed(1)}k`;
         return `${currencySymbol}${val.toLocaleString('en-PH', { maximumFractionDigits: 0 })}`;
     };
@@ -649,7 +649,7 @@ export function SpendTrendBarChart({
     };
 
     const width = Math.max(760, data.length * 44);
-    const height = 230;
+    const height = 240;
     const paddingLeft = 48;
     const paddingRight = 16;
     const chartTop = 22;
@@ -668,17 +668,17 @@ export function SpendTrendBarChart({
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 rounded-xl border border-red-100 bg-gradient-to-r from-red-50/70 via-white to-slate-50 p-2.5 text-xs shadow-xs shrink-0">
                 <div>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Expenditure</p>
-                    <p className="mt-0.5 text-xs sm:text-sm font-extrabold text-red-900 truncate">{formatFull(totalSpend)}</p>
+                    <p className="mt-0.5 text-xs sm:text-sm font-extrabold text-red-900">{formatFull(totalSpend)}</p>
                 </div>
                 <div>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Peak Period</p>
-                    <p className="mt-0.5 text-xs sm:text-sm font-extrabold text-slate-900 truncate" title={`${peak?.label}: ${formatFull(peak?.value ?? 0)}`}>
-                        {peak?.label ?? '—'} <span className="text-[10px] font-semibold text-red-700">({formatShort(peak?.value ?? 0)})</span>
+                    <p className="mt-0.5 text-xs sm:text-sm font-extrabold text-slate-900" title={`${peak?.label}: ${formatFull(peak?.value ?? 0)}`}>
+                        {peak?.label ?? '—'} <span className="text-[10.5px] font-semibold text-red-700">({formatFull(peak?.value ?? 0)})</span>
                     </p>
                 </div>
                 <div>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Monthly Average</p>
-                    <p className="mt-0.5 text-xs sm:text-sm font-extrabold text-slate-900 truncate">{formatFull(average)}</p>
+                    <p className="mt-0.5 text-xs sm:text-sm font-extrabold text-slate-900">{formatFull(average)}</p>
                 </div>
                 <div>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Orders Processed</p>
@@ -688,7 +688,7 @@ export function SpendTrendBarChart({
 
             {/* SVG Bar Chart - 100% Fluid & Responsive, Zero Scrollbars */}
             <div className="w-full flex-1 flex items-center justify-center pt-2 overflow-x-auto min-w-0">
-                <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto max-h-[230px] min-w-[580px] overflow-visible">
+                <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto max-h-[235px] min-w-[580px] overflow-visible">
                     <defs>
                         <linearGradient id="spendBarGradient" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="0%" stopColor="rgb(220 38 38)" />
@@ -737,6 +737,15 @@ export function SpendTrendBarChart({
                         const y = chartBottom - barHeight;
                         const isPeak = item.value === peak?.value && item.value > 0;
 
+                        const barLabelStride = data.length <= 12 ? 1 : Math.max(2, Math.ceil(data.length / 8));
+                        const distToLast = data.length - 1 - index;
+                        const showMonthLabel =
+                            data.length <= 12 ||
+                            index === 0 ||
+                            index === data.length - 1 ||
+                            isPeak ||
+                            (index % barLabelStride === 0 && distToLast >= Math.ceil(barLabelStride * 0.75));
+
                         return (
                             <g key={item.label} className="group cursor-pointer">
                                 {/* Bar */}
@@ -764,35 +773,22 @@ export function SpendTrendBarChart({
                                 ) : null}
 
                                 {/* Month label on X axis */}
-                                {(() => {
-                                    const barLabelStride = data.length <= 12 ? 1 : Math.max(2, Math.ceil(data.length / 8));
-                                    const distToLast = data.length - 1 - index;
-                                    const showMonthLabel =
-                                        data.length <= 12 ||
-                                        index === 0 ||
-                                        index === data.length - 1 ||
-                                        isPeak ||
-                                        (index % barLabelStride === 0 && distToLast >= Math.ceil(barLabelStride * 0.75));
-
-                                    if (!showMonthLabel) return null;
-
-                                    return (
-                                        <text
-                                            x={x + barWidth / 2}
-                                            y={chartBottom + 15}
-                                            textAnchor="middle"
-                                            className={`text-[9px] font-semibold ${isPeak ? 'fill-red-800 font-bold' : 'fill-slate-600'}`}
-                                        >
-                                            {item.label}
-                                        </text>
-                                    );
-                                })()}
-
-                                {/* Order Count Badge below Month */}
-                                {item.orderCount !== undefined && (groupWidth >= 32 || data.length <= 14) ? (
+                                {showMonthLabel ? (
                                     <text
                                         x={x + barWidth / 2}
-                                        y={chartBottom + 26}
+                                        y={chartBottom + 15}
+                                        textAnchor="middle"
+                                        className={`text-[9px] font-semibold ${isPeak ? 'fill-red-800 font-bold' : 'fill-slate-600'}`}
+                                    >
+                                        {item.label}
+                                    </text>
+                                ) : null}
+
+                                {/* Order Count Badge below Month (aligned with shown month ticks to avoid overlap) */}
+                                {item.orderCount !== undefined && showMonthLabel ? (
+                                    <text
+                                        x={x + barWidth / 2}
+                                        y={chartBottom + 27}
                                         textAnchor="middle"
                                         className="fill-slate-400 text-[8px] font-medium"
                                     >

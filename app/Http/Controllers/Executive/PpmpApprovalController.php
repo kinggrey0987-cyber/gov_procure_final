@@ -54,19 +54,36 @@ class PpmpApprovalController extends Controller
         }
 
         if (! empty($filters['year'])) {
-            $query->whereYear('created_at', (int) $filters['year']);
+            $year = (int) $filters['year'];
+            $query->where(static function ($yearQuery) use ($year): void {
+                $yearQuery->where('fiscal_year', $year)
+                    ->orWhereYear('date_prepared', $year)
+                    ->orWhereYear('created_at', $year);
+            });
         }
 
         if (! empty($filters['month'])) {
-            $query->whereMonth('created_at', (int) $filters['month']);
+            $month = (int) $filters['month'];
+            $query->where(static function ($monthQuery) use ($month): void {
+                $monthQuery->whereMonth('date_prepared', $month)
+                    ->orWhereMonth('created_at', $month);
+            });
         }
 
         if (! empty($filters['from_date'])) {
-            $query->whereDate('created_at', '>=', (string) $filters['from_date']);
+            $fromDate = (string) $filters['from_date'];
+            $query->where(static function ($dateQuery) use ($fromDate): void {
+                $dateQuery->whereDate('date_prepared', '>=', $fromDate)
+                    ->orWhereDate('created_at', '>=', $fromDate);
+            });
         }
 
         if (! empty($filters['to_date'])) {
-            $query->whereDate('created_at', '<=', (string) $filters['to_date']);
+            $toDate = (string) $filters['to_date'];
+            $query->where(static function ($dateQuery) use ($toDate): void {
+                $dateQuery->whereDate('date_prepared', '<=', $toDate)
+                    ->orWhereDate('created_at', '<=', $toDate);
+            });
         }
 
         if (! empty($filters['search'])) {
@@ -170,11 +187,17 @@ class PpmpApprovalController extends Controller
                 'offices' => Office::query()->requestingOffices()->select(['id', 'name'])->orderBy('name', 'asc')->get(),
                 'statuses' => ['SUBMITTED', 'APPROVED', 'REJECTED', 'RETURNED_FOR_REVISION'],
                 'years' => Ppmp::query()
-                    ->where('date_prepared', '!=', null)
-                    ->latest('date_prepared')
-                    ->pluck('date_prepared')
-                    ->map(fn ($value): int => (int) $value->year)
+                    ->whereNotNull('fiscal_year')
+                    ->pluck('fiscal_year')
+                    ->merge(
+                        Ppmp::query()
+                            ->whereNotNull('date_prepared')
+                            ->pluck('date_prepared')
+                            ->map(fn ($value): int => (int) $value->year)
+                    )
+                    ->map(fn ($value): int => (int) $value)
                     ->unique()
+                    ->sortDesc()
                     ->values(),
             ],
             'office_breakdown' => $officeBreakdown,

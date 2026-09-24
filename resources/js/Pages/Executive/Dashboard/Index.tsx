@@ -265,10 +265,10 @@ export default function ExecutiveDashboardIndex({
 
     const anomalyPreviewRows = useMemo(() => filteredAnomalyGroups.slice(0, 5), [filteredAnomalyGroups]);
     const alertPreviewRows = useMemo(() => filteredAlerts.slice(0, 5), [filteredAlerts]);
-    const anomalyExportPages = useMemo(() => chunkRows(recent_anomalies_export.slice(0, 24), 12), [recent_anomalies_export]);
-    const alertExportPages = useMemo(() => chunkRows(recent_alerts_export.slice(0, 24), 12), [recent_alerts_export]);
-    const disclosureExportPages = useMemo(() => chunkRows(recent_disclosures_export.slice(0, 12), 12), [recent_disclosures_export]);
-    const businessLogExportPages = useMemo(() => chunkRows(recent_business_logs_export.slice(0, 12), 12), [recent_business_logs_export]);
+    const anomalyExportPages = useMemo(() => chunkRows(recent_anomalies_export, 12), [recent_anomalies_export]);
+    const alertExportPages = useMemo(() => chunkRows(recent_alerts_export, 12), [recent_alerts_export]);
+    const disclosureExportPages = useMemo(() => chunkRows(recent_disclosures_export, 12), [recent_disclosures_export]);
+    const businessLogExportPages = useMemo(() => chunkRows(recent_business_logs_export, 12), [recent_business_logs_export]);
 
     const totalPdfPages = 1 + anomalyExportPages.length + alertExportPages.length + disclosureExportPages.length + businessLogExportPages.length;
 
@@ -905,6 +905,17 @@ export default function ExecutiveDashboardIndex({
                                 <HorizontalBarChart data={officeRanking} emptyText="No data in current filter scope" />
                             </section>
                         </div>
+
+                        <section className="rounded-lg border border-slate-300 bg-white p-3.5 mt-3">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2.5">
+                                Procurement Velocity & Activity Trend
+                            </h3>
+                            <TrendLineChart
+                                data={totalActivityTrend}
+                                emptyText="No procurement activity trend in current filter scope"
+                                showPointCards={false}
+                            />
+                        </section>
                     </GovDocumentPage>
 
                     {/* Continuation Pages: Anomaly Records */}

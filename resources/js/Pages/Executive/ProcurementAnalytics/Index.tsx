@@ -1,4 +1,4 @@
-import { DonutChart, ExecutiveChartCard, HorizontalBarChart, SpendPoint, SpendTrendBarChart, TrendGroupedBarChart } from '@/Components/Executive/Charts';
+import { DonutChart, ExecutiveChartCard, HorizontalBarChart, SpendPoint, SpendTrendBarChart, TrendGroupedBarChart, TrendLineChart } from '@/Components/Executive/Charts';
 import { GovDocumentPage, GovDocumentMetadata } from '@/Components/Executive/GovDocumentLayout';
 import MonthFilterSelect from '@/Components/MonthFilterSelect';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
@@ -221,6 +221,14 @@ export default function ProcurementAnalyticsIndex({
     const monthlyMerged = useMemo(() => {
         return mergeTrend(monthly_trends.purchase_requests, monthly_trends.purchase_orders, isSingleYearScope);
     }, [monthly_trends.purchase_requests, monthly_trends.purchase_orders, isSingleYearScope]);
+
+    const totalActivityTrend = useMemo(() => {
+        return monthlyMerged.map((row) => ({
+            label: row.label,
+            value: row.first + row.second,
+        }));
+    }, [monthlyMerged]);
+
     const officeValueBreakdown = office_comparison
         .map((row) => ({
             label: row.office_name,
@@ -273,8 +281,25 @@ export default function ProcurementAnalyticsIndex({
     const exportSectionId = 'procurement-insights-export-section';
     const procurementRecords = recent.procurement_records ?? recent.purchase_orders;
     const exportProcurementRecords: ProcurementRecordRow[] = recent.procurement_records_export ?? (procurementRecords.data as unknown as ProcurementRecordRow[]);
-    const procurementExportPages = useMemo(() => chunkRows(exportProcurementRecords.slice(0, 36), 12), [exportProcurementRecords]);
+    const procurementExportPages = useMemo(() => chunkRows(exportProcurementRecords, 12), [exportProcurementRecords]);
     const totalPdfPages = 1 + (procurementExportPages.length > 0 ? procurementExportPages.length : 1);
+
+    const selectedOfficeName = useMemo(() => {
+        if (!form.office_id) return 'All Offices';
+        const match = filter_options.offices.find((o) => String(o.id) === String(form.office_id));
+        return match ? match.name : `Office #${form.office_id}`;
+    }, [filter_options.offices, form.office_id]);
+
+    const filterScopeSummary = useMemo(() => {
+        const parts: string[] = [];
+        parts.push(`Office: ${selectedOfficeName}`);
+        parts.push(`Fiscal Year: ${form.year || 'All Years'}`);
+        if (form.status) parts.push(`Status: ${form.status}`);
+        if (form.record_type && form.record_type !== 'all') parts.push(`Scope: ${form.record_type.toUpperCase()}`);
+        if (form.month) parts.push(`Month: ${form.month}`);
+        if (form.from_date || form.to_date) parts.push(`Date: ${form.from_date || 'Start'} to ${form.to_date || 'Present'}`);
+        return parts.join(' | ');
+    }, [selectedOfficeName, form.year, form.status, form.record_type, form.month, form.from_date, form.to_date]);
 
     const baseMetadata: GovDocumentMetadata = {
         title: 'EXECUTIVE PROCUREMENT ANALYTICS & SPENDING REPORT',
@@ -282,7 +307,8 @@ export default function ProcurementAnalyticsIndex({
         trackingCode: `EBM-PROC-SPEND-${form.year || new Date().getFullYear()}`,
         fiscalYear: form.year || new Date().getFullYear(),
         period: form.year ? `Fiscal Year ${form.year}${form.month ? ` - Month ${form.month}` : ''}` : `Fiscal Year ${new Date().getFullYear()}`,
-        moduleScope: 'Purchase Request vs Purchase Order Analytics & Office Spend',
+        moduleScope: `Procurement & Spend Analytics (${selectedOfficeName})`,
+        filterScopeSummary,
         preparedByName: auth?.user?.name || 'Mayor Jeron',
         preparedByRole: auth?.user?.role_code || 'Municipal Mayor / Local Chief Executive',
         preparedAt: new Date().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }),
@@ -763,6 +789,17 @@ export default function ProcurementAnalyticsIndex({
                                 </div>
                             </section>
                         </div>
+
+                        <section className="rounded-lg border border-slate-300 bg-white p-3.5 mt-3">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2.5">
+                                Procurement Velocity & Activity Volume Trend
+                            </h3>
+                            <TrendLineChart
+                                data={totalActivityTrend}
+                                emptyText="No procurement activity volume data in current filter scope"
+                                showPointCards={false}
+                            />
+                        </section>
                     </GovDocumentPage>
 
                     {/* Continuation Pages: Detailed Procurement Records */}

@@ -107,7 +107,7 @@ export default function BusinessAudit({ auditLogs, auditLogsExport, filters, ana
         router.get(route('executive.audit.business'), activeFilters, {
             preserveState: true,
             replace: true,
-            only: ['auditLogs', 'filters', 'analytics', 'filter_options'],
+            only: ['auditLogs', 'auditLogsExport', 'filters', 'analytics', 'filter_options'],
         });
     }, [activeFilters, activeFiltersKey, currentFiltersKey]);
 
@@ -132,7 +132,7 @@ export default function BusinessAudit({ auditLogs, auditLogsExport, filters, ana
     const activeActions = actionSummary.length;
     const auditLogsExportPages = useMemo(() => {
         const pageSize = 14;
-        const targetLogs = auditLogsExport.slice(0, 28);
+        const targetLogs = auditLogsExport;
         const pages: typeof auditLogsExport[] = [];
 
         for (let index = 0; index < targetLogs.length; index += pageSize) {
@@ -170,13 +170,24 @@ export default function BusinessAudit({ auditLogs, auditLogsExport, filters, ana
     const { auth } = usePage<PageProps>().props;
     const totalPdfPages = 1 + (auditLogsExportPages.length > 0 ? auditLogsExportPages.length : 1);
 
+    const filterScopeSummary = useMemo(() => {
+        const parts: string[] = [];
+        if (form.module_name) parts.push(`Module: ${formatModuleLabel(form.module_name)}`);
+        if (form.action_type) parts.push(`Action: ${formatActionLabel(form.action_type)}`);
+        if (form.user_query) parts.push(`User: ${form.user_query}`);
+        if (form.from_date || form.to_date) parts.push(`Date: ${form.from_date || 'Start'} to ${form.to_date || 'Present'}`);
+        if (parts.length === 0) return 'All Governance Events & System Users';
+        return parts.join(' | ');
+    }, [form.module_name, form.action_type, form.user_query, form.from_date, form.to_date]);
+
     const baseMetadata: GovDocumentMetadata = {
         title: 'OFFICIAL GOVERNANCE & BUSINESS AUDIT TRAIL REPORT',
         formCode: 'FDP Form - Executive Governance & Audit Trail',
         trackingCode: `EBM-AUDIT-${new Date().getFullYear()}`,
         fiscalYear: new Date().getFullYear(),
         period: form.from_date || form.to_date ? `${form.from_date || 'Start'} to ${form.to_date || 'Present'}` : `Calendar Year ${new Date().getFullYear()}`,
-        moduleScope: 'Executive Business Event Logging & Governance Trail',
+        moduleScope: form.module_name ? `Governance Trail (${formatModuleLabel(form.module_name)})` : 'Executive Business Event Logging & Governance Trail',
+        filterScopeSummary,
         preparedByName: auth?.user?.name || 'Mayor Jeron',
         preparedByRole: auth?.user?.role_code || 'Municipal Mayor / Local Chief Executive',
         preparedAt: new Date().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }),
@@ -530,8 +541,11 @@ function formatModuleLabel(value: string): string {
         'Executive.Alert': 'Alert Monitoring',
         'Executive.PPMP': 'PPMP Approval',
         'Executive.PublicDisclosure': 'Transparency Disclosure',
+        'Executive.RecordArchive': 'Yearly Record Archive',
         'Office.SupplyRequest': 'Supply Request Submission',
+        'Procurement.PurchaseRequest': 'Purchase Request Processing',
         'Procurement.PurchaseOrder': 'Procurement Order Processing',
+        'Inventory.Delivery': 'Delivery Verification',
         'Inventory.Distribution': 'Distribution Activity',
         'Inventory.Claim': 'Claims Review',
     };

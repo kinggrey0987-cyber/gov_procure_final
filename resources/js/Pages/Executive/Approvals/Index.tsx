@@ -94,7 +94,7 @@ export default function ExecutiveApprovalsIndex({ records, recordsExport, summar
         router.get(route('executive.ppmp-approvals.index'), nextForm, {
             preserveState: true,
             replace: true,
-            only: ['records', 'summary', 'filters', 'filter_options', 'office_breakdown'],
+            only: ['records', 'recordsExport', 'summary', 'filters', 'filter_options', 'office_breakdown'],
         });
     };
 
@@ -192,8 +192,25 @@ export default function ExecutiveApprovalsIndex({ records, recordsExport, summar
     };
 
     const { auth } = usePage<PageProps>().props;
-    const recordsExportPages = useMemo(() => chunkRows(recordsExport.slice(0, 36), 12), [recordsExport]);
+    const recordsExportPages = useMemo(() => chunkRows(recordsExport, 12), [recordsExport]);
     const totalPdfPages = 1 + (recordsExportPages.length > 0 ? recordsExportPages.length : 1);
+
+    const selectedOfficeName = useMemo(() => {
+        if (!form.office_id) return 'All Offices';
+        const match = filter_options.offices.find((o) => String(o.id) === String(form.office_id));
+        return match ? match.name : `Office #${form.office_id}`;
+    }, [filter_options.offices, form.office_id]);
+
+    const filterScopeSummary = useMemo(() => {
+        const parts: string[] = [];
+        parts.push(`Office: ${selectedOfficeName}`);
+        parts.push(`Fiscal Year: ${form.year || 'All Years'}`);
+        if (form.status) parts.push(`Status: ${form.status}`);
+        if (form.month) parts.push(`Month: ${form.month}`);
+        if (form.from_date || form.to_date) parts.push(`Date: ${form.from_date || 'Start'} to ${form.to_date || 'Present'}`);
+        if (form.search) parts.push(`Search: "${form.search}"`);
+        return parts.join(' | ');
+    }, [selectedOfficeName, form.year, form.status, form.month, form.from_date, form.to_date, form.search]);
 
     const baseMetadata: GovDocumentMetadata = {
         title: 'PROJECT PROCUREMENT MANAGEMENT PLAN (PPMP) EXECUTIVE APPROVAL REPORT',
@@ -201,7 +218,8 @@ export default function ExecutiveApprovalsIndex({ records, recordsExport, summar
         trackingCode: `EBM-PPMP-${form.year || new Date().getFullYear()}`,
         fiscalYear: form.year || new Date().getFullYear(),
         period: form.year ? `Fiscal Year ${form.year}` : `Fiscal Year ${new Date().getFullYear()}`,
-        moduleScope: 'Executive PPMP Signoff & Annual Procurement Plan Queue',
+        moduleScope: `Executive PPMP Signoff (${selectedOfficeName})`,
+        filterScopeSummary,
         preparedByName: auth?.user?.name || 'Mayor Jeron',
         preparedByRole: auth?.user?.role_code || 'Municipal Mayor / Local Chief Executive',
         preparedAt: new Date().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }),

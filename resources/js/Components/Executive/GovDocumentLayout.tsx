@@ -7,6 +7,7 @@ export type GovDocumentMetadata = {
     fiscalYear?: string | number;
     period?: string;
     moduleScope?: string;
+    filterScopeSummary?: string;
     officeName?: string;
     preparedByName?: string;
     preparedByRole?: string;
@@ -150,6 +151,16 @@ export function GovDocumentHeader({ metadata, isContinuation = false, pageNumber
                         <span className="text-slate-600 font-medium"> ({formatRole(metadata.preparedByRole)})</span>
                     </div>
                 </div>
+
+                {metadata.filterScopeSummary && (
+                    <div className="border-t border-slate-300 bg-amber-50/70 px-3 py-1.5 text-[10.5px] text-slate-800 flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="font-bold text-red-900 uppercase tracking-wider text-[9.5px] shrink-0">Filter Scope:</span>
+                            <span className="font-semibold text-slate-900 truncate">{metadata.filterScopeSummary}</span>
+                        </div>
+                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider shrink-0 ml-2">Filtered Scope</span>
+                    </div>
+                )}
 
                 <div className="border-t border-slate-300 bg-slate-100/70 px-3 py-1 text-[10px] text-slate-600 flex justify-between">
                     <span><strong>PREPARED AT:</strong> {formattedDate}</span>

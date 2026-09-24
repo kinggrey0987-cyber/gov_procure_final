@@ -131,6 +131,169 @@ class GovernanceOpsDemoSeeder extends Seeder
             'backup_status' => 'failed',
             'notes' => 'Failed demo backup record for access-state and filtering validation.',
         ]);
+
+        $this->seedBusinessAuditLogs($executive);
+    }
+
+    private function seedBusinessAuditLogs(User $executive): void
+    {
+        $procUser = User::query()->whereHas('role', fn ($q) => $q->where('code', 'PROC_OFFICER'))->first() ?? $executive;
+        $gsoUser = User::query()->whereHas('role', fn ($q) => $q->where('code', 'GSO_OFFICER'))->first() ?? $executive;
+
+        // 1. Supply Requests (Department Users)
+        if (Schema::hasTable('supply_requests')) {
+            \App\Models\SupplyRequest::query()->each(function (\App\Models\SupplyRequest $sr): void {
+                \App\Models\AuditLog::query()->firstOrCreate([
+                    'reference_type' => \App\Models\SupplyRequest::class,
+                    'reference_id' => (int) $sr->supply_request_id,
+                    'action_type' => 'SUBMIT',
+                ], [
+                    'user_id' => $sr->requested_by,
+                    'office_id' => $sr->office_id,
+                    'log_domain' => 'BUSINESS',
+                    'module_name' => 'Office.SupplyRequest',
+                    'details' => [
+                        'status' => $sr->status,
+                        'request_code' => $sr->request_code,
+                    ],
+                    'created_at' => $sr->created_at ?? now(),
+                    'updated_at' => $sr->created_at ?? now(),
+                ]);
+            });
+        }
+
+        // 2. Purchase Requests (Procurement Officers / Department Requisitioners)
+        if (Schema::hasTable('purchase_requests')) {
+            \App\Models\PurchaseRequest::query()->each(function (\App\Models\PurchaseRequest $pr) use ($procUser): void {
+                \App\Models\AuditLog::query()->firstOrCreate([
+                    'reference_type' => \App\Models\PurchaseRequest::class,
+                    'reference_id' => (int) $pr->purchase_request_id,
+                    'action_type' => 'CREATE',
+                ], [
+                    'user_id' => $pr->requested_by ?? $procUser->id,
+                    'office_id' => $pr->office_id,
+                    'log_domain' => 'BUSINESS',
+                    'module_name' => 'Procurement.PurchaseRequest',
+                    'details' => [
+                        'status' => $pr->status,
+                        'pr_number' => $pr->pr_number ?? sprintf('PR-%d', $pr->purchase_request_id),
+                    ],
+                    'created_at' => $pr->created_at ?? now(),
+                    'updated_at' => $pr->created_at ?? now(),
+                ]);
+            });
+        }
+
+        // 3. Purchase Orders (Procurement Officers)
+        if (Schema::hasTable('purchase_orders')) {
+            \App\Models\PurchaseOrder::query()->with('purchaseRequest')->each(function (\App\Models\PurchaseOrder $po) use ($procUser): void {
+                \App\Models\AuditLog::query()->firstOrCreate([
+                    'reference_type' => \App\Models\PurchaseOrder::class,
+                    'reference_id' => (int) $po->purchase_order_id,
+                    'action_type' => 'ISSUE',
+                ], [
+                    'user_id' => $po->created_by ?? $procUser->id,
+                    'office_id' => $po->purchaseRequest?->office_id ?? $procUser->office_id,
+                    'log_domain' => 'BUSINESS',
+                    'module_name' => 'Procurement.PurchaseOrder',
+                    'details' => [
+                        'status' => $po->status,
+                        'po_number' => $po->po_number ?? sprintf('PO-%d', $po->purchase_order_id),
+                        'total_amount' => $po->total_amount,
+                    ],
+                    'created_at' => $po->created_at ?? now(),
+                    'updated_at' => $po->created_at ?? now(),
+                ]);
+            });
+        }
+
+        // 4. Deliveries (GSO Officers)
+        if (Schema::hasTable('deliveries')) {
+            \App\Models\Delivery::query()->each(function (\App\Models\Delivery $del) use ($gsoUser): void {
+                \App\Models\AuditLog::query()->firstOrCreate([
+                    'reference_type' => \App\Models\Delivery::class,
+                    'reference_id' => (int) $del->delivery_id,
+                    'action_type' => 'VERIFY',
+                ], [
+                    'user_id' => $del->received_by ?? $gsoUser->id,
+                    'office_id' => $gsoUser->office_id,
+                    'log_domain' => 'BUSINESS',
+                    'module_name' => 'Inventory.Delivery',
+                    'details' => [
+                        'status' => $del->status,
+                        'delivery_order_number' => $del->delivery_order_number ?? sprintf('DEL-%d', $del->delivery_id),
+                    ],
+                    'created_at' => $del->created_at ?? now(),
+                    'updated_at' => $del->created_at ?? now(),
+                ]);
+            });
+        }
+
+        // 5. Distribution Records (GSO Officers)
+        if (Schema::hasTable('distribution_records')) {
+            \App\Models\DistributionRecord::query()->each(function (\App\Models\DistributionRecord $dist) use ($gsoUser): void {
+                \App\Models\AuditLog::query()->firstOrCreate([
+                    'reference_type' => \App\Models\DistributionRecord::class,
+                    'reference_id' => (int) $dist->distribution_record_id,
+                    'action_type' => 'DISTRIBUTE',
+                ], [
+                    'user_id' => $dist->released_by ?? $gsoUser->id,
+                    'office_id' => $dist->office_id,
+                    'log_domain' => 'BUSINESS',
+                    'module_name' => 'Inventory.Distribution',
+                    'details' => [
+                        'status' => $dist->status,
+                        'control_no' => $dist->control_no ?? sprintf('DIS-%d', $dist->distribution_record_id),
+                    ],
+                    'created_at' => $dist->created_at ?? now(),
+                    'updated_at' => $dist->created_at ?? now(),
+                ]);
+            });
+        }
+
+        // 6. Claims (Department Staff)
+        if (Schema::hasTable('claims')) {
+            \App\Models\Claim::query()->each(function (\App\Models\Claim $claim): void {
+                \App\Models\AuditLog::query()->firstOrCreate([
+                    'reference_type' => \App\Models\Claim::class,
+                    'reference_id' => (int) $claim->claim_id,
+                    'action_type' => 'CLAIM',
+                ], [
+                    'user_id' => $claim->claimed_by,
+                    'office_id' => $claim->office_id,
+                    'log_domain' => 'BUSINESS',
+                    'module_name' => 'Inventory.Claim',
+                    'details' => [
+                        'status' => $claim->status,
+                    ],
+                    'created_at' => $claim->created_at ?? now(),
+                    'updated_at' => $claim->created_at ?? now(),
+                ]);
+            });
+        }
+
+        // 7. PPMPs (Executive / Offices)
+        if (Schema::hasTable('ppmps')) {
+            \App\Models\Ppmp::query()->where('status', 'APPROVED')->each(function (\App\Models\Ppmp $ppmp) use ($executive): void {
+                \App\Models\AuditLog::query()->firstOrCreate([
+                    'reference_type' => \App\Models\Ppmp::class,
+                    'reference_id' => (int) $ppmp->ppmp_id,
+                    'action_type' => 'APPROVE',
+                ], [
+                    'user_id' => $ppmp->approved_by ?? $executive->id,
+                    'office_id' => $ppmp->office_id,
+                    'log_domain' => 'BUSINESS',
+                    'module_name' => 'Executive.PPMP',
+                    'details' => [
+                        'fiscal_year' => $ppmp->fiscal_year,
+                        'status' => $ppmp->status,
+                        'total_budget' => $ppmp->total_estimated_budget,
+                    ],
+                    'created_at' => $ppmp->date_approved ?? $ppmp->created_at ?? now(),
+                    'updated_at' => $ppmp->date_approved ?? $ppmp->created_at ?? now(),
+                ]);
+            });
+        }
     }
 }
 
