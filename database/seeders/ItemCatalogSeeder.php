@@ -54,8 +54,7 @@ class ItemCatalogSeeder extends Seeder
 
         $items = [
             [
-                'item_name' => 'Bond Paper',
-                'legacy_name' => 'Bond Paper, A4 (80 GSM)',
+                'item_name' => 'Bond Paper, A4 (80 GSM)',
                 'category_name' => 'Office Supplies',
                 'description' => 'A4 white copy paper, 80 GSM, 500 sheets/ream (Box of 5 reams).',
                 'default_unit' => 'box',
@@ -67,8 +66,7 @@ class ItemCatalogSeeder extends Seeder
                 ],
             ],
             [
-                'item_name' => 'Bond Paper',
-                'legacy_name' => 'Bond Paper, Legal (80 GSM)',
+                'item_name' => 'Bond Paper, Legal (80 GSM)',
                 'category_name' => 'Office Supplies',
                 'description' => 'Legal white copy paper, 80 GSM, 500 sheets/ream (Box of 5 reams).',
                 'default_unit' => 'box',
@@ -80,8 +78,7 @@ class ItemCatalogSeeder extends Seeder
                 ],
             ],
             [
-                'item_name' => 'Bond Paper',
-                'legacy_name' => 'Bond Paper, Letter (80 GSM)',
+                'item_name' => 'Bond Paper, Letter (80 GSM)',
                 'category_name' => 'Office Supplies',
                 'description' => 'Letter white copy paper, 80 GSM, 500 sheets/ream (Box of 5 reams).',
                 'default_unit' => 'box',
@@ -93,8 +90,7 @@ class ItemCatalogSeeder extends Seeder
                 ],
             ],
             [
-                'item_name' => 'Folder, Tagboard',
-                'legacy_name' => 'Folder, Tagboard (Legal size)',
+                'item_name' => 'Folder, Tagboard (Legal size)',
                 'category_name' => 'Office Supplies',
                 'description' => 'Standard legal filing folder, 14pt tagboard (Pack of 100 pcs).',
                 'default_unit' => 'pack',
@@ -106,8 +102,7 @@ class ItemCatalogSeeder extends Seeder
                 ],
             ],
             [
-                'item_name' => 'Folder, Tagboard',
-                'legacy_name' => 'Folder, Tagboard (A4 size)',
+                'item_name' => 'Folder, Tagboard (A4 size)',
                 'category_name' => 'Office Supplies',
                 'description' => 'Standard A4 filing folder, 14pt tagboard (Pack of 100 pcs).',
                 'default_unit' => 'pack',
@@ -119,8 +114,7 @@ class ItemCatalogSeeder extends Seeder
                 ],
             ],
             [
-                'item_name' => 'Ballpen',
-                'legacy_name' => 'Ballpen, Black',
+                'item_name' => 'Ballpen, Black',
                 'category_name' => 'Office Supplies',
                 'description' => 'Black 0.5mm ballpoint pen (Box of 50 pcs).',
                 'default_unit' => 'box',
@@ -132,8 +126,7 @@ class ItemCatalogSeeder extends Seeder
                 ],
             ],
             [
-                'item_name' => 'Ballpen',
-                'legacy_name' => 'Ballpen, Blue',
+                'item_name' => 'Ballpen, Blue',
                 'category_name' => 'Office Supplies',
                 'description' => 'Blue 0.5mm ballpoint pen (Box of 50 pcs).',
                 'default_unit' => 'box',
@@ -145,8 +138,7 @@ class ItemCatalogSeeder extends Seeder
                 ],
             ],
             [
-                'item_name' => 'Ballpen',
-                'legacy_name' => 'Ballpen, Red',
+                'item_name' => 'Ballpen, Red',
                 'category_name' => 'Office Supplies',
                 'description' => 'Red 0.5mm ballpoint pen (Box of 50 pcs).',
                 'default_unit' => 'box',
@@ -194,8 +186,7 @@ class ItemCatalogSeeder extends Seeder
                 ],
             ],
             [
-                'item_name' => 'Flash Drive',
-                'legacy_name' => 'Flash Drive, 32GB',
+                'item_name' => 'Flash Drive, 32GB',
                 'category_name' => 'IT Equipment',
                 'description' => 'Portable USB 3.0 storage device 32GB (Box of 10 pcs).',
                 'default_unit' => 'box',
@@ -207,8 +198,7 @@ class ItemCatalogSeeder extends Seeder
                 ],
             ],
             [
-                'item_name' => 'Flash Drive',
-                'legacy_name' => 'Flash Drive, 64GB',
+                'item_name' => 'Flash Drive, 64GB',
                 'category_name' => 'IT Equipment',
                 'description' => 'Portable USB 3.0 storage device 64GB (Box of 10 pcs).',
                 'default_unit' => 'box',
@@ -232,8 +222,7 @@ class ItemCatalogSeeder extends Seeder
                 ],
             ],
             [
-                'item_name' => 'Printer Ink',
-                'legacy_name' => 'Printer Ink, Black',
+                'item_name' => 'Printer Ink, Black',
                 'category_name' => 'IT Equipment',
                 'description' => 'Compatible black printer ink bottle (Box of 5 cartridges).',
                 'default_unit' => 'box',
@@ -245,8 +234,7 @@ class ItemCatalogSeeder extends Seeder
                 ],
             ],
             [
-                'item_name' => 'Printer Ink',
-                'legacy_name' => 'Printer Ink, Color Set',
+                'item_name' => 'Printer Ink, Color Set',
                 'category_name' => 'IT Equipment',
                 'description' => 'Compatible color printer ink bottle set (Box of 5 cartridges).',
                 'default_unit' => 'box',
@@ -270,8 +258,7 @@ class ItemCatalogSeeder extends Seeder
                 ],
             ],
             [
-                'item_name' => 'Printer Ink',
-                'legacy_name' => 'HP 680 Tri-Color Ink',
+                'item_name' => 'HP 680 Tri-Color Ink',
                 'category_name' => 'IT Equipment',
                 'description' => 'Standard tri-color ink cartridge (Box of 5 cartridges).',
                 'default_unit' => 'box',
@@ -283,8 +270,7 @@ class ItemCatalogSeeder extends Seeder
                 ],
             ],
             [
-                'item_name' => 'Rubbing Alcohol',
-                'legacy_name' => 'Rubbing Alcohol (70%)',
+                'item_name' => 'Rubbing Alcohol (70%)',
                 'category_name' => 'Cleaning Supplies',
                 'description' => '70% Isopropyl cleaning alcohol (Box of 4 gallons).',
                 'default_unit' => 'box',
@@ -308,8 +294,7 @@ class ItemCatalogSeeder extends Seeder
                 ],
             ],
             [
-                'item_name' => 'Trash Bag',
-                'legacy_name' => 'Trash Bag, Black XL',
+                'item_name' => 'Trash Bag, Black XL',
                 'category_name' => 'Cleaning Supplies',
                 'description' => 'Heavy-duty black plastic waste bag, XL (37" x 40") (Box of 10 rolls @ 50 pcs = 500 pcs).',
                 'default_unit' => 'box',
@@ -321,8 +306,7 @@ class ItemCatalogSeeder extends Seeder
                 ],
             ],
             [
-                'item_name' => 'Trash Bag',
-                'legacy_name' => 'Trash Bag, Yellow Biohazard XL',
+                'item_name' => 'Trash Bag, Yellow Biohazard XL',
                 'category_name' => 'Cleaning Supplies',
                 'description' => 'Heavy-duty yellow biohazard waste bag, XL (37" x 40") (Box of 10 rolls @ 50 pcs = 500 pcs).',
                 'default_unit' => 'box',
@@ -365,46 +349,18 @@ class ItemCatalogSeeder extends Seeder
                 continue;
             }
 
-            $primarySpec = $itemData['specifications'][0] ?? null;
-
-            // Find an existing item with the exact name and primary specification (or legacy name)
-            /** @var Item|null $item */
-            $item = Item::query()
-                ->where('item_category_id', $categoryId)
-                ->where(function ($q) use ($itemData, $primarySpec) {
-                    $q->where('item_name', $itemData['item_name']);
-                    if (! empty($itemData['legacy_name'])) {
-                        $q->orWhere('item_name', $itemData['legacy_name']);
-                    }
-                })
-                ->when($primarySpec, function ($q) use ($primarySpec) {
-                    $q->whereHas('specifications', function ($sq) use ($primarySpec) {
-                        $sq->where('specification', $primarySpec);
-                    });
-                })
-                ->first();
-
-            if (! $item) {
-                $item = Item::query()->create([
-                    'item_name' => $itemData['item_name'],
+            /** @var Item $item */
+            $item = Item::query()->updateOrCreate(
+                ['item_name' => $itemData['item_name']],
+                [
                     'item_category_id' => $categoryId,
                     'description' => $itemData['description'],
                     'default_unit' => $itemData['default_unit'],
                     'pieces_per_box' => $itemData['pieces_per_box'] ?? 1,
                     'sub_unit' => $itemData['sub_unit'] ?? 'piece',
                     'status' => $itemData['status'],
-                ]);
-            } else {
-                $item->update([
-                    'item_name' => $itemData['item_name'],
-                    'item_category_id' => $categoryId,
-                    'description' => $itemData['description'],
-                    'default_unit' => $itemData['default_unit'],
-                    'pieces_per_box' => $itemData['pieces_per_box'] ?? 1,
-                    'sub_unit' => $itemData['sub_unit'] ?? 'piece',
-                    'status' => $itemData['status'],
-                ]);
-            }
+                ],
+            );
 
             foreach ($itemData['specifications'] ?? [] as $spec) {
                 ItemSpecification::query()->updateOrCreate(
