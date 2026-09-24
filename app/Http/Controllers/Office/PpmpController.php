@@ -185,6 +185,7 @@ class PpmpController extends Controller
     private function itemOptions(): array
     {
         return Item::query()
+            ->where('status', 'active')
             ->with([
                 'category:item_category_id,category_name',
                 'specifications:item_specification_id,item_id,specification',

@@ -5,22 +5,12 @@ import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEvent, useMemo } from 'react';
 import { FUND_SOURCES, DEFAULT_FUND_SOURCE } from '@/constants/fundSources';
 import { todayInputValue } from '@/lib/dateInput';
-
-type SpecificationOption = {
-    item_specification_id: number;
-    specification: string;
-};
-
-type ItemOption = {
-    item_id: number;
-    item_name: string;
-    item_category_id: number;
-    item_category_name: string;
-    default_unit?: string | null;
-    pieces_per_box?: number | null;
-    sub_unit?: string | null;
-    specifications?: SpecificationOption[];
-};
+import {
+    buildCatalogGroups,
+    findGroupByItemId,
+    findVariantByItemId,
+    ItemOption,
+} from '@/lib/catalogGrouping';
 
 type ItemDraft = {
     item_id: string;
@@ -29,6 +19,7 @@ type ItemDraft = {
     unit_cost: string;
     procurement_schedule: string;
     remarks: string;
+    selected_group_key?: string;
 };
 
 type Props = {
@@ -45,6 +36,8 @@ export default function PpmpCreate({ itemOptions }: Props) {
         refreshOnFocus: false,
         refreshOnMount: false,
     });
+
+    const catalogGroups = useMemo(() => buildCatalogGroups(itemOptions), [itemOptions]);
 
     const form = useForm({
         fiscal_year: CURRENT_YEAR,
@@ -85,24 +78,55 @@ export default function PpmpCreate({ itemOptions }: Props) {
     const patchItem = (index: number, patch: Partial<ItemDraft>) => {
         form.setData('items', form.data.items.map((item, i) => (i === index ? { ...item, ...patch } : item)));
     };
-    const chooseItem = (index: number, itemId: string) => {
-        const option = itemOptions.find((entry) => String(entry.item_id) === itemId);
-        if (!option) {
-            patchItem(index, { item_id: '', item_category_id: '', remarks: '' });
+
+    const chooseGroup = (index: number, groupKey: string) => {
+        const group = catalogGroups.find((g) => g.group_key === groupKey);
+        if (!group) {
+            patchItem(index, {
+                selected_group_key: '',
+                item_id: '',
+                item_category_id: '',
+                remarks: '',
+            });
             return;
         }
 
-        const specs = option.specifications ?? [];
-        const autoSpec = specs.length === 1 ? specs[0].specification : '';
-
-        patchItem(index, {
-            item_id: String(option.item_id),
-            item_category_id: String(option.item_category_id),
-            remarks: autoSpec,
-        });
+        if (group.variants.length === 1) {
+            const single = group.variants[0];
+            patchItem(index, {
+                selected_group_key: group.group_key,
+                item_id: String(single.item_id),
+                item_category_id: String(single.item_category_id),
+                remarks: single.specification,
+            });
+        } else {
+            // Multi-variant product (e.g. Bond Paper with A4, Letter, Legal)
+            patchItem(index, {
+                selected_group_key: group.group_key,
+                item_id: '',
+                item_category_id: String(group.item_category_id),
+                remarks: '',
+            });
+        }
     };
 
-    const itemOptionById = new Map(itemOptions.map((option) => [String(option.item_id), option]));
+    const chooseVariant = (index: number, variantItemId: string) => {
+        const groupKey = form.data.items[index]?.selected_group_key;
+        const group = groupKey ? catalogGroups.find((g) => g.group_key === groupKey) : undefined;
+        const variant = group?.variants.find((v) => String(v.item_id) === variantItemId)
+            || findVariantByItemId(catalogGroups, variantItemId);
+
+        if (!variant) {
+            patchItem(index, { item_id: '', remarks: '' });
+            return;
+        }
+
+        patchItem(index, {
+            item_id: String(variant.item_id),
+            item_category_id: String(variant.item_category_id),
+            remarks: variant.specification,
+        });
+    };
 
     return (
         <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Create PPMP</h2>}>
@@ -241,11 +265,15 @@ export default function PpmpCreate({ itemOptions }: Props) {
                     {/* Scrollable Items Container (Page itself does not scroll; only rows scroll inside) */}
                     <div className="flex-1 overflow-y-auto pr-1 space-y-2 min-h-0">
                         {form.data.items.map((item, index) => {
-                            const selectedItem = itemOptionById.get(item.item_id);
-                            const unit = selectedItem?.default_unit || 'box';
-                            const piecesPerBox = selectedItem?.pieces_per_box || 1;
-                            const subUnit = selectedItem?.sub_unit || 'piece';
-                            const specs = selectedItem?.specifications || [];
+                            const selectedVariant = item.item_id ? findVariantByItemId(catalogGroups, item.item_id) : undefined;
+                            const selectedGroup = selectedVariant
+                                ? findGroupByItemId(catalogGroups, item.item_id)
+                                : (item.selected_group_key ? catalogGroups.find((g) => g.group_key === item.selected_group_key) : undefined);
+
+                            const currentGroupKey = selectedGroup?.group_key || '';
+                            const unit = selectedVariant?.default_unit || selectedGroup?.default_unit || 'box';
+                            const piecesPerBox = selectedVariant?.pieces_per_box || selectedGroup?.pieces_per_box || 1;
+                            const subUnit = selectedVariant?.sub_unit || selectedGroup?.sub_unit || 'piece';
                             const qtyNum = Number(item.quantity) || 0;
                             const unitCostNum = Number(item.unit_cost) || 0;
                             const totalPieces = qtyNum * piecesPerBox;
@@ -301,8 +329,8 @@ export default function PpmpCreate({ itemOptions }: Props) {
                                         <label className="block">
                                             <span className="mb-0.5 block text-xs font-medium text-slate-700">Catalog Item</span>
                                             <select
-                                                value={item.item_id}
-                                                onChange={(event) => chooseItem(index, event.target.value)}
+                                                value={currentGroupKey}
+                                                onChange={(event) => chooseGroup(index, event.target.value)}
                                                 className={`w-full rounded-lg border px-2.5 py-1 text-xs ${
                                                     form.errors[`items.${index}.item_id`] || form.errors[`items.${index}.item_category_id`]
                                                         ? 'border-rose-400 bg-rose-50/30'
@@ -311,9 +339,9 @@ export default function PpmpCreate({ itemOptions }: Props) {
                                                 required
                                             >
                                                 <option value="">Select Item</option>
-                                                {itemOptions.map((option) => (
-                                                    <option key={option.item_id} value={option.item_id}>
-                                                        {option.item_name} {option.pieces_per_box && option.pieces_per_box > 1 ? `(${option.pieces_per_box} ${option.sub_unit || 'piece'}s/${option.default_unit || 'box'})` : ''}
+                                                {catalogGroups.map((group) => (
+                                                    <option key={group.group_key} value={group.group_key}>
+                                                        {group.base_name} {group.pieces_per_box > 1 ? `(${group.pieces_per_box} ${group.sub_unit}s/${group.default_unit})` : `(${group.default_unit})`}
                                                     </option>
                                                 ))}
                                             </select>
@@ -405,41 +433,41 @@ export default function PpmpCreate({ itemOptions }: Props) {
                                                 <span className="block text-xs font-medium text-slate-700">
                                                     Standard Specification / Technical Details <span className="text-rose-600">*</span>
                                                 </span>
-                                                {specs.length === 1 ? (
+                                                {selectedGroup && selectedGroup.variants.length > 1 ? (
+                                                    <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700 border border-indigo-200">
+                                                        {selectedGroup.variants.length} Approved Specifications Available
+                                                    </span>
+                                                ) : selectedGroup && selectedGroup.variants.length === 1 ? (
                                                     <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 border border-slate-200">
                                                         <svg className="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                                         </svg>
                                                         Standard Catalog Specification (Locked)
                                                     </span>
-                                                ) : specs.length > 1 ? (
-                                                    <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700 border border-indigo-200">
-                                                        {specs.length} GSO Approved Options
-                                                    </span>
                                                 ) : null}
                                             </div>
 
-                                            {specs.length > 1 ? (
+                                            {selectedGroup && selectedGroup.variants.length > 1 ? (
                                                 <select
-                                                    value={item.remarks}
-                                                    onChange={(event) => patchItem(index, { remarks: event.target.value })}
+                                                    value={item.item_id}
+                                                    onChange={(event) => chooseVariant(index, event.target.value)}
                                                     className={`w-full rounded-lg border px-2.5 py-1 text-xs ${
-                                                        form.errors[`items.${index}.remarks`]
+                                                        form.errors[`items.${index}.remarks`] || form.errors[`items.${index}.item_id`]
                                                             ? 'border-rose-400 bg-rose-50/30'
                                                             : 'border-slate-300'
                                                     }`}
                                                     required
                                                 >
-                                                    <option value="">Select standard specification...</option>
-                                                    {specs.map((s) => (
-                                                        <option key={s.item_specification_id} value={s.specification}>
-                                                            {s.specification}
+                                                    <option value="">Select standard specification (A4, Letter, Legal...)</option>
+                                                    {selectedGroup.variants.map((v) => (
+                                                        <option key={v.item_id} value={v.item_id}>
+                                                            {v.specification}
                                                         </option>
                                                     ))}
                                                 </select>
-                                            ) : specs.length === 1 ? (
+                                            ) : selectedGroup && selectedGroup.variants.length === 1 ? (
                                                 <input
-                                                    value={item.remarks || specs[0].specification}
+                                                    value={item.remarks || selectedGroup.variants[0].specification}
                                                     readOnly
                                                     aria-readonly="true"
                                                     className="w-full rounded-lg border border-slate-300 bg-slate-100/70 px-2.5 py-1 text-xs text-slate-800 font-medium cursor-not-allowed"
@@ -448,18 +476,14 @@ export default function PpmpCreate({ itemOptions }: Props) {
                                             ) : (
                                                 <input
                                                     value={item.remarks}
-                                                    onChange={(event) => patchItem(index, { remarks: event.target.value })}
-                                                    placeholder="Required item specification"
-                                                    className={`w-full rounded-lg border px-2.5 py-1 text-xs ${
-                                                        form.errors[`items.${index}.remarks`]
-                                                            ? 'border-rose-400 bg-rose-50/30'
-                                                            : 'border-slate-300'
-                                                    }`}
+                                                    readOnly
+                                                    placeholder="Select a catalog item above first..."
+                                                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-400 cursor-not-allowed"
                                                     required
                                                 />
                                             )}
                                             <span className="mt-0.5 block text-[10px] text-slate-500">
-                                                {specs.length > 1
+                                                {selectedGroup && selectedGroup.variants.length > 1
                                                     ? 'Select from GSO pre-approved standardized specifications for this item.'
                                                     : 'Pre-approved GSO standard technical specification auto-filled into Supply Requests and Purchase Orders.'}
                                             </span>
