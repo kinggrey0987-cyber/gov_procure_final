@@ -101,6 +101,8 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
         attachments: [] as File[],
     });
     const [issueLines, setIssueLines] = useState<IssueLine[]>(() => buildInitialIssueLines(initialItem));
+    const [validationError, setValidationError] = useState<string | null>(null);
+    const [fileWarning, setFileWarning] = useState<string | null>(null);
 
     const selectedRecord = useMemo(
         () => distributionRecords.find((record) => record.distribution_record_id === Number(form.data.distribution_record_id)),
@@ -120,18 +122,22 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
     const backRouteName = isOfficeUser ? 'office.claims.index' : 'inventory.claims.index';
 
     const isDuplicateCombo = (itemId: string | number, claimType: string, lineId: number) => {
+        if (!itemId || !claimType) return false;
         return issueLines.some(
             (other) =>
                 other.id !== lineId &&
+                Boolean(other.distribution_item_id) &&
                 String(other.distribution_item_id) === String(itemId) &&
                 other.claim_type === claimType,
         );
     };
 
     const nextAvailableCombo = useMemo(() => {
+        if (selectedRecordItems.length === 0) return null;
+
         const usedCombos = new Set(
             issueLines
-                .filter((l) => l.distribution_item_id)
+                .filter((l) => Boolean(l.distribution_item_id))
                 .map((l) => `${l.distribution_item_id}_${l.claim_type}`),
         );
 
@@ -148,6 +154,10 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
         }
         return null;
     }, [selectedRecordItems, issueLines]);
+
+    const hasEmptyLine = useMemo(() => issueLines.some((line) => !line.distribution_item_id), [issueLines]);
+    const allCombosUsed = nextAvailableCombo === null;
+    const canAddIssueLine = selectedRecordItems.length > 0 && !hasEmptyLine && !allCombosUsed;
 
     const hasDuplicateIssues = useMemo(() => {
         const seen = new Set<string>();
@@ -203,16 +213,34 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                         className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
                         onSubmit={(e) => {
                             e.preventDefault();
+                            setValidationError(null);
+
+                            if (!form.data.distribution_record_id) {
+                                setValidationError('Please select a received supply request.');
+                                return;
+                            }
+
+                            const unselectedLineIndex = issueLines.findIndex((l) => !l.distribution_item_id);
+                            if (unselectedLineIndex !== -1) {
+                                setValidationError(`Please select an item on issue line #${unselectedLineIndex + 1} before submitting.`);
+                                return;
+                            }
+
                             if (hasDuplicateIssues) {
-                                alert('Duplicate issue lines found for the same item and reason. Please remove duplicate lines before submitting.');
+                                setValidationError('Duplicate issue lines found for the same item and reason. Please remove duplicate lines before submitting.');
                                 return;
                             }
                             if (hasOverclaimedItems) {
-                                alert('Total claimed quantity exceeds the released quantity for one or more items. Please adjust the quantities before submitting.');
+                                setValidationError('Total claimed quantity exceeds the released quantity for one or more items. Please adjust the quantities before submitting.');
                                 return;
                             }
                             if (totalIssueQuantity <= 0) {
-                                alert('Please specify a claimed quantity greater than 0 on at least one issue line.');
+                                setValidationError('Please specify a claimed quantity greater than 0 on at least one issue line.');
+                                return;
+                            }
+
+                            if (!form.data.remarks.trim()) {
+                                setValidationError('Please provide discrepancy details & findings before submitting.');
                                 return;
                             }
 
@@ -236,6 +264,7 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                 value={form.data.distribution_record_id}
                                 disabled={isFollowUpClaim}
                                 onChange={(e) => {
+                                    setValidationError(null);
                                     const selectedRecordId = Number(e.target.value);
                                     const selected = distributionRecords.find((record) => record.distribution_record_id === selectedRecordId);
                                     const firstItem = selected?.items?.[0] ?? null;
@@ -297,40 +326,70 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                     <h3 className="text-sm font-semibold text-amber-900">Multiple affected items or issue types?</h3>
                                     <p className="text-xs text-amber-800">Add issue lines here. The system totals the claimed quantity automatically.</p>
                                 </div>
-                                <button
-                                    type="button"
-                                    className="rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
-                                    disabled={selectedRecordItems.length === 0 || nextAvailableCombo === null}
-                                    title={nextAvailableCombo === null ? 'All possible issue combinations for these items have been added' : 'Add another issue line'}
-                                    onClick={() => {
-                                        if (nextAvailableCombo) {
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {hasEmptyLine && (
+                                        <span className="text-[11px] font-medium text-amber-800 bg-amber-100/70 border border-amber-200/80 rounded px-2 py-0.5">
+                                            Select an item on current lines to add more
+                                        </span>
+                                    )}
+                                    {!hasEmptyLine && allCombosUsed && selectedRecordItems.length > 0 && (
+                                        <span className="text-[11px] font-medium text-slate-500 bg-slate-100 border border-slate-200 rounded px-2 py-0.5">
+                                            All issue combinations added
+                                        </span>
+                                    )}
+                                    <button
+                                        type="button"
+                                        className="rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                        disabled={!canAddIssueLine}
+                                        title={
+                                            selectedRecordItems.length === 0
+                                                ? 'Please select a received supply request first'
+                                                : hasEmptyLine
+                                                ? 'Select an item for all current issue lines before adding another'
+                                                : allCombosUsed
+                                                ? 'All possible issue combinations for these items have been added'
+                                                : 'Add another issue line'
+                                        }
+                                        onClick={() => {
+                                            if (!canAddIssueLine || !nextAvailableCombo) return;
+                                            setValidationError(null);
                                             setIssueLines((lines) => [
                                                 ...lines,
                                                 createIssueLine(nextAvailableCombo.claim_type, '', nextAvailableCombo.distribution_item_id),
                                             ]);
-                                        }
-                                    }}
-                                >
-                                    Add Issue Line
-                                </button>
+                                        }}
+                                    >
+                                        Add Issue Line
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="mt-3 space-y-3">
-                                {issueLines.map((line) => {
-                                    const lineItem = selectedRecordItems.find((item) => item.distribution_item_id === Number(line.distribution_item_id)) ?? selectedItem;
+                                {issueLines.map((line, lineIndex) => {
+                                    const lineItem = line.distribution_item_id
+                                        ? selectedRecordItems.find((item) => item.distribution_item_id === Number(line.distribution_item_id)) ?? null
+                                        : null;
                                     const lineMaxQuantity = Math.trunc(lineItem?.quantity_released ?? 0);
-                                    const lineIsDuplicate = isDuplicateCombo(line.distribution_item_id, line.claim_type, line.id);
-                                    const itemTotal = itemClaimedTotals[line.distribution_item_id] ?? 0;
+                                    const lineIsDuplicate = Boolean(line.distribution_item_id) && isDuplicateCombo(line.distribution_item_id, line.claim_type, line.id);
+                                    const itemTotal = line.distribution_item_id ? itemClaimedTotals[line.distribution_item_id] ?? 0 : 0;
                                     const itemOverclaimed = lineMaxQuantity > 0 && itemTotal > lineMaxQuantity;
+                                    const lineMissingItem = !line.distribution_item_id;
 
                                     return (
                                         <div key={line.id} className="space-y-1.5 rounded-lg border border-amber-200 bg-white p-3">
                                             <div className="grid gap-2 sm:grid-cols-[1.35fr_1.1fr_0.65fr_auto]">
                                                 <select
-                                                    className={`w-full rounded-lg border px-3 py-2 text-sm ${lineIsDuplicate ? 'border-rose-400 bg-rose-50/50' : 'border-slate-300'}`}
+                                                    className={`w-full rounded-lg border px-3 py-2 text-sm ${
+                                                        lineIsDuplicate
+                                                            ? 'border-rose-400 bg-rose-50/50'
+                                                            : lineMissingItem && validationError
+                                                            ? 'border-rose-400 bg-rose-50/30'
+                                                            : 'border-slate-300'
+                                                    }`}
                                                     value={line.distribution_item_id}
                                                     onChange={(e) => {
                                                         const newDistributionItemId = e.target.value;
+                                                        setValidationError(null);
                                                         updateIssueLine(setIssueLines, line.id, { distribution_item_id: newDistributionItemId });
                                                         if (issueLines[0]?.id === line.id) {
                                                             form.setData('distribution_item_id', newDistributionItemId);
@@ -354,7 +413,10 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                                 <select
                                                     className={`w-full rounded-lg border px-3 py-2 text-sm ${lineIsDuplicate ? 'border-rose-400 bg-rose-50/50' : 'border-slate-300'}`}
                                                     value={line.claim_type}
-                                                    onChange={(e) => updateIssueLine(setIssueLines, line.id, { claim_type: e.target.value })}
+                                                    onChange={(e) => {
+                                                        setValidationError(null);
+                                                        updateIssueLine(setIssueLines, line.id, { claim_type: e.target.value });
+                                                    }}
                                                 >
                                                     {claimTypeOptions.map((option) => {
                                                         const isUsed = isDuplicateCombo(line.distribution_item_id, option.value, line.id);
@@ -377,6 +439,7 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                                     placeholder="Qty"
                                                     value={line.quantity}
                                                     onChange={(e) => {
+                                                        setValidationError(null);
                                                         const wholeQuantity = e.target.value.replace(/\D/g, '');
                                                         const cappedQuantity = lineMaxQuantity > 0 && Number(wholeQuantity) > lineMaxQuantity ? String(lineMaxQuantity) : wholeQuantity;
 
@@ -387,7 +450,10 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                                     type="button"
                                                     className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-50"
                                                     disabled={issueLines.length === 1}
-                                                    onClick={() => setIssueLines((lines) => lines.filter((current) => current.id !== line.id))}
+                                                    onClick={() => {
+                                                        setValidationError(null);
+                                                        setIssueLines((lines) => lines.filter((current) => current.id !== line.id));
+                                                    }}
                                                 >
                                                     Remove
                                                 </button>
@@ -395,6 +461,11 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                             {lineIsDuplicate && (
                                                 <p className="text-[11px] font-semibold text-rose-600">
                                                     ⚠ Duplicate issue: An issue line for this item with reason "{claimTypeOptions.find((o) => o.value === line.claim_type)?.label ?? line.claim_type}" is already added.
+                                                </p>
+                                            )}
+                                            {lineMissingItem && validationError && (
+                                                <p className="text-[11px] font-semibold text-rose-600">
+                                                    ⚠ Line #{lineIndex + 1}: Please select an item.
                                                 </p>
                                             )}
                                             {itemOverclaimed && (
@@ -427,7 +498,15 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
 
                         <div>
                             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-700">Discrepancy Details & Findings <span className="text-rose-600 font-bold">* Required</span></label>
-                            <textarea className="min-h-[90px] w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Describe what was observed and what quantity/item was affected." value={form.data.remarks} onChange={(e) => form.setData('remarks', e.target.value)} />
+                            <textarea
+                                className={`min-h-[90px] w-full rounded-lg border px-3 py-2 text-sm ${validationError && !form.data.remarks.trim() ? 'border-rose-400 bg-rose-50/30' : 'border-slate-300'}`}
+                                placeholder="Describe what was observed and what quantity/item was affected."
+                                value={form.data.remarks}
+                                onChange={(e) => {
+                                    setValidationError(null);
+                                    form.setData('remarks', e.target.value);
+                                }}
+                            />
                             {form.errors.remarks ? <p className="mt-1 text-xs text-rose-600">{form.errors.remarks}</p> : null}
                         </div>
 
@@ -468,13 +547,29 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                             const newFiles = Array.from(e.target.files ?? []);
                                             const validFiles = newFiles.filter((f) => f.size <= 10 * 1024 * 1024);
                                             if (validFiles.length < newFiles.length) {
-                                                alert('Some files exceed the 10MB limit and were skipped.');
+                                                setFileWarning('Some files exceed the 10MB limit and were skipped.');
+                                            } else {
+                                                setFileWarning(null);
                                             }
                                             const combined = [...form.data.attachments, ...validFiles];
                                             form.setData('attachments', combined);
                                             form.setData('attachment_file', combined[0] ?? null);
                                         }}
                                     />
+                                    {fileWarning && (
+                                        <div className="mt-2 flex items-center justify-between rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                            <span className="flex items-center gap-1.5 font-medium">
+                                                ⚠ {fileWarning}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setFileWarning(null)}
+                                                className="ml-2 font-bold text-amber-700 hover:text-amber-950"
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -508,6 +603,29 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
 
                             {form.errors.attachment_file ? <p className="text-xs text-rose-600">{form.errors.attachment_file}</p> : null}
                         </div>
+
+                        {validationError && (
+                            <div
+                                id="claim-validation-banner"
+                                className="flex items-start gap-3 rounded-xl border border-rose-300 bg-rose-50/90 p-4 text-sm text-rose-800 shadow-xs"
+                            >
+                                <svg className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <div className="flex-1">
+                                    <p className="font-semibold text-rose-900">Submission Blocked</p>
+                                    <p className="mt-0.5 text-xs text-rose-700">{validationError}</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setValidationError(null)}
+                                    className="p-1 text-xs font-semibold text-rose-500 hover:text-rose-800"
+                                    title="Dismiss error"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                        )}
 
                         {form.hasErrors ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">Please review the highlighted claim form fields before submitting.</p> : null}
 
