@@ -56,12 +56,15 @@ class PpmpController extends Controller
                 'ppmp_code' => sprintf('PPMP-%d-%04d', (int) $ppmp->fiscal_year, (int) $ppmp->ppmp_id),
                 'fiscal_year' => (int) $ppmp->fiscal_year,
                 'status' => (string) $ppmp->status,
+                'is_projected' => (int) $ppmp->fiscal_year > (int) now()->format('Y'),
+                'is_past' => (int) $ppmp->fiscal_year < (int) now()->format('Y'),
                 'last_updated' => optional($ppmp->updated_at)?->toIso8601String(),
                 'date_prepared' => optional($ppmp->date_prepared)?->toDateString(),
             ]);
 
         return Inertia::render('Office/Ppmp/Index', [
             'ppmps' => $ppmps,
+            'currentFiscalYear' => (int) now()->format('Y'),
             'filters' => [
                 'status' => $status,
                 'year' => $year,
@@ -77,6 +80,7 @@ class PpmpController extends Controller
     {
         return Inertia::render('Office/Ppmp/Create', [
             'itemOptions' => $this->itemOptions(),
+            'currentFiscalYear' => (int) now()->format('Y'),
         ]);
     }
 
@@ -100,12 +104,18 @@ class PpmpController extends Controller
 
         $canEdit = $request->user()?->can('office.ppmp.update', $ppmp) ?? false;
         $canSubmit = $request->user()?->can('office.ppmp.submit', $ppmp) ?? false;
+        $currentFiscalYear = (int) now()->format('Y');
+        $isProjected = (int) $ppmp->fiscal_year > $currentFiscalYear;
+        $isPast = (int) $ppmp->fiscal_year < $currentFiscalYear;
         $history = $this->historyTimelineService->forRecord($request->user(), $ppmp);
 
         return Inertia::render('Office/Ppmp/Show', [
             'ppmp' => $ppmp->load(['items.item', 'items.itemCategory', 'office', 'preparer', 'approver']),
             'canEdit' => $canEdit,
             'canSubmit' => $canSubmit,
+            'isProjected' => $isProjected,
+            'isPast' => $isPast,
+            'currentFiscalYear' => $currentFiscalYear,
             'itemOptions' => $this->itemOptions(),
             'statusHistory' => $history['status']->map(fn ($entry): array => [
                 'id' => (int) $entry->id,
@@ -142,6 +152,7 @@ class PpmpController extends Controller
         return Inertia::render('Office/Ppmp/Edit', [
             'ppmp' => $ppmp->load(['items.item', 'items.itemCategory']),
             'itemOptions' => $this->itemOptions(),
+            'currentFiscalYear' => (int) now()->format('Y'),
         ]);
     }
 

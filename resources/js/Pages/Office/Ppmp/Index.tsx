@@ -9,12 +9,15 @@ type PpmpRow = {
     ppmp_code: string;
     fiscal_year: number;
     status: string;
+    is_projected?: boolean;
+    is_past?: boolean;
     date_prepared?: string | null;
     last_updated?: string | null;
 };
 
 type Props = {
     ppmps: { data: PpmpRow[]; links: Array<{ url: string | null; label: string; active: boolean }> };
+    currentFiscalYear?: number;
     filters?: {
         status?: string;
         year?: string;
@@ -25,7 +28,7 @@ type Props = {
     };
 };
 
-export default function PpmpIndex({ ppmps, filters, filter_options }: Props) {
+export default function PpmpIndex({ ppmps, currentFiscalYear, filters, filter_options }: Props) {
     const [status, setStatus] = useState(filters?.status ?? '');
     const [year, setYear] = useState(filters?.year ?? '');
     const [month, setMonth] = useState(filters?.month ?? '');
@@ -106,7 +109,7 @@ export default function PpmpIndex({ ppmps, filters, filter_options }: Props) {
                             className="h-8 rounded-lg border-slate-300 pl-2.5 pr-8 py-1 text-xs"
                         >
                             <option value="">All statuses</option>
-                            {['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'RETURNED_FOR_REVISION'].map((option) => (
+                            {['DRAFT', 'SUBMITTED', 'APPROVED', 'CLOSED', 'REJECTED', 'RETURNED_FOR_REVISION'].map((option) => (
                                 <option key={option} value={option}>{option.replaceAll('_', ' ')}</option>
                             ))}
                         </select>
@@ -174,7 +177,7 @@ export default function PpmpIndex({ ppmps, filters, filter_options }: Props) {
                                             <td className="px-3.5 py-2 text-slate-700 font-medium">{ppmp.fiscal_year}</td>
                                             <td className="px-3.5 py-2 text-slate-700">{ppmp.date_prepared ?? '-'}</td>
                                             <td className="px-3.5 py-2">
-                                                <StatusBadge status={ppmp.status} />
+                                                <StatusBadge status={ppmp.status} isProjected={ppmp.is_projected} />
                                             </td>
                                             <td className="px-3.5 py-2 text-slate-700 text-xs">{formatDateTime(ppmp.last_updated)}</td>
                                             <td className="px-3.5 py-2 text-right">
@@ -251,18 +254,29 @@ function formatDateTime(value?: string | null): string {
     return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, isProjected }: { status: string; isProjected?: boolean }) {
+    if (isProjected) {
+        return (
+            <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-semibold text-purple-800">
+                <span className="h-1.5 w-1.5 rounded-full bg-purple-600"></span>
+                <span>Projected</span>
+            </span>
+        );
+    }
+
     const normalized = status.toUpperCase();
     const style =
         normalized === 'APPROVED'
             ? 'bg-emerald-100 text-emerald-700'
-            : normalized === 'SUBMITTED'
-                ? 'bg-blue-100 text-blue-700'
-                : normalized === 'RETURNED_FOR_REVISION'
-                    ? 'bg-amber-100 text-amber-700'
-                    : normalized === 'REJECTED'
-                        ? 'bg-rose-100 text-rose-700'
-                        : 'bg-slate-100 text-slate-700';
+            : normalized === 'CLOSED'
+                ? 'bg-slate-200 text-slate-600 font-medium'
+                : normalized === 'SUBMITTED'
+                    ? 'bg-blue-100 text-blue-700'
+                    : normalized === 'RETURNED_FOR_REVISION'
+                        ? 'bg-amber-100 text-amber-700'
+                        : normalized === 'REJECTED'
+                            ? 'bg-rose-100 text-rose-700'
+                            : 'bg-slate-100 text-slate-700';
 
     return <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${style}`}>{status.replaceAll('_', ' ')}</span>;
 }

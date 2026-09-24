@@ -97,11 +97,14 @@ class ClaimController
 
         $parentClaim = null;
         $requestedParentClaimId = (int) $request->query('parent_claim_id', 0);
+        $currentYear = (int) now()->format('Y');
+
         if ($requestedParentClaimId > 0) {
             $candidateParentClaim = Claim::query()
                 ->where('claims_id', $requestedParentClaimId)
                 ->where('office_id', (int) $user->office_id)
                 ->where('status', 'RESOLVED')
+                ->whereYear('created_at', $currentYear)
                 ->whereNull('parent_claim_id')
                 ->doesntHave('followUpClaims')
                 ->firstOrFail();
@@ -112,6 +115,12 @@ class ClaimController
         $distributionRecords = DistributionRecord::query()
             ->where('office_id', (int) $user->office_id)
             ->where('status', 'RECEIVED')
+            ->where(function ($query) use ($currentYear) {
+                $query->whereYear('release_date', $currentYear)
+                    ->orWhere(function ($q) use ($currentYear) {
+                        $q->whereNull('release_date')->whereYear('created_at', $currentYear);
+                    });
+            })
             ->with(['office', 'supplyRequest', 'items.item'])
             ->orderByDesc('release_date')
             ->orderByDesc('distribution_record_id')

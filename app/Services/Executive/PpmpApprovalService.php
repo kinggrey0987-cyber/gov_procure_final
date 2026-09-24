@@ -46,6 +46,12 @@ class PpmpApprovalService
             ]);
         }
 
+        if ($newStatus === 'APPROVED' && (int) $ppmp->fiscal_year > (int) now()->format('Y')) {
+            throw ValidationException::withMessages([
+                'status' => "Projected PPMP for future Fiscal Year {$ppmp->fiscal_year} cannot be approved for active procurement until that fiscal year begins.",
+            ]);
+        }
+
         return DB::transaction(function () use ($ppmp, $actor, $newStatus, $currentStatus, $remarks): Ppmp {
             $approvalDate = $newStatus === 'APPROVED' ? now()->toDateString() : null;
             $approverId = in_array($newStatus, ['APPROVED', 'REJECTED'], true) ? (int) $actor->id : null;

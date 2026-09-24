@@ -225,6 +225,14 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                             <span className="mb-1 block text-sm font-medium text-slate-700">Fiscal Year</span>
                             <input type="number" min={CURRENT_YEAR} className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700" value={form.data.fiscal_year} readOnly aria-readonly="true" />
                             <span className="mt-1 block text-xs text-slate-500">Fiscal year is locked after PPMP creation.</span>
+                            {Number(form.data.fiscal_year) > CURRENT_YEAR && (
+                                <div className="mt-2 flex items-start gap-2 rounded-lg border border-purple-200 bg-purple-50/80 p-2.5 text-xs text-purple-800">
+                                    <span className="text-sm leading-none">📘</span>
+                                    <div>
+                                        <strong className="font-semibold">Projected PPMP (FY {form.data.fiscal_year}):</strong> This plan is a forward-year budget projection. You can modify planned items, but it cannot be submitted for executive approval until Fiscal Year {form.data.fiscal_year} begins.
+                                    </div>
+                                </div>
+                            )}
                         </label>
                         <label className="block">
                             <span className="mb-1 block text-sm font-medium text-slate-700">Date Prepared</span>

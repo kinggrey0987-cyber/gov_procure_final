@@ -63,9 +63,12 @@ class PurchaseOrderController extends Controller
     {
         abort_unless($request->user()?->can('procurement.purchase-order.create'), 403);
 
+        $currentYear = (int) now()->format('Y');
+
         $eligiblePurchaseRequests = PurchaseRequest::query()
             ->processing()
             ->whereDoesntHave('purchaseOrders')
+            ->whereYear('created_at', $currentYear)
             ->with([
                 'office:id,code,name',
                 'supplyRequest:supply_request_id,request_code,requested_by',

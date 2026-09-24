@@ -136,7 +136,7 @@ class AppServiceProvider extends ServiceProvider
             return $user->can('office.ppmp.view', $ppmp) && (string) $ppmp->status === 'DRAFT';
         });
         Gate::define('office.ppmp.submit', function (User $user, Ppmp $ppmp): bool {
-            return $user->can('office.ppmp.update', $ppmp);
+            return $user->can('office.ppmp.update', $ppmp) && (int) $ppmp->fiscal_year <= (int) now()->format('Y');
         });
 
         Gate::define('office.supply-request.view-any', fn (User $user): bool => $user->isOfficeUser());

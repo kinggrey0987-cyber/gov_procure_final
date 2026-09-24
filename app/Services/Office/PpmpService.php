@@ -84,6 +84,13 @@ class PpmpService
     {
         $this->assertDraftAndOwned($ppmp, $actor);
 
+        $currentYear = (int) now()->format('Y');
+        if ((int) $ppmp->fiscal_year > $currentYear) {
+            throw ValidationException::withMessages([
+                'fiscal_year' => "PPMP for Fiscal Year {$ppmp->fiscal_year} is a projected plan and cannot be submitted for executive review until FY {$ppmp->fiscal_year} begins.",
+            ]);
+        }
+
         if (! $ppmp->items()->exists()) {
             throw ValidationException::withMessages([
                 'items' => 'At least one PPMP item is required before submission.',

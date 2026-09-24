@@ -59,14 +59,16 @@ class StoreSupplyRequestRequest extends FormRequest
             $items = collect($this->input('items', []));
 
             if ($ppmpId > 0) {
+                $currentYear = (int) now()->format('Y');
                 $ppmpIsApproved = Ppmp::query()
                     ->where('ppmp_id', $ppmpId)
                     ->where('office_id', $officeId)
                     ->where('status', 'APPROVED')
+                    ->where('fiscal_year', $currentYear)
                     ->exists();
 
                 if (! $ppmpIsApproved) {
-                    $validator->errors()->add('ppmp_id', 'Selected PPMP is not approved and cannot be used for a supply request.');
+                    $validator->errors()->add('ppmp_id', "Selected PPMP is not an approved PPMP for active Fiscal Year {$currentYear} and cannot be used for a supply request.");
                     return;
                 }
             }

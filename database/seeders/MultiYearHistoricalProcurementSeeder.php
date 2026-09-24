@@ -189,7 +189,7 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
                         'prepared_by' => $user->id,
                         'approved_by' => $execUser->id,
                         'fund_source' => $def['fund_source'],
-                        'status' => 'APPROVED',
+                        'status' => $year < 2026 ? 'CLOSED' : 'APPROVED',
                         'total_estimated_budget' => 0,
                         'date_prepared' => $datePrepared,
                         'date_approved' => $dateApproved,

@@ -32,6 +32,9 @@ type Props = {
     };
     canEdit: boolean;
     canSubmit: boolean;
+    isProjected?: boolean;
+    isPast?: boolean;
+    currentFiscalYear?: number;
     statusHistory: Array<{
         id: number;
         old_status?: string | null;
@@ -59,7 +62,7 @@ type Props = {
     }>;
 };
 
-export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, approvalHistory }: Props) {
+export default function PpmpShow({ ppmp, canEdit, canSubmit, isProjected, isPast, currentFiscalYear, statusHistory, approvalHistory }: Props) {
     const submitForm = useForm({ remarks: ppmp.remarks ?? '' });
     const [confirmingDelete, setConfirmingDelete] = useState(false);
     const [confirmingSubmit, setConfirmingSubmit] = useState(false);
@@ -174,9 +177,37 @@ export default function PpmpShow({ ppmp, canEdit, canSubmit, statusHistory, appr
                                     {isExportingPdf ? 'Generating PDF...' : 'Export PDF'}
                                 </button>
                             </div>
-                            <StatusBadge status={ppmp.status} />
+                            <StatusBadge status={ppmp.status} isProjected={isProjected} />
                         </div>
                     </div>
+
+                    {isProjected && (
+                        <div className="mt-4 rounded-xl border border-purple-200 bg-purple-50/90 px-4 py-3 text-purple-900 shadow-sm">
+                            <div className="flex items-start gap-3">
+                                <span className="text-xl">📘</span>
+                                <div>
+                                    <h5 className="font-semibold text-purple-900">Projected Forward-Planning PPMP (FY {ppmp.fiscal_year})</h5>
+                                    <p className="mt-0.5 text-xs text-purple-700">
+                                        This plan is prepared for future Fiscal Year {ppmp.fiscal_year}. It serves as a forward budgeting and demand projection. It cannot be submitted for executive approval or utilized for active supply requests until Fiscal Year {ppmp.fiscal_year} commences.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {(isPast || ppmp.status === 'CLOSED') && (
+                        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-100/90 px-4 py-3 text-slate-800 shadow-sm">
+                            <div className="flex items-start gap-3">
+                                <span className="text-xl">🏛️</span>
+                                <div>
+                                    <h5 className="font-semibold text-slate-800">Concluded Fiscal Year ({ppmp.fiscal_year}) — Archived Record</h5>
+                                    <p className="mt-0.5 text-xs text-slate-600">
+                                        Fiscal Year {ppmp.fiscal_year} has completed. This procurement plan is closed and retained for auditing and historical transparency. It can no longer be modified or referenced for active procurement workflows.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="mt-5 grid gap-4 md:grid-cols-3">
                         <Card label="Fiscal Year" value={String(ppmp.fiscal_year)} />
@@ -555,18 +586,29 @@ function formatDate(value?: string | null): string {
         : parsed.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, isProjected }: { status: string; isProjected?: boolean }) {
+    if (isProjected) {
+        return (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-purple-100 px-3 py-1 text-sm font-semibold text-purple-800">
+                <span className="h-2 w-2 rounded-full bg-purple-600"></span>
+                <span>Projected Plan</span>
+            </span>
+        );
+    }
+
     const normalized = status.toUpperCase();
     const style =
         normalized === 'APPROVED'
             ? 'bg-emerald-100 text-emerald-700'
-            : normalized === 'SUBMITTED'
-                ? 'bg-blue-100 text-blue-700'
-                : normalized === 'RETURNED_FOR_REVISION'
-                    ? 'bg-amber-100 text-amber-700'
-                    : normalized === 'REJECTED'
-                        ? 'bg-rose-100 text-rose-700'
-                        : 'bg-slate-100 text-slate-700';
+            : normalized === 'CLOSED'
+                ? 'bg-slate-200 text-slate-700'
+                : normalized === 'SUBMITTED'
+                    ? 'bg-blue-100 text-blue-700'
+                    : normalized === 'RETURNED_FOR_REVISION'
+                        ? 'bg-amber-100 text-amber-700'
+                        : normalized === 'REJECTED'
+                            ? 'bg-rose-100 text-rose-700'
+                            : 'bg-slate-100 text-slate-700';
 
     return <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${style}`}>{status.replaceAll('_', ' ')}</span>;
 }

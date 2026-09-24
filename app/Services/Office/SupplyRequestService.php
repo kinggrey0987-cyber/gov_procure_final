@@ -305,9 +305,12 @@ class SupplyRequestService
      */
     public function ppmpOptionsForOffice(int $officeId): array
     {
+        $currentYear = (int) now()->format('Y');
+
         return Ppmp::query()
             ->where('office_id', $officeId)
             ->where('status', 'APPROVED')
+            ->where('fiscal_year', $currentYear)
             ->latest('ppmp_id')
             ->get(['ppmp_id', 'fiscal_year', 'status', 'date_prepared'])
             ->map(fn (Ppmp $ppmp): array => [
@@ -412,16 +415,19 @@ class SupplyRequestService
 
     private function resolveOfficePpmp(int $ppmpId, User $actor): Ppmp
     {
+        $currentYear = (int) now()->format('Y');
+
         /** @var Ppmp|null $ppmp */
         $ppmp = Ppmp::query()
             ->where('ppmp_id', $ppmpId)
             ->where('office_id', (int) $actor->office_id)
             ->where('status', 'APPROVED')
+            ->where('fiscal_year', $currentYear)
             ->first();
 
         if (! $ppmp) {
             throw ValidationException::withMessages([
-                'ppmp_id' => 'Selected PPMP is not approved and cannot be used for a supply request.',
+                'ppmp_id' => "Selected PPMP is not an approved PPMP for active Fiscal Year {$currentYear} and cannot be used for a supply request.",
             ]);
         }
 

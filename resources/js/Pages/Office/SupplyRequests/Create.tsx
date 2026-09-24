@@ -290,10 +290,10 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                     </option>
                                 ))}
                             </select>
-                            <p className="mt-0.5 text-[10px] text-slate-500">Only approved PPMPs can be used as the basis for a supply request.</p>
+                            <p className="mt-0.5 text-[10px] text-slate-500">Only approved PPMPs for the active fiscal year can be used as the basis for a supply request.</p>
                         </label>
-                        {!hasPpmp ? (
-                            <p className="mt-1 text-[11px] font-medium text-amber-700">No approved PPMP is available yet. Your office must have an approved PPMP before creating a supply request.</p>
+                        {ppmpOptions.length === 0 ? (
+                            <p className="mt-1 text-[11px] font-medium text-amber-700">No approved PPMP found for the active fiscal year. Your office must have an approved PPMP before submitting supply requests.</p>
                         ) : null}
                     </div>
 

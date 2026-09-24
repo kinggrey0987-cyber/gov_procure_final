@@ -154,6 +154,14 @@ export default function PpmpCreate({ itemOptions }: Props) {
                                 required
                             />
                             <span className="mt-0.5 block text-[10px] text-slate-500">Fiscal year cannot be earlier than {CURRENT_YEAR}.</span>
+                            {Number(form.data.fiscal_year) > CURRENT_YEAR && (
+                                <div className="mt-1.5 flex items-start gap-1.5 rounded-lg border border-purple-200 bg-purple-50/80 p-2 text-[11px] text-purple-800">
+                                    <span className="text-sm leading-none">📘</span>
+                                    <div>
+                                        <strong className="font-semibold">Projected PPMP (FY {form.data.fiscal_year}):</strong> This plan is for a future fiscal year. It will be saved as a draft projection for forward planning and cannot be submitted for executive review until Fiscal Year {form.data.fiscal_year} starts.
+                                    </div>
+                                </div>
+                            )}
                             <InputError message={form.errors.fiscal_year} className="mt-0.5 text-[10px]" />
                         </label>
 
