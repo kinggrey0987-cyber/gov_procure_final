@@ -14,7 +14,9 @@ type Props = {
         requester?: { id: number; name: string } | null;
         item_count: number;
         requested_total: number;
+        released_total?: number;
         shortage_total: number;
+        has_unreleased_available_stock?: boolean;
         has_purchase_request: boolean;
         purchase_request_count: number;
         distribution_records_count: number;
@@ -25,6 +27,8 @@ type Props = {
             pieces_per_box?: number | null;
             sub_unit?: string | null;
             quantity_requested: number;
+            quantity_released?: number;
+            quantity_remaining?: number;
             available_stock: number;
             shortage: number;
         }>;
@@ -167,6 +171,40 @@ export default function InventoryOfficeSupplyRequestShow({ request, backFilters 
                         </div>
                     )}
 
+                    {request.has_unreleased_available_stock && (
+                        <div className="mb-4 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-emerald-300 bg-emerald-50/90 p-4 text-emerald-950 shadow-xs">
+                            <div className="flex items-center gap-3.5">
+                                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white shadow">
+                                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </span>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h4 className="text-sm font-extrabold uppercase tracking-wide text-emerald-900">
+                                            Warehouse Stock Available for Remaining Request
+                                        </h4>
+                                        <span className="rounded bg-emerald-200 px-2 py-0.5 text-[10px] font-bold text-emerald-900">
+                                            READY TO RELEASE
+                                        </span>
+                                    </div>
+                                    <p className="mt-0.5 text-xs text-emerald-800">
+                                        Matching warehouse stock is available to fulfill unreleased items for this request. Create an inventory distribution release to deliver them to the office.
+                                    </p>
+                                </div>
+                            </div>
+                            <Link
+                                href={route('inventory.distribution-records.create', { supply_request_id: request.supply_request_id })}
+                                className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 transition"
+                            >
+                                <span>Create Distribution Release</span>
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </Link>
+                        </div>
+                    )}
+
                     <p className="font-mono text-sm text-slate-700">{request.request_code}</p>
                     <div className="mt-3 grid gap-3 text-sm text-slate-700 md:grid-cols-2 lg:grid-cols-3">
                         <p><span className="font-semibold">Status:</span> {request.status}</p>
@@ -188,9 +226,10 @@ export default function InventoryOfficeSupplyRequestShow({ request, backFilters 
                         <p><span className="font-semibold">Requester:</span> {request.requester?.name ?? '-'}</p>
                     </div>
                     <p className="mt-3 text-sm text-slate-700"><span className="font-semibold">Purpose:</span> {request.purpose}</p>
-                    <div className="mt-3 grid gap-3 text-sm text-slate-700 md:grid-cols-2 lg:grid-cols-4">
+                    <div className="mt-3 grid gap-3 text-sm text-slate-700 md:grid-cols-2 lg:grid-cols-5">
                         <p><span className="font-semibold">Items:</span> {request.item_count}</p>
                         <p><span className="font-semibold">Requested Total:</span> {request.requested_total.toFixed(2)}</p>
+                        <p><span className="font-semibold">Released Total:</span> {(request.released_total ?? 0).toFixed(2)}</p>
                         <p><span className="font-semibold">Shortage Total:</span> {request.shortage_total.toFixed(2)}</p>
                         <p><span className="font-semibold">Purchase Requests:</span> {request.purchase_request_count}</p>
                     </div>
@@ -204,20 +243,23 @@ export default function InventoryOfficeSupplyRequestShow({ request, backFilters 
                         <thead className="bg-slate-50">
                             <tr>
                                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Item</th>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Qty Requested</th>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Available Stock</th>
-                                <th className="px-4 py-3 text-left font-semibold text-slate-700">Shortage</th>
+                                <th className="px-4 py-3 text-right font-semibold text-slate-700">Qty Requested</th>
+                                <th className="px-4 py-3 text-right font-semibold text-slate-700">Released</th>
+                                <th className="px-4 py-3 text-right font-semibold text-slate-700">Remaining</th>
+                                <th className="px-4 py-3 text-right font-semibold text-slate-700">Available Stock</th>
+                                <th className="px-4 py-3 text-right font-semibold text-slate-700">Shortage</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {request.items.map((item) => {
                                 const piecesPerBox = item.pieces_per_box ?? 1;
                                 const subUnit = item.sub_unit || 'piece';
+                                const remaining = item.quantity_remaining ?? Math.max(item.quantity_requested - (item.quantity_released ?? 0), 0);
 
                                 return (
                                 <tr key={item.supply_request_item_id}>
                                     <td className="px-4 py-3 text-slate-700 font-medium">{item.item_name}</td>
-                                    <td className="px-4 py-3 text-slate-700 font-semibold">
+                                    <td className="px-4 py-3 text-right text-slate-700 font-semibold">
                                         <span>{item.quantity_requested.toFixed(2)} {item.unit}</span>
                                         {piecesPerBox > 1 ? (
                                             <span className="block text-xs font-semibold text-indigo-700">
@@ -225,15 +267,25 @@ export default function InventoryOfficeSupplyRequestShow({ request, backFilters 
                                             </span>
                                         ) : null}
                                     </td>
-                                    <td className="px-4 py-3 text-slate-700">
-                                        <span>{item.available_stock.toFixed(2)} {item.unit}</span>
+                                    <td className="px-4 py-3 text-right text-slate-700">
+                                        <span>{(item.quantity_released ?? 0).toFixed(2)} {item.unit}</span>
+                                    </td>
+                                    <td className="px-4 py-3 text-right font-semibold text-slate-700">
+                                        <span className={remaining > 0 ? 'text-amber-800' : 'text-slate-500'}>
+                                            {remaining.toFixed(2)} {item.unit}
+                                        </span>
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-slate-700">
+                                        <span className={item.available_stock > 0 ? 'font-bold text-emerald-700' : 'text-slate-500'}>
+                                            {item.available_stock.toFixed(2)} {item.unit}
+                                        </span>
                                         {piecesPerBox > 1 ? (
                                             <span className="block text-xs text-slate-500">
                                                 ({(item.available_stock * piecesPerBox).toLocaleString()} {subUnit}s)
                                             </span>
                                         ) : null}
                                     </td>
-                                    <td className="px-4 py-3 text-slate-700">
+                                    <td className="px-4 py-3 text-right text-slate-700">
                                         <span>{item.shortage.toFixed(2)} {item.unit}</span>
                                         {piecesPerBox > 1 && item.shortage > 0 ? (
                                             <span className="block text-xs text-rose-600 font-medium">

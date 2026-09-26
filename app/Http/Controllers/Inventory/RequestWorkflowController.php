@@ -342,25 +342,46 @@ class RequestWorkflowController
             abort(404);
         }
 
+        $allDistributions = $this->allFulfillmentDistributionRecords($supplyRequest)
+            ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED']);
+        $releasedByItemId = $allDistributions
+            ->flatMap(fn ($record) => $record->items)
+            ->groupBy(fn ($item) => (int) $item->item_id)
+            ->map(fn ($group) => (float) $group->sum('quantity_released'));
+
         $requestedTotal = 0.0;
+        $releasedTotal = 0.0;
         $shortageTotal = 0.0;
+        $hasUnreleasedAvailableStock = false;
 
         $items = $supplyRequest->items
-            ->map(function (SupplyRequestItem $item) use (&$requestedTotal, &$shortageTotal): array {
+            ->map(function (SupplyRequestItem $item) use ($releasedByItemId, &$requestedTotal, &$releasedTotal, &$shortageTotal, &$hasUnreleasedAvailableStock): array {
+                $itemId = (int) $item->item_id;
                 $requested = (float) $item->quantity_requested;
-                $available = (float) ($item->item?->inventory?->available_stock ?? 0);
-                $shortage = max($requested - $available, 0);
+                $released = (float) ($releasedByItemId->get($itemId) ?? 0.0);
+                $remaining = max($requested - $released, 0);
+                $inv = $item->item?->inventory;
+                $available = (float) ($inv?->available_stock ?? 0) + (float) ($inv?->reserved_quantity ?? 0);
+                $shortage = max($remaining - $available, 0);
+
+                if ($remaining > 0.0001 && $available > 0.0001) {
+                    $hasUnreleasedAvailableStock = true;
+                }
 
                 $requestedTotal += $requested;
+                $releasedTotal += $released;
                 $shortageTotal += $shortage;
 
                 return [
                     'supply_request_item_id' => (int) $item->supply_request_item_id,
+                    'item_id' => $itemId,
                     'item_name' => (string) ($item->item?->item_name ?? $item->item_name_snapshot ?? 'Unknown Item'),
                     'unit' => (string) ($item->item?->default_unit ?? 'UNIT'),
                     'pieces_per_box' => (int) ($item->item?->pieces_per_box ?? 1),
                     'sub_unit' => (string) ($item->item?->sub_unit ?? 'piece'),
                     'quantity_requested' => round($requested, 2),
+                    'quantity_released' => round($released, 2),
+                    'quantity_remaining' => round($remaining, 2),
                     'available_stock' => round($available, 2),
                     'shortage' => round($shortage, 2),
                 ];
@@ -386,7 +407,9 @@ class RequestWorkflowController
                 ] : null,
                 'item_count' => $items->count(),
                 'requested_total' => round($requestedTotal, 2),
+                'released_total' => round($releasedTotal, 2),
                 'shortage_total' => round($shortageTotal, 2),
+                'has_unreleased_available_stock' => $hasUnreleasedAvailableStock,
                 'has_purchase_request' => $supplyRequest->purchaseRequests->isNotEmpty(),
                 'purchase_request_count' => $supplyRequest->purchaseRequests->count(),
                 'distribution_records_count' => $supplyRequest->distributionRecords->count(),
@@ -843,6 +866,27 @@ class RequestWorkflowController
                 (string) ($inventory->item?->item_name ?? 'selected item'),
                 $quantityRequested
             ));
+    }
+
+    /**
+     * @return Collection<int, \App\Models\DistributionRecord>
+     */
+    private function allFulfillmentDistributionRecords(SupplyRequest $request): Collection
+    {
+        $request->loadMissing('distributionRecords.items');
+        $directRecords = $request->distributionRecords;
+
+        $childIds = $this->followUpService->resolveAllFollowUpChildSupplyRequestIds($request);
+        if (empty($childIds)) {
+            return $directRecords;
+        }
+
+        $childRecords = \App\Models\DistributionRecord::query()
+            ->with('items')
+            ->whereIn('supply_request_id', $childIds)
+            ->get();
+
+        return $directRecords->concat($childRecords);
     }
 
     private function computeItemShortage(SupplyRequest $supplyRequest, int $itemId): float

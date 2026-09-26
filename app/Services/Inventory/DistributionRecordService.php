@@ -5,6 +5,7 @@ namespace App\Services\Inventory;
 use App\Models\ApprovalHistory;
 use App\Models\DistributionItem;
 use App\Models\DistributionRecord;
+use App\Models\Inventory;
 use App\Models\StatusHistory;
 use App\Models\User;
 use App\Services\AuditLogService;
@@ -516,8 +517,11 @@ class DistributionRecordService
                     ->sum('quantity_ordered');
 
                 $inventoryPortion = max($requestedQuantity - $totalOrdered, 0.0);
+                $inv = Inventory::query()->where('item_id', $itemId)->first();
+                $availableWarehouseStock = (float) ($inv?->available_stock ?? 0) + (float) ($inv?->reserved_quantity ?? 0);
+                $releasableInventory = min($inventoryPortion, $availableWarehouseStock);
 
-                $maxReleasable = min($maxReleasable, $deliveryRemaining + $inventoryPortion);
+                $maxReleasable = min($maxReleasable, $deliveryRemaining + $releasableInventory);
             }
         }
 
@@ -526,7 +530,7 @@ class DistributionRecordService
                 'quantity_released' => sprintf(
                     'Quantity released cannot exceed the remaining releasable quantity of %.2f for this request%s.',
                     $maxReleasable,
-                    $record->delivery_id !== null ? ' and verified delivery' : ''
+                    $record->delivery_id !== null ? ' and verified delivery/warehouse stock' : ''
                 ),
             ]);
         }
@@ -587,13 +591,7 @@ class DistributionRecordService
 
                     if ($isItemInDelivery) {
                         $deliveryRemaining = (float) ($deliveryRemainingByItemId->get($itemId) ?? 0.0);
-                        $totalOrdered = (float) $record->supplyRequest->purchaseOrders
-                            ->flatMap(fn ($po) => $po->items)
-                            ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
-                            ->sum('quantity_ordered');
-                        $inventoryPortion = max($requested - $totalOrdered, 0.0);
-
-                        $quantity = min($quantity, $deliveryRemaining + $inventoryPortion);
+                        $quantity = min($quantity, $deliveryRemaining);
                     }
                 }
 

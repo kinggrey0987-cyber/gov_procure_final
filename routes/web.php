@@ -568,6 +568,9 @@ Route::middleware(['auth', 'twofactor', 'must-change-password'])->group(function
                 Route::post('/{distribution_record}/receive', [DistributionRecordController::class, 'receive'])
                     ->middleware('can:distribution.receive,distribution_record')
                     ->name('receive');
+                Route::post('/{distribution_record}/release-available-stock', [DistributionRecordController::class, 'releaseAvailableStock'])
+                    ->middleware('can:distribution.manage,distribution_record')
+                    ->name('release-available-stock');
 
                 Route::post('/{distribution_record}/items', [DistributionItemController::class, 'store'])
                     ->middleware('can:distribution.manage,distribution_record')

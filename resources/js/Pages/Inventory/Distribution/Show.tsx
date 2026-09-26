@@ -13,6 +13,7 @@ type Props = {
         notes?: string | null;
         office?: { name: string } | null;
         supply_request?: {
+            supply_request_id?: number;
             request_code: string;
             status: string;
             items: Array<{
@@ -52,9 +53,23 @@ type Props = {
             claim_date?: string | null;
         }>;
     };
+    unreleased_stock_items?: Array<{
+        supply_request_id?: number;
+        supply_request_item_id: number;
+        item_id: number;
+        item_name: string;
+        category_name?: string;
+        unit: string;
+        quantity_requested: number;
+        quantity_remaining: number;
+        available_stock: number;
+        releasable_quantity: number;
+        is_parent?: boolean;
+        request_code?: string;
+    }>;
 };
 
-export default function DistributionShow({ record }: Props) {
+export default function DistributionShow({ record, unreleased_stock_items = [] }: Props) {
     const page = usePage().props as {
         auth?: {
             can?: {
@@ -71,10 +86,23 @@ export default function DistributionShow({ record }: Props) {
     const canConfirmReceipt = isOfficeUser && record.status === 'RELEASED';
     const canFileClaim = isOfficeUser && record.status === 'RECEIVED' && !record.is_claim_expired;
     const [activeTab, setActiveTab] = useState<'overview' | 'items' | 'status' | 'related' | 'notes'>('overview');
+    const [isReleasingAll, setIsReleasingAll] = useState(false);
     const isDeliveryBackedRelease = record.delivery !== null && record.delivery !== undefined;
     const releaseSource = isDeliveryBackedRelease ? 'Verified Delivery' : 'Available Inventory';
     const sourceReference = isDeliveryBackedRelease ? record.delivery?.delivery_code ?? 'Verified delivery' : 'Current inventory balance';
     const releaseDate = record.release_date ? formatDate(record.release_date) : (record.status === 'DRAFT' ? 'Pending item release' : 'Not recorded');
+
+    const handleReleaseAllStock = () => {
+        const totalUnits = unreleased_stock_items.reduce((sum, i) => sum + i.releasable_quantity, 0);
+        if (!confirm(`Are you sure you want to add all available warehouse stock (${totalUnits.toFixed(2)} units across ${unreleased_stock_items.length} item(s)) into this distribution release?`)) {
+            return;
+        }
+        setIsReleasingAll(true);
+        router.post(route('inventory.distribution-records.release-available-stock', record.distribution_record_id), {}, {
+            preserveScroll: true,
+            onFinish: () => setIsReleasingAll(false),
+        });
+    };
 
     return (
         <AuthenticatedLayout
@@ -89,6 +117,110 @@ export default function DistributionShow({ record }: Props) {
         >
             <Head title="Distribution Detail" />
             <div className="space-y-6 py-8">
+                {unreleased_stock_items.length > 0 && (
+                    <div className={`rounded-xl border p-4 shadow-sm ${
+                        record.status === 'RECEIVED'
+                            ? 'border-sky-300 bg-sky-50 text-sky-950'
+                            : 'border-amber-300 bg-amber-50 text-amber-950'
+                    }`}>
+                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                            <div className="flex items-start gap-3">
+                                <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white shadow ${
+                                    record.status === 'RECEIVED' ? 'bg-sky-600' : 'bg-amber-600'
+                                }`}>
+                                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                </span>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h4 className="text-sm font-extrabold uppercase tracking-wide">
+                                            {unreleased_stock_items.some(i => i.is_parent)
+                                                ? `Notice: Parent Requisition (${unreleased_stock_items.find(i => i.is_parent)?.request_code}) Has Remaining Unreleased Stock`
+                                                : (record.status === 'RECEIVED'
+                                                    ? 'Notice: Remaining Requested Items Available in Warehouse'
+                                                    : `Action Recommended: Unreleased Warehouse Stock Available (${unreleased_stock_items.length} item${unreleased_stock_items.length > 1 ? 's' : ''})`)
+                                            }
+                                        </h4>
+                                        <span className={`rounded px-2 py-0.5 text-[10px] font-bold ${
+                                            record.status === 'RECEIVED' || unreleased_stock_items.some(i => i.is_parent)
+                                                ? 'bg-sky-200 text-sky-900'
+                                                : 'bg-amber-200 text-amber-900'
+                                        }`}>
+                                            STOCK READY
+                                        </span>
+                                    </div>
+                                    <p className="mt-1 text-xs opacity-90">
+                                        {unreleased_stock_items.some(i => i.is_parent)
+                                            ? `This follow-up record fulfills delivery discrepancies, but the parent requisition (${unreleased_stock_items.find(i => i.is_parent)?.request_code}) still has ${unreleased_stock_items.length} unfulfilled item(s) with matching warehouse stock available.`
+                                            : (record.status === 'RECEIVED'
+                                                ? `This distribution record is already received, but the linked request has ${unreleased_stock_items.length} item(s) unfulfilled with matching warehouse stock available.`
+                                                : "The requesting office has unfulfilled items, and matching stock is currently available in the warehouse. Don't overlook releasing this stock to fulfill the request.")
+                                        }
+                                    </p>
+                                    <div className="mt-2.5 flex flex-wrap gap-2">
+                                        {unreleased_stock_items.map((item) => (
+                                            <span
+                                                key={item.item_id}
+                                                className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold border ${
+                                                    record.status === 'RECEIVED' || item.is_parent
+                                                        ? 'bg-sky-100/80 border-sky-200 text-sky-900'
+                                                        : 'bg-amber-100/90 border-amber-200 text-amber-900'
+                                                }`}
+                                            >
+                                                <span className="font-bold">{item.item_name}:</span>
+                                                <span>{item.releasable_quantity.toFixed(2)} {item.unit} available</span>
+                                                <span className="text-[10px] opacity-75">({item.quantity_remaining.toFixed(2)} remaining requested{item.is_parent ? ` on ${item.request_code}` : ''})</span>
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                            {canManageDistribution && (
+                                <div className="flex shrink-0 items-center gap-2">
+                                    {unreleased_stock_items.some(i => i.is_parent) ? (
+                                        <Link
+                                            href={route('inventory.distribution-records.create', {
+                                                supply_request_id: unreleased_stock_items.find(i => i.is_parent)?.supply_request_id,
+                                            })}
+                                            className="inline-flex items-center gap-1.5 rounded-lg bg-sky-700 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-sky-800 transition"
+                                        >
+                                            <span>Create Release for Parent ({unreleased_stock_items.find(i => i.is_parent)?.request_code})</span>
+                                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                                            </svg>
+                                        </Link>
+                                    ) : record.status !== 'RECEIVED' ? (
+                                        <button
+                                            type="button"
+                                            onClick={handleReleaseAllStock}
+                                            disabled={isReleasingAll}
+                                            className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50 transition"
+                                        >
+                                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                                            </svg>
+                                            <span>{isReleasingAll ? 'Adding Stock...' : 'Add All Available Stock to Release'}</span>
+                                        </button>
+                                    ) : (
+                                        <Link
+                                            href={route('inventory.distribution-records.create', {
+                                                supply_request_id: unreleased_stock_items[0]?.supply_request_id ?? record.supply_request?.supply_request_id,
+                                            })}
+                                            className="inline-flex items-center gap-1.5 rounded-lg bg-sky-700 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-sky-800 transition"
+                                        >
+                                            <span>Create New Inventory Release</span>
+                                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                                            </svg>
+                                        </Link>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 <section className="rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
                     <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
                         {[
@@ -151,6 +283,12 @@ export default function DistributionShow({ record }: Props) {
                                 <button
                                     type="button"
                                     onClick={() => {
+                                        if (unreleased_stock_items.length > 0) {
+                                            const itemsList = unreleased_stock_items.map(i => `${i.item_name}: ${i.releasable_quantity.toFixed(2)} ${i.unit}`).join(', ');
+                                            if (!confirm(`Attention: There are still unreleased items with available warehouse stock for this request (${itemsList}). Acknowledging receipt now will only cover the items currently released. Do you want to proceed?`)) {
+                                                return;
+                                            }
+                                        }
                                         router.post(route('office.distribution-records.receive', record.distribution_record_id), {}, {
                                             preserveScroll: true,
                                         });
@@ -186,16 +324,28 @@ export default function DistributionShow({ record }: Props) {
                         <tbody className="divide-y divide-slate-100">
                             {(record.supply_request?.items ?? []).map((requestItem) => {
                                 const maxReleasable = requestItem.max_releasable;
-                                const canAdd = canManageDistribution && maxReleasable > 0;
+                                const canAdd = canManageDistribution && maxReleasable > 0 && record.status !== 'RECEIVED';
+                                const isUnreleasedStock = unreleased_stock_items.some(u => u.item_id === requestItem.item_id);
 
                                 return (
-                                    <tr key={requestItem.supply_request_item_id} className="hover:bg-slate-50/60">
-                                        <td className="px-4 py-3 text-slate-700">{requestItem.item_name}</td>
+                                    <tr key={requestItem.supply_request_item_id} className={`hover:bg-slate-50/60 ${isUnreleasedStock ? 'bg-amber-50/40 border-l-4 border-l-amber-500' : ''}`}>
+                                        <td className="px-4 py-3 text-slate-700 font-medium">
+                                            {requestItem.item_name}
+                                            {isUnreleasedStock && (
+                                                <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800 border border-amber-200">
+                                                    Stock Available
+                                                </span>
+                                            )}
+                                        </td>
                                         <td className="px-4 py-3 text-slate-600">{requestItem.category_name || '-'}</td>
                                         <td className="px-4 py-3 text-right font-semibold text-slate-700">{requestItem.quantity_requested.toFixed(2)} {requestItem.unit}</td>
                                         <td className="px-4 py-3 text-right text-slate-700">{requestItem.quantity_released.toFixed(2)} {requestItem.unit}</td>
-                                        <td className="px-4 py-3 text-right text-slate-700">{requestItem.quantity_remaining.toFixed(2)} {requestItem.unit}</td>
-                                        <td className="px-4 py-3 text-right text-slate-700">{requestItem.available_stock.toFixed(2)} {requestItem.unit}</td>
+                                        <td className="px-4 py-3 text-right font-semibold text-slate-700">{requestItem.quantity_remaining.toFixed(2)} {requestItem.unit}</td>
+                                        <td className="px-4 py-3 text-right text-slate-700">
+                                            <span className={requestItem.available_stock > 0 ? 'font-bold text-emerald-700' : 'text-slate-500'}>
+                                                {requestItem.available_stock.toFixed(2)} {requestItem.unit}
+                                            </span>
+                                        </td>
                                         <td className="px-4 py-3 text-right">
                                             {canManageDistribution ? (
                                                 <button
@@ -212,9 +362,16 @@ export default function DistributionShow({ record }: Props) {
                                                             preserveScroll: true,
                                                         });
                                                     }}
-                                                    className="rounded-md border border-emerald-600 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:border-slate-300 disabled:text-slate-400 disabled:hover:bg-transparent"
+                                                    className={`rounded-md px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:border-slate-300 disabled:text-slate-400 disabled:hover:bg-transparent ${
+                                                        canAdd && isUnreleasedStock
+                                                            ? 'bg-amber-600 text-white hover:bg-amber-700 shadow-xs'
+                                                            : 'border border-emerald-600 text-emerald-700 hover:bg-emerald-50'
+                                                    }`}
                                                 >
-                                                    {canAdd ? 'Add to Release' : 'No Releasable Qty'}
+                                                    {canAdd
+                                                        ? (isUnreleasedStock ? `Add ${maxReleasable.toFixed(2)} ${requestItem.unit} to Release` : 'Add to Release')
+                                                        : (record.status === 'RECEIVED' ? 'Record Received' : 'No Releasable Qty')
+                                                    }
                                                 </button>
                                             ) : (
                                                 <span className="text-xs text-slate-400">View only</span>
