@@ -12,6 +12,8 @@ type PurchaseRequest = {
     created_at?: string | null;
     source_type?: string | null;
     source_delivery_id?: number | null;
+    source_claim_id?: number | null;
+    is_zero_cost_replacement?: boolean;
     office?: {
         name?: string | null;
         code?: string | null;
@@ -140,6 +142,13 @@ export default function PurchaseRequestsShow({ purchaseRequest, traceability, re
         (purchaseRequest.supply_request?.priority_level?.toUpperCase() === 'URGENT') ||
         traceability?.is_urgent
     );
+    const isDiscrepancyReplacement = Boolean(
+        purchaseRequest.is_zero_cost_replacement ||
+        purchaseRequest.source_type === 'PARTIAL_DELIVERY_FOLLOW_UP' ||
+        purchaseRequest.source_type === 'CLAIM_REPLACEMENT_FOLLOW_UP' ||
+        Boolean(purchaseRequest.source_delivery_id) ||
+        Boolean(purchaseRequest.source_claim_id)
+    );
     const processForm = useForm({ action: 'process', remarks: '' });
     const totalQuantity = (purchaseRequest.items ?? []).reduce((sum, row) => sum + Number(row.quantity_requested ?? 0), 0);
     const normalizedRequestRemarks = formatRequestRemarks(purchaseRequest.remarks);
@@ -222,7 +231,7 @@ export default function PurchaseRequestsShow({ purchaseRequest, traceability, re
                                             <span className="h-1.5 w-1.5 rounded-full bg-red-600"></span> URGENT
                                         </span>
                                     ) : null}
-                                    {purchaseRequest.source_type === 'PARTIAL_DELIVERY_FOLLOW_UP' || Boolean(purchaseRequest.source_delivery_id) ? (
+                                    {isDiscrepancyReplacement ? (
                                         <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
                                             🛡️ Discrepancy Replacement PR (Zero-Cost)
                                         </span>
@@ -280,7 +289,7 @@ export default function PurchaseRequestsShow({ purchaseRequest, traceability, re
                             <span className="font-semibold text-slate-700">Remarks:</span> {normalizedRequestRemarks}
                         </p>
 
-                        {purchaseRequest.source_type === 'PARTIAL_DELIVERY_FOLLOW_UP' || Boolean(purchaseRequest.source_delivery_id) ? (
+                        {isDiscrepancyReplacement ? (
                             <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
                                 <p className="font-semibold">🛡️ Zero-Cost Supplier Rectification Request:</p>
                                 <p className="mt-0.5">
@@ -485,15 +494,25 @@ export default function PurchaseRequestsShow({ purchaseRequest, traceability, re
 
                     {canReviewRequest ? (
                         <form onSubmit={processRequest} className="space-y-3 rounded-lg border bg-white p-6">
+                            {isDiscrepancyReplacement && (
+                                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                                    <p className="font-semibold">🛡️ Supplier Warranty Rectification Follow-Up</p>
+                                    <p className="mt-0.5">
+                                        This follow-up request was generated due to a delivery discrepancy (fault of the supplier). Under municipal procurement and warranty standards, it cannot be returned for revision or rejected. Proceed by moving it to processing.
+                                    </p>
+                                </div>
+                            )}
+
                             <label className="mb-1 block text-sm text-gray-700">Review Decision Remarks</label>
                             <textarea
                                 value={processForm.data.remarks}
                                 onChange={(event) => processForm.setData('remarks', event.target.value)}
-                                placeholder="Provide remarks. Required for Return for Revision and Reject."
+                                placeholder={isDiscrepancyReplacement ? "Provide optional remarks when moving to processing." : "Provide remarks. Required for Return for Revision and Reject."}
                                 className="w-full rounded border-gray-300 text-sm"
                                 rows={3}
                             />
                             {processForm.errors.remarks ? <p className="text-xs text-rose-600">{processForm.errors.remarks}</p> : null}
+                            {processForm.errors.action ? <p className="text-xs text-rose-600">{processForm.errors.action}</p> : null}
                             <div className="flex flex-wrap gap-2">
                                 <Link
                                     href={resolvedBackLink.href}
@@ -506,12 +525,16 @@ export default function PurchaseRequestsShow({ purchaseRequest, traceability, re
                                         Move to Processing
                                     </button>
                                 )}
-                                <button type="button" onClick={() => submitReviewAction('return')} disabled={reasonIsBlank || processForm.processing} className="rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60">
-                                    Return for Revision
-                                </button>
-                                <button type="button" onClick={() => submitReviewAction('reject')} disabled={reasonIsBlank || processForm.processing} className="rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60">
-                                    Reject Request
-                                </button>
+                                {!isDiscrepancyReplacement && (
+                                    <>
+                                        <button type="button" onClick={() => submitReviewAction('return')} disabled={reasonIsBlank || processForm.processing} className="rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60">
+                                            Return for Revision
+                                        </button>
+                                        <button type="button" onClick={() => submitReviewAction('reject')} disabled={reasonIsBlank || processForm.processing} className="rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60">
+                                            Reject Request
+                                        </button>
+                                    </>
+                                )}
                             </div>
                         </form>
                     ) : (

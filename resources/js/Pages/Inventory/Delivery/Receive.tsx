@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
 
 type DeliveryItem = {
     delivery_item_id: number;
@@ -51,7 +51,10 @@ type ReceiveFormData = {
     sales_invoice_date: string;
     sales_invoice_amount: string | number;
     delivery_receipt_file: File | null;
+    delivery_receipt_files: File[];
     sales_invoice_file: File | null;
+    sales_invoice_files: File[];
+    supporting_files: File[];
     remarks: string;
     items: Array<{
         delivery_item_id: number;
@@ -90,8 +93,9 @@ export default function DeliveryReceive({ delivery }: Props) {
         return digits.replace(/^0+(?=\d)/, '');
     };
 
-    const [drPreview, setDrPreview] = useState<string | null>(null);
-    const [siPreview, setSiPreview] = useState<string | null>(null);
+    const [drFiles, setDrFiles] = useState<File[]>([]);
+    const [siFiles, setSiFiles] = useState<File[]>([]);
+    const [supportingFiles, setSupportingFiles] = useState<File[]>([]);
 
     const initialDeliveryDate = delivery.actual_delivery_date || todayDate();
     const isZeroCost = Boolean(
@@ -112,7 +116,10 @@ export default function DeliveryReceive({ delivery }: Props) {
                 ? String(delivery.sales_invoice_amount)
                 : (delivery.estimated_po_total ? String(delivery.estimated_po_total) : '')),
         delivery_receipt_file: null,
+        delivery_receipt_files: [],
         sales_invoice_file: null,
+        sales_invoice_files: [],
+        supporting_files: [],
         remarks: delivery.remarks || '',
         items: delivery.items.map(item => ({
             delivery_item_id: item.delivery_item_id,
@@ -127,24 +134,48 @@ export default function DeliveryReceive({ delivery }: Props) {
         setData('items', updatedItems);
     };
 
-    const handleDrFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0] ?? null;
-        setData('delivery_receipt_file', file);
-        if (file && file.type.startsWith('image/')) {
-            setDrPreview(URL.createObjectURL(file));
-        } else {
-            setDrPreview(null);
-        }
+    const handleDrFilesAdd = (e: ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0) return;
+        const newFiles = Array.from(e.target.files);
+        setDrFiles((prev) => {
+            const existing = new Set(prev.map((f) => `${f.name}_${f.size}`));
+            return [...prev, ...newFiles.filter((f) => !existing.has(`${f.name}_${f.size}`))];
+        });
+        setFileError(null);
+        e.target.value = '';
     };
 
-    const handleSiFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0] ?? null;
-        setData('sales_invoice_file', file);
-        if (file && file.type.startsWith('image/')) {
-            setSiPreview(URL.createObjectURL(file));
-        } else {
-            setSiPreview(null);
-        }
+    const removeDrFile = (index: number) => {
+        setDrFiles((prev) => prev.filter((_, i) => i !== index));
+    };
+
+    const handleSiFilesAdd = (e: ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0) return;
+        const newFiles = Array.from(e.target.files);
+        setSiFiles((prev) => {
+            const existing = new Set(prev.map((f) => `${f.name}_${f.size}`));
+            return [...prev, ...newFiles.filter((f) => !existing.has(`${f.name}_${f.size}`))];
+        });
+        setFileError(null);
+        e.target.value = '';
+    };
+
+    const removeSiFile = (index: number) => {
+        setSiFiles((prev) => prev.filter((_, i) => i !== index));
+    };
+
+    const handleSupportingFilesAdd = (e: ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0) return;
+        const newFiles = Array.from(e.target.files);
+        setSupportingFiles((prev) => {
+            const existing = new Set(prev.map((f) => `${f.name}_${f.size}`));
+            return [...prev, ...newFiles.filter((f) => !existing.has(`${f.name}_${f.size}`))];
+        });
+        e.target.value = '';
+    };
+
+    const removeSupportingFile = (index: number) => {
+        setSupportingFiles((prev) => prev.filter((_, i) => i !== index));
     };
 
     const lineErrors: string[] = [];
@@ -180,12 +211,12 @@ export default function DeliveryReceive({ delivery }: Props) {
         e.preventDefault();
         setFileError(null);
 
-        if (!delivery.has_existing_dr && !data.delivery_receipt_file) {
+        if (!delivery.has_existing_dr && drFiles.length === 0 && !data.delivery_receipt_file) {
             setFileError('Mandatory: Scanned copy or camera photo of the Supplier Delivery Receipt (DR) is required.');
             return;
         }
 
-        if (!delivery.has_existing_si && !data.sales_invoice_file) {
+        if (!delivery.has_existing_si && siFiles.length === 0 && !data.sales_invoice_file) {
             setFileError('Mandatory: Scanned copy or camera photo of the Supplier Sales Invoice (SI) is required.');
             return;
         }
@@ -193,6 +224,11 @@ export default function DeliveryReceive({ delivery }: Props) {
         transform((formData) => ({
             ...formData,
             _method: 'PUT',
+            delivery_receipt_file: drFiles[0] ?? null,
+            delivery_receipt_files: drFiles,
+            sales_invoice_file: siFiles[0] ?? null,
+            sales_invoice_files: siFiles,
+            supporting_files: supportingFiles,
             items: formData.items.map((item) => ({
                 ...item,
                 received_quantity: toWholeQuantity(item.received_quantity),
@@ -205,6 +241,10 @@ export default function DeliveryReceive({ delivery }: Props) {
             onFinish: () => transform((formData) => formData),
         });
     };
+
+    const drError = errors.delivery_receipt_file || (Object.entries(errors).find(([k]) => k.startsWith('delivery_receipt_files'))?.[1] as string | undefined);
+    const siError = errors.sales_invoice_file || (Object.entries(errors).find(([k]) => k.startsWith('sales_invoice_files'))?.[1] as string | undefined);
+    const supportingError = Object.entries(errors).find(([k]) => k.startsWith('supporting_files'))?.[1] as string | undefined;
 
     return (
         <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Receive Delivery {delivery.delivery_code}</h2>}>
@@ -315,9 +355,16 @@ export default function DeliveryReceive({ delivery }: Props) {
 
                                 {/* Scanned File Upload Area */}
                                 <div className="border-t border-slate-200 pt-5">
-                                    <div className="mb-3 flex items-center justify-between">
-                                        <p className="text-xs font-bold uppercase tracking-wider text-slate-600">Scanned Attachments (Audit Readiness)</p>
-                                        <span className="text-xs font-semibold text-rose-600">* DR and SI photos are mandatory for inspection compliance</span>
+                                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                                        <p className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                                            <span>Scanned Attachments (Audit Readiness)</span>
+                                            {(drFiles.length > 0 || siFiles.length > 0 || supportingFiles.length > 0) && (
+                                                <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-700">
+                                                    {drFiles.length + siFiles.length + supportingFiles.length} attached
+                                                </span>
+                                            )}
+                                        </p>
+                                        <span className="text-xs font-semibold text-rose-600">* DR and SI attachments are mandatory for inspection compliance</span>
                                     </div>
                                     {fileError && (
                                         <div className="mb-4 rounded-lg border border-rose-300 bg-rose-50 p-3 text-xs font-bold text-rose-700 flex items-center gap-2">
@@ -327,118 +374,164 @@ export default function DeliveryReceive({ delivery }: Props) {
                                     )}
                                     <div className="grid gap-4 sm:grid-cols-2">
                                         {/* Upload Delivery Receipt */}
-                                        <div className={`rounded-xl border border-dashed p-4 transition ${!delivery.has_existing_dr && !data.delivery_receipt_file ? 'border-rose-300 bg-rose-50/30' : 'border-slate-300 bg-slate-50/70 hover:border-indigo-400'}`}>
+                                        <div className={`rounded-xl border border-dashed p-4 transition ${!delivery.has_existing_dr && drFiles.length === 0 ? 'border-rose-300 bg-rose-50/30' : 'border-slate-300 bg-slate-50/70 hover:border-indigo-400'}`}>
                                             <div className="flex items-start justify-between">
                                                 <div className="space-y-1">
                                                     <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                                                         <span>Scanned Delivery Receipt (DR)</span>
-                                                        {!delivery.has_existing_dr ? (
-                                                            <span className="rounded bg-rose-100 border border-rose-300 px-1.5 py-0.5 text-[10px] font-black text-rose-700 uppercase">* Required</span>
-                                                        ) : (
+                                                        {drFiles.length > 0 ? (
+                                                            <span className="rounded bg-emerald-100 border border-emerald-300 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">
+                                                                ✓ {drFiles.length} {drFiles.length === 1 ? 'file' : 'files'} attached
+                                                            </span>
+                                                        ) : delivery.has_existing_dr ? (
                                                             <span className="rounded bg-emerald-100 border border-emerald-300 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">✓ On File</span>
+                                                        ) : (
+                                                            <span className="rounded bg-rose-100 border border-rose-300 px-1.5 py-0.5 text-[10px] font-black text-rose-700 uppercase">* Required</span>
                                                         )}
                                                     </p>
-                                                    <p className="text-[11px] text-slate-500">Take a photo with your phone camera or browse file</p>
+                                                    <p className="text-[11px] text-slate-500">Take photos with your camera or browse files (multi-page DRs supported)</p>
                                                 </div>
                                                 <span className="text-lg">📷</span>
                                             </div>
 
-                                            {drPreview ? (
-                                                <div className="mt-3 relative inline-block">
-                                                    <img src={drPreview} alt="Receipt Preview" className="h-24 w-auto rounded border object-contain bg-white shadow-sm" />
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setData('delivery_receipt_file', null);
-                                                            setDrPreview(null);
-                                                        }}
-                                                        className="absolute -top-1.5 -right-1.5 rounded-full bg-rose-600 text-white p-0.5 text-xs shadow hover:bg-rose-700"
-                                                    >
-                                                        ✕
-                                                    </button>
+                                            {drFiles.length > 0 && (
+                                                <div className="mt-3 space-y-2">
+                                                    {drFiles.map((file, idx) => (
+                                                        <AttachmentCard
+                                                            key={`dr_${file.name}_${file.size}_${idx}`}
+                                                            file={file}
+                                                            onRemove={() => removeDrFile(idx)}
+                                                        />
+                                                    ))}
                                                 </div>
-                                            ) : data.delivery_receipt_file ? (
-                                                <div className="mt-2 flex items-center justify-between rounded bg-white px-2.5 py-1.5 border text-xs text-slate-700">
-                                                    <span className="truncate">{data.delivery_receipt_file.name}</span>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setData('delivery_receipt_file', null)}
-                                                        className="ml-2 text-rose-600 font-bold hover:underline"
-                                                    >
-                                                        Remove
-                                                    </button>
-                                                </div>
-                                            ) : null}
+                                            )}
 
-                                            <div className="mt-3">
-                                                <input
-                                                    type="file"
-                                                    accept="image/*,application/pdf"
-                                                    capture="environment"
-                                                    onChange={handleDrFileChange}
-                                                    className="w-full text-xs text-slate-600 file:mr-2 file:rounded-md file:border-0 file:bg-indigo-600 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-indigo-700 cursor-pointer"
-                                                />
+                                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                                                <label className="inline-flex items-center gap-1.5 cursor-pointer rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 transition">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                                    </svg>
+                                                    <span>{drFiles.length > 0 ? 'Add Another DR File / Photo' : 'Choose DR File(s) / Photo'}</span>
+                                                    <input
+                                                        type="file"
+                                                        multiple
+                                                        accept="image/*,application/pdf"
+                                                        capture="environment"
+                                                        onChange={handleDrFilesAdd}
+                                                        className="sr-only"
+                                                    />
+                                                </label>
+                                                <span className="text-[11px] text-slate-400">PDF, PNG, JPG (Max 10MB each)</span>
                                             </div>
-                                            {errors.delivery_receipt_file && (
-                                                <p className="mt-1 text-xs text-rose-600">{errors.delivery_receipt_file}</p>
+                                            {drError && (
+                                                <p className="mt-2 text-xs font-semibold text-rose-600">{drError}</p>
                                             )}
                                         </div>
 
                                         {/* Upload Sales Invoice */}
-                                        <div className={`rounded-xl border border-dashed p-4 transition ${!delivery.has_existing_si && !data.sales_invoice_file ? 'border-rose-300 bg-rose-50/30' : 'border-slate-300 bg-slate-50/70 hover:border-indigo-400'}`}>
+                                        <div className={`rounded-xl border border-dashed p-4 transition ${!delivery.has_existing_si && siFiles.length === 0 ? 'border-rose-300 bg-rose-50/30' : 'border-slate-300 bg-slate-50/70 hover:border-indigo-400'}`}>
                                             <div className="flex items-start justify-between">
                                                 <div className="space-y-1">
                                                     <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                                                         <span>Scanned Sales Invoice (SI)</span>
-                                                        {!delivery.has_existing_si ? (
-                                                            <span className="rounded bg-rose-100 border border-rose-300 px-1.5 py-0.5 text-[10px] font-black text-rose-700 uppercase">* Required</span>
-                                                        ) : (
+                                                        {siFiles.length > 0 ? (
+                                                            <span className="rounded bg-emerald-100 border border-emerald-300 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">
+                                                                ✓ {siFiles.length} {siFiles.length === 1 ? 'file' : 'files'} attached
+                                                            </span>
+                                                        ) : delivery.has_existing_si ? (
                                                             <span className="rounded bg-emerald-100 border border-emerald-300 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">✓ On File</span>
+                                                        ) : (
+                                                            <span className="rounded bg-rose-100 border border-rose-300 px-1.5 py-0.5 text-[10px] font-black text-rose-700 uppercase">* Required</span>
                                                         )}
                                                     </p>
-                                                    <p className="text-[11px] text-slate-500">Take a photo with your phone camera or browse file</p>
+                                                    <p className="text-[11px] text-slate-500">Take photos with your camera or browse files (multi-page invoices supported)</p>
                                                 </div>
                                                 <span className="text-lg">🧾</span>
                                             </div>
 
-                                            {siPreview ? (
-                                                <div className="mt-3 relative inline-block">
-                                                    <img src={siPreview} alt="Invoice Preview" className="h-24 w-auto rounded border object-contain bg-white shadow-sm" />
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setData('sales_invoice_file', null);
-                                                            setSiPreview(null);
-                                                        }}
-                                                        className="absolute -top-1.5 -right-1.5 rounded-full bg-rose-600 text-white p-0.5 text-xs shadow hover:bg-rose-700"
-                                                    >
-                                                        ✕
-                                                    </button>
+                                            {siFiles.length > 0 && (
+                                                <div className="mt-3 space-y-2">
+                                                    {siFiles.map((file, idx) => (
+                                                        <AttachmentCard
+                                                            key={`si_${file.name}_${file.size}_${idx}`}
+                                                            file={file}
+                                                            onRemove={() => removeSiFile(idx)}
+                                                        />
+                                                    ))}
                                                 </div>
-                                            ) : data.sales_invoice_file ? (
-                                                <div className="mt-2 flex items-center justify-between rounded bg-white px-2.5 py-1.5 border text-xs text-slate-700">
-                                                    <span className="truncate">{data.sales_invoice_file.name}</span>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setData('sales_invoice_file', null)}
-                                                        className="ml-2 text-rose-600 font-bold hover:underline"
-                                                    >
-                                                        Remove
-                                                    </button>
-                                                </div>
-                                            ) : null}
+                                            )}
 
-                                            <div className="mt-3">
-                                                <input
-                                                    type="file"
-                                                    accept="image/*,application/pdf"
-                                                    capture="environment"
-                                                    onChange={handleSiFileChange}
-                                                    className="w-full text-xs text-slate-600 file:mr-2 file:rounded-md file:border-0 file:bg-indigo-600 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-indigo-700 cursor-pointer"
-                                                />
+                                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                                                <label className="inline-flex items-center gap-1.5 cursor-pointer rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 transition">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                                    </svg>
+                                                    <span>{siFiles.length > 0 ? 'Add Another SI File / Photo' : 'Choose SI File(s) / Photo'}</span>
+                                                    <input
+                                                        type="file"
+                                                        multiple
+                                                        accept="image/*,application/pdf"
+                                                        capture="environment"
+                                                        onChange={handleSiFilesAdd}
+                                                        className="sr-only"
+                                                    />
+                                                </label>
+                                                <span className="text-[11px] text-slate-400">PDF, PNG, JPG (Max 10MB each)</span>
                                             </div>
-                                            {errors.sales_invoice_file && (
-                                                <p className="mt-1 text-xs text-rose-600">{errors.sales_invoice_file}</p>
+                                            {siError && (
+                                                <p className="mt-2 text-xs font-semibold text-rose-600">{siError}</p>
+                                            )}
+                                        </div>
+
+                                        {/* Optional Supporting Files */}
+                                        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-4 transition hover:border-indigo-400 sm:col-span-2">
+                                            <div className="flex items-start justify-between">
+                                                <div className="space-y-1">
+                                                    <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                                                        <span>Additional Supporting Attachments</span>
+                                                        <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">Optional</span>
+                                                        {supportingFiles.length > 0 && (
+                                                            <span className="rounded bg-indigo-100 border border-indigo-200 px-1.5 py-0.5 text-[10px] font-bold text-indigo-800">
+                                                                ✓ {supportingFiles.length} {supportingFiles.length === 1 ? 'file' : 'files'} attached
+                                                            </span>
+                                                        )}
+                                                    </p>
+                                                    <p className="text-[11px] text-slate-500">Unboxing photos, damaged item evidence, or supplier packing slips for the audit record</p>
+                                                </div>
+                                                <span className="text-lg">📦</span>
+                                            </div>
+
+                                            {supportingFiles.length > 0 && (
+                                                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                                    {supportingFiles.map((file, idx) => (
+                                                        <AttachmentCard
+                                                            key={`supp_${file.name}_${file.size}_${idx}`}
+                                                            file={file}
+                                                            onRemove={() => removeSupportingFile(idx)}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                                                <label className="inline-flex items-center gap-1.5 cursor-pointer rounded-md bg-white border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 transition">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                                    </svg>
+                                                    <span>{supportingFiles.length > 0 ? 'Add Another Supporting File' : 'Attach Supporting Photos / Files'}</span>
+                                                    <input
+                                                        type="file"
+                                                        multiple
+                                                        accept="image/*,application/pdf"
+                                                        capture="environment"
+                                                        onChange={handleSupportingFilesAdd}
+                                                        className="sr-only"
+                                                    />
+                                                </label>
+                                                <span className="text-[11px] text-slate-400">PDF, PNG, JPG (Max 10MB each)</span>
+                                            </div>
+                                            {supportingError && (
+                                                <p className="mt-2 text-xs font-semibold text-rose-600">{supportingError}</p>
                                             )}
                                         </div>
                                     </div>
@@ -673,6 +766,72 @@ function FormField({
             </label>
             {children}
             {error ? <p className="mt-1 text-xs text-rose-600">{error}</p> : null}
+        </div>
+    );
+}
+
+function AttachmentCard({
+    file,
+    onRemove,
+}: {
+    file: File;
+    onRemove: () => void;
+}) {
+    const isImage = file.type.startsWith('image/');
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (isImage) {
+            const url = URL.createObjectURL(file);
+            setPreviewUrl(url);
+            return () => {
+                URL.revokeObjectURL(url);
+            };
+        }
+    }, [file, isImage]);
+
+    const formatSize = (bytes: number) => {
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    };
+
+    return (
+        <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-2.5 shadow-2xs transition hover:border-slate-300">
+            <div className="flex items-center gap-3 overflow-hidden">
+                {isImage && previewUrl ? (
+                    <img
+                        src={previewUrl}
+                        alt={file.name}
+                        className="h-10 w-10 shrink-0 rounded border border-slate-200 object-cover bg-slate-50"
+                    />
+                ) : (
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-slate-200 bg-slate-100 text-[10px] font-black text-slate-600 uppercase">
+                        {file.type === 'application/pdf' ? (
+                            <span className="text-rose-600 font-bold">PDF</span>
+                        ) : (
+                            <span>DOC</span>
+                        )}
+                    </div>
+                )}
+                <div className="min-w-0">
+                    <p className="truncate text-xs font-semibold text-slate-800" title={file.name}>
+                        {file.name}
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                        {formatSize(file.size)}
+                    </p>
+                </div>
+            </div>
+            <button
+                type="button"
+                onClick={onRemove}
+                className="ml-2 inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-50 hover:text-rose-700 transition"
+                title="Remove attachment"
+            >
+                <span className="text-sm font-bold leading-none">✕</span>
+                <span>Remove</span>
+            </button>
         </div>
     );
 }

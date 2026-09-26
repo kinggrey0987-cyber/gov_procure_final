@@ -69,7 +69,7 @@ export default function DistributionShow({ record }: Props) {
     const backRouteName = isOfficeUser ? 'office.supplies-ready.index' : 'inventory.distribution-records.index';
     const backLabel = isOfficeUser ? 'Back to Ready Supplies' : 'Back to Distribution Records';
     const canConfirmReceipt = isOfficeUser && record.status === 'RELEASED';
-    const canFileClaim = isOfficeUser && (record.status === 'RELEASED' || record.status === 'RECEIVED') && !record.is_claim_expired;
+    const canFileClaim = isOfficeUser && record.status === 'RECEIVED' && !record.is_claim_expired;
     const [activeTab, setActiveTab] = useState<'overview' | 'items' | 'status' | 'related' | 'notes'>('overview');
     const isDeliveryBackedRelease = record.delivery !== null && record.delivery !== undefined;
     const releaseSource = isDeliveryBackedRelease ? 'Verified Delivery' : 'Available Inventory';

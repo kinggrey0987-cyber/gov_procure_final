@@ -5,6 +5,7 @@ namespace Tests\Feature\Delivery;
 use App\Enums\UserRole;
 use App\Models\Delivery;
 use App\Models\DeliveryItem;
+use App\Models\Document;
 use App\Models\Inventory;
 use App\Models\InventoryMovement;
 use App\Models\Office;
@@ -1088,6 +1089,79 @@ class DeliveryFeatureTest extends TestCase
             'related_reference_id' => $delivery->delivery_id,
             'document_kind' => 'sales_invoice',
         ]);
+    }
+
+    public function test_receiving_supports_multiple_dr_si_and_supporting_attachments(): void
+    {
+        Storage::fake('private');
+
+        $delivery = $this->createDelivery();
+        $item = DeliveryItem::query()->create([
+            'delivery_id' => $delivery->delivery_id,
+            'purchase_order_item_id' => $this->purchaseOrderItem->purchase_order_item_id,
+            'expected_quantity' => 10,
+            'received_quantity' => 0,
+            'damaged_quantity' => 0,
+            'missing_quantity' => 0,
+            'item_condition' => 'PENDING_RECEIPT',
+        ]);
+
+        $drFiles = [
+            UploadedFile::fake()->create('dr_page_1.pdf', 300, 'application/pdf'),
+            UploadedFile::fake()->image('dr_page_2.png'),
+        ];
+        $siFiles = [
+            UploadedFile::fake()->image('invoice_main.jpg'),
+            UploadedFile::fake()->create('invoice_annex.pdf', 400, 'application/pdf'),
+        ];
+        $suppFiles = [
+            UploadedFile::fake()->image('unboxing_photo.jpg'),
+        ];
+
+        $this->actingAs($this->gsoOfficer)
+            ->put(route('inventory.deliveries.update', $delivery->delivery_id), [
+                'actual_delivery_date' => now()->toDateString(),
+                'delivery_receipt_no' => 'DR-MULTI-001',
+                'sales_invoice_no' => 'SI-MULTI-001',
+                'sales_invoice_date' => now()->toDateString(),
+                'sales_invoice_amount' => 50000.00,
+                'delivery_receipt_files' => $drFiles,
+                'sales_invoice_files' => $siFiles,
+                'supporting_files' => $suppFiles,
+                'remarks' => 'Multiple scanned pages attached.',
+                'items' => [[
+                    'delivery_item_id' => $item->delivery_item_id,
+                    'received_quantity' => 10,
+                    'damaged_quantity' => 0,
+                    'item_condition' => 'GOOD',
+                ]],
+            ])
+            ->assertRedirect(route('inventory.deliveries.show', $delivery->delivery_id));
+
+        $drDocs = Document::query()
+            ->where('related_module', 'deliveries')
+            ->where('related_reference_id', $delivery->delivery_id)
+            ->where('document_kind', 'delivery_receipt')
+            ->get();
+        $this->assertCount(2, $drDocs);
+        $this->assertStringContainsString('File 1 of 2', $drDocs[0]->title);
+        $this->assertStringContainsString('File 2 of 2', $drDocs[1]->title);
+
+        $siDocs = Document::query()
+            ->where('related_module', 'deliveries')
+            ->where('related_reference_id', $delivery->delivery_id)
+            ->where('document_kind', 'sales_invoice')
+            ->get();
+        $this->assertCount(2, $siDocs);
+        $this->assertStringContainsString('File 1 of 2', $siDocs[0]->title);
+        $this->assertStringContainsString('File 2 of 2', $siDocs[1]->title);
+
+        $suppDocs = Document::query()
+            ->where('related_module', 'deliveries')
+            ->where('related_reference_id', $delivery->delivery_id)
+            ->where('document_kind', 'verification_evidence')
+            ->get();
+        $this->assertCount(1, $suppDocs);
     }
 
     public function test_verification_rejects_rejection_when_received_items_have_no_discrepancy(): void

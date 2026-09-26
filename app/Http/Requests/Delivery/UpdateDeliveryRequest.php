@@ -27,8 +27,8 @@ class UpdateDeliveryRequest extends FormRequest
         $hasExistingSi = $delivery instanceof \App\Models\Delivery
             && $delivery->documents()->where('document_kind', 'sales_invoice')->exists();
 
-        $drRule = ($this->has('items') && ! $hasExistingDr && ! app()->environment('testing')) ? 'required' : 'nullable';
-        $siRule = ($this->has('items') && ! $hasExistingSi && ! app()->environment('testing')) ? 'required' : 'nullable';
+        $drRule = ($this->has('items') && ! $hasExistingDr && ! $this->hasFile('delivery_receipt_file') && ! $this->hasFile('delivery_receipt_files') && ! app()->environment('testing')) ? 'required' : 'nullable';
+        $siRule = ($this->has('items') && ! $hasExistingSi && ! $this->hasFile('sales_invoice_file') && ! $this->hasFile('sales_invoice_files') && ! app()->environment('testing')) ? 'required' : 'nullable';
 
         return [
             'actual_delivery_date' => [$this->has('items') ? 'required' : 'nullable', 'date', 'after_or_equal:'.$earliestAllowedDeliveryDate, 'before_or_equal:today'],
@@ -38,7 +38,13 @@ class UpdateDeliveryRequest extends FormRequest
             'sales_invoice_date' => ['nullable', 'date', 'before_or_equal:today'],
             'sales_invoice_amount' => ['nullable', 'numeric', 'min:0'],
             'delivery_receipt_file' => [$drRule, 'file', 'max:10240', 'mimes:pdf,png,jpg,jpeg,webp'],
+            'delivery_receipt_files' => ['nullable', 'array'],
+            'delivery_receipt_files.*' => ['file', 'max:10240', 'mimes:pdf,png,jpg,jpeg,webp'],
             'sales_invoice_file' => [$siRule, 'file', 'max:10240', 'mimes:pdf,png,jpg,jpeg,webp'],
+            'sales_invoice_files' => ['nullable', 'array'],
+            'sales_invoice_files.*' => ['file', 'max:10240', 'mimes:pdf,png,jpg,jpeg,webp'],
+            'supporting_files' => ['nullable', 'array'],
+            'supporting_files.*' => ['file', 'max:10240', 'mimes:pdf,png,jpg,jpeg,webp'],
             'remarks' => ['nullable', 'string', 'max:500'],
             'items' => ['nullable', 'array', 'min:1'],
             'items.*.delivery_item_id' => ['required_with:items', 'integer', 'exists:delivery_items,delivery_item_id'],
@@ -103,11 +109,17 @@ class UpdateDeliveryRequest extends FormRequest
             'sales_invoice_file.required' => 'Scanned copy or camera photo of the Supplier Sales Invoice (SI) is mandatory.',
             'delivery_receipt_file.max' => 'Delivery receipt file must not exceed 10MB.',
             'sales_invoice_file.max' => 'Sales invoice file must not exceed 10MB.',
+            'delivery_receipt_files.*.max' => 'Each delivery receipt file must not exceed 10MB.',
+            'sales_invoice_files.*.max' => 'Each sales invoice file must not exceed 10MB.',
+            'supporting_files.*.max' => 'Each supporting file must not exceed 10MB.',
             'sales_invoice_date.date' => 'Sales invoice date must be a valid date.',
             'sales_invoice_date.before_or_equal' => 'Sales invoice date cannot be in the future.',
             'sales_invoice_amount.numeric' => 'Sales invoice amount must be a valid number.',
             'delivery_receipt_file.mimes' => 'Delivery receipt file must be a PDF or image (PNG, JPG, WEBP).',
             'sales_invoice_file.mimes' => 'Sales invoice file must be a PDF or image (PNG, JPG, WEBP).',
+            'delivery_receipt_files.*.mimes' => 'Each delivery receipt file must be a PDF or image (PNG, JPG, WEBP).',
+            'sales_invoice_files.*.mimes' => 'Each sales invoice file must be a PDF or image (PNG, JPG, WEBP).',
+            'supporting_files.*.mimes' => 'Each supporting file must be a PDF or image (PNG, JPG, WEBP).',
             'items.min' => 'Delivery cannot be received without purchase order item lines.',
             'items.*.received_quantity.integer' => 'Received quantity must be a whole number.',
             'items.*.damaged_quantity.integer' => 'Damaged quantity must be a whole number.',

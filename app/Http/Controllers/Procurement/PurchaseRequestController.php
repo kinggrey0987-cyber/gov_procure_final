@@ -183,6 +183,12 @@ class PurchaseRequestController extends Controller
         $action = (string) $request->input('action', 'process');
         $remarks = $request->input('remarks');
 
+        if ($purchaseRequest->is_zero_cost_replacement && in_array($action, ['return', 'reject'], true)) {
+            throw ValidationException::withMessages([
+                'action' => 'Discrepancy follow-up purchase requests are under supplier warranty and cannot be returned for revision or rejected.',
+            ]);
+        }
+
         if ($action === 'return') {
             if (! is_string($remarks)) {
                 throw ValidationException::withMessages([

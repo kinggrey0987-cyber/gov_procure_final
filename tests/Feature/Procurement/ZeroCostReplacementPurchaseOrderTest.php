@@ -203,4 +203,150 @@ class ZeroCostReplacementPurchaseOrderTest extends TestCase
         $this->assertEquals('VERIFIED', $delivery->fresh()->receipt_status);
         $this->assertEquals('VERIFIED', $replacementDelivery->fresh()->receipt_status);
     }
+
+    public function test_discrepancy_follow_up_pr_cannot_be_returned_or_rejected(): void
+    {
+        $roleProc = Role::query()->firstOrCreate(['code' => UserRole::PROCUREMENT_OFFICER->value], ['name' => 'Procurement Officer']);
+        $office = Office::query()->create(['name' => 'General Services Office', 'code' => 'GSO', 'status' => 'ACTIVE']);
+        $procUser = User::factory()->create(['role_id' => $roleProc->id, 'office_id' => $office->id, 'name' => 'Proc Officer']);
+
+        $sr = SupplyRequest::query()->create([
+            'request_code' => 'SR-2026-GSO-099',
+            'office_id' => $office->id,
+            'requested_by' => $procUser->id,
+            'status' => 'SUBMITTED',
+            'priority_level' => 'NORMAL',
+            'request_category' => 'OFFICE_SUPPLIES',
+            'purpose' => 'Discrepancy follow up source',
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(7)->toDateString(),
+        ]);
+
+        $followUpPr = PurchaseRequest::query()->create([
+            'pr_number' => 'PR-2026-09-0099',
+            'supply_request_id' => $sr->supply_request_id,
+            'office_id' => $office->id,
+            'requested_by' => $procUser->id,
+            'source_type' => 'PARTIAL_DELIVERY_FOLLOW_UP',
+            'status' => 'OPEN',
+            'remarks' => 'Follow up PR for discrepancy replacement',
+        ]);
+
+        $this->assertTrue($followUpPr->is_zero_cost_replacement);
+
+        // 1. Attempting to return for revision should fail
+        $responseReturn = $this->actingAs($procUser)->post(
+            route('procurement.purchase-requests.process', $followUpPr->purchase_request_id),
+            [
+                'action' => 'return',
+                'remarks' => 'Needs revision',
+            ]
+        );
+        $responseReturn->assertSessionHasErrors(['action']);
+
+        // 2. Attempting to reject should fail
+        $responseReject = $this->actingAs($procUser)->post(
+            route('procurement.purchase-requests.process', $followUpPr->purchase_request_id),
+            [
+                'action' => 'reject',
+                'remarks' => 'Rejecting request',
+            ]
+        );
+        $responseReject->assertSessionHasErrors(['action']);
+
+        // 3. Moving to processing should succeed
+        $responseProcess = $this->actingAs($procUser)->post(
+            route('procurement.purchase-requests.process', $followUpPr->purchase_request_id),
+            [
+                'action' => 'process',
+                'remarks' => 'Approved to proceed with replacement order',
+            ]
+        );
+        $responseProcess->assertRedirect(route('procurement.purchase-requests.show', ['purchase_request' => $followUpPr->purchase_request_id]));
+        $this->assertEquals('PROCESSING', $followUpPr->fresh()->status);
+    }
+
+    public function test_warranty_replacement_po_supplier_cannot_be_changed(): void
+    {
+        $roleProc = Role::query()->firstOrCreate(['code' => UserRole::PROCUREMENT_OFFICER->value], ['name' => 'Procurement Officer']);
+        $office = Office::query()->create(['name' => 'General Services Office', 'code' => 'GSO', 'status' => 'ACTIVE']);
+        $procUser = User::factory()->create(['role_id' => $roleProc->id, 'office_id' => $office->id, 'name' => 'Proc Officer']);
+
+        $originalSupplier = Supplier::query()->create(['supplier_name' => 'Original Contractor', 'status' => 'ACTIVE']);
+        $differentSupplier = Supplier::query()->create(['supplier_name' => 'Different Contractor', 'status' => 'ACTIVE']);
+
+        $sr = SupplyRequest::query()->create([
+            'request_code' => 'SR-2026-GSO-100',
+            'office_id' => $office->id,
+            'requested_by' => $procUser->id,
+            'status' => 'SUBMITTED',
+            'priority_level' => 'NORMAL',
+            'request_category' => 'OFFICE_SUPPLIES',
+            'purpose' => 'Replacement source',
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(7)->toDateString(),
+        ]);
+
+        $followUpPr = PurchaseRequest::query()->create([
+            'pr_number' => 'PR-2026-09-0100',
+            'supply_request_id' => $sr->supply_request_id,
+            'office_id' => $office->id,
+            'requested_by' => $procUser->id,
+            'source_type' => 'PARTIAL_DELIVERY_FOLLOW_UP',
+            'status' => 'PROCESSING',
+            'remarks' => 'Discrepancy replacement PR',
+        ]);
+
+        $replacementPo = PurchaseOrder::query()->create([
+            'purchase_request_id' => $followUpPr->purchase_request_id,
+            'supply_request_id' => $sr->supply_request_id,
+            'supplier_id' => $originalSupplier->supplier_id,
+            'created_by' => $procUser->id,
+            'po_number' => 'PO-2026-09-0088',
+            'procurement_method' => 'DIRECT_CONTRACTING',
+            'status' => 'DRAFT',
+            'expected_delivery_date' => now()->addDays(5)->toDateString(),
+            'total_amount' => 0.00,
+            'terms_notes' => 'Zero-cost replacement',
+        ]);
+
+        $this->assertTrue($replacementPo->is_zero_cost_replacement);
+
+        // 1. GET Edit page should pass isZeroCostReplacement: true
+        $this->actingAs($procUser)
+            ->get(route('procurement.purchase-orders.edit', $replacementPo->purchase_order_id))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Procurement/PurchaseOrders/Edit')
+                ->where('isZeroCostReplacement', true)
+                ->where('purchaseOrder.supplier_id', $originalSupplier->supplier_id)
+            );
+
+        // 2. Attempting to update with a different supplier must fail
+        $responseChangeSupplier = $this->actingAs($procUser)->put(
+            route('procurement.purchase-orders.update', $replacementPo->purchase_order_id),
+            [
+                'supplier_id' => $differentSupplier->supplier_id,
+                'po_number' => $replacementPo->po_number,
+                'procurement_method' => 'DIRECT_CONTRACTING',
+                'expected_delivery_date' => now()->addDays(5)->toDateString(),
+                'terms_notes' => 'Updated notes',
+            ]
+        );
+        $responseChangeSupplier->assertSessionHasErrors(['supplier_id']);
+
+        // 3. Updating while keeping the original supplier succeeds
+        $responseKeepSupplier = $this->actingAs($procUser)->put(
+            route('procurement.purchase-orders.update', $replacementPo->purchase_order_id),
+            [
+                'supplier_id' => $originalSupplier->supplier_id,
+                'po_number' => $replacementPo->po_number,
+                'procurement_method' => 'DIRECT_CONTRACTING',
+                'expected_delivery_date' => now()->addDays(7)->toDateString(),
+                'terms_notes' => 'Updated terms for warranty order',
+            ]
+        );
+        $responseKeepSupplier->assertRedirect(route('procurement.purchase-orders.items.index', $replacementPo->purchase_order_id));
+        $this->assertEquals($originalSupplier->supplier_id, $replacementPo->fresh()->supplier_id);
+    }
 }

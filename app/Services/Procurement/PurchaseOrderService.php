@@ -139,6 +139,13 @@ class PurchaseOrderService
         $this->assertProcurementActor($actor);
         $this->assertOrderIsMutable($purchaseOrder);
 
+        $purchaseOrder->loadMissing('purchaseRequest');
+        if ($purchaseOrder->is_zero_cost_replacement && isset($payload['supplier_id']) && (int) $payload['supplier_id'] !== (int) $purchaseOrder->supplier_id) {
+            throw ValidationException::withMessages([
+                'supplier_id' => 'Cannot change supplier for a warranty replacement purchase order. It is locked to the original contractor under warranty.',
+            ]);
+        }
+
         $supplier = Supplier::query()->where('supplier_id', (int) $payload['supplier_id'])->firstOrFail();
         $this->assertSupplierIsAllowed($supplier);
 

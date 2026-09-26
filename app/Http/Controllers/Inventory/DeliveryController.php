@@ -14,6 +14,7 @@ use App\Services\Delivery\DeliveryService;
 use App\Services\Documents\DocumentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Redirect;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -369,30 +370,97 @@ public function edit(Delivery $delivery): Response
 
         $documentService = app(DocumentService::class);
 
+        $rawDrFiles = [];
         if ($request->hasFile('delivery_receipt_file')) {
+            $rawDrFiles[] = $request->file('delivery_receipt_file');
+        }
+        if ($request->hasFile('delivery_receipt_files')) {
+            $uploadedDrFiles = $request->file('delivery_receipt_files');
+            if (is_array($uploadedDrFiles)) {
+                $rawDrFiles = array_merge($rawDrFiles, $uploadedDrFiles);
+            }
+        }
+        $drFiles = [];
+        $processedDrKeys = [];
+        foreach ($rawDrFiles as $file) {
+            if ($file instanceof UploadedFile) {
+                $fileKey = $file->getClientOriginalName() . '_' . $file->getSize();
+                if (! isset($processedDrKeys[$fileKey])) {
+                    $processedDrKeys[$fileKey] = true;
+                    $drFiles[] = $file;
+                }
+            }
+        }
+        $drCount = count($drFiles);
+        foreach ($drFiles as $index => $file) {
+            $part = $drCount > 1 ? ' (File ' . ($index + 1) . ' of ' . $drCount . ')' : '';
             $documentService->upload(
                 request()->user(),
                 'deliveries',
                 (int) $delivery->delivery_id,
                 [
-                    'title' => 'Supplier Delivery Receipt (DR) — ' . ($delivery->delivery_receipt_no ?: $delivery->delivery_code),
+                    'title' => 'Supplier Delivery Receipt (DR) — ' . ($delivery->delivery_receipt_no ?: $delivery->delivery_code) . $part,
                     'document_kind' => 'delivery_receipt',
-                    'file' => $request->file('delivery_receipt_file'),
+                    'file' => $file,
                 ]
             );
         }
 
+        $rawSiFiles = [];
         if ($request->hasFile('sales_invoice_file')) {
+            $rawSiFiles[] = $request->file('sales_invoice_file');
+        }
+        if ($request->hasFile('sales_invoice_files')) {
+            $uploadedSiFiles = $request->file('sales_invoice_files');
+            if (is_array($uploadedSiFiles)) {
+                $rawSiFiles = array_merge($rawSiFiles, $uploadedSiFiles);
+            }
+        }
+        $siFiles = [];
+        $processedSiKeys = [];
+        foreach ($rawSiFiles as $file) {
+            if ($file instanceof UploadedFile) {
+                $fileKey = $file->getClientOriginalName() . '_' . $file->getSize();
+                if (! isset($processedSiKeys[$fileKey])) {
+                    $processedSiKeys[$fileKey] = true;
+                    $siFiles[] = $file;
+                }
+            }
+        }
+        $siCount = count($siFiles);
+        foreach ($siFiles as $index => $file) {
+            $part = $siCount > 1 ? ' (File ' . ($index + 1) . ' of ' . $siCount . ')' : '';
             $documentService->upload(
                 request()->user(),
                 'deliveries',
                 (int) $delivery->delivery_id,
                 [
-                    'title' => 'Supplier Sales Invoice (SI) — ' . ($delivery->sales_invoice_no ?: $delivery->delivery_code),
+                    'title' => 'Supplier Sales Invoice (SI) — ' . ($delivery->sales_invoice_no ?: $delivery->delivery_code) . $part,
                     'document_kind' => 'sales_invoice',
-                    'file' => $request->file('sales_invoice_file'),
+                    'file' => $file,
                 ]
             );
+        }
+
+        if ($request->hasFile('supporting_files')) {
+            $rawSupportingFiles = $request->file('supporting_files');
+            if (is_array($rawSupportingFiles)) {
+                $supportingFiles = array_values(array_filter($rawSupportingFiles, fn ($f) => $f instanceof UploadedFile));
+                $suppCount = count($supportingFiles);
+                foreach ($supportingFiles as $index => $file) {
+                    $part = $suppCount > 1 ? ' (File ' . ($index + 1) . ' of ' . $suppCount . ')' : '';
+                    $documentService->upload(
+                        request()->user(),
+                        'deliveries',
+                        (int) $delivery->delivery_id,
+                        [
+                            'title' => 'Supporting Attachment — ' . $delivery->delivery_code . $part,
+                            'document_kind' => 'verification_evidence',
+                            'file' => $file,
+                        ]
+                    );
+                }
+            }
         }
 
         if ($request->has('items')) {

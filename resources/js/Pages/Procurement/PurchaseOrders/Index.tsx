@@ -35,6 +35,7 @@ type ReadyPurchaseRequest = {
     purchase_request_id: number;
     pr_number: string;
     office_name?: string | null;
+    office_code?: string | null;
     is_urgent?: boolean;
 };
 
@@ -65,6 +66,7 @@ export default function PurchaseOrdersIndex({
 }: Props) {
     const [status, setStatus] = useState(filters?.status ?? '');
     const [search, setSearch] = useState(filters?.search ?? '');
+    const [showReadyDrawer, setShowReadyDrawer] = useState(false);
     const debouncedSearch = useDebouncedValue(search, 450);
     const hasMountedRef = useRef(false);
 
@@ -130,24 +132,6 @@ export default function PurchaseOrdersIndex({
     return (
         <AuthenticatedLayout
             header="Purchase Orders"
-            headerActions={
-                <Link
-                    href={route('procurement.purchase-orders.create')}
-                    className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-red-600 px-3 text-xs font-semibold text-white shadow-sm hover:bg-red-700 transition"
-                >
-                    <span className="text-sm leading-none">＋</span>
-                    <span>Create PO</span>
-                    {readyPrCount > 0 && (
-                        <span className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-black ${
-                            urgentReadyPrCount > 0
-                                ? 'bg-white text-red-700 ring-1 ring-red-400'
-                                : 'bg-red-800 text-white'
-                        }`}>
-                            {readyPrCount} ready
-                        </span>
-                    )}
-                </Link>
-            }
         >
             <Head title="Purchase Orders" />
 
@@ -160,7 +144,7 @@ export default function PurchaseOrdersIndex({
                             : 'border-blue-200 bg-blue-50/80 text-blue-950'
                     }`}>
                         <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div className="flex items-start gap-3">
+                            <div className="flex items-start gap-3 min-w-0">
                                 <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl font-bold shadow-2xs ${
                                     urgentReadyPrCount > 0 ? 'bg-red-600 text-white' : 'bg-blue-600 text-white'
                                 }`}>
@@ -168,7 +152,7 @@ export default function PurchaseOrdersIndex({
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                                     </svg>
                                 </span>
-                                <div>
+                                <div className="min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <h4 className="text-xs font-bold">
                                             {readyPrCount} Reviewed Purchase {readyPrCount === 1 ? 'Request' : 'Requests'} Ready for PO Creation
@@ -182,10 +166,12 @@ export default function PurchaseOrdersIndex({
                                     <p className="mt-0.5 text-[11px] text-slate-600">
                                         These purchase requests have completed procurement review and are awaiting purchase orders to initiate supplier ordering.
                                     </p>
-                                    {readyPurchaseRequests.length > 0 && (
+
+                                    {/* Compact Quick Chips (when collapsed) */}
+                                    {!showReadyDrawer && readyPurchaseRequests.length > 0 && (
                                         <div className="mt-2 flex items-center gap-1.5 flex-wrap">
                                             <span className="text-[10px] font-semibold text-slate-500">Quick Create:</span>
-                                            {readyPurchaseRequests.map((pr) => (
+                                            {readyPurchaseRequests.slice(0, 3).map((pr) => (
                                                 <Link
                                                     key={pr.purchase_request_id}
                                                     href={route('procurement.purchase-orders.create', { pr_id: pr.purchase_request_id })}
@@ -197,28 +183,106 @@ export default function PurchaseOrdersIndex({
                                                     title={`Create PO for ${pr.pr_number} (${pr.office_name ?? 'Office'})`}
                                                 >
                                                     {pr.is_urgent && <span className="h-1.5 w-1.5 rounded-full bg-red-600"></span>}
-                                                    <span>{pr.pr_number}</span>
-                                                    <span className="text-[9px] text-slate-400">({pr.office_name})</span>
+                                                    <span className="font-bold">{pr.pr_number}</span>
+                                                    <span className="text-[9px] text-slate-500">({pr.office_code || pr.office_name})</span>
                                                     <span className="text-slate-400">→</span>
                                                 </Link>
                                             ))}
-                                            {readyPrCount > readyPurchaseRequests.length && (
-                                                <span className="text-[10px] text-slate-500 font-medium">
-                                                    +{readyPrCount - readyPurchaseRequests.length} more
-                                                </span>
+                                            {readyPurchaseRequests.length > 3 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowReadyDrawer(true)}
+                                                    className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold text-blue-700 hover:text-blue-900 hover:bg-blue-100/60 transition"
+                                                >
+                                                    +{readyPrCount - 3} more ▾
+                                                </button>
                                             )}
                                         </div>
                                     )}
                                 </div>
                             </div>
-                            <Link
-                                href={route('procurement.purchase-orders.create')}
-                                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-red-700 transition"
-                            >
-                                <span>Create Purchase Order</span>
-                                <span>→</span>
-                            </Link>
+
+                            {/* Action Buttons: Drawer Toggle & Primary Create */}
+                            <div className="flex items-center gap-2 shrink-0">
+                                {readyPurchaseRequests.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowReadyDrawer(!showReadyDrawer)}
+                                        className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-2xs transition ${
+                                            showReadyDrawer
+                                                ? 'border-blue-400 bg-blue-100 text-blue-900 hover:bg-blue-200/70'
+                                                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        <svg className={`h-3.5 w-3.5 transition-transform duration-200 ${showReadyDrawer ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                        <span>{showReadyDrawer ? 'Hide List' : `View Ready PRs (${readyPrCount})`}</span>
+                                    </button>
+                                )}
+                                <Link
+                                    href={route('procurement.purchase-orders.create')}
+                                    className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-red-700 transition"
+                                >
+                                    <span>Create Purchase Order</span>
+                                    <span>→</span>
+                                </Link>
+                            </div>
                         </div>
+
+                        {/* Collapsible Scrollable Tray */}
+                        {showReadyDrawer && readyPurchaseRequests.length > 0 && (
+                            <div className="mt-3.5 pt-3 border-t border-blue-200/80 space-y-2">
+                                <div className="flex items-center justify-between text-xs px-0.5">
+                                    <span className="font-bold text-slate-800">
+                                        Pending Reviewed PRs Awaiting Purchase Order ({readyPurchaseRequests.length}{readyPrCount > readyPurchaseRequests.length ? ` of ${readyPrCount}` : ''}):
+                                    </span>
+                                    <span className="text-[11px] text-slate-500">Select any PR to initiate its PO with pre-filled items</span>
+                                </div>
+
+                                <div className="max-h-56 overflow-y-auto space-y-1.5 pr-1">
+                                    {readyPurchaseRequests.map((pr) => (
+                                        <div
+                                            key={pr.purchase_request_id}
+                                            className="flex items-center justify-between gap-3 rounded-lg border border-slate-200/80 bg-white p-2.5 text-xs shadow-2xs hover:border-blue-300 hover:bg-blue-50/40 transition"
+                                        >
+                                            <div className="flex items-center gap-2.5 min-w-0">
+                                                {pr.is_urgent ? (
+                                                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-100 border border-red-200 px-2 py-0.5 text-[9px] font-black uppercase text-red-700">
+                                                        <span className="h-1.5 w-1.5 rounded-full bg-red-600"></span> Urgent
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex shrink-0 items-center rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-medium text-slate-600">
+                                                        Normal
+                                                    </span>
+                                                )}
+                                                <span className="font-bold text-slate-900">{pr.pr_number}</span>
+                                                <span className="inline-flex items-center rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 border border-slate-200/70">
+                                                    {pr.office_code || 'Office'}
+                                                </span>
+                                                <span className="text-[11px] text-slate-500 truncate" title={pr.office_name ?? ''}>
+                                                    {pr.office_name}
+                                                </span>
+                                            </div>
+
+                                            <Link
+                                                href={route('procurement.purchase-orders.create', { pr_id: pr.purchase_request_id })}
+                                                className="inline-flex shrink-0 items-center gap-1 rounded-md bg-red-600 hover:bg-red-700 text-white px-3 py-1 text-[11px] font-semibold shadow-2xs transition"
+                                            >
+                                                <span>Create PO</span>
+                                                <span>→</span>
+                                            </Link>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {readyPrCount > readyPurchaseRequests.length && (
+                                    <p className="text-center pt-1 text-[10px] text-slate-500">
+                                        Showing first {readyPurchaseRequests.length} requests. Additional requests can be found in Request Review.
+                                    </p>
+                                )}
+                            </div>
+                        )}
                     </section>
                 )}
 

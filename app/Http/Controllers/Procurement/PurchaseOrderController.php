@@ -62,10 +62,11 @@ class PurchaseOrderController extends Controller
 
         $readyPrCount = $readyPurchaseRequests->count();
         $urgentReadyPrCount = $readyPurchaseRequests->filter(fn ($pr) => $pr->priority_level === 'URGENT')->count();
-        $readyPurchaseRequestsSummary = $readyPurchaseRequests->take(6)->map(fn ($pr): array => [
+        $readyPurchaseRequestsSummary = $readyPurchaseRequests->take(25)->map(fn ($pr): array => [
             'purchase_request_id' => (int) $pr->purchase_request_id,
             'pr_number' => (string) $pr->pr_number,
             'office_name' => (string) ($pr->office?->name ?? 'Unknown Office'),
+            'office_code' => (string) ($pr->office?->code ?? $pr->office?->name ?? 'Office'),
             'is_urgent' => $pr->priority_level === 'URGENT',
         ])->values();
 
@@ -281,20 +282,27 @@ class PurchaseOrderController extends Controller
 
         $suppliers = Supplier::query()->active()->orderBy('supplier_name')->get(['supplier_id', 'supplier_name']);
 
+        $purchaseOrder->loadMissing([
+            'supplier:supplier_id,supplier_name',
+            'purchaseRequest.office:id,code,name',
+            'purchaseRequest.sourceDelivery.supplier',
+            'purchaseRequest.sourceDelivery.purchaseOrder.supplier',
+            'supplyRequest.requester:id,name',
+            'supplyRequest.items.item.category',
+        ]);
+
         return Inertia::render('Procurement/PurchaseOrders/Edit', [
-            'purchaseOrder' => $purchaseOrder->load([
-                'supplier:supplier_id,supplier_name',
-                'purchaseRequest.office:id,code,name',
-                'supplyRequest.requester:id,name',
-                'supplyRequest.items.item.category',
-            ]),
+            'purchaseOrder' => $purchaseOrder,
             'suppliers' => $suppliers,
+            'isZeroCostReplacement' => (bool) $purchaseOrder->is_zero_cost_replacement,
         ]);
     }
 
     public function update(UpdatePurchaseOrderRequest $request, PurchaseOrder $purchaseOrder): RedirectResponse
     {
         abort_unless($request->user()?->can('procurement.purchase-order.update', $purchaseOrder), 403);
+
+        $purchaseOrder->loadMissing('purchaseRequest');
 
         if ($purchaseOrder->is_zero_cost_replacement && (int) $request->validated('supplier_id') !== (int) $purchaseOrder->supplier_id) {
             throw \Illuminate\Validation\ValidationException::withMessages([

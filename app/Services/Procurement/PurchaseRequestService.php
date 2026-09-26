@@ -818,6 +818,12 @@ class PurchaseRequestService
     {
         $this->assertProcurementActor($actor);
 
+        if ($purchaseRequest->is_zero_cost_replacement) {
+            throw ValidationException::withMessages([
+                'status' => 'Discrepancy follow-up purchase requests are under supplier warranty and cannot be returned for revision.',
+            ]);
+        }
+
         if (! in_array((string) $purchaseRequest->status, ['OPEN', 'PROCESSING'], true)) {
             throw ValidationException::withMessages([
                 'status' => 'Only OPEN or PROCESSING purchase requests can be returned for revision.',
@@ -858,6 +864,12 @@ class PurchaseRequestService
     public function reject(PurchaseRequest $purchaseRequest, User $actor, string $remarks): PurchaseRequest
     {
         $this->assertProcurementActor($actor);
+
+        if ($purchaseRequest->is_zero_cost_replacement) {
+            throw ValidationException::withMessages([
+                'status' => 'Discrepancy follow-up purchase requests are under supplier warranty and cannot be rejected.',
+            ]);
+        }
 
         if (! in_array((string) $purchaseRequest->status, ['OPEN', 'PROCESSING'], true)) {
             throw ValidationException::withMessages([

@@ -18,12 +18,20 @@ class UpdatePurchaseOrderRequest extends FormRequest
     public function rules(): array
     {
         $purchaseOrder = $this->route('purchase_order');
-        $purchaseOrderId = is_object($purchaseOrder)
-            ? (int) $purchaseOrder->purchase_order_id
-            : (int) $purchaseOrder;
+        if (! ($purchaseOrder instanceof \App\Models\PurchaseOrder) && ! empty($purchaseOrder)) {
+            $purchaseOrder = \App\Models\PurchaseOrder::query()->find($purchaseOrder);
+        }
+
+        $supplierRules = ['required', 'integer', 'exists:suppliers,supplier_id'];
+        if ($purchaseOrder instanceof \App\Models\PurchaseOrder) {
+            $purchaseOrder->loadMissing('purchaseRequest');
+            if ($purchaseOrder->is_zero_cost_replacement) {
+                $supplierRules[] = Rule::in([(int) $purchaseOrder->supplier_id]);
+            }
+        }
 
         return [
-            'supplier_id' => ['required', 'integer', 'exists:suppliers,supplier_id'],
+            'supplier_id' => $supplierRules,
             'po_number' => ['nullable', 'string', 'max:80'],
             'procurement_method' => ['required', 'string', Rule::in(ProcurementMethod::values())],
             'expected_delivery_date' => ['required', 'date', 'after_or_equal:today'],

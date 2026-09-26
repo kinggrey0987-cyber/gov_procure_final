@@ -42,7 +42,15 @@ class PurchaseRequest extends Model
 
      protected $appends = [
          'priority_level',
+         'is_zero_cost_replacement',
      ];
+
+     public function getIsZeroCostReplacementAttribute(): bool
+     {
+         return in_array((string) ($this->source_type ?? ''), ['PARTIAL_DELIVERY_FOLLOW_UP', 'CLAIM_REPLACEMENT_FOLLOW_UP'], true)
+             || (int) ($this->source_delivery_id ?? 0) > 0
+             || (int) ($this->source_claim_id ?? 0) > 0;
+     }
 
      public function getPriorityLevelAttribute(): string
      {

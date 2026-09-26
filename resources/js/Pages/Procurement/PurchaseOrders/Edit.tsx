@@ -18,10 +18,14 @@ type PurchaseOrder = {
     expected_delivery_date: string | null;
     terms_notes: string | null;
     remarks: string | null;
+    is_zero_cost_replacement?: boolean;
     supplier?: SupplierOption | null;
     purchase_request?: {
         purchase_request_id: number;
         pr_number?: string | null;
+        source_type?: string | null;
+        source_delivery_id?: number | null;
+        source_claim_id?: number | null;
         office?: {
             id: number;
             code?: string | null;
@@ -53,9 +57,10 @@ type PurchaseOrder = {
 type Props = {
     purchaseOrder: PurchaseOrder;
     suppliers: SupplierOption[];
+    isZeroCostReplacement?: boolean;
 };
 
-export default function PurchaseOrdersEdit({ purchaseOrder, suppliers }: Props) {
+export default function PurchaseOrdersEdit({ purchaseOrder, suppliers, isZeroCostReplacement: propIsZeroCostReplacement }: Props) {
     const today = todayInputValue();
 
     const form = useForm({
@@ -70,6 +75,14 @@ export default function PurchaseOrdersEdit({ purchaseOrder, suppliers }: Props) 
     const requestItems = purchaseOrder.supply_request?.items ?? [];
     const totalQuantity = requestItems.reduce((sum, row) => sum + Number(row.quantity_requested ?? 0), 0);
     const selectedSupplier = suppliers.find((row) => row.supplier_id === Number(form.data.supplier_id)) ?? purchaseOrder.supplier ?? null;
+    const isZeroCostReplacement = Boolean(
+        purchaseOrder.is_zero_cost_replacement ||
+        propIsZeroCostReplacement ||
+        purchaseOrder.purchase_request?.source_type === 'PARTIAL_DELIVERY_FOLLOW_UP' ||
+        purchaseOrder.purchase_request?.source_type === 'CLAIM_REPLACEMENT_FOLLOW_UP' ||
+        Boolean(purchaseOrder.purchase_request?.source_delivery_id) ||
+        Boolean(purchaseOrder.purchase_request?.source_claim_id)
+    );
 
     useEffect(() => {
         if (!form.isDirty) return;
@@ -117,6 +130,22 @@ export default function PurchaseOrdersEdit({ purchaseOrder, suppliers }: Props) 
                         </div>
                     </div>
 
+                    {isZeroCostReplacement ? (
+                        <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900 shadow-xs">
+                            <div className="flex items-start gap-3">
+                                <span className="text-xl">🛡️</span>
+                                <div>
+                                    <h4 className="font-bold text-amber-950 text-sm">
+                                        Zero-Cost Warranty Replacement Purchase Order (COA & RA 9184)
+                                    </h4>
+                                    <p className="mt-1 text-amber-800">
+                                        This Purchase Order fulfills a warranty rectification for a delivery discrepancy. Under government procurement standards, it is permanently locked to the original contracted supplier ({selectedSupplier?.supplier_name || 'Original Contractor'}) at ₱0.00 additional municipal cost.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    ) : null}
+
                     <div className="grid gap-4 md:grid-cols-2">
                         <label className="block md:col-span-2">
                             <span className="mb-1 block text-sm font-medium text-slate-700">Linked Purchase Request Source</span>
@@ -129,19 +158,39 @@ export default function PurchaseOrdersEdit({ purchaseOrder, suppliers }: Props) 
                         </label>
 
                         <label className="block">
-                            <span className="mb-1 block text-sm font-medium text-slate-700">Select Supplier</span>
-                            <select
-                                value={form.data.supplier_id}
-                                onChange={(event) => form.setData('supplier_id', Number(event.target.value))}
-                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                                required
-                            >
-                                {suppliers.map((row) => (
-                                    <option key={row.supplier_id} value={row.supplier_id}>
-                                        {row.supplier_name}
-                                    </option>
-                                ))}
-                            </select>
+                            <span className="mb-1 block text-sm font-medium text-slate-700">
+                                Select Supplier {isZeroCostReplacement ? <span className="font-semibold text-amber-800">(Locked under Warranty)</span> : ''}
+                            </span>
+                            {isZeroCostReplacement ? (
+                                <div>
+                                    <input
+                                        type="text"
+                                        value={selectedSupplier?.supplier_name || 'Original Contractor'}
+                                        className="w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 shadow-inner"
+                                        readOnly
+                                        aria-readonly="true"
+                                    />
+                                    <span className="mt-1 block text-xs text-amber-700 font-medium">
+                                        Supplier cannot be changed because this order is under the original contractor's warranty terms.
+                                    </span>
+                                </div>
+                            ) : (
+                                <select
+                                    value={form.data.supplier_id}
+                                    onChange={(event) => form.setData('supplier_id', Number(event.target.value))}
+                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                    required
+                                >
+                                    {suppliers.map((row) => (
+                                        <option key={row.supplier_id} value={row.supplier_id}>
+                                            {row.supplier_name}
+                                        </option>
+                                    ))}
+                                </select>
+                            )}
+                            {form.errors.supplier_id ? (
+                                <p className="mt-1 text-xs font-semibold text-rose-600">{form.errors.supplier_id}</p>
+                            ) : null}
                         </label>
 
                         <label className="block">
@@ -166,7 +215,23 @@ export default function PurchaseOrdersEdit({ purchaseOrder, suppliers }: Props) 
                         <ContextField label="Requesting Office" value={formatOffice(purchaseOrder.purchase_request?.office)} />
                         <ContextField label="Request Reference" value={purchaseOrder.supply_request?.request_code || (purchaseOrder.supply_request?.supply_request_id ? `SR #${purchaseOrder.supply_request.supply_request_id}` : 'N/A')} />
                         <ContextField label="Originating Requester" value={purchaseOrder.supply_request?.requester?.name || 'N/A'} />
-                        <ContextField label="Selected Supplier" value={selectedSupplier?.supplier_name || 'N/A'} />
+                        <ContextField
+                            label="Selected Supplier"
+                            value={
+                                selectedSupplier ? (
+                                    <span className="flex items-center gap-1.5 flex-wrap">
+                                        <span>{selectedSupplier.supplier_name}</span>
+                                        {isZeroCostReplacement ? (
+                                            <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                                                Warranty Contractor
+                                            </span>
+                                        ) : null}
+                                    </span>
+                                ) : (
+                                    'N/A'
+                                )
+                            }
+                        />
                     </div>
                 </section>
 
@@ -282,11 +347,11 @@ export default function PurchaseOrdersEdit({ purchaseOrder, suppliers }: Props) 
     );
 }
 
-function ContextField({ label, value }: { label: string; value: string }) {
+function ContextField({ label, value }: { label: string; value: React.ReactNode }) {
     return (
         <div className="rounded-lg border border-red-100 bg-white px-3 py-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-            <p className="mt-1 text-sm font-medium text-slate-800">{value}</p>
+            <div className="mt-1 text-sm font-medium text-slate-800">{value}</div>
         </div>
     );
 }
