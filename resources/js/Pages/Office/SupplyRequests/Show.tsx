@@ -209,7 +209,11 @@ export default function SupplyRequestShow({
                         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                     {supplyRequest.priority_level?.toUpperCase() === 'URGENT' && (
                         <div className="mb-6 flex items-center gap-3.5 rounded-xl border-2 border-red-500 bg-red-50 p-4 text-red-900 shadow-xs">
-                            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-600 text-2xl text-white shadow">🔥</span>
+                            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-600 text-white shadow">
+                                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                            </span>
                             <div>
                                 <div className="flex items-center gap-2">
                                     <h4 className="text-base font-extrabold uppercase tracking-wide text-red-900">URGENT PRIORITY REQUEST</h4>
@@ -237,7 +241,8 @@ export default function SupplyRequestShow({
                             <div className="mt-1">
                                 {supplyRequest.priority_level?.toUpperCase() === 'URGENT' ? (
                                     <span className="inline-flex items-center gap-1.5 rounded-full border border-red-300 bg-red-100 px-3 py-1 text-xs font-bold text-red-800 shadow-2xs">
-                                        <span>🔥</span> URGENT (Priority Need)
+                                        <span className="h-1.5 w-1.5 rounded-full bg-red-600"></span>
+                                        URGENT (Priority Need)
                                     </span>
                                 ) : (
                                     <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
@@ -268,18 +273,6 @@ export default function SupplyRequestShow({
                 </section>
 
                         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    {supplyRequest.priority_level?.toUpperCase() === 'URGENT' && (
-                        <div className="mb-6 flex items-center gap-3.5 rounded-xl border-2 border-red-500 bg-red-50 p-4 text-red-900 shadow-xs">
-                            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-600 text-2xl text-white shadow">🔥</span>
-                            <div>
-                                <div className="flex items-center gap-2">
-                                    <h4 className="text-base font-extrabold uppercase tracking-wide text-red-900">URGENT PRIORITY REQUEST</h4>
-                                    <span className="rounded bg-red-600 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-white shadow-2xs">PRIORITIZED</span>
-                                </div>
-                                <p className="mt-0.5 text-xs text-red-700">This request is flagged as an urgent operational requirement and is expedited across inventory and procurement reviews.</p>
-                            </div>
-                        </div>
-                    )}
                             <div className="flex flex-wrap gap-3">
                                 <Link
                                     href={route('office.supply-requests.index')}
@@ -766,18 +759,6 @@ export default function SupplyRequestShow({
 
                 {activeTab === 'related' ? (
                     <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    {supplyRequest.priority_level?.toUpperCase() === 'URGENT' && (
-                        <div className="mb-6 flex items-center gap-3.5 rounded-xl border-2 border-red-500 bg-red-50 p-4 text-red-900 shadow-xs">
-                            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-600 text-2xl text-white shadow">🔥</span>
-                            <div>
-                                <div className="flex items-center gap-2">
-                                    <h4 className="text-base font-extrabold uppercase tracking-wide text-red-900">URGENT PRIORITY REQUEST</h4>
-                                    <span className="rounded bg-red-600 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-white shadow-2xs">PRIORITIZED</span>
-                                </div>
-                                <p className="mt-0.5 text-xs text-red-700">This request is flagged as an urgent operational requirement and is expedited across inventory and procurement reviews.</p>
-                            </div>
-                        </div>
-                    )}
                         <h4 className="text-xl font-semibold text-slate-800">Related Records</h4>
                         <div className="mt-4 space-y-5">
                             <div>
@@ -826,18 +807,6 @@ export default function SupplyRequestShow({
 
                 {activeTab === 'notes' ? (
                     <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    {supplyRequest.priority_level?.toUpperCase() === 'URGENT' && (
-                        <div className="mb-6 flex items-center gap-3.5 rounded-xl border-2 border-red-500 bg-red-50 p-4 text-red-900 shadow-xs">
-                            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-600 text-2xl text-white shadow">🔥</span>
-                            <div>
-                                <div className="flex items-center gap-2">
-                                    <h4 className="text-base font-extrabold uppercase tracking-wide text-red-900">URGENT PRIORITY REQUEST</h4>
-                                    <span className="rounded bg-red-600 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-white shadow-2xs">PRIORITIZED</span>
-                                </div>
-                                <p className="mt-0.5 text-xs text-red-700">This request is flagged as an urgent operational requirement and is expedited across inventory and procurement reviews.</p>
-                            </div>
-                        </div>
-                    )}
                         <h4 className="text-xl font-semibold text-slate-800">Notes / Attachments</h4>
                         <p className="mt-2 text-sm text-slate-600">Review notes and issue reporting are available here for released/completed requests.</p>
                         <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">

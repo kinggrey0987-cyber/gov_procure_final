@@ -353,7 +353,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                 required
                             >
                                 <option value="NORMAL">Normal</option>
-                                <option value="URGENT">🔥 Urgent (Priority Need)</option>
+                                <option value="URGENT">Urgent (Priority Need)</option>
                             </select>
                         </label>
                     </div>

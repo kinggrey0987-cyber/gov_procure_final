@@ -195,7 +195,11 @@ export default function SupplyRequestsIndex({ supplyRequests, filters, filter_op
                 {supplyRequests.data.some((r) => r.priority_level === 'URGENT') && (
                     <div className="rounded-xl border-2 border-red-300 bg-red-50 p-3.5 shadow-xs">
                         <div className="flex items-center gap-2 font-bold text-red-900 text-xs sm:text-sm">
-                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-sm text-white shadow-2xs">🔥</span>
+                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-white shadow-2xs">
+                                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                            </span>
                             <span className="uppercase tracking-wider">Urgent Requests Pinned to Top</span>
                             <span className="ml-auto rounded-full bg-red-600 px-2.5 py-0.5 text-[10px] text-white font-black tracking-wider uppercase">
                                 {supplyRequests.data.filter((r) => r.priority_level === 'URGENT').length} URGENT PINNED
@@ -230,19 +234,13 @@ export default function SupplyRequestsIndex({ supplyRequests, filters, filter_op
                                         return (
                                             <tr key={row.supply_request_id} className={`hover:bg-slate-50/60 transition-colors ${isUrgent ? 'border-l-4 border-l-red-600 bg-red-50/20' : ''}`}>
                                                 <td className="px-3.5 py-2 font-semibold text-red-700">
-                                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                                        <span>{row.request_code}</span>
-                                                        {isUrgent && (
-                                                            <span className="inline-flex items-center gap-0.5 rounded-full bg-red-100 border border-red-300 px-2 py-0.5 text-[10px] font-black text-red-700 shadow-2xs tracking-wide uppercase">
-                                                                🔥 Urgent
-                                                            </span>
-                                                        )}
-                                                    </div>
+                                                    <span>{row.request_code}</span>
                                                 </td>
                                             <td className="px-3.5 py-2">
                                                 {isUrgent ? (
                                                     <span className="inline-flex items-center gap-1 rounded-full border border-red-300 bg-red-100 px-2 py-0.5 text-[10px] font-black text-red-800 shadow-2xs uppercase tracking-wide">
-                                                        <span>🔥</span> Urgent
+                                                        <span className="h-1.5 w-1.5 rounded-full bg-red-600"></span>
+                                                        Urgent
                                                     </span>
                                                 ) : (
                                                     <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
