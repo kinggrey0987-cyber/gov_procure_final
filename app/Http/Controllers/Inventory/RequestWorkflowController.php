@@ -74,13 +74,38 @@ class RequestWorkflowController
             $rows = $rows->where('workflow_bucket', $workflowBucketFilter);
         }
 
-        // Prioritize actionable shortage requests at the top so GSO sees pending consolidation work immediately
+        // Pin Urgent requests to the top, then prioritize actionable shortage requests, then newest first
         $rows = $rows->sort(function ($a, $b) {
-            $priorityA = ($a['status'] === 'SUBMITTED' && $a['stock_assessment'] === 'SHORTAGE_REQUIRES_PROCUREMENT' && ! $a['has_purchase_request']) ? 2 : 1;
-            $priorityB = ($b['status'] === 'SUBMITTED' && $b['stock_assessment'] === 'SHORTAGE_REQUIRES_PROCUREMENT' && ! $b['has_purchase_request']) ? 2 : 1;
+            $isUrgentA = strtoupper(trim((string) ($a['priority_level'] ?? ''))) === 'URGENT';
+            $isUrgentB = strtoupper(trim((string) ($b['priority_level'] ?? ''))) === 'URGENT';
 
-            if ($priorityA !== $priorityB) {
-                return $priorityB <=> $priorityA;
+            $isCompletedA = in_array((string) ($a['status'] ?? ''), ['COMPLETED', 'FULFILLED', 'RECEIVED'], true);
+            $isCompletedB = in_array((string) ($b['status'] ?? ''), ['COMPLETED', 'FULFILLED', 'RECEIVED'], true);
+
+            // Active urgent requests are always pinned to the very top
+            $activeUrgentA = $isUrgentA && ! $isCompletedA;
+            $activeUrgentB = $isUrgentB && ! $isCompletedB;
+
+            if ($activeUrgentA !== $activeUrgentB) {
+                return $activeUrgentB <=> $activeUrgentA;
+            }
+
+            // Active requests come before completed/fulfilled requests
+            if ($isCompletedA !== $isCompletedB) {
+                return $isCompletedA <=> $isCompletedB;
+            }
+
+            // Among active requests, prioritize actionable shortages
+            $shortageA = ($a['status'] === 'SUBMITTED' && $a['stock_assessment'] === 'SHORTAGE_REQUIRES_PROCUREMENT' && ! $a['has_purchase_request']) ? 2 : 1;
+            $shortageB = ($b['status'] === 'SUBMITTED' && $b['stock_assessment'] === 'SHORTAGE_REQUIRES_PROCUREMENT' && ! $b['has_purchase_request']) ? 2 : 1;
+
+            if ($shortageA !== $shortageB) {
+                return $shortageB <=> $shortageA;
+            }
+
+            // If both are completed and one was urgent, keep urgent first among completed
+            if ($isUrgentA !== $isUrgentB) {
+                return $isUrgentB <=> $isUrgentA;
             }
 
             return (int) $b['supply_request_id'] <=> (int) $a['supply_request_id'];

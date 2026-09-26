@@ -65,7 +65,11 @@ export default function InventoryOfficeSupplyRequestShow({ request, backFilters 
                 <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                     {request.priority_level?.toUpperCase() === 'URGENT' && (
                         <div className="mb-4 flex items-center gap-3.5 rounded-xl border-2 border-red-500 bg-red-50 p-4 text-red-900 shadow-xs">
-                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-600 text-xl text-white shadow">🔥</span>
+                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-600 text-white shadow">
+                                <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                            </span>
                             <div>
                                 <div className="flex items-center gap-2">
                                     <h4 className="text-sm font-extrabold uppercase tracking-wide text-red-900">URGENT PRIORITY SUPPLY REQUEST</h4>
@@ -81,8 +85,8 @@ export default function InventoryOfficeSupplyRequestShow({ request, backFilters 
                         <p className="flex items-center gap-1.5">
                             <span className="font-semibold">Priority:</span>
                             {request.priority_level?.toUpperCase() === 'URGENT' ? (
-                                <span className="inline-flex items-center gap-1 rounded-full border border-red-300 bg-red-100 px-2.5 py-0.5 text-xs font-bold text-red-800 shadow-2xs">
-                                    <span>🔥</span> URGENT
+                                <span className="inline-flex items-center gap-1.5 rounded-full border border-red-300 bg-red-100 px-2.5 py-0.5 text-xs font-bold text-red-800 shadow-2xs">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-red-600"></span> URGENT
                                 </span>
                             ) : (
                                 <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">

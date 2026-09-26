@@ -1732,6 +1732,25 @@ class InventoryDistributionFoundationTest extends TestCase
             );
     }
 
+    public function test_urgent_supply_request_is_pinned_to_top_of_inventory_office_supply_requests_listing(): void
+    {
+        $contextShortage = $this->createSubmittedSupplyRequestForQueue($this->officeA, $this->officeUserA, 9051, 10, 2);
+        $contextShortage['supplyRequest']->update(['priority_level' => 'NORMAL']);
+
+        $contextStockReady = $this->createSubmittedSupplyRequestForQueue($this->officeA, $this->officeUserA, 9052, 2, 10);
+        $contextStockReady['supplyRequest']->update(['priority_level' => 'NORMAL']);
+
+        $contextUrgent = $this->createSubmittedSupplyRequestForQueue($this->officeA, $this->officeUserA, 9053, 1, 10);
+        $contextUrgent['supplyRequest']->update(['priority_level' => 'URGENT']);
+
+        $this->actingAs($this->gsoOfficer)
+            ->get(route('inventory.office-supply-requests.index'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('requests.data.0.request_code', $contextUrgent['supplyRequest']->request_code)
+                ->where('requests.data.0.priority_level', 'URGENT')
+            );
+    }
+
     public function test_gso_origin_supply_request_is_excluded_from_inventory_office_supply_request_listing(): void
     {
         $gsoOffice = $this->createOffice('General Services Office', 'GSO');
