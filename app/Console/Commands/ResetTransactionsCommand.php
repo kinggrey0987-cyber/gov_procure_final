@@ -64,6 +64,8 @@ class ResetTransactionsCommand extends Command
             'ppmp_items',
             'ppmp',
             'documents',
+            'supplier_item_categories',
+            'suppliers',
             'item_specifications',
             'items',
             'item_categories',
