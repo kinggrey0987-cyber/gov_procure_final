@@ -81,6 +81,8 @@ class PurchaseRequestController extends Controller
                 'office',
                 'requester',
                 'supplyRequest.requester',
+                'sourceClaim:claims_id,claim_code',
+                'sourceDelivery:delivery_id,delivery_code',
             ]),
             'traceability' => $traceability,
             'reviewMode' => $isReviewMode && (string) $purchaseRequest->status === 'OPEN',

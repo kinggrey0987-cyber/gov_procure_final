@@ -13,6 +13,14 @@ type PurchaseRequest = {
     source_type?: string | null;
     source_delivery_id?: number | null;
     source_claim_id?: number | null;
+    source_delivery?: {
+        delivery_id?: number;
+        delivery_code?: string;
+    } | null;
+    source_claim?: {
+        claims_id?: number;
+        claim_code?: string;
+    } | null;
     is_zero_cost_replacement?: boolean;
     office?: {
         name?: string | null;
@@ -142,13 +150,15 @@ export default function PurchaseRequestsShow({ purchaseRequest, traceability, re
         (purchaseRequest.supply_request?.priority_level?.toUpperCase() === 'URGENT') ||
         traceability?.is_urgent
     );
-    const isDiscrepancyReplacement = Boolean(
-        purchaseRequest.is_zero_cost_replacement ||
+    const isDeliveryDiscrepancy = Boolean(
         purchaseRequest.source_type === 'PARTIAL_DELIVERY_FOLLOW_UP' ||
+        Boolean(purchaseRequest.source_delivery_id)
+    );
+    const isClaimReplacement = Boolean(
         purchaseRequest.source_type === 'CLAIM_REPLACEMENT_FOLLOW_UP' ||
-        Boolean(purchaseRequest.source_delivery_id) ||
         Boolean(purchaseRequest.source_claim_id)
     );
+    const isDiscrepancyReplacement = isDeliveryDiscrepancy;
     const processForm = useForm({ action: 'process', remarks: '' });
     const totalQuantity = (purchaseRequest.items ?? []).reduce((sum, row) => sum + Number(row.quantity_requested ?? 0), 0);
     const normalizedRequestRemarks = formatRequestRemarks(purchaseRequest.remarks);
@@ -231,9 +241,14 @@ export default function PurchaseRequestsShow({ purchaseRequest, traceability, re
                                             <span className="h-1.5 w-1.5 rounded-full bg-red-600"></span> URGENT
                                         </span>
                                     ) : null}
-                                    {isDiscrepancyReplacement ? (
+                                    {isDeliveryDiscrepancy ? (
                                         <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
-                                            🛡️ Discrepancy Replacement PR (Zero-Cost)
+                                            🛡️ Delivery Discrepancy PR (Zero-Cost)
+                                        </span>
+                                    ) : null}
+                                    {isClaimReplacement ? (
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-800">
+                                            📋 Office Claim Replacement PR
                                         </span>
                                     ) : null}
                                     {traceability?.is_consolidated ? (
@@ -289,11 +304,20 @@ export default function PurchaseRequestsShow({ purchaseRequest, traceability, re
                             <span className="font-semibold text-slate-700">Remarks:</span> {normalizedRequestRemarks}
                         </p>
 
-                        {isDiscrepancyReplacement ? (
+                        {isDeliveryDiscrepancy ? (
                             <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
                                 <p className="font-semibold">🛡️ Zero-Cost Supplier Rectification Request:</p>
                                 <p className="mt-0.5">
-                                    Generated from a delivery discrepancy (damaged/missing items). Under COA and RA 9184 standards, this request will generate a ₱0.00 purchase order directly to the original contractor at no additional cost to the municipal government.
+                                    Generated from a delivery discrepancy (damaged/missing items during supplier delivery intake). Under COA and RA 9184 standards, this request will generate a ₱0.00 purchase order directly to the original contractor at no additional cost to the municipal government.
+                                </p>
+                            </div>
+                        ) : null}
+
+                        {isClaimReplacement ? (
+                            <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900">
+                                <p className="font-semibold">📋 Office Claim Replacement Procurement Request:</p>
+                                <p className="mt-0.5">
+                                    Generated from office claim {purchaseRequest.source_claim?.claim_code ? `(${purchaseRequest.source_claim.claim_code})` : ''} due to insufficient GSO warehouse buffer stock. This procurement request was forwarded by GSO to acquire replacement items for the requesting office.
                                 </p>
                             </div>
                         ) : null}
