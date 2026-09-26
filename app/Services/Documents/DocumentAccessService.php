@@ -94,6 +94,10 @@ class DocumentAccessService
             return true;
         }
 
+        if ($module === 'deliveries' && $actor instanceof User && $actor->isExecutive()) {
+            return true;
+        }
+
         if ($module === 'public_disclosures') {
             $isPublished = (string) ($parent->getAttribute('status') ?? '') === 'PUBLISHED'
                 && (bool) $parent->getAttribute('published_at');

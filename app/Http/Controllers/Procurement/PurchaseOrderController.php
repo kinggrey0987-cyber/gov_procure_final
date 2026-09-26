@@ -207,6 +207,7 @@ class PurchaseOrderController extends Controller
     {
         abort_unless($request->user()?->can('procurement.purchase-order.view', $purchaseOrder), 403);
         $isExecutiveRoute = $request->routeIs('executive.procurement-records.*');
+        $isExecutive = (bool) $request->user()?->isExecutive();
 
         $history = $this->historyTimelineService->forRecord($request->user(), $purchaseOrder);
 
@@ -216,10 +217,91 @@ class PurchaseOrderController extends Controller
                 'document_id' => (int) $document->document_id,
                 'title' => (string) $document->title,
                 'file_name' => (string) $document->file_name,
-                'uploaded_at' => optional($document->uploaded_at)?->toIso8601String(),
+                'uploaded_at' => optional($document->uploaded_at)?->format('M d, Y'),
                 'uploaded_by' => (int) $document->uploaded_by,
                 'uploader_name' => $document->uploader?->name,
+                'view_url' => route('documents.show', $document->document_id),
+                'download_url' => route('documents.show', ['document' => $document->document_id, 'download' => 1]),
             ])->values();
+
+        $deliveries = [];
+        $sourceDiscrepancyDelivery = null;
+
+        if ($isExecutive) {
+            $deliveries = $purchaseOrder->deliveries()
+                ->with([
+                    'receiver:id,name',
+                    'verifications.verifier:id,name',
+                    'documents.uploader:id,name',
+                    'items.item',
+                ])
+                ->latest('delivery_id')
+                ->get()
+                ->map(fn (\App\Models\Delivery $delivery): array => [
+                    'delivery_id' => (int) $delivery->delivery_id,
+                    'delivery_code' => (string) $delivery->delivery_code,
+                    'delivery_receipt_no' => $delivery->delivery_receipt_no,
+                    'sales_invoice_no' => $delivery->sales_invoice_no,
+                    'sales_invoice_date' => optional($delivery->sales_invoice_date)?->format('M d, Y'),
+                    'sales_invoice_amount' => $delivery->sales_invoice_amount ? (float) $delivery->sales_invoice_amount : null,
+                    'actual_delivery_date' => optional($delivery->actual_delivery_date)?->format('M d, Y'),
+                    'receipt_status' => (string) $delivery->receipt_status,
+                    'remarks' => $delivery->remarks,
+                    'received_by' => $delivery->receiver ? [
+                        'id' => (int) $delivery->receiver->id,
+                        'name' => (string) $delivery->receiver->name,
+                    ] : null,
+                    'verifications' => $delivery->verifications->map(fn ($v): array => [
+                        'verification_id' => (int) $v->verification_id,
+                        'verification_status' => (string) $v->verification_status,
+                        'inspection_notes' => $v->inspection_notes,
+                        'verified_at' => optional($v->verified_at)?->format('M d, Y H:i'),
+                        'verifier_name' => $v->verifier?->name,
+                    ])->values(),
+                    'items' => $delivery->items->map(fn ($di): array => [
+                        'delivery_item_id' => (int) $di->delivery_item_id,
+                        'item_name' => (string) ($di->item?->item_name ?? 'Item'),
+                        'expected_quantity' => (float) $di->expected_quantity,
+                        'received_quantity' => (float) $di->received_quantity,
+                        'damaged_quantity' => (float) $di->damaged_quantity,
+                        'missing_quantity' => (float) $di->missing_quantity,
+                        'item_condition' => (string) $di->item_condition,
+                        'remarks' => $di->remarks,
+                    ])->values(),
+                    'documents' => $delivery->documents->map(fn (\App\Models\Document $doc): array => [
+                        'document_id' => (int) $doc->document_id,
+                        'title' => (string) $doc->title,
+                        'file_name' => (string) $doc->file_name,
+                        'uploaded_at' => optional($doc->uploaded_at)?->format('M d, Y'),
+                        'uploader_name' => $doc->uploader?->name,
+                        'view_url' => route('documents.show', $doc->document_id),
+                        'download_url' => route('documents.show', ['document' => $doc->document_id, 'download' => 1]),
+                    ])->values(),
+                ])->values();
+
+            if ($purchaseOrder->is_zero_cost_replacement && $purchaseOrder->purchaseRequest?->sourceDelivery) {
+                $sd = $purchaseOrder->purchaseRequest->sourceDelivery->loadMissing(['receiver:id,name', 'documents.uploader:id,name', 'verifications.verifier:id,name', 'purchaseOrder']);
+                $sourceDiscrepancyDelivery = [
+                    'delivery_id' => (int) $sd->delivery_id,
+                    'delivery_code' => (string) $sd->delivery_code,
+                    'delivery_receipt_no' => $sd->delivery_receipt_no,
+                    'sales_invoice_no' => $sd->sales_invoice_no,
+                    'sales_invoice_amount' => $sd->sales_invoice_amount ? (float) $sd->sales_invoice_amount : null,
+                    'receipt_status' => (string) $sd->receipt_status,
+                    'actual_delivery_date' => optional($sd->actual_delivery_date)?->format('M d, Y'),
+                    'parent_po_number' => $sd->purchaseOrder?->po_number,
+                    'documents' => $sd->documents->map(fn (\App\Models\Document $doc): array => [
+                        'document_id' => (int) $doc->document_id,
+                        'title' => (string) $doc->title,
+                        'file_name' => (string) $doc->file_name,
+                        'uploaded_at' => optional($doc->uploaded_at)?->format('M d, Y'),
+                        'uploader_name' => $doc->uploader?->name,
+                        'view_url' => route('documents.show', $doc->document_id),
+                        'download_url' => route('documents.show', ['document' => $doc->document_id, 'download' => 1]),
+                    ])->values(),
+                ];
+            }
+        }
 
         return Inertia::render('Procurement/PurchaseOrders/Show', [
             'purchaseOrder' => $purchaseOrder->load([
@@ -228,10 +310,14 @@ class PurchaseOrderController extends Controller
                 'creator',
                 'approver',
                 'purchaseRequest.office',
+                'purchaseRequest.sourceDelivery.purchaseOrder',
                 'supplyRequest.requester',
             ]),
+            'isExecutive' => $isExecutive,
             'isZeroCostReplacement' => (bool) $purchaseOrder->is_zero_cost_replacement,
             'traceability' => $this->traceabilityService->resolveForPurchaseOrder($purchaseOrder),
+            'deliveries' => $deliveries,
+            'sourceDiscrepancyDelivery' => $sourceDiscrepancyDelivery,
             'attachments' => $documents,
             'attachmentPermissions' => [
                 'upload' => $request->user()?->can('procurement.purchase-order.view', $purchaseOrder) ?? false,

@@ -349,4 +349,84 @@ class ZeroCostReplacementPurchaseOrderTest extends TestCase
         $responseKeepSupplier->assertRedirect(route('procurement.purchase-orders.items.index', $replacementPo->purchase_order_id));
         $this->assertEquals($originalSupplier->supplier_id, $replacementPo->fresh()->supplier_id);
     }
+
+    public function test_executive_views_delivery_receipts_and_compliance_attachments_dossier_on_po_show(): void
+    {
+        $roleMayor = Role::query()->firstOrCreate(['code' => UserRole::EXECUTIVE_OFFICER->value], ['name' => 'Municipal Mayor']);
+        $roleProc = Role::query()->firstOrCreate(['code' => UserRole::PROCUREMENT_OFFICER->value], ['name' => 'Procurement Officer']);
+        $office = Office::query()->create(['name' => 'Office of the Mayor', 'code' => 'MO', 'status' => 'ACTIVE']);
+
+        $mayorUser = User::factory()->create(['role_id' => $roleMayor->id, 'office_id' => $office->id, 'name' => 'Mayor Jerry']);
+        $procUser = User::factory()->create(['role_id' => $roleProc->id, 'office_id' => $office->id, 'name' => 'Proc Jeron']);
+
+        $supplier = Supplier::query()->create(['supplier_name' => 'Office Depot PH', 'status' => 'ACTIVE']);
+
+        $sr = SupplyRequest::query()->create([
+            'request_code' => 'SR-2026-MO-001',
+            'office_id' => $office->id,
+            'requested_by' => $mayorUser->id,
+            'status' => 'APPROVED',
+            'priority_level' => 'NORMAL',
+            'request_category' => 'OFFICE_SUPPLIES',
+            'purpose' => 'Office equipment',
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(5)->toDateString(),
+        ]);
+
+        $pr = PurchaseRequest::query()->create([
+            'pr_number' => 'PR-2026-MO-001',
+            'supply_request_id' => $sr->supply_request_id,
+            'office_id' => $office->id,
+            'requested_by' => $mayorUser->id,
+            'status' => 'APPROVED',
+            'remarks' => 'Executive equipment request',
+        ]);
+
+        $po = PurchaseOrder::query()->create([
+            'po_number' => 'PO-2026-MO-001',
+            'purchase_request_id' => $pr->purchase_request_id,
+            'supply_request_id' => $sr->supply_request_id,
+            'supplier_id' => $supplier->supplier_id,
+            'created_by' => $procUser->id,
+            'status' => 'PLACED',
+            'total_amount' => 25000.00,
+            'procurement_method' => 'SHOPPING',
+        ]);
+
+        $delivery = Delivery::query()->create([
+            'delivery_code' => 'DEL-2026-MO-001',
+            'purchase_order_id' => $po->purchase_order_id,
+            'supplier_id' => $supplier->supplier_id,
+            'receipt_status' => 'VERIFIED',
+            'delivery_receipt_no' => 'DR-2026-9901',
+            'sales_invoice_no' => 'SI-2026-8802',
+            'sales_invoice_date' => now()->toDateString(),
+            'sales_invoice_amount' => 25000.00,
+            'actual_delivery_date' => now()->toDateString(),
+            'remarks' => 'Complete delivery verified by GSO',
+        ]);
+
+        // 1. Executive accesses PO via Executive route -> isExecutive is true, deliveries & DR/SI are present
+        $this->actingAs($mayorUser)
+            ->get(route('executive.procurement-records.purchase-orders.show', $po->purchase_order_id))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Procurement/PurchaseOrders/Show')
+                ->where('isExecutive', true)
+                ->where('deliveries.0.delivery_receipt_no', 'DR-2026-9901')
+                ->where('deliveries.0.sales_invoice_no', 'SI-2026-8802')
+                ->where('deliveries.0.sales_invoice_amount', 25000)
+                ->where('deliveries.0.receipt_status', 'VERIFIED')
+            );
+
+        // 2. Non-executive (Procurement Officer) accesses PO -> isExecutive is false, deliveries array is empty
+        $this->actingAs($procUser)
+            ->get(route('procurement.purchase-orders.show', $po->purchase_order_id))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Procurement/PurchaseOrders/Show')
+                ->where('isExecutive', false)
+                ->where('deliveries', [])
+            );
+    }
 }

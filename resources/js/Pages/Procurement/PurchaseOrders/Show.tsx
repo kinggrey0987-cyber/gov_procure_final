@@ -126,8 +126,80 @@ type Traceability = {
     }>;
 };
 
+type DeliveryItem = {
+    delivery_item_id: number;
+    item_name: string;
+    expected_quantity: number;
+    received_quantity: number;
+    damaged_quantity: number;
+    missing_quantity: number;
+    item_condition: string;
+    remarks?: string | null;
+};
+
+type DeliveryDocument = {
+    document_id: number;
+    title: string;
+    file_name: string;
+    uploaded_at?: string | null;
+    uploader_name?: string | null;
+    view_url: string;
+    download_url: string;
+};
+
+type DeliveryVerification = {
+    verification_id: number;
+    verification_status: string;
+    inspection_notes?: string | null;
+    verified_at?: string | null;
+    verifier_name?: string | null;
+};
+
+type DeliveryRecord = {
+    delivery_id: number;
+    delivery_code: string;
+    delivery_receipt_no?: string | null;
+    sales_invoice_no?: string | null;
+    sales_invoice_date?: string | null;
+    sales_invoice_amount?: number | null;
+    actual_delivery_date?: string | null;
+    receipt_status: string;
+    remarks?: string | null;
+    received_by?: {
+        id: number;
+        name: string;
+    } | null;
+    verifications: DeliveryVerification[];
+    items: DeliveryItem[];
+    documents: DeliveryDocument[];
+};
+
+type SourceDiscrepancyDelivery = {
+    delivery_id: number;
+    delivery_code: string;
+    delivery_receipt_no?: string | null;
+    sales_invoice_no?: string | null;
+    sales_invoice_amount?: number | null;
+    receipt_status: string;
+    actual_delivery_date?: string | null;
+    parent_po_number?: string | null;
+    documents: DeliveryDocument[];
+};
+
+type PoAttachment = {
+    document_id: number;
+    title: string;
+    file_name: string;
+    uploaded_at?: string | null;
+    uploaded_by?: number;
+    uploader_name?: string | null;
+    view_url: string;
+    download_url: string;
+};
+
 type Props = {
     purchaseOrder: PurchaseOrder;
+    isExecutive?: boolean;
     isZeroCostReplacement?: boolean;
     traceability?: Traceability;
     statusHistory: Array<{
@@ -163,9 +235,25 @@ type Props = {
         label: string;
     };
     showProcurementDocumentsLink?: boolean;
+    deliveries?: DeliveryRecord[];
+    sourceDiscrepancyDelivery?: SourceDiscrepancyDelivery | null;
+    attachments?: PoAttachment[];
 };
 
-export default function PurchaseOrdersShow({ purchaseOrder, isZeroCostReplacement: propsIsZeroCostReplacement, traceability, statusHistory, approvalHistory, permissions, backLink, showProcurementDocumentsLink = true }: Props) {
+export default function PurchaseOrdersShow({
+    purchaseOrder,
+    isExecutive = false,
+    isZeroCostReplacement: propsIsZeroCostReplacement,
+    traceability,
+    statusHistory,
+    approvalHistory,
+    permissions,
+    backLink,
+    showProcurementDocumentsLink = true,
+    deliveries = [],
+    sourceDiscrepancyDelivery = null,
+    attachments = [],
+}: Props) {
     const isZeroCostReplacement = Boolean(
         propsIsZeroCostReplacement ||
         purchaseOrder.is_zero_cost_replacement ||
@@ -639,6 +727,378 @@ export default function PurchaseOrdersShow({ purchaseOrder, isZeroCostReplacemen
                         </div>
                     )}
 
+                    {/* Executive Exclusive Oversight Dossier: DR, SI, Inspection Reports & Compliance Audit */}
+                    {isExecutive ? (
+                        <section className="rounded-xl border-2 border-indigo-200/90 bg-gradient-to-b from-white via-indigo-50/20 to-white p-6 shadow-sm space-y-6">
+                            {/* Executive Header Banner */}
+                            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-indigo-100 pb-4">
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <span className="inline-flex items-center gap-1.5 rounded-md bg-indigo-900 px-2.5 py-1 text-xs font-bold text-white shadow-xs">
+                                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                            </svg>
+                                            Executive Oversight Dossier
+                                        </span>
+                                        <span className="text-xs font-semibold text-indigo-900">
+                                            Confidential Audit Trail & Verification
+                                        </span>
+                                    </div>
+                                    <h3 className="text-lg font-bold text-slate-900">
+                                        Delivery Receipts (DR), Sales Invoices (SI) & Statutory Compliance Audit
+                                    </h3>
+                                    <p className="text-xs text-slate-600 max-w-3xl">
+                                        High-level executive dossier consolidating all supplier delivery receipts, sales invoices, GSO warehouse physical inspection reports, and attached documentary evidence for this Purchase Order pursuant to COA & RA 9184 guidelines.
+                                    </p>
+                                </div>
+                                <div className="text-right">
+                                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-900">
+                                        <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                                        Authorized Executive View
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Source Discrepancy Delivery (if zero-cost warranty replacement) */}
+                            {sourceDiscrepancyDelivery ? (
+                                <div className="rounded-xl border border-amber-300 bg-amber-50/70 p-4 space-y-3">
+                                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200 pb-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-base">🛡️</span>
+                                            <div>
+                                                <h4 className="text-xs font-bold uppercase tracking-wider text-amber-950">
+                                                    Warranty Origin: Linked Discrepancy Delivery Audit
+                                                </h4>
+                                                <p className="text-[11px] text-amber-800">
+                                                    This PO rectifies missing/damaged goods from original shipment <strong>{sourceDiscrepancyDelivery.delivery_code}</strong>.
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <span className="inline-flex items-center rounded-full bg-amber-200/80 px-2.5 py-0.5 text-xs font-bold text-amber-900">
+                                            Original Discrepancy: {humanizeEnum(sourceDiscrepancyDelivery.receipt_status)}
+                                        </span>
+                                    </div>
+
+                                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-xs">
+                                        <div className="rounded-lg border border-amber-200 bg-white/80 p-2.5">
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Originating PO</span>
+                                            <p className="mt-0.5 font-bold text-slate-900">{sourceDiscrepancyDelivery.parent_po_number || 'N/A'}</p>
+                                        </div>
+                                        <div className="rounded-lg border border-amber-200 bg-white/80 p-2.5">
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Original DR No.</span>
+                                            <p className="mt-0.5 font-bold text-slate-900">{sourceDiscrepancyDelivery.delivery_receipt_no || 'N/A'}</p>
+                                        </div>
+                                        <div className="rounded-lg border border-amber-200 bg-white/80 p-2.5">
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Original SI No.</span>
+                                            <p className="mt-0.5 font-bold text-slate-900">{sourceDiscrepancyDelivery.sales_invoice_no || 'N/A'}</p>
+                                        </div>
+                                        <div className="rounded-lg border border-amber-200 bg-white/80 p-2.5">
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Original SI Amount</span>
+                                            <p className="mt-0.5 font-bold text-slate-900">
+                                                {sourceDiscrepancyDelivery.sales_invoice_amount ? formatMoney(sourceDiscrepancyDelivery.sales_invoice_amount) : 'N/A'}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {sourceDiscrepancyDelivery.documents && sourceDiscrepancyDelivery.documents.length > 0 ? (
+                                        <div className="pt-1">
+                                            <p className="text-[11px] font-bold uppercase tracking-wider text-amber-900 mb-1.5">
+                                                Original Discrepancy Documents & Photographic Evidence:
+                                            </p>
+                                            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                                {sourceDiscrepancyDelivery.documents.map((doc) => (
+                                                    <div key={doc.document_id} className="flex items-center justify-between rounded-lg border border-amber-200 bg-white p-2.5 text-xs shadow-2xs">
+                                                        <div className="min-w-0 pr-2">
+                                                            <p className="truncate font-semibold text-slate-900" title={doc.title}>{doc.title}</p>
+                                                            <p className="truncate text-[10px] text-slate-500">{doc.file_name}</p>
+                                                        </div>
+                                                        <div className="flex items-center gap-1.5 shrink-0">
+                                                            <a
+                                                                href={doc.view_url}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-900 hover:bg-amber-100"
+                                                            >
+                                                                View
+                                                            </a>
+                                                            <a
+                                                                href={doc.download_url}
+                                                                className="rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                                                            >
+                                                                Download
+                                                            </a>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ) : null}
+                                </div>
+                            ) : null}
+
+                            {/* PO Compliance & Statutory Attachments */}
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                                            1. Purchase Order Statutory Documents & Compliance Attachments
+                                        </h4>
+                                        <p className="text-xs text-slate-500">
+                                            Official PO documents, Notice of Award, PhilGEPS postings, and supplier quotations on file.
+                                        </p>
+                                    </div>
+                                    <span className="text-xs font-medium text-slate-500">
+                                        {attachments.length} attachment{attachments.length === 1 ? '' : 's'}
+                                    </span>
+                                </div>
+
+                                {attachments.length > 0 ? (
+                                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                        {attachments.map((att) => (
+                                            <div key={att.document_id} className="flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs hover:border-indigo-300 transition-colors">
+                                                <div>
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <span className="rounded bg-indigo-50 p-1.5 text-indigo-700">
+                                                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                            </svg>
+                                                        </span>
+                                                        <span className="text-[10px] text-slate-400">{att.uploaded_at || 'Attached'}</span>
+                                                    </div>
+                                                    <h5 className="mt-2 text-xs font-bold text-slate-900 truncate" title={att.title}>{att.title}</h5>
+                                                    <p className="text-[11px] text-slate-500 truncate" title={att.file_name}>{att.file_name}</p>
+                                                    {att.uploader_name ? (
+                                                        <p className="text-[10px] text-slate-400 mt-1">Uploaded by: {att.uploader_name}</p>
+                                                    ) : null}
+                                                </div>
+                                                <div className="mt-3 flex items-center gap-2 border-t border-slate-100 pt-2.5">
+                                                    <a
+                                                        href={att.view_url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="flex-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-center text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors"
+                                                    >
+                                                        View in Browser
+                                                    </a>
+                                                    <a
+                                                        href={att.download_url}
+                                                        className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
+                                                        title="Download document file"
+                                                    >
+                                                        <svg className="h-3.5 w-3.5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                                        </svg>
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50/60 p-4 text-center text-xs text-slate-500">
+                                        No statutory PO compliance attachments uploaded yet.
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Deliveries, Delivery Receipts (DR) & Sales Invoices (SI) */}
+                            <div className="space-y-4">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div>
+                                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                                            2. Delivery Receipts (DR), Sales Invoices (SI) & GSO Warehouse Inspections
+                                        </h4>
+                                        <p className="text-xs text-slate-500">
+                                            Shipment-by-shipment records submitted by supplier and inspected by General Services Office (GSO).
+                                        </p>
+                                    </div>
+                                    <span className="text-xs font-medium text-slate-500">
+                                        {deliveries.length} shipment{deliveries.length === 1 ? '' : 's'} recorded
+                                    </span>
+                                </div>
+
+                                {deliveries.length > 0 ? (
+                                    <div className="space-y-4">
+                                        {deliveries.map((delivery, dIdx) => (
+                                            <div key={delivery.delivery_id} className="rounded-xl border border-slate-300 bg-white p-4 shadow-xs space-y-3.5">
+                                                {/* Delivery Header */}
+                                                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-800">
+                                                            {dIdx + 1}
+                                                        </span>
+                                                        <div>
+                                                            <span className="font-mono text-sm font-bold text-slate-900">{delivery.delivery_code}</span>
+                                                            <span className="text-xs text-slate-500 ml-2">
+                                                                Arrival: {delivery.actual_delivery_date || 'Date not recorded'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        {deliveryStatusBadge(delivery.receipt_status)}
+                                                        {delivery.received_by?.name ? (
+                                                            <span className="text-xs text-slate-500">
+                                                                Received by: <strong className="text-slate-800">{delivery.received_by.name}</strong>
+                                                            </span>
+                                                        ) : null}
+                                                    </div>
+                                                </div>
+
+                                                {/* DR & SI Numbers & Financial Metrics Grid */}
+                                                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                                                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Delivery Receipt (DR) No.</span>
+                                                        <p className="mt-0.5 text-sm font-bold font-mono text-indigo-900">
+                                                            {delivery.delivery_receipt_no || <span className="text-slate-400 font-sans font-normal italic">Pending / Unencoded</span>}
+                                                        </p>
+                                                    </div>
+                                                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Sales Invoice (SI) No.</span>
+                                                        <p className="mt-0.5 text-sm font-bold font-mono text-indigo-900">
+                                                            {delivery.sales_invoice_no || <span className="text-slate-400 font-sans font-normal italic">Pending / Unencoded</span>}
+                                                        </p>
+                                                    </div>
+                                                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Sales Invoice Date</span>
+                                                        <p className="mt-0.5 text-sm font-semibold text-slate-800">
+                                                            {delivery.sales_invoice_date || '-'}
+                                                        </p>
+                                                    </div>
+                                                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Sales Invoice Amount</span>
+                                                        <p className="mt-0.5 text-sm font-bold text-slate-900">
+                                                            {delivery.sales_invoice_amount ? formatMoney(delivery.sales_invoice_amount) : (isZeroCostReplacement ? '₱0.00 (Warranty)' : '-')}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                {/* GSO Inspection Verification & Remarks */}
+                                                {delivery.verifications && delivery.verifications.length > 0 ? (
+                                                    <div className="rounded-lg border border-indigo-100 bg-indigo-50/40 p-3 space-y-1.5">
+                                                        <div className="flex items-center justify-between text-xs">
+                                                            <span className="font-bold text-indigo-950 uppercase tracking-wide text-[11px]">
+                                                                GSO Physical Inspection & Quality Verification:
+                                                            </span>
+                                                            <span className="font-semibold text-indigo-800">
+                                                                Status: {delivery.verifications[0].verification_status}
+                                                            </span>
+                                                        </div>
+                                                        {delivery.verifications[0].inspection_notes ? (
+                                                            <p className="text-xs text-slate-700 italic bg-white/70 rounded p-2 border border-indigo-100/60">
+                                                                "{delivery.verifications[0].inspection_notes}"
+                                                            </p>
+                                                        ) : null}
+                                                        <div className="flex items-center justify-between text-[11px] text-slate-500 pt-0.5">
+                                                            <span>Verified By: <strong>{delivery.verifications[0].verifier_name || 'GSO Property Inspector'}</strong></span>
+                                                            <span>Timestamp: {delivery.verifications[0].verified_at || 'Inspected'}</span>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-500">
+                                                        <span className="font-semibold text-slate-700">Inspection Note:</span> Awaiting formal GSO Inspection and Acceptance Report (IAR).
+                                                    </div>
+                                                )}
+
+                                                {/* Scanned DR / SI / IAR Documents for this Delivery */}
+                                                <div className="space-y-2 pt-1">
+                                                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                                                        Attached Scanned DR, SI & Delivery Documents:
+                                                    </span>
+                                                    {delivery.documents && delivery.documents.length > 0 ? (
+                                                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                                            {delivery.documents.map((doc) => (
+                                                                <div key={doc.document_id} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50/70 p-2 text-xs">
+                                                                    <div className="min-w-0 pr-2">
+                                                                        <p className="truncate font-semibold text-slate-800" title={doc.title}>
+                                                                            {doc.title}
+                                                                        </p>
+                                                                        <p className="truncate text-[10px] text-slate-400">
+                                                                            {doc.file_name} {doc.uploaded_at ? `(${doc.uploaded_at})` : ''}
+                                                                        </p>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-1.5 shrink-0">
+                                                                        <a
+                                                                            href={doc.view_url}
+                                                                            target="_blank"
+                                                                            rel="noopener noreferrer"
+                                                                            className="rounded border border-indigo-300 bg-white px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-50"
+                                                                        >
+                                                                            View
+                                                                        </a>
+                                                                        <a
+                                                                            href={doc.download_url}
+                                                                            className="rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
+                                                                            title="Download"
+                                                                        >
+                                                                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                                                            </svg>
+                                                                        </a>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <p className="text-xs text-slate-400 italic">
+                                                            No scanned delivery documents or photos attached to this delivery record yet.
+                                                        </p>
+                                                    )}
+                                                </div>
+
+                                                {/* Delivered Items Breakdown */}
+                                                {delivery.items && delivery.items.length > 0 ? (
+                                                    <div className="mt-2 overflow-x-auto rounded border border-slate-200">
+                                                        <table className="min-w-full divide-y divide-slate-200 text-xs">
+                                                            <thead className="bg-slate-50 text-[10px] font-bold uppercase text-slate-600">
+                                                                <tr>
+                                                                    <th className="px-3 py-1.5 text-left">Delivered Item</th>
+                                                                    <th className="px-2 py-1.5 text-right">Expected</th>
+                                                                    <th className="px-2 py-1.5 text-right">Received</th>
+                                                                    <th className="px-2 py-1.5 text-right">Damaged</th>
+                                                                    <th className="px-2 py-1.5 text-right">Missing</th>
+                                                                    <th className="px-2 py-1.5 text-center">Condition</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="divide-y divide-slate-100 bg-white">
+                                                                {delivery.items.map((item) => (
+                                                                    <tr key={item.delivery_item_id} className="hover:bg-slate-50/50">
+                                                                        <td className="px-3 py-1.5 font-medium text-slate-900">{item.item_name}</td>
+                                                                        <td className="px-2 py-1.5 text-right text-slate-600">{item.expected_quantity}</td>
+                                                                        <td className="px-2 py-1.5 text-right font-semibold text-emerald-700">{item.received_quantity}</td>
+                                                                        <td className={`px-2 py-1.5 text-right font-semibold ${item.damaged_quantity > 0 ? 'text-rose-600' : 'text-slate-400'}`}>
+                                                                            {item.damaged_quantity}
+                                                                        </td>
+                                                                        <td className={`px-2 py-1.5 text-right font-semibold ${item.missing_quantity > 0 ? 'text-amber-600' : 'text-slate-400'}`}>
+                                                                            {item.missing_quantity}
+                                                                        </td>
+                                                                        <td className="px-2 py-1.5 text-center">
+                                                                            <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold ${item.item_condition === 'GOOD' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+                                                                                {item.item_condition}
+                                                                            </span>
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                ) : null}
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center">
+                                        <svg className="mx-auto h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                                        </svg>
+                                        <p className="mt-2 text-xs font-semibold text-slate-700">No Delivery Shipments Recorded Yet</p>
+                                        <p className="mt-0.5 text-xs text-slate-500">
+                                            Once the supplier makes delivery and GSO warehouse encodes the Delivery Receipt (DR) and Sales Invoice (SI), full audit records and scanned documents will appear here.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        </section>
+                    ) : null}
+
                     <WorkflowHistoryTimeline
                         statusHistory={statusHistory}
                         approvalHistory={approvalHistory}
@@ -957,6 +1417,22 @@ function statusClass(status: string) {
     };
 
     return map[status] ?? `${base} bg-slate-100 text-slate-700`;
+}
+
+function deliveryStatusBadge(status: string) {
+    const base = 'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold';
+    switch (status) {
+        case 'VERIFIED':
+            return <span className={`${base} bg-emerald-100 text-emerald-800`}>Verified by GSO</span>;
+        case 'RECEIVED':
+            return <span className={`${base} bg-blue-100 text-blue-800`}>Received / Pending Inspection</span>;
+        case 'PARTIALLY_RECEIVED':
+            return <span className={`${base} bg-amber-100 text-amber-800`}>Partially Received</span>;
+        case 'DISCREPANCY':
+            return <span className={`${base} bg-rose-100 text-rose-800`}>Discrepancy Recorded</span>;
+        default:
+            return <span className={`${base} bg-slate-100 text-slate-700`}>{humanizeEnum(status)}</span>;
+    }
 }
 
 function formatDate(value?: string | null): string {
