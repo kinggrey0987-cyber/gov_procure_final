@@ -270,7 +270,7 @@ export default function ExecutiveDashboardIndex({
     const disclosureExportPages = useMemo(() => chunkRows(recent_disclosures_export.slice(0, 12), 12), [recent_disclosures_export]);
     const businessLogExportPages = useMemo(() => chunkRows(recent_business_logs_export.slice(0, 12), 12), [recent_business_logs_export]);
 
-    const totalPdfPages = 1 + anomalyExportPages.length + alertExportPages.length + disclosureExportPages.length + businessLogExportPages.length;
+    const totalPdfPages = 2 + anomalyExportPages.length + alertExportPages.length + disclosureExportPages.length + businessLogExportPages.length;
 
     const filterScopeSummary = useMemo(() => {
         const parts: string[] = [];
@@ -877,71 +877,197 @@ export default function ExecutiveDashboardIndex({
                         pageNumber={1}
                         totalPages={totalPdfPages}
                         showLetterhead={true}
-                        showSignatories={totalPdfPages === 1}
-                        showAttestation={totalPdfPages === 1}
+                        showSignatories={false}
+                        showAttestation={false}
                     >
-                        <div className="rounded-lg border border-slate-300 bg-slate-50/50 p-3">
+                        <div className="rounded-lg border border-slate-300 bg-slate-50/50 p-3.5">
                             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2.5">
                                 Executive Activity & Spend Highlights
                             </h3>
-                            <div className="grid grid-cols-3 gap-2.5">
+                            <div className="grid grid-cols-4 gap-2.5">
                                 <div className="rounded-md border border-slate-300 bg-white p-2.5 text-center">
                                     <p className="text-[10px] font-bold uppercase text-slate-600">Purchase Requests</p>
-                                    <p className="mt-0.5 text-xl font-extrabold text-slate-900">{procurement.purchase_request_count}</p>
+                                    <p className="mt-1 text-2xl font-black text-slate-900">{procurement.purchase_request_count}</p>
                                 </div>
                                 <div className="rounded-md border border-slate-300 bg-white p-2.5 text-center">
                                     <p className="text-[10px] font-bold uppercase text-slate-600">Purchase Orders</p>
-                                    <p className="mt-0.5 text-xl font-extrabold text-slate-900">{procurement.purchase_order_count}</p>
+                                    <p className="mt-1 text-2xl font-black text-slate-900">{procurement.purchase_order_count}</p>
+                                </div>
+                                <div className="rounded-md border border-slate-300 bg-white p-2.5 text-center">
+                                    <p className="text-[10px] font-bold uppercase text-slate-600">Committed Spend</p>
+                                    <p className="mt-1 text-lg font-black text-red-800 leading-tight">
+                                        {formatCurrency(procurement.total_purchase_order_amount)}
+                                    </p>
                                 </div>
                                 <div className="rounded-md border border-slate-300 bg-white p-2.5 text-center">
                                     <p className="text-[10px] font-bold uppercase text-slate-600">Published Disclosures</p>
-                                    <p className="mt-0.5 text-xl font-extrabold text-emerald-700">{transparency.published_disclosure_count}</p>
+                                    <p className="mt-1 text-2xl font-black text-emerald-700">{transparency.published_disclosure_count}</p>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3.5">
-                            <section className="rounded-lg border border-slate-300 bg-white p-3">
-                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2">
-                                    Active Risk Exposure Summary
-                                </h3>
-                                <div className="space-y-1.5">
-                                    <RiskStrip label="Active Anomalies" value={activeAnomalies} max={Math.max(activeAnomalies, activeAlerts, highSeverityTotal, 1)} tone="rose" />
-                                    <RiskStrip label="Active Alerts" value={activeAlerts} max={Math.max(activeAnomalies, activeAlerts, highSeverityTotal, 1)} tone="amber" />
-                                    <RiskStrip label="High Severity Incidents" value={highSeverityTotal} max={Math.max(activeAnomalies, activeAlerts, highSeverityTotal, 1)} tone="slate" />
+                        <div className="grid grid-cols-2 gap-3.5 mt-3">
+                            <section className="rounded-lg border border-slate-300 bg-white p-3.5 flex flex-col justify-between">
+                                <div>
+                                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2.5">
+                                        Active Risk Exposure Summary
+                                    </h3>
+                                    <div className="space-y-2">
+                                        <RiskStrip label="Active Anomalies" value={activeAnomalies} max={Math.max(activeAnomalies, activeAlerts, highSeverityTotal, 1)} tone="rose" />
+                                        <RiskStrip label="Active Alerts" value={activeAlerts} max={Math.max(activeAnomalies, activeAlerts, highSeverityTotal, 1)} tone="amber" />
+                                        <RiskStrip label="High Severity Incidents" value={highSeverityTotal} max={Math.max(activeAnomalies, activeAlerts, highSeverityTotal, 1)} tone="slate" />
+                                    </div>
+                                </div>
+
+                                <div className="mt-4 pt-3 border-t border-slate-200 bg-slate-50/70 -mx-3.5 -mb-3.5 p-3 rounded-b-lg">
+                                    <div className="flex items-center justify-between text-xs">
+                                        <span className="font-semibold text-slate-700">PPMP Clearance Rate:</span>
+                                        <span className="font-extrabold text-emerald-700">{ppmpClearanceRate}%</span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-[11px] text-slate-500 mt-0.5">
+                                        <span>Pending Department Submissions:</span>
+                                        <span className="font-bold text-slate-700">{approvals.pending_ppmp_approvals}</span>
+                                    </div>
                                 </div>
                             </section>
 
-                            <section className="rounded-lg border border-slate-300 bg-white p-3 flex flex-col justify-between">
+                            <section className="rounded-lg border border-slate-300 bg-white p-3.5 flex flex-col justify-between">
                                 <div>
-                                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2">
+                                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2.5">
                                         Office Risk Concentration
                                     </h3>
-                                    <HorizontalBarChart data={officeRanking.slice(0, 4)} emptyText="No data in current filter scope" />
+                                    <HorizontalBarChart data={officeRanking.slice(0, 6)} emptyText="No data in current filter scope" />
                                 </div>
-                                {officeRanking.length > 4 && (
-                                    <p className="mt-1 text-[10px] text-slate-400 italic text-right">
-                                        Top 4 of {officeRanking.length} offices shown
+                                {officeRanking.length > 6 && (
+                                    <p className="mt-2 text-[10px] text-slate-400 italic text-right">
+                                        Top 6 of {officeRanking.length} offices shown
                                     </p>
                                 )}
                             </section>
                         </div>
 
-                        <section className="rounded-lg border border-slate-300 bg-white p-3 mt-2.5">
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2">
-                                Procurement Velocity & Activity Trend
-                            </h3>
-                            <TrendLineChart
-                                data={totalActivityTrend}
-                                emptyText="No procurement activity trend in current filter scope"
-                                showPointCards={false}
-                            />
-                        </section>
+                        <div className="rounded-lg border border-slate-300 bg-slate-50 p-3 mt-3 text-xs text-slate-700 space-y-1">
+                            <p className="font-bold text-slate-900 uppercase tracking-wide text-[10.5px]">Governance Oversight Protocol Note:</p>
+                            <p className="text-[11px] leading-relaxed text-slate-600">
+                                This executive overview compiles active procurement requisition flows, purchase commitments, and real-time risk indicators under the Municipal Procurement & Transparency Management System. Comprehensive velocity trend analysis is detailed on Page 2, followed by itemized anomaly, alert, and disclosure audits.
+                            </p>
+                        </div>
+                    </GovDocumentPage>
+
+                    {/* Page 2: Dedicated Procurement Velocity & Trend Analytics */}
+                    <GovDocumentPage
+                        metadata={{
+                            ...baseMetadata,
+                            title: 'EXECUTIVE PROCUREMENT VELOCITY & TREND ANALYTICS',
+                            moduleScope: 'Procurement Activity Volume & Historical Velocity Analysis',
+                        }}
+                        pageNumber={2}
+                        totalPages={totalPdfPages}
+                        showLetterhead={true}
+                        showSignatories={totalPdfPages === 2}
+                        showAttestation={totalPdfPages === 2}
+                    >
+                        <div className="space-y-3.5">
+                            {/* Velocity Telemetry Banner */}
+                            <div className="grid grid-cols-4 gap-2.5">
+                                <div className="rounded-lg border border-slate-300 bg-white p-2.5 text-center">
+                                    <p className="text-[10px] font-bold uppercase text-slate-500">Cumulative Volume</p>
+                                    <p className="mt-1 text-2xl font-black text-slate-900">
+                                        {totalActivityTrend.reduce((sum, p) => sum + p.value, 0).toLocaleString()}
+                                    </p>
+                                    <p className="text-[10px] text-slate-500 mt-0.5">Total documents</p>
+                                </div>
+                                <div className="rounded-lg border border-slate-300 bg-white p-2.5 text-center">
+                                    <p className="text-[10px] font-bold uppercase text-slate-500">Peak Velocity Month</p>
+                                    <p className="mt-1 text-sm font-extrabold text-red-700">
+                                        {[...totalActivityTrend].sort((a, b) => b.value - a.value)[0]?.label ?? '—'}
+                                    </p>
+                                    <p className="text-[10px] text-slate-500 mt-0.5">
+                                        {[...totalActivityTrend].sort((a, b) => b.value - a.value)[0]?.value ?? 0} docs processed
+                                    </p>
+                                </div>
+                                <div className="rounded-lg border border-slate-300 bg-white p-2.5 text-center">
+                                    <p className="text-[10px] font-bold uppercase text-slate-500">Latest Period</p>
+                                    <p className="mt-1 text-sm font-extrabold text-slate-900">
+                                        {totalActivityTrend[totalActivityTrend.length - 1]?.label ?? '—'}
+                                    </p>
+                                    <p className="text-[10px] text-slate-500 mt-0.5">
+                                        {totalActivityTrend[totalActivityTrend.length - 1]?.value ?? 0} docs processed
+                                    </p>
+                                </div>
+                                <div className="rounded-lg border border-slate-300 bg-white p-2.5 text-center">
+                                    <p className="text-[10px] font-bold uppercase text-slate-500">Average Velocity</p>
+                                    <p className="mt-1 text-2xl font-black text-slate-900">
+                                        {totalActivityTrend.length > 0
+                                            ? (totalActivityTrend.reduce((sum, p) => sum + p.value, 0) / totalActivityTrend.length).toFixed(1)
+                                            : '0'}
+                                    </p>
+                                    <p className="text-[10px] text-slate-500 mt-0.5">Docs / month</p>
+                                </div>
+                            </div>
+
+                            {/* Dedicated Enlarged Velocity Chart Section */}
+                            <section className="rounded-lg border border-slate-300 bg-white p-3.5">
+                                <div className="flex items-center justify-between border-b border-slate-200 pb-2 mb-2">
+                                    <div>
+                                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                                            Historical Procurement Velocity Curve
+                                        </h3>
+                                        <p className="text-[10.5px] text-slate-500 mt-0.5">
+                                            Combined volume of approved Purchase Requests (PR) and executed Purchase Orders (PO)
+                                        </p>
+                                    </div>
+                                    <span className="rounded bg-red-50 border border-red-200 px-2 py-0.5 text-[10px] font-bold text-red-800">
+                                        {totalActivityTrend.length} Periods Recorded
+                                    </span>
+                                </div>
+
+                                <div className="py-2">
+                                    <TrendLineChart
+                                        data={totalActivityTrend}
+                                        emptyText="No procurement activity trend in current filter scope"
+                                        showPointCards={false}
+                                        height={230}
+                                    />
+                                </div>
+                            </section>
+
+                            {/* PR vs PO Breakdown & Recent Trend Table */}
+                            {monthlyProcurement.length > 0 && (
+                                <section className="rounded-lg border border-slate-300 bg-white p-3">
+                                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2">
+                                        Recent Monthly Requisition & Order Progression
+                                    </h3>
+                                    <div className="overflow-x-auto">
+                                        <table className="min-w-full table-fixed divide-y divide-slate-300 text-[11px]">
+                                            <thead className="bg-slate-100 text-slate-800 font-bold uppercase">
+                                                <tr>
+                                                    <th className="px-3 py-1.5 text-left border-r border-slate-300">Period</th>
+                                                    <th className="px-3 py-1.5 text-center border-r border-slate-300">Purchase Requests (PR)</th>
+                                                    <th className="px-3 py-1.5 text-center border-r border-slate-300">Purchase Orders (PO)</th>
+                                                    <th className="px-3 py-1.5 text-center font-black">Combined Activity</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-200 bg-white">
+                                                {monthlyProcurement.slice(-6).map((item) => (
+                                                    <tr key={item.label} className="hover:bg-slate-50/50">
+                                                        <td className="px-3 py-1.5 font-semibold text-slate-900 border-r border-slate-200">{item.label}</td>
+                                                        <td className="px-3 py-1.5 text-center text-slate-700 border-r border-slate-200">{item.first}</td>
+                                                        <td className="px-3 py-1.5 text-center text-slate-700 border-r border-slate-200">{item.second}</td>
+                                                        <td className="px-3 py-1.5 text-center font-bold text-red-700">{item.first + item.second}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </section>
+                            )}
+                        </div>
                     </GovDocumentPage>
 
                     {/* Continuation Pages: Anomaly Records */}
                     {anomalyExportPages.map((rows, pageIndex) => {
-                        const pageNumber = 2 + pageIndex;
+                        const pageNumber = 3 + pageIndex;
                         const isLast = pageNumber === totalPdfPages;
 
                         return (
@@ -988,7 +1114,7 @@ export default function ExecutiveDashboardIndex({
 
                     {/* Continuation Pages: Alert Records */}
                     {alertExportPages.map((rows, pageIndex) => {
-                        const pageNumber = 2 + anomalyExportPages.length + pageIndex;
+                        const pageNumber = 3 + anomalyExportPages.length + pageIndex;
                         const isLast = pageNumber === totalPdfPages;
 
                         return (
@@ -1035,7 +1161,7 @@ export default function ExecutiveDashboardIndex({
 
                     {/* Continuation Pages: Disclosure Records */}
                     {disclosureExportPages.map((rows, pageIndex) => {
-                        const pageNumber = 2 + anomalyExportPages.length + alertExportPages.length + pageIndex;
+                        const pageNumber = 3 + anomalyExportPages.length + alertExportPages.length + pageIndex;
                         const isLast = pageNumber === totalPdfPages;
 
                         return (
@@ -1082,7 +1208,7 @@ export default function ExecutiveDashboardIndex({
 
                     {/* Continuation Pages: Business Activity Logs */}
                     {businessLogExportPages.map((rows, pageIndex) => {
-                        const pageNumber = 2 + anomalyExportPages.length + alertExportPages.length + disclosureExportPages.length + pageIndex;
+                        const pageNumber = 3 + anomalyExportPages.length + alertExportPages.length + disclosureExportPages.length + pageIndex;
                         const isLast = pageNumber === totalPdfPages;
 
                         return (

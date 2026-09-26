@@ -304,7 +304,7 @@ export default function ProcurementAnalyticsIndex({
     const procurementRecords = recent.procurement_records ?? recent.purchase_orders;
     const exportProcurementRecords: ProcurementRecordRow[] = recent.procurement_records_export ?? (procurementRecords.data as unknown as ProcurementRecordRow[]);
     const procurementExportPages = useMemo(() => chunkRows(exportProcurementRecords.slice(0, 36), 12), [exportProcurementRecords]);
-    const totalPdfPages = 1 + (procurementExportPages.length > 0 ? procurementExportPages.length : 1);
+    const totalPdfPages = 2 + (procurementExportPages.length > 0 ? procurementExportPages.length : 1);
 
     const selectedOfficeName = useMemo(() => {
         if (!form.office_id) return 'All Offices';
@@ -796,91 +796,198 @@ export default function ProcurementAnalyticsIndex({
                         pageNumber={1}
                         totalPages={totalPdfPages}
                         showLetterhead={true}
-                        showSignatories={totalPdfPages === 1}
-                        showAttestation={totalPdfPages === 1}
+                        showSignatories={false}
+                        showAttestation={false}
                     >
-                        <div className="rounded-lg border border-slate-300 bg-slate-50/50 p-3">
+                        <div className="rounded-lg border border-slate-300 bg-slate-50/50 p-3.5">
                             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2.5">
                                 Procurement Activity & Expenditure Totals
                             </h3>
-                            <div className="grid grid-cols-3 gap-2.5">
+                            <div className="grid grid-cols-4 gap-2.5">
                                 <div className="rounded-md border border-slate-300 bg-white p-2.5 text-center">
-                                    <p className="text-[10px] font-bold uppercase text-slate-600">Total Purchase Requests</p>
-                                    <p className="mt-0.5 text-xl font-extrabold text-slate-900">{totals.purchase_request_count}</p>
+                                    <p className="text-[10px] font-bold uppercase text-slate-600">Purchase Requests</p>
+                                    <p className="mt-1 text-2xl font-black text-slate-900">{totals.purchase_request_count}</p>
                                 </div>
                                 <div className="rounded-md border border-slate-300 bg-white p-2.5 text-center">
-                                    <p className="text-[10px] font-bold uppercase text-slate-600">Total Purchase Orders</p>
-                                    <p className="mt-0.5 text-xl font-extrabold text-slate-900">{totals.purchase_order_count}</p>
+                                    <p className="text-[10px] font-bold uppercase text-slate-600">Purchase Orders</p>
+                                    <p className="mt-1 text-2xl font-black text-slate-900">{totals.purchase_order_count}</p>
                                 </div>
                                 <div className="rounded-md border border-slate-300 bg-white p-2.5 text-center">
-                                    <p className="text-[10px] font-bold uppercase text-slate-600">Total Committed Spend</p>
-                                    <p className="mt-0.5 text-lg font-extrabold text-red-800">{formatCurrency(totals.purchase_order_total_amount)}</p>
+                                    <p className="text-[10px] font-bold uppercase text-slate-600">Committed Spend</p>
+                                    <p className="mt-1 text-lg font-black text-red-800 leading-tight">{formatCurrency(totals.purchase_order_total_amount)}</p>
+                                </div>
+                                <div className="rounded-md border border-slate-300 bg-white p-2.5 text-center">
+                                    <p className="text-[10px] font-bold uppercase text-slate-600">Active Offices</p>
+                                    <p className="mt-1 text-2xl font-black text-slate-900">{crossOfficeActivity}</p>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3.5">
-                            <section className="rounded-lg border border-slate-300 bg-white p-3">
-                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2">
-                                    Monthly Procurement Expenditure Trend
-                                </h3>
-                                <SpendTrendBarChart
-                                    data={spendTrendPoints}
-                                    emptyText="No data in current filter scope"
-                                />
+                        <div className="grid grid-cols-2 gap-3.5 mt-3">
+                            <section className="rounded-lg border border-slate-300 bg-white p-3.5 flex flex-col justify-between">
+                                <div>
+                                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2.5">
+                                        Monthly Procurement Expenditure Trend
+                                    </h3>
+                                    <SpendTrendBarChart
+                                        data={spendTrendPoints}
+                                        emptyText="No data in current filter scope"
+                                    />
+                                </div>
                             </section>
 
-                            <section className="rounded-lg border border-slate-300 bg-white p-3 flex flex-col justify-between">
+                            <section className="rounded-lg border border-slate-300 bg-white p-3.5 flex flex-col justify-between">
                                 <div>
-                                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2">
+                                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2.5">
                                         Office Procurement Spending Concentration
                                     </h3>
-                                    <table className="w-full text-[11px] table-fixed border-collapse">
-                                        <tbody>
-                                            {office_comparison.slice(0, 4).map((office, idx) => {
-                                                const percent = office.spending_share_percentage ?? (totalProcurementSpend > 0 ? Math.round((office.purchase_order_total_amount / totalProcurementSpend) * 100) : 0);
-                                                const barWidth = Math.max((office.purchase_order_total_amount / maxOfficeSpend) * 100, office.purchase_order_total_amount > 0 ? 6 : 0);
-                                                return (
-                                                    <Fragment key={office.office_id}>
-                                                        <tr className="font-semibold">
-                                                            <td className="w-[60%] text-left text-slate-800 pr-2 truncate pt-1">
-                                                                #{idx + 1} {office.office_name}
-                                                            </td>
-                                                            <td className="w-[40%] text-right text-slate-900 whitespace-nowrap pt-1">
-                                                                {formatCurrency(office.purchase_order_total_amount)} ({percent}%)
-                                                            </td>
-                                                        </tr>
-                                                        <tr>
-                                                            <td colSpan={2} className="pt-0.5 pb-2">
-                                                                <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden block">
-                                                                    <div className="h-full bg-red-600 rounded-full block" style={{ width: `${barWidth}%` }} />
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                    </Fragment>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
+                                    <div className="space-y-2.5 py-1">
+                                        {office_comparison.slice(0, 6).map((office, idx) => {
+                                            const percent = office.spending_share_percentage ?? (totalProcurementSpend > 0 ? Math.round((office.purchase_order_total_amount / totalProcurementSpend) * 100) : 0);
+                                            const barWidth = Math.max((office.purchase_order_total_amount / maxOfficeSpend) * 100, office.purchase_order_total_amount > 0 ? 6 : 0);
+                                            return (
+                                                <div key={office.office_id} className="group block">
+                                                    <div className="flex items-center justify-between gap-2 mb-1">
+                                                        <span className="truncate text-xs font-semibold text-slate-800" title={office.office_name}>
+                                                            #{idx + 1} {office.office_name}
+                                                        </span>
+                                                        <span className="shrink-0 text-right text-xs font-bold text-slate-900 whitespace-nowrap">
+                                                            {formatCurrency(office.purchase_order_total_amount)} ({percent}%)
+                                                        </span>
+                                                    </div>
+                                                    <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden block">
+                                                        <div className="h-full bg-red-600 rounded-full block transition-all" style={{ width: `${barWidth}%` }} />
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
-                                {office_comparison.length > 4 && (
-                                    <p className="mt-1 text-[10px] text-slate-400 italic text-right">
-                                        Top 4 of {office_comparison.length} procuring offices shown
+                                {office_comparison.length > 6 && (
+                                    <p className="mt-2 text-[10px] text-slate-400 italic text-right">
+                                        Top 6 of {office_comparison.length} procuring offices shown
                                     </p>
                                 )}
                             </section>
                         </div>
 
-                        <section className="rounded-lg border border-slate-300 bg-white p-3 mt-2.5">
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2">
-                                Procurement Velocity & Activity Volume Trend
-                            </h3>
-                            <TrendLineChart
-                                data={totalActivityTrend}
-                                emptyText="No procurement activity volume data in current filter scope"
-                                showPointCards={false}
-                            />
-                        </section>
+                        <div className="rounded-lg border border-slate-300 bg-slate-50 p-3 mt-3 text-xs text-slate-700 space-y-1">
+                            <p className="font-bold text-slate-900 uppercase tracking-wide text-[10.5px]">Fiscal Accountability & Spend Scope Note:</p>
+                            <p className="text-[11px] leading-relaxed text-slate-600">
+                                This procurement expenditure report aggregates committed public procurement obligations across municipal departments under R.A. 9184 standards. Historical activity velocity and requisition volumes are detailed on Page 2, followed by itemized purchase transaction schedules.
+                            </p>
+                        </div>
+                    </GovDocumentPage>
+
+                    {/* Page 2: Dedicated Procurement Velocity & Activity Volume Analysis */}
+                    <GovDocumentPage
+                        metadata={{
+                            ...baseMetadata,
+                            title: 'EXECUTIVE PROCUREMENT VELOCITY & VOLUME ANALYSIS',
+                            moduleScope: 'Procurement Activity Volume & Historical Velocity Analysis',
+                        }}
+                        pageNumber={2}
+                        totalPages={totalPdfPages}
+                        showLetterhead={true}
+                        showSignatories={totalPdfPages === 2}
+                        showAttestation={totalPdfPages === 2}
+                    >
+                        <div className="space-y-3.5">
+                            {/* Velocity Telemetry Banner */}
+                            <div className="grid grid-cols-4 gap-2.5">
+                                <div className="rounded-lg border border-slate-300 bg-white p-2.5 text-center">
+                                    <p className="text-[10px] font-bold uppercase text-slate-500">Cumulative Volume</p>
+                                    <p className="mt-1 text-2xl font-black text-slate-900">
+                                        {totalActivityTrend.reduce((sum, p) => sum + p.value, 0).toLocaleString()}
+                                    </p>
+                                    <p className="text-[10px] text-slate-500 mt-0.5">Total documents</p>
+                                </div>
+                                <div className="rounded-lg border border-slate-300 bg-white p-2.5 text-center">
+                                    <p className="text-[10px] font-bold uppercase text-slate-500">Peak Velocity Month</p>
+                                    <p className="mt-1 text-sm font-extrabold text-red-700">
+                                        {[...totalActivityTrend].sort((a, b) => b.value - a.value)[0]?.label ?? '—'}
+                                    </p>
+                                    <p className="text-[10px] text-slate-500 mt-0.5">
+                                        {[...totalActivityTrend].sort((a, b) => b.value - a.value)[0]?.value ?? 0} docs processed
+                                    </p>
+                                </div>
+                                <div className="rounded-lg border border-slate-300 bg-white p-2.5 text-center">
+                                    <p className="text-[10px] font-bold uppercase text-slate-500">Latest Period</p>
+                                    <p className="mt-1 text-sm font-extrabold text-slate-900">
+                                        {totalActivityTrend[totalActivityTrend.length - 1]?.label ?? '—'}
+                                    </p>
+                                    <p className="text-[10px] text-slate-500 mt-0.5">
+                                        {totalActivityTrend[totalActivityTrend.length - 1]?.value ?? 0} docs processed
+                                    </p>
+                                </div>
+                                <div className="rounded-lg border border-slate-300 bg-white p-2.5 text-center">
+                                    <p className="text-[10px] font-bold uppercase text-slate-500">Average Velocity</p>
+                                    <p className="mt-1 text-2xl font-black text-slate-900">
+                                        {totalActivityTrend.length > 0
+                                            ? (totalActivityTrend.reduce((sum, p) => sum + p.value, 0) / totalActivityTrend.length).toFixed(1)
+                                            : '0'}
+                                    </p>
+                                    <p className="text-[10px] text-slate-500 mt-0.5">Docs / month</p>
+                                </div>
+                            </div>
+
+                            {/* Dedicated Enlarged Velocity Chart Section */}
+                            <section className="rounded-lg border border-slate-300 bg-white p-3.5">
+                                <div className="flex items-center justify-between border-b border-slate-200 pb-2 mb-2">
+                                    <div>
+                                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                                            Historical Procurement Velocity & Activity Volume Curve
+                                        </h3>
+                                        <p className="text-[10.5px] text-slate-500 mt-0.5">
+                                            Combined volume of approved Purchase Requests (PR) and executed Purchase Orders (PO)
+                                        </p>
+                                    </div>
+                                    <span className="rounded bg-red-50 border border-red-200 px-2 py-0.5 text-[10px] font-bold text-red-800">
+                                        {totalActivityTrend.length} Periods Recorded
+                                    </span>
+                                </div>
+
+                                <div className="py-2">
+                                    <TrendLineChart
+                                        data={totalActivityTrend}
+                                        emptyText="No procurement activity volume data in current filter scope"
+                                        showPointCards={false}
+                                        height={230}
+                                    />
+                                </div>
+                            </section>
+
+                            {/* PR vs PO Breakdown & Recent Trend Table */}
+                            {monthlyMerged.length > 0 && (
+                                <section className="rounded-lg border border-slate-300 bg-white p-3">
+                                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2">
+                                        Recent Monthly Requisition & Order Progression
+                                    </h3>
+                                    <div className="overflow-x-auto">
+                                        <table className="min-w-full table-fixed divide-y divide-slate-300 text-[11px]">
+                                            <thead className="bg-slate-100 text-slate-800 font-bold uppercase">
+                                                <tr>
+                                                    <th className="px-3 py-1.5 text-left border-r border-slate-300">Period</th>
+                                                    <th className="px-3 py-1.5 text-center border-r border-slate-300">Purchase Requests (PR)</th>
+                                                    <th className="px-3 py-1.5 text-center border-r border-slate-300">Purchase Orders (PO)</th>
+                                                    <th className="px-3 py-1.5 text-center font-black">Combined Activity</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-200 bg-white">
+                                                {monthlyMerged.slice(-6).map((item) => (
+                                                    <tr key={item.label} className="hover:bg-slate-50/50">
+                                                        <td className="px-3 py-1.5 font-semibold text-slate-900 border-r border-slate-200">{item.label}</td>
+                                                        <td className="px-3 py-1.5 text-center text-slate-700 border-r border-slate-200">{item.first}</td>
+                                                        <td className="px-3 py-1.5 text-center text-slate-700 border-r border-slate-200">{item.second}</td>
+                                                        <td className="px-3 py-1.5 text-center font-bold text-red-700">{item.first + item.second}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </section>
+                            )}
+                        </div>
                     </GovDocumentPage>
 
                     {/* Continuation Pages: Detailed Procurement Records */}
@@ -891,8 +998,8 @@ export default function ProcurementAnalyticsIndex({
                                 title: 'PROCUREMENT TRANSACTION SCHEDULE',
                                 moduleScope: 'Itemized Purchase Requests & Purchase Orders',
                             }}
-                            pageNumber={2}
-                            totalPages={2}
+                            pageNumber={3}
+                            totalPages={3}
                             showLetterhead={true}
                             showSignatories={true}
                             showAttestation={true}
@@ -901,7 +1008,7 @@ export default function ProcurementAnalyticsIndex({
                         </GovDocumentPage>
                     ) : (
                         procurementExportPages.map((rows, pageIndex) => {
-                            const pageNumber = 2 + pageIndex;
+                            const pageNumber = 3 + pageIndex;
                             const isLast = pageNumber === totalPdfPages;
 
                             return (

@@ -105,6 +105,9 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
         event.preventDefault();
         form.post(route('procurement.purchase-orders.items.store', purchaseOrder.purchase_order_id), {
             preserveScroll: true,
+            onSuccess: () => {
+                form.reset();
+            },
         });
     };
 
@@ -364,7 +367,14 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                                 {items.data.map((row) => (
                                     <tr key={row.purchase_order_item_id} className="border-t">
                                         <td className="px-3 py-2">{row.item_id}</td>
-                                        <td className="px-3 py-2">{row.item_name_snapshot}</td>
+                                        <td className="px-3 py-2 font-medium text-slate-900">
+                                            {row.item_name_snapshot}
+                                            {row.supply_request_item_id ? (
+                                                <span className="ml-1.5 inline-flex items-center rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono text-slate-500">
+                                                    SR Line #{row.supply_request_item_id}
+                                                </span>
+                                            ) : null}
+                                        </td>
                                         <td className="px-3 py-2">{row.specification || '-'}</td>
                                         <td className="px-3 py-2">{row.quantity_ordered}</td>
                                         <td className="px-3 py-2">{row.unit}</td>

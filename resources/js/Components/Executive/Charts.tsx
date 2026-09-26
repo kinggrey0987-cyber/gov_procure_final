@@ -211,46 +211,38 @@ export function HorizontalBarChart({
     };
 
     return (
-        <div className="py-0.5 flex-1 overflow-y-auto min-h-0">
-            <table className="w-full table-fixed text-xs border-collapse">
-                <tbody>
-                    {data.map((item, index) => {
-                        const widthPercent = Math.max((item.value / max) * 100, item.value > 0 ? 5 : 0);
-                        const sharePercent = total > 0 ? Math.round((item.value / total) * 100) : 0;
-                        const gradientClass = getBarGradient(item.label, index);
+        <div className="py-1 flex-1 overflow-y-auto min-h-0 space-y-2.5">
+            {data.map((item, index) => {
+                const widthPercent = Math.max((item.value / max) * 100, item.value > 0 ? 5 : 0);
+                const sharePercent = total > 0 ? Math.round((item.value / total) * 100) : 0;
+                const gradientClass = getBarGradient(item.label, index);
 
-                        return (
-                            <Fragment key={item.label}>
-                                <tr className="group">
-                                    <td className="truncate font-semibold text-slate-700 pr-2 group-hover:text-slate-900 transition pt-1" title={item.label}>
-                                        {item.label}
-                                    </td>
-                                    <td className="text-right whitespace-nowrap w-[40%] pt-1">
-                                        {showPercentage && total > 0 ? (
-                                            <span className="text-[10px] font-medium text-slate-500 mr-1.5">
-                                                ({sharePercent}%)
-                                            </span>
-                                        ) : null}
-                                        <span className="text-xs font-bold text-slate-900">
-                                            {valueFormatter ? valueFormatter(item.value) : item.value.toLocaleString()}
-                                        </span>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td colSpan={2} className="pt-0.5 pb-2">
-                                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 block">
-                                            <div
-                                                className={`h-full rounded-full ${gradientClass} transition-all duration-500 block`}
-                                                style={{ width: `${widthPercent}%` }}
-                                            />
-                                        </div>
-                                    </td>
-                                </tr>
-                            </Fragment>
-                        );
-                    })}
-                </tbody>
-            </table>
+                return (
+                    <div key={item.label} className="group block">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                            <span className="truncate text-xs font-semibold text-slate-700 group-hover:text-slate-900 transition" title={item.label}>
+                                {item.label}
+                            </span>
+                            <div className="text-right shrink-0 whitespace-nowrap">
+                                {showPercentage && total > 0 ? (
+                                    <span className="text-[10px] font-medium text-slate-500 mr-1.5">
+                                        ({sharePercent}%)
+                                    </span>
+                                ) : null}
+                                <span className="text-xs font-bold text-slate-900">
+                                    {valueFormatter ? valueFormatter(item.value) : item.value.toLocaleString()}
+                                </span>
+                            </div>
+                        </div>
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 block">
+                            <div
+                                className={`h-full rounded-full ${gradientClass} transition-all duration-500 block`}
+                                style={{ width: `${widthPercent}%` }}
+                            />
+                        </div>
+                    </div>
+                );
+            })}
         </div>
     );
 }
@@ -303,11 +295,13 @@ export function TrendLineChart({
     emptyText,
     valueFormatter,
     showPointCards = false,
+    height = 150,
 }: {
     data: ChartPoint[];
     emptyText: string;
     valueFormatter?: (value: number) => string;
     showPointCards?: boolean;
+    height?: number;
 }) {
     if (data.length === 0) {
         return <EmptyState text={emptyText} />;
@@ -318,7 +312,6 @@ export function TrendLineChart({
     }
 
     const width = 680;
-    const height = 150;
     const paddingX = 35;
     const paddingY = 16;
     const paddingBottom = 26;
@@ -358,7 +351,11 @@ export function TrendLineChart({
             </div>
 
             <div className="overflow-hidden">
-                <svg viewBox={`0 0 ${width} ${height}`} className="h-32 sm:h-36 w-full min-w-0">
+                <svg
+                    viewBox={`0 0 ${width} ${height}`}
+                    style={height > 150 ? { height: `${height}px` } : undefined}
+                    className={height > 150 ? 'w-full min-w-0' : 'h-32 sm:h-36 w-full min-w-0'}
+                >
                     <defs>
                         <linearGradient id="trendAreaGradientRed" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="0%" stopColor="rgb(220 38 38)" stopOpacity="0.25" />

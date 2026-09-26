@@ -387,33 +387,6 @@ class PurchaseOrderService
             $unit = trim((string) ($payload['unit'] ?? ($supplyRequestItem->item?->default_unit ?? '')));
             $specification = $this->resolveItemSpecification($payload, $supplyRequestItem);
 
-            // Auto-merge: if the same item_id + specification already exists as
-            // a PO line, add the quantity to the existing line at the same unit
-            // price rather than creating a duplicate line. Same item from the
-            // same supplier should be one consolidated line.
-            $existingItem = $purchaseOrder->items()
-                ->where('item_id', (int) $supplyRequestItem->item_id)
-                ->where('specification', $specification)
-                ->first();
-
-            if ($existingItem) {
-                $mergedQuantity = round((float) $existingItem->quantity_ordered + $quantity, 2);
-                $existingItem->forceFill([
-                    'quantity_ordered' => $mergedQuantity,
-                    'total_price' => round($mergedQuantity * (float) $existingItem->unit_price, 2),
-                ])->save();
-
-                $this->recomputeTotalAmount($purchaseOrder);
-                $this->recordStatus($purchaseOrder, (string) $purchaseOrder->status, (string) $purchaseOrder->status, $actor, sprintf(
-                    'Merged %s qty into existing line (new total qty: %s).',
-                    number_format($quantity, 2),
-                    number_format($mergedQuantity, 2),
-                ));
-                $this->recordAudit($actor, 'MERGE_ITEM', $purchaseOrder);
-
-                return $existingItem;
-            }
-
             $item = $purchaseOrder->items()->create([
                 'supply_request_item_id' => (int) $supplyRequestItem->supply_request_item_id,
                 'item_id' => (int) $supplyRequestItem->item_id,
