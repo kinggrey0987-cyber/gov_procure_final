@@ -137,6 +137,7 @@ class ConsolidationTraceabilityService
             return [
                 'supply_request_id' => (int) $sr->supply_request_id,
                 'request_code' => (string) $sr->request_code,
+                'priority_level' => strtoupper((string) ($sr->priority_level ?? 'NORMAL')),
                 'office_name' => (string) ($sr->office?->name ?? 'Unknown Office'),
                 'office_code' => (string) ($sr->office?->code ?? 'OFFICE'),
                 'requester_name' => (string) ($sr->requester?->name ?? 'Office Requisitioner'),
@@ -207,8 +208,12 @@ class ConsolidationTraceabilityService
             }
         }
 
+        $isUrgent = $allSupplyRequests->contains(fn ($sr) => strtoupper((string) ($sr->priority_level ?? '')) === 'URGENT')
+            || strtoupper((string) ($purchaseRequest->supplyRequest?->priority_level ?? '')) === 'URGENT';
+
         return [
             'is_consolidated' => $isConsolidated,
+            'is_urgent' => $isUrgent,
             'gso_forwarder' => $gsoForwarder,
             'procurement_officer' => $procurementOfficer,
             'source_supply_requests' => $sourceRequests,

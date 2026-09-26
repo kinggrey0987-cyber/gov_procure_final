@@ -120,7 +120,8 @@ class ClaimService
             ]);
         }
 
-        if ($distributionRecord->updated_at && now()->diffInHours($distributionRecord->updated_at) > 48) {
+        $receivedAt = $distributionRecord->updated_at ?? $distributionRecord->created_at;
+        if ($receivedAt && ($receivedAt->copy()->addHours(48)->isPast() || abs(now()->diffInHours($receivedAt)) > 48)) {
             throw ValidationException::withMessages([
                 'distribution_record_id' => 'Claims must be filed within 2 days (48 hours) of receiving the supplies.',
             ]);

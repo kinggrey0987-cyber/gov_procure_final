@@ -31,6 +31,7 @@ type Props = {
         delivery?: { delivery_code: string } | null;
         preparer?: { name: string } | null;
         receiver?: { name: string } | null;
+        is_claim_expired?: boolean;
         items: Array<{
             distribution_item_id: number;
             item_id: number;
@@ -68,7 +69,7 @@ export default function DistributionShow({ record }: Props) {
     const backRouteName = isOfficeUser ? 'office.supplies-ready.index' : 'inventory.distribution-records.index';
     const backLabel = isOfficeUser ? 'Back to Ready Supplies' : 'Back to Distribution Records';
     const canConfirmReceipt = isOfficeUser && record.status === 'RELEASED';
-    const canFileClaim = isOfficeUser && (record.status === 'RELEASED' || record.status === 'RECEIVED');
+    const canFileClaim = isOfficeUser && (record.status === 'RELEASED' || record.status === 'RECEIVED') && !record.is_claim_expired;
     const [activeTab, setActiveTab] = useState<'overview' | 'items' | 'status' | 'related' | 'notes'>('overview');
     const isDeliveryBackedRelease = record.delivery !== null && record.delivery !== undefined;
     const releaseSource = isDeliveryBackedRelease ? 'Verified Delivery' : 'Available Inventory';
@@ -137,6 +138,13 @@ export default function DistributionShow({ record }: Props) {
                                 >
                                     Claims and Adjustments
                                 </Link>
+                            ) : record.is_claim_expired && record.status === 'RECEIVED' ? (
+                                <span
+                                    className="rounded-md border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-400 cursor-not-allowed select-none"
+                                    title="Claims must be filed within 2 days (48 hours) of receiving supplies. The reporting window has closed."
+                                >
+                                    Claim Period Closed (2 days)
+                                </span>
                             ) : null}
 
                             {canConfirmReceipt ? (

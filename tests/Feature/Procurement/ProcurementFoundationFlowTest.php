@@ -356,6 +356,170 @@ class ProcurementFoundationFlowTest extends TestCase
         $this->assertStringContainsString('Not valid for procurement.', (string) $supplyRequest->review_notes);
     }
 
+    public function test_urgent_supply_request_shows_as_urgent_pr_and_is_pinned_to_top_in_procurement_index(): void
+    {
+        $office = $this->createOffice();
+        $officeUser = $this->createUser(UserRole::OFFICE_USER, $office);
+        $procurementOfficer = $this->createUser(UserRole::PROCUREMENT_OFFICER, $office);
+
+        // 1. Create a Normal priority supply request & PR
+        $normalSr = SupplyRequest::query()->create([
+            'request_code' => 'SR-NORM-001',
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(5)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Routine office supply',
+            'priority_level' => 'NORMAL',
+            'status' => 'APPROVED',
+        ]);
+
+        $normalPr = PurchaseRequest::query()->create([
+            'pr_number' => 'PR-NORM-001',
+            'supply_request_id' => $normalSr->supply_request_id,
+            'office_id' => $office->id,
+            'requested_by' => $procurementOfficer->id,
+            'status' => 'OPEN',
+            'remarks' => 'Normal supply request queued',
+        ]);
+
+        // 2. Create an Urgent priority supply request & PR
+        $urgentSr = SupplyRequest::query()->create([
+            'request_code' => 'SR-URGENT-001',
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Urgent disaster response supply',
+            'priority_level' => 'URGENT',
+            'status' => 'APPROVED',
+        ]);
+
+        $urgentPr = PurchaseRequest::query()->create([
+            'pr_number' => 'PR-URGENT-001',
+            'supply_request_id' => $urgentSr->supply_request_id,
+            'office_id' => $office->id,
+            'requested_by' => $procurementOfficer->id,
+            'status' => 'OPEN',
+            'remarks' => 'Urgent supply request queued',
+        ]);
+
+        // Even if normalPr was created first and urgentPr second (or vice-versa),
+        // let's create a newer normal PR to guarantee normal PR has a higher ID:
+        $laterNormalSr = SupplyRequest::query()->create([
+            'request_code' => 'SR-NORM-002',
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(5)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Another normal supply',
+            'priority_level' => 'NORMAL',
+            'status' => 'APPROVED',
+        ]);
+
+        $laterNormalPr = PurchaseRequest::query()->create([
+            'pr_number' => 'PR-NORM-002',
+            'supply_request_id' => $laterNormalSr->supply_request_id,
+            'office_id' => $office->id,
+            'requested_by' => $procurementOfficer->id,
+            'status' => 'OPEN',
+            'remarks' => 'Later normal PR',
+        ]);
+
+        // Verify model attribute directly
+        $this->assertSame('URGENT', $urgentPr->priority_level);
+        $this->assertSame('NORMAL', $normalPr->priority_level);
+
+        // Fetch Procurement Purchase Requests Index
+        $response = $this->actingAs($procurementOfficer)
+            ->get(route('procurement.purchase-requests.index'));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('Procurement/PurchaseRequests/Index')
+            ->has('purchaseRequests.data', 3)
+            // Urgent PR must be pinned at index 0 despite having a lower ID than laterNormalPr
+            ->where('purchaseRequests.data.0.purchase_request_id', $urgentPr->purchase_request_id)
+            ->where('purchaseRequests.data.0.priority_level', 'URGENT')
+        );
+
+        // Show page traceability and priority check
+        $showResponse = $this->actingAs($procurementOfficer)
+            ->get(route('procurement.purchase-requests.show', $urgentPr->purchase_request_id));
+
+        $showResponse->assertOk();
+        $showResponse->assertInertia(fn ($page) => $page
+            ->component('Procurement/PurchaseRequests/Show')
+            ->where('purchaseRequest.priority_level', 'URGENT')
+            ->where('traceability.is_urgent', true)
+        );
+    }
+
+    public function test_purchase_orders_index_exposes_ready_reviewed_prs_count_and_summary_with_preselection(): void
+    {
+        $office = $this->createOffice();
+        $officeUser = $this->createUser(UserRole::OFFICE_USER, $office);
+        $procurementOfficer = $this->createUser(UserRole::PROCUREMENT_OFFICER, $office);
+
+        $urgentSr = SupplyRequest::query()->create([
+            'request_code' => 'SR-URGENT-PO',
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Urgent requisition awaiting PO',
+            'priority_level' => 'URGENT',
+            'status' => 'APPROVED',
+        ]);
+
+        $urgentPr = PurchaseRequest::query()->create([
+            'pr_number' => 'PR-URGENT-PO',
+            'supply_request_id' => $urgentSr->supply_request_id,
+            'office_id' => $office->id,
+            'requested_by' => $procurementOfficer->id,
+            'status' => 'PROCESSING',
+            'remarks' => 'Approved PR awaiting PO creation',
+        ]);
+
+        // Access Purchase Orders index: should show 1 ready PR, 1 urgent ready PR
+        $poIndexResponse = $this->actingAs($procurementOfficer)
+            ->get(route('procurement.purchase-orders.index'));
+
+        $poIndexResponse->assertOk();
+        $poIndexResponse->assertInertia(fn ($page) => $page
+            ->component('Procurement/PurchaseOrders/Index')
+            ->where('readyPrCount', 1)
+            ->where('urgentReadyPrCount', 1)
+            ->has('readyPurchaseRequests', 1)
+            ->where('readyPurchaseRequests.0.purchase_request_id', $urgentPr->purchase_request_id)
+            ->where('readyPurchaseRequests.0.is_urgent', true)
+        );
+
+        // Access Purchase Orders create with pr_id query param: selectedPurchaseRequestId should match
+        $poCreateResponse = $this->actingAs($procurementOfficer)
+            ->get(route('procurement.purchase-orders.create', ['pr_id' => $urgentPr->purchase_request_id]));
+
+        $poCreateResponse->assertOk();
+        $poCreateResponse->assertInertia(fn ($page) => $page
+            ->component('Procurement/PurchaseOrders/Create')
+            ->where('selectedPurchaseRequestId', $urgentPr->purchase_request_id)
+        );
+
+        // Show page for reviewed PR: create_po permission should be true
+        $prShowResponse = $this->actingAs($procurementOfficer)
+            ->get(route('procurement.purchase-requests.show', $urgentPr->purchase_request_id));
+
+        $prShowResponse->assertOk();
+        $prShowResponse->assertInertia(fn ($page) => $page
+            ->component('Procurement/PurchaseRequests/Show')
+            ->where('permissions.create_po', true)
+        );
+    }
+
     private function createOffice(): Office
     {
         return Office::query()->create([

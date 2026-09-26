@@ -35,7 +35,7 @@ class PurchaseOrderController extends Controller
         $search = trim((string) $request->input('search', ''));
 
         $purchaseOrders = PurchaseOrder::query()
-            ->with(['purchaseRequest.office', 'purchaseRequest.sourceDelivery.purchaseOrder', 'supplyRequest', 'supplier'])
+            ->with(['purchaseRequest.office', 'purchaseRequest.supplyRequest', 'purchaseRequest.sourceDelivery.purchaseOrder', 'supplyRequest', 'supplier'])
             ->withCount('deliveries')
             ->when($status !== '', fn ($query) => $query->where('status', $status))
             ->when($search !== '', function ($query) use ($search): void {
@@ -50,8 +50,30 @@ class PurchaseOrderController extends Controller
             ->paginate(5)
             ->withQueryString();
 
+        $currentYear = (int) now()->format('Y');
+
+        $readyPurchaseRequests = PurchaseRequest::query()
+            ->processing()
+            ->whereDoesntHave('purchaseOrders')
+            ->whereYear('created_at', $currentYear)
+            ->with(['office:id,code,name', 'supplyRequest:supply_request_id,request_code,priority_level'])
+            ->latest('purchase_request_id')
+            ->get(['purchase_request_id', 'pr_number', 'supply_request_id', 'office_id', 'status', 'created_at', 'remarks']);
+
+        $readyPrCount = $readyPurchaseRequests->count();
+        $urgentReadyPrCount = $readyPurchaseRequests->filter(fn ($pr) => $pr->priority_level === 'URGENT')->count();
+        $readyPurchaseRequestsSummary = $readyPurchaseRequests->take(6)->map(fn ($pr): array => [
+            'purchase_request_id' => (int) $pr->purchase_request_id,
+            'pr_number' => (string) $pr->pr_number,
+            'office_name' => (string) ($pr->office?->name ?? 'Unknown Office'),
+            'is_urgent' => $pr->priority_level === 'URGENT',
+        ])->values();
+
         return Inertia::render('Procurement/PurchaseOrders/Index', [
             'purchaseOrders' => $purchaseOrders,
+            'readyPrCount' => $readyPrCount,
+            'urgentReadyPrCount' => $urgentReadyPrCount,
+            'readyPurchaseRequests' => $readyPurchaseRequestsSummary,
             'filters' => [
                 'status' => $status,
                 'search' => $search,
@@ -133,10 +155,13 @@ class PurchaseOrderController extends Controller
             ])
             ->values();
 
+        $selectedPrId = (int) ($request->query('pr_id') ?? $request->query('purchase_request_id') ?? 0);
+
         return Inertia::render('Procurement/PurchaseOrders/Create', [
             'eligiblePurchaseRequests' => $eligiblePurchaseRequests,
             'suppliers' => $suppliers,
             'poNumberPreview' => $this->service->previewNextPoNumber(),
+            'selectedPurchaseRequestId' => $selectedPrId,
         ]);
     }
 

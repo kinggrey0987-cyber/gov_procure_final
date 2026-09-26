@@ -63,7 +63,19 @@ class PurchaseOrder extends Model
     protected $appends = [
         'is_zero_cost_replacement',
         'parent_po',
+        'priority_level',
     ];
+
+    public function getPriorityLevelAttribute(): string
+    {
+        if ($this->relationLoaded('purchaseRequest') && $this->purchaseRequest) {
+            return $this->purchaseRequest->priority_level;
+        }
+        if ($this->purchase_request_id) {
+            return PurchaseRequest::query()->find($this->purchase_request_id)?->priority_level ?? 'NORMAL';
+        }
+        return 'NORMAL';
+    }
 
     public function getParentPoAttribute(): ?self
     {

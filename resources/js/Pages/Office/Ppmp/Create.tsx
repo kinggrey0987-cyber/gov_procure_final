@@ -285,13 +285,12 @@ export default function PpmpCreate({ itemOptions }: Props) {
                             return (
                                 <div
                                     key={index}
-                                    className={`rounded-xl border p-2.5 transition ${
-                                        isDuplicate
+                                    className={`rounded-xl border p-2.5 transition ${isDuplicate
                                             ? 'border-amber-300 bg-amber-50/40'
                                             : hasRowError
-                                            ? 'border-rose-300 bg-rose-50/20 ring-1 ring-rose-200'
-                                            : 'border-slate-200 bg-slate-50/40'
-                                    }`}
+                                                ? 'border-rose-300 bg-rose-50/20 ring-1 ring-rose-200'
+                                                : 'border-slate-200 bg-slate-50/40'
+                                        }`}
                                 >
                                     <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-slate-200">
                                         <div className="flex items-center gap-2">
@@ -331,11 +330,10 @@ export default function PpmpCreate({ itemOptions }: Props) {
                                             <select
                                                 value={currentGroupKey}
                                                 onChange={(event) => chooseGroup(index, event.target.value)}
-                                                className={`w-full rounded-lg border px-2.5 py-1 text-xs ${
-                                                    form.errors[`items.${index}.item_id`] || form.errors[`items.${index}.item_category_id`]
+                                                className={`w-full rounded-lg border px-2.5 py-1 text-xs ${form.errors[`items.${index}.item_id`] || form.errors[`items.${index}.item_category_id`]
                                                         ? 'border-rose-400 bg-rose-50/30'
                                                         : 'border-slate-300'
-                                                }`}
+                                                    }`}
                                                 required
                                             >
                                                 <option value="">Select Item</option>
@@ -359,11 +357,10 @@ export default function PpmpCreate({ itemOptions }: Props) {
                                                     step="1"
                                                     value={item.quantity}
                                                     onChange={(event) => patchItem(index, { quantity: event.target.value })}
-                                                    className={`w-full rounded-lg border px-2.5 py-1 text-xs ${
-                                                        form.errors[`items.${index}.quantity`]
+                                                    className={`w-full rounded-lg border px-2.5 py-1 text-xs ${form.errors[`items.${index}.quantity`]
                                                             ? 'border-rose-400 bg-rose-50/30'
                                                             : 'border-slate-300'
-                                                    }`}
+                                                        }`}
                                                     required
                                                 />
                                                 <div className="mt-0.5 text-[10px] text-slate-600 truncate" title={`Planned: ${qtyNum} ${unit}${piecesPerBox > 1 ? ` = ${totalPieces} ${subUnit}s` : ''}`}>
@@ -391,11 +388,10 @@ export default function PpmpCreate({ itemOptions }: Props) {
                                                     step="0.01"
                                                     value={item.unit_cost}
                                                     onChange={(event) => patchItem(index, { unit_cost: event.target.value })}
-                                                    className={`w-full rounded-lg border px-2.5 py-1 text-xs ${
-                                                        form.errors[`items.${index}.unit_cost`]
+                                                    className={`w-full rounded-lg border px-2.5 py-1 text-xs ${form.errors[`items.${index}.unit_cost`]
                                                             ? 'border-rose-400 bg-rose-50/30'
                                                             : 'border-slate-300'
-                                                    }`}
+                                                        }`}
                                                     required
                                                 />
                                                 {unitCostNum > 0 && piecesPerBox > 1 ? (
@@ -411,11 +407,10 @@ export default function PpmpCreate({ itemOptions }: Props) {
                                                 <select
                                                     value={item.procurement_schedule}
                                                     onChange={(event) => patchItem(index, { procurement_schedule: event.target.value })}
-                                                    className={`w-full rounded-lg border px-2.5 py-1 text-xs ${
-                                                        form.errors[`items.${index}.procurement_schedule`]
+                                                    className={`w-full rounded-lg border px-2.5 py-1 text-xs ${form.errors[`items.${index}.procurement_schedule`]
                                                             ? 'border-rose-400 bg-rose-50/30'
                                                             : 'border-slate-300'
-                                                    }`}
+                                                        }`}
                                                     required
                                                 >
                                                     <option value="">Select Quarter</option>
@@ -451,14 +446,13 @@ export default function PpmpCreate({ itemOptions }: Props) {
                                                 <select
                                                     value={item.item_id}
                                                     onChange={(event) => chooseVariant(index, event.target.value)}
-                                                    className={`w-full rounded-lg border px-2.5 py-1 text-xs ${
-                                                        form.errors[`items.${index}.remarks`] || form.errors[`items.${index}.item_id`]
+                                                    className={`w-full rounded-lg border px-2.5 py-1 text-xs ${form.errors[`items.${index}.remarks`] || form.errors[`items.${index}.item_id`]
                                                             ? 'border-rose-400 bg-rose-50/30'
                                                             : 'border-slate-300'
-                                                    }`}
+                                                        }`}
                                                     required
                                                 >
-                                                    <option value="">Select standard specification (A4, Letter, Legal...)</option>
+                                                    <option value="">Select standard specification</option>
                                                     {selectedGroup.variants.map((v) => (
                                                         <option key={v.item_id} value={v.item_id}>
                                                             {v.specification}

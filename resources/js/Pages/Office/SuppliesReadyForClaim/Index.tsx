@@ -145,10 +145,10 @@ export default function SuppliesReadyForClaimIndex({ records }: Props) {
                                                             </Link>
                                                         ) : record.is_claim_expired ? (
                                                             <span
-                                                                className="rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-400 cursor-not-allowed"
-                                                                title="Claims must be filed within 2 days (48 hours) of receiving supplies."
+                                                                className="inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-100/80 px-2 py-1 text-[11px] font-medium text-slate-400 cursor-not-allowed select-none"
+                                                                title="Claims must be filed within 2 days (48 hours) of receiving supplies. The 2-day reporting window has expired."
                                                             >
-                                                                Claim expired (2 days)
+                                                                <span>Claim Expired (2d)</span>
                                                             </span>
                                                         ) : (
                                                             <Link

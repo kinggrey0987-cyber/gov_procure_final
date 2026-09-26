@@ -40,6 +40,42 @@ class PurchaseRequest extends Model
          'source_claim_id' => 'integer',
      ];
 
+     protected $appends = [
+         'priority_level',
+     ];
+
+     public function getPriorityLevelAttribute(): string
+     {
+         if ($this->relationLoaded('supplyRequest') && $this->supplyRequest) {
+             if (strtoupper((string) ($this->supplyRequest->priority_level ?? '')) === 'URGENT') {
+                 return 'URGENT';
+             }
+         } elseif ($this->supply_request_id) {
+             $level = SupplyRequest::query()
+                 ->where('supply_request_id', (int) $this->supply_request_id)
+                 ->value('priority_level');
+
+             if (strtoupper((string) ($level ?? '')) === 'URGENT') {
+                 return 'URGENT';
+             }
+         }
+
+         if (! empty($this->remarks) && (str_contains($this->remarks, 'Consolidated PR') || preg_match('/SR-[A-Z0-9-]+/', $this->remarks))) {
+             if (preg_match_all('/SR-[A-Z0-9-]+/', $this->remarks, $matches)) {
+                 $hasUrgent = SupplyRequest::query()
+                     ->whereIn('request_code', $matches[0])
+                     ->whereRaw("UPPER(priority_level) = 'URGENT'")
+                     ->exists();
+
+                 if ($hasUrgent) {
+                     return 'URGENT';
+                 }
+             }
+         }
+
+         return 'NORMAL';
+     }
+
      public function getPrNumberAttribute(?string $value): string
      {
          if (! empty($value)) {

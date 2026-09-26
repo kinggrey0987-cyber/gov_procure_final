@@ -19,8 +19,10 @@ type PurchaseRequest = {
     requester?: {
         name?: string | null;
     } | null;
+    priority_level?: string | null;
     supply_request?: {
         request_code?: string | null;
+        priority_level?: string | null;
         requester?: {
             name?: string | null;
         } | null;
@@ -45,6 +47,7 @@ type PurchaseRequest = {
 
 type Traceability = {
     is_consolidated: boolean;
+    is_urgent?: boolean;
     gso_forwarder?: {
         name: string;
         role: string;
@@ -98,6 +101,7 @@ type Props = {
     };
     permissions?: {
         process?: boolean;
+        create_po?: boolean;
     };
     backLink?: {
         href: string;
@@ -131,6 +135,11 @@ type Props = {
 };
 
 export default function PurchaseRequestsShow({ purchaseRequest, traceability, reviewMode = false, backFilters, permissions, backLink, statusHistory = [], approvalHistory = [] }: Props) {
+    const isUrgent = Boolean(
+        (purchaseRequest.priority_level?.toUpperCase() === 'URGENT') ||
+        (purchaseRequest.supply_request?.priority_level?.toUpperCase() === 'URGENT') ||
+        traceability?.is_urgent
+    );
     const processForm = useForm({ action: 'process', remarks: '' });
     const totalQuantity = (purchaseRequest.items ?? []).reduce((sum, row) => sum + Number(row.quantity_requested ?? 0), 0);
     const normalizedRequestRemarks = formatRequestRemarks(purchaseRequest.remarks);
@@ -188,10 +197,31 @@ export default function PurchaseRequestsShow({ purchaseRequest, traceability, re
             <div className="py-10">
                 <div className="mx-auto max-w-6xl space-y-4 px-4 sm:px-6 lg:px-8">
                     <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                        {isUrgent && (
+                            <div className="mb-4 flex items-center gap-3.5 rounded-xl border-2 border-red-500 bg-red-50 p-4 text-red-900 shadow-xs">
+                                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-600 text-white shadow">
+                                    <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                </span>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h4 className="text-sm font-extrabold uppercase tracking-wide text-red-900">URGENT PRIORITY PROCUREMENT REQUEST</h4>
+                                        <span className="rounded bg-red-600 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-white shadow-2xs">EXPEDITE REVIEW</span>
+                                    </div>
+                                    <p className="mt-0.5 text-xs text-red-700">This purchase request originates from an urgent office supply requisition and is prioritized for immediate procurement action.</p>
+                                </div>
+                            </div>
+                        )}
                         <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                     <p className="text-xs uppercase tracking-[0.15em] text-slate-500">{reviewMode ? 'Request Review' : 'Request Information'}</p>
+                                    {isUrgent ? (
+                                        <span className="inline-flex items-center gap-1 rounded-full border border-red-300 bg-red-100 px-2.5 py-0.5 text-xs font-bold text-red-800 shadow-2xs">
+                                            <span className="h-1.5 w-1.5 rounded-full bg-red-600"></span> URGENT
+                                        </span>
+                                    ) : null}
                                     {purchaseRequest.source_type === 'PARTIAL_DELIVERY_FOLLOW_UP' || Boolean(purchaseRequest.source_delivery_id) ? (
                                         <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
                                             🛡️ Discrepancy Replacement PR (Zero-Cost)
@@ -212,11 +242,33 @@ export default function PurchaseRequestsShow({ purchaseRequest, traceability, re
                                     ) : null}
                                 </h3>
                             </div>
-                            <span className={statusClass(purchaseRequest.status)}>{purchaseRequest.status}</span>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <span className={statusClass(purchaseRequest.status)}>{purchaseRequest.status}</span>
+                                {permissions?.create_po && (
+                                    <Link
+                                        href={route('procurement.purchase-orders.create', { pr_id: purchaseRequest.purchase_request_id })}
+                                        className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1 text-xs font-semibold text-white shadow-xs hover:bg-red-700 transition"
+                                    >
+                                        <span>＋ Create Purchase Order</span>
+                                    </Link>
+                                )}
+                            </div>
                         </div>
 
                         <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
                             <Info label="Office" value={purchaseRequest.office?.name ?? '-'} />
+                            <Info
+                                label="Priority"
+                                value={
+                                    isUrgent ? (
+                                        <span className="inline-flex items-center gap-1 font-bold text-red-700">
+                                            <span className="h-1.5 w-1.5 rounded-full bg-red-600"></span> Urgent (Priority Need)
+                                        </span>
+                                    ) : (
+                                        'Normal'
+                                    )
+                                }
+                            />
                             <Info label="Requester" value={purchaseRequest.supply_request?.requester?.name || purchaseRequest.requester?.name || '-'} />
                             <Info label="Supply Request" value={purchaseRequest.supply_request?.request_code || (purchaseRequest.supply_request_id ? `SR #${purchaseRequest.supply_request_id}` : '-')} />
                             <Info label="Date" value={formatDate(purchaseRequest.created_at)} />
@@ -478,7 +530,7 @@ export default function PurchaseRequestsShow({ purchaseRequest, traceability, re
     );
 }
 
-function Info({ label, value }: { label: string; value: string }) {
+function Info({ label, value }: { label: string; value: React.ReactNode }) {
     return (
         <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
             <dt className="text-xs uppercase tracking-wide text-slate-500">{label}</dt>

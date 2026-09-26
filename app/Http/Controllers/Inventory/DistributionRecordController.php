@@ -380,6 +380,7 @@ class DistributionRecordController
                 'distribution_record_id' => (int) $distribution_record->distribution_record_id,
                 'distribution_code' => (string) $distribution_record->distribution_code,
                 'status' => (string) $distribution_record->status,
+                'is_claim_expired' => $distribution_record->status === 'RECEIVED' && ($distribution_record->updated_at ?? $distribution_record->created_at) && (($distribution_record->updated_at ?? $distribution_record->created_at)->copy()->addHours(48)->isPast() || abs(now()->diffInHours($distribution_record->updated_at ?? $distribution_record->created_at)) > 48),
                 'release_date' => optional($distribution_record->release_date)?->toDateString(),
                 'storage_location' => $distribution_record->storage_location,
                 'notes' => $distribution_record->notes,

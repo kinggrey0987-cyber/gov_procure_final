@@ -1785,6 +1785,71 @@ class InventoryDistributionFoundationTest extends TestCase
             );
     }
 
+    public function test_distribution_record_received_more_than_48_hours_ago_is_marked_expired_and_disables_claims(): void
+    {
+        $itemId = 8821;
+        $record = $this->createReleasedDistributionRecordForOffice($this->officeA, $itemId);
+
+        // Mark as RECEIVED 3 days ago (72 hours ago)
+        $pastDate = now()->subDays(3);
+        $record->forceFill([
+            'status' => 'RECEIVED',
+            'received_by' => $this->officeUserA->id,
+            'updated_at' => $pastDate,
+            'created_at' => $pastDate,
+        ])->saveQuietly();
+
+        // 1. In Supplies Ready For Claim index, is_claim_expired must be true
+        $response = $this->actingAs($this->officeUserA)
+            ->get(route('office.supplies-ready.index'));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Office/SuppliesReadyForClaim/Index')
+            ->where('records.data.0.distribution_record_id', $record->distribution_record_id)
+            ->where('records.data.0.is_claim_expired', true)
+        );
+
+        // 2. In Distribution Show, is_claim_expired must be true
+        $showResponse = $this->actingAs($this->officeUserA)
+            ->get(route('office.distribution-records.show', $record->distribution_record_id));
+
+        $showResponse->assertOk();
+        $showResponse->assertInertia(fn (Assert $page) => $page
+            ->component('Inventory/Distribution/Show')
+            ->where('record.is_claim_expired', true)
+        );
+
+        // 3. In Claims Create, the expired distribution record must not be in the selectable list
+        $createResponse = $this->actingAs($this->officeUserA)
+            ->get(route('office.claims.create'));
+
+        $createResponse->assertOk();
+        $createResponse->assertInertia(fn (Assert $page) => $page
+            ->component('Inventory/Claim/Create')
+            ->where('distributionRecords', fn ($records): bool => collect($records)->firstWhere('distribution_record_id', $record->distribution_record_id) === null)
+        );
+
+        // 4. Directly attempting to file a claim via POST must fail with validation error
+        $item = $record->items()->firstOrFail();
+        $postResponse = $this->actingAs($this->officeUserA)
+            ->post(route('office.claims.store'), [
+                'distribution_record_id' => $record->distribution_record_id,
+                'distribution_item_id' => $item->distribution_item_id,
+                'office_id' => $this->officeA->id,
+                'claim_type' => 'DAMAGED_ITEM',
+                'claim_date' => now()->toDateString(),
+                'claim_location' => 'Office MPDO',
+                'attachment_file' => \Illuminate\Http\UploadedFile::fake()->image('evidence.png'),
+                'quantity_disputed' => 1,
+                'quantity_damaged' => 1,
+                'quantity_missing' => 0,
+                'remarks' => 'Filing claim after 48h deadline',
+            ]);
+
+        $postResponse->assertSessionHasErrors(['distribution_record_id']);
+    }
+
     private function createReleasedDistributionRecordForOffice(Office $office, int $itemId): DistributionRecord
     {
         $officeUser = ((int) $office->id === (int) $this->officeA->id) ? $this->officeUserA : $this->officeUserB;

@@ -9,10 +9,14 @@ type PurchaseRequestRow = {
     purchase_request_id: number;
     pr_number?: string | null;
     supply_request_id?: number | null;
+    priority_level?: string | null;
     status: string;
     created_at?: string;
     office?: { name?: string | null } | null;
-    supply_request?: { request_code?: string | null } | null;
+    supply_request?: {
+        request_code?: string | null;
+        priority_level?: string | null;
+    } | null;
     items?: Array<{
         quantity_requested?: string | number;
         item?: {
@@ -146,6 +150,23 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                     </div>
                 </section>
 
+                {/* Urgent Pinned Banner */}
+                {purchaseRequests.data.some((r) => r.priority_level?.toUpperCase() === 'URGENT' || r.supply_request?.priority_level?.toUpperCase() === 'URGENT') && (
+                    <div className="rounded-xl border border-red-200 bg-red-50/90 px-4 py-2.5 text-xs text-red-900 flex items-center justify-between shadow-2xs">
+                        <div className="flex items-center gap-2">
+                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-600 text-white shadow-2xs">
+                                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                            </span>
+                            <span><strong>Urgent Purchase Requests Pinned to Top:</strong> Requests originating from urgent office requisitions are prioritized for expedited procurement processing.</span>
+                        </div>
+                        <span className="rounded-full bg-red-200/80 px-2.5 py-0.5 text-[10px] font-bold text-red-900 border border-red-300">
+                            {purchaseRequests.data.filter((r) => r.priority_level?.toUpperCase() === 'URGENT' || r.supply_request?.priority_level?.toUpperCase() === 'URGENT').length} Urgent Pinned
+                        </span>
+                    </div>
+                )}
+
                 {/* Table Container */}
                 <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
                     <div className="overflow-x-auto">
@@ -165,9 +186,10 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                             {purchaseRequests.data.map((row) => {
                                 const firstCategory = row.items?.[0]?.item?.category?.category_name ?? 'Uncategorized';
                                 const quantity = Number(row.items_sum_quantity_requested ?? 0);
+                                const isUrgent = (row.priority_level?.toUpperCase() === 'URGENT') || (row.supply_request?.priority_level?.toUpperCase() === 'URGENT');
 
                                 return (
-                                    <tr key={row.purchase_request_id} className="hover:bg-slate-50/60 transition-colors">
+                                    <tr key={row.purchase_request_id} className={`hover:bg-slate-50/60 transition-colors ${isUrgent ? 'border-l-4 border-l-red-600 bg-red-50/20' : ''}`}>
                                         <td className="px-3.5 py-2 font-semibold text-red-700">
                                             {(() => {
                                                 const isConsolidated = Boolean(row.remarks && (row.remarks.includes('Consolidated PR') || /from \d+ supply requests/i.test(row.remarks)));
@@ -176,6 +198,11 @@ export default function PurchaseRequestsIndex({ purchaseRequests, filters }: Pro
                                                     <div>
                                                         <div className="flex items-center gap-1.5 flex-wrap">
                                                             <span>{prNumber}</span>
+                                                            {isUrgent ? (
+                                                                <span className="inline-flex items-center gap-1 rounded-full border border-red-300 bg-red-100 px-2 py-0.5 text-[10px] font-black text-red-700 shadow-2xs tracking-wide uppercase">
+                                                                    <span className="h-1.5 w-1.5 rounded-full bg-red-600"></span> Urgent
+                                                                </span>
+                                                            ) : null}
                                                             {isConsolidated ? (
                                                                 <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-800">
                                                                     📦 Consolidated

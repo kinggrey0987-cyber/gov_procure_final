@@ -124,7 +124,13 @@ class ClaimController
             ->with(['office', 'supplyRequest', 'items.item'])
             ->orderByDesc('release_date')
             ->orderByDesc('distribution_record_id')
-            ->get();
+            ->get()
+            ->filter(function (DistributionRecord $record): bool {
+                $receivedAt = $record->updated_at ?? $record->created_at;
+
+                return ! ($receivedAt && ($receivedAt->copy()->addHours(48)->isPast() || abs(now()->diffInHours($receivedAt)) > 48));
+            })
+            ->values();
 
         $requestedDistributionRecordId = (int) $request->query('distribution_record_id', 0);
         $requestedSupplyRequestId = (int) $request->query('supply_request_id', 0);

@@ -17,16 +17,25 @@ type PurchaseOrderRow = {
     purchase_request?: {
         purchase_request_id: number;
         pr_number?: string | null;
+        priority_level?: string | null;
         office?: {
             name?: string | null;
         } | null;
     } | null;
+    priority_level?: string | null;
     deliveries_count?: number;
     is_zero_cost_replacement?: boolean;
     parent_po?: {
         purchase_order_id: number;
         po_number?: string | null;
     } | null;
+};
+
+type ReadyPurchaseRequest = {
+    purchase_request_id: number;
+    pr_number: string;
+    office_name?: string | null;
+    is_urgent?: boolean;
 };
 
 type Props = {
@@ -38,13 +47,22 @@ type Props = {
             active: boolean;
         }>;
     };
+    readyPrCount?: number;
+    urgentReadyPrCount?: number;
+    readyPurchaseRequests?: ReadyPurchaseRequest[];
     filters?: {
         status?: string;
         search?: string;
     };
 };
 
-export default function PurchaseOrdersIndex({ purchaseOrders, filters }: Props) {
+export default function PurchaseOrdersIndex({
+    purchaseOrders,
+    readyPrCount = 0,
+    urgentReadyPrCount = 0,
+    readyPurchaseRequests = [],
+    filters,
+}: Props) {
     const [status, setStatus] = useState(filters?.status ?? '');
     const [search, setSearch] = useState(filters?.search ?? '');
     const debouncedSearch = useDebouncedValue(search, 450);
@@ -119,12 +137,91 @@ export default function PurchaseOrdersIndex({ purchaseOrders, filters }: Props) 
                 >
                     <span className="text-sm leading-none">＋</span>
                     <span>Create PO</span>
+                    {readyPrCount > 0 && (
+                        <span className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-black ${
+                            urgentReadyPrCount > 0
+                                ? 'bg-white text-red-700 ring-1 ring-red-400'
+                                : 'bg-red-800 text-white'
+                        }`}>
+                            {readyPrCount} ready
+                        </span>
+                    )}
                 </Link>
             }
         >
             <Head title="Purchase Orders" />
 
             <div className="space-y-3">
+                {/* Ready PRs Alert Banner */}
+                {readyPrCount > 0 && (
+                    <section className={`rounded-xl border p-3.5 shadow-2xs transition-all ${
+                        urgentReadyPrCount > 0
+                            ? 'border-red-200 bg-red-50/80 text-red-950'
+                            : 'border-blue-200 bg-blue-50/80 text-blue-950'
+                    }`}>
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex items-start gap-3">
+                                <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl font-bold shadow-2xs ${
+                                    urgentReadyPrCount > 0 ? 'bg-red-600 text-white' : 'bg-blue-600 text-white'
+                                }`}>
+                                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                                    </svg>
+                                </span>
+                                <div>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <h4 className="text-xs font-bold">
+                                            {readyPrCount} Reviewed Purchase {readyPrCount === 1 ? 'Request' : 'Requests'} Ready for PO Creation
+                                        </h4>
+                                        {urgentReadyPrCount > 0 && (
+                                            <span className="inline-flex items-center gap-1 rounded-full border border-red-300 bg-red-100 px-2 py-0.5 text-[10px] font-black text-red-700 shadow-2xs uppercase tracking-wide">
+                                                <span className="h-1.5 w-1.5 rounded-full bg-red-600"></span> {urgentReadyPrCount} Urgent Priority
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="mt-0.5 text-[11px] text-slate-600">
+                                        These purchase requests have completed procurement review and are awaiting purchase orders to initiate supplier ordering.
+                                    </p>
+                                    {readyPurchaseRequests.length > 0 && (
+                                        <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                                            <span className="text-[10px] font-semibold text-slate-500">Quick Create:</span>
+                                            {readyPurchaseRequests.map((pr) => (
+                                                <Link
+                                                    key={pr.purchase_request_id}
+                                                    href={route('procurement.purchase-orders.create', { pr_id: pr.purchase_request_id })}
+                                                    className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold border transition ${
+                                                        pr.is_urgent
+                                                            ? 'border-red-300 bg-red-100/90 text-red-800 hover:bg-red-200'
+                                                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
+                                                    }`}
+                                                    title={`Create PO for ${pr.pr_number} (${pr.office_name ?? 'Office'})`}
+                                                >
+                                                    {pr.is_urgent && <span className="h-1.5 w-1.5 rounded-full bg-red-600"></span>}
+                                                    <span>{pr.pr_number}</span>
+                                                    <span className="text-[9px] text-slate-400">({pr.office_name})</span>
+                                                    <span className="text-slate-400">→</span>
+                                                </Link>
+                                            ))}
+                                            {readyPrCount > readyPurchaseRequests.length && (
+                                                <span className="text-[10px] text-slate-500 font-medium">
+                                                    +{readyPrCount - readyPurchaseRequests.length} more
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            <Link
+                                href={route('procurement.purchase-orders.create')}
+                                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-red-700 transition"
+                            >
+                                <span>Create Purchase Order</span>
+                                <span>→</span>
+                            </Link>
+                        </div>
+                    </section>
+                )}
+
                 {/* Compact Control & Filter Header */}
                 <section className="shrink-0 rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm">
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -182,11 +279,19 @@ export default function PurchaseOrdersIndex({ purchaseOrders, filters }: Props) 
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {purchaseOrders.data.map((row) => (
-                                <tr key={row.purchase_order_id} className="hover:bg-slate-50/60 transition-colors">
+                            {purchaseOrders.data.map((row) => {
+                                const isUrgent = (row.purchase_request?.priority_level?.toUpperCase() === 'URGENT') || (row.priority_level?.toUpperCase() === 'URGENT');
+
+                                return (
+                                <tr key={row.purchase_order_id} className={`hover:bg-slate-50/60 transition-colors ${isUrgent ? 'border-l-4 border-l-red-600 bg-red-50/20' : ''}`}>
                                     <td className="px-3.5 py-2 font-semibold text-red-700">
                                         <div className="flex items-center gap-1.5 flex-wrap">
                                             <span>{row.po_number}</span>
+                                            {isUrgent && (
+                                                <span className="inline-flex items-center gap-1 rounded-full border border-red-300 bg-red-100 px-2 py-0.5 text-[10px] font-black text-red-700 shadow-2xs tracking-wide uppercase">
+                                                    <span className="h-1.5 w-1.5 rounded-full bg-red-600"></span> Urgent
+                                                </span>
+                                            )}
                                             {row.is_zero_cost_replacement && (
                                                 <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 border border-emerald-300 px-2 py-0.5 text-[10px] font-black text-emerald-800 shadow-2xs uppercase tracking-wide">
                                                     🛡️ Warranty Replacement
@@ -258,8 +363,9 @@ export default function PurchaseOrdersIndex({ purchaseOrders, filters }: Props) 
                                         </div>
                                     </td>
                                 </tr>
-                            ))}
-                            {purchaseOrders.data.length === 0 ? (
+                            );
+                        })}
+                        {purchaseOrders.data.length === 0 ? (
                                 <tr>
                                     <td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-500">
                                         No purchase orders found.

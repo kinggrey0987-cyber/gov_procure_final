@@ -1144,8 +1144,8 @@ class SupplyRequestController extends Controller
                     ->where('distribution_record_id', (int) $record->distribution_record_id)
                     ->first();
 
-                $receivedAt = $record->status === 'RECEIVED' ? $record->updated_at : null;
-                $isClaimExpired = $receivedAt !== null && now()->diffInHours($receivedAt) > 48;
+                $receivedAt = $record->status === 'RECEIVED' ? ($record->updated_at ?? $record->created_at) : null;
+                $isClaimExpired = $receivedAt !== null && ($receivedAt->copy()->addHours(48)->isPast() || abs(now()->diffInHours($receivedAt)) > 48);
 
                 return [
                     'distribution_record_id' => (int) $record->distribution_record_id,

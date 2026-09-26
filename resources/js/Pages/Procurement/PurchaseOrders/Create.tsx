@@ -47,13 +47,21 @@ type Props = {
     eligiblePurchaseRequests: PurchaseRequestOption[];
     suppliers: SupplierOption[];
     poNumberPreview: string;
+    selectedPurchaseRequestId?: number;
 };
 
-export default function PurchaseOrdersCreate({ eligiblePurchaseRequests, suppliers, poNumberPreview }: Props) {
-    const firstPurchaseRequest = eligiblePurchaseRequests[0];
+export default function PurchaseOrdersCreate({
+    eligiblePurchaseRequests,
+    suppliers,
+    poNumberPreview,
+    selectedPurchaseRequestId,
+}: Props) {
+    const defaultPrId = selectedPurchaseRequestId && eligiblePurchaseRequests.some((r) => r.purchase_request_id === selectedPurchaseRequestId)
+        ? selectedPurchaseRequestId
+        : (eligiblePurchaseRequests.length === 1 ? (eligiblePurchaseRequests[0]?.purchase_request_id ?? 0) : 0);
 
     const form = useForm({
-        purchase_request_id: eligiblePurchaseRequests.length === 1 ? (firstPurchaseRequest?.purchase_request_id ?? 0) : 0,
+        purchase_request_id: defaultPrId,
         supplier_id: 0,
         procurement_method: DEFAULT_PROCUREMENT_METHOD,
         expected_delivery_date: '',

@@ -34,21 +34,24 @@ class PurchaseRequestController extends Controller
         $search = trim((string) $request->input('search', ''));
 
         $purchaseRequests = PurchaseRequest::query()
+            ->select('purchase_requests.*')
+            ->leftJoin('supply_requests', 'purchase_requests.supply_request_id', '=', 'supply_requests.supply_request_id')
             ->with(['office', 'requester', 'supplyRequest', 'items.item.category'])
             ->withCount('items')
             ->withSum('items', 'quantity_requested')
-            ->where(fn ($q) => $q->where('remarks', 'not like', 'Linked to consolidated PR-%')->orWhereHas('items'))
-            ->when($status !== '', fn ($query) => $query->where('status', $status))
+            ->where(fn ($q) => $q->where('purchase_requests.remarks', 'not like', 'Linked to consolidated PR-%')->orWhereHas('items'))
+            ->when($status !== '', fn ($query) => $query->where('purchase_requests.status', $status))
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($nested) use ($search): void {
-                    $nested->where('purchase_request_id', 'like', '%'.$search.'%')
-                        ->orWhereLikeInsensitive('pr_number', $search)
-                        ->orWhereHas('supplyRequest', fn ($supplyRequestQuery) => $supplyRequestQuery->whereLikeInsensitive('request_code', $search))
+                    $nested->where('purchase_requests.purchase_request_id', 'like', '%'.$search.'%')
+                        ->orWhereLikeInsensitive('purchase_requests.pr_number', $search)
+                        ->orWhereLikeInsensitive('supply_requests.request_code', $search)
                         ->orWhereHas('office', fn ($officeQuery) => $officeQuery->whereLikeInsensitive('name', $search))
-                        ->orWhere('remarks', 'like', '%'.$search.'%');
+                        ->orWhere('purchase_requests.remarks', 'like', '%'.$search.'%');
                 });
             })
-            ->latest('purchase_request_id')
+            ->orderByRaw("CASE WHEN UPPER(COALESCE(supply_requests.priority_level, '')) = 'URGENT' AND purchase_requests.status IN ('OPEN', 'PROCESSING') THEN 0 ELSE 1 END ASC")
+            ->latest('purchase_requests.purchase_request_id')
             ->paginate(5)
             ->withQueryString();
 
@@ -87,6 +90,9 @@ class PurchaseRequestController extends Controller
             ],
             'permissions' => [
                 'process' => ($request->user()?->can('procurement.purchase-request.process', $purchaseRequest) ?? false) && (string) $purchaseRequest->status === 'OPEN',
+                'create_po' => ($request->user()?->can('procurement.purchase-order.create') ?? false)
+                    && (string) $purchaseRequest->status === 'PROCESSING'
+                    && ! $purchaseRequest->purchaseOrders()->exists(),
             ],
             'backLink' => $isExecutiveRoute ? [
                 'href' => route('executive.procurement-analytics'),

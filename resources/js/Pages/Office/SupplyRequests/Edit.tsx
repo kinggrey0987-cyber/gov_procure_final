@@ -107,13 +107,21 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
     };
 
     const addItem = () => {
-        if (!hasPpmp) {
+        if (!hasPpmp || !newItem.ppmp_item_id || newItemIsDuplicate) {
             return;
         }
 
         router.post(route('office.supply-requests.items.store', supplyRequest.supply_request_id), newItem, {
             preserveScroll: true,
             preserveState: false,
+            onSuccess: () => {
+                setNewItem({
+                    ppmp_item_id: '',
+                    item_id: '',
+                    item_name_snapshot: '',
+                    quantity_requested: '1',
+                });
+            },
         });
     };
 
@@ -126,10 +134,12 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
     };
 
     const removeItem = (itemId: number) => {
-        router.delete(route('office.supply-requests.items.destroy', [supplyRequest.supply_request_id, itemId]), {
-            preserveScroll: true,
-            preserveState: false,
-        });
+        if (confirm('Are you sure you want to remove this item from the supply request?')) {
+            router.delete(route('office.supply-requests.items.destroy', [supplyRequest.supply_request_id, itemId]), {
+                preserveScroll: true,
+                preserveState: false,
+            });
+        }
     };
 
     const onNewItemOptionChange = (value: string) => {
@@ -170,26 +180,49 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
     };
 
     return (
-        <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">Edit Supply Request</h2>}>
-            <Head title="Edit Supply Request" />
+        <AuthenticatedLayout
+            header={
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h2 className="text-xl font-bold leading-tight text-slate-900">Edit Supply Request</h2>
+                        <p className="text-xs text-slate-500 mt-0.5">Manage supply request details and line items before submission.</p>
+                    </div>
+                    <Link
+                        href={route('office.supply-requests.show', supplyRequest.supply_request_id)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:text-slate-900 transition"
+                    >
+                        <svg className="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                        </svg>
+                        <span>Back to Details</span>
+                    </Link>
+                </div>
+            }
+        >
+            <Head title={`Edit ${supplyRequest.request_code ?? 'Supply Request'}`} />
 
-            <div className="space-y-6 py-4">
-                <form onSubmit={submitHeader} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-2xl font-semibold text-slate-800">{supplyRequest.request_code ?? 'Supply Request'}</h3>
-                        <Link
-                            href={route('office.supply-requests.show', supplyRequest.supply_request_id)}
-                            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
-                        >
-                            Back to Details
-                        </Link>
+            <div className="max-w-7xl mx-auto space-y-6 py-4">
+                {/* Request Header Details Card */}
+                <form onSubmit={submitHeader} className="space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+                    <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                        <div>
+                            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Request Number</span>
+                            <h3 className="text-2xl font-bold text-red-700">{supplyRequest.request_code ?? 'Supply Request'}</h3>
+                        </div>
+                        <div className="text-right">
+                            <span className="text-xs font-medium text-slate-400">Status</span>
+                            <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
+                                Draft
+                            </div>
+                        </div>
                     </div>
 
-                    <Field label="Source PPMP">
+                    <Field label="Source PPMP" required hint="Only approved PPMPs can be used as the basis for a supply request." error={form.errors.ppmp_id}>
                         <select
-                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-red-500 focus:ring-1 focus:ring-red-500 bg-white"
                             value={form.data.ppmp_id}
                             onChange={(event) => void onHeaderPpmpChange(event.target.value)}
+                            required
                         >
                             <option value="">Select PPMP</option>
                             {ppmpOptions.map((option) => (
@@ -198,112 +231,180 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                                 </option>
                             ))}
                         </select>
-                        <p className="mt-1 text-xs text-slate-500">Only approved PPMPs can be used as the basis for a supply request.</p>
                     </Field>
 
                     <div className="grid gap-4 md:grid-cols-2">
                         <Field label="Request Date" hint="Request date is automatically recorded by the system.">
-                            <input type="text" className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700" value={form.data.request_date} readOnly aria-readonly="true" />
+                            <input
+                                type="text"
+                                className="w-full rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm text-slate-600 cursor-not-allowed"
+                                value={form.data.request_date}
+                                readOnly
+                                aria-readonly="true"
+                            />
                         </Field>
-                        <Field label="Needed By Date">
-                            <input type="date" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={form.data.needed_by_date} onChange={(event) => form.setData('needed_by_date', event.target.value)} />
+
+                        <Field label="Needed By Date" required error={form.errors.needed_by_date}>
+                            <input
+                                type="date"
+                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-red-500 focus:ring-1 focus:ring-red-500 bg-white"
+                                value={form.data.needed_by_date}
+                                onChange={(event) => form.setData('needed_by_date', event.target.value)}
+                                required
+                            />
                         </Field>
-                        <Field label="Request Category">
-                            <input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={form.data.request_category} onChange={(event) => form.setData('request_category', event.target.value)} />
+
+                        <Field label="Request Category" required error={form.errors.request_category}>
+                            <select
+                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-red-500 focus:ring-1 focus:ring-red-500 bg-white"
+                                value={form.data.request_category}
+                                onChange={(event) => form.setData('request_category', event.target.value)}
+                                required
+                            >
+                                <option value="GENERAL">General</option>
+                                <option value="OFFICE_SUPPLIES">Office Supplies</option>
+                                <option value="IT_EQUIPMENT">IT Equipment</option>
+                                <option value="FACILITY">Facility</option>
+                                {!['GENERAL', 'OFFICE_SUPPLIES', 'IT_EQUIPMENT', 'FACILITY'].includes(form.data.request_category) && form.data.request_category ? (
+                                    <option value={form.data.request_category}>{form.data.request_category}</option>
+                                ) : null}
+                            </select>
                         </Field>
-                        <Field label="Priority Level">
-                            <select className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={form.data.priority_level} onChange={(event) => form.setData('priority_level', event.target.value)}>
+
+                        <Field label="Priority Level" required error={form.errors.priority_level}>
+                            <select
+                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-red-500 focus:ring-1 focus:ring-red-500 bg-white"
+                                value={form.data.priority_level}
+                                onChange={(event) => form.setData('priority_level', event.target.value)}
+                                required
+                            >
                                 <option value="NORMAL">Normal</option>
                                 <option value="URGENT">Urgent (Priority Need)</option>
+                                {!['NORMAL', 'URGENT'].includes(form.data.priority_level) && form.data.priority_level ? (
+                                    <option value={form.data.priority_level}>{form.data.priority_level}</option>
+                                ) : null}
                             </select>
                         </Field>
                     </div>
 
-                    <Field label="Purpose">
-                        <textarea className="h-24 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={form.data.purpose} onChange={(event) => form.setData('purpose', event.target.value)} />
-                    </Field>
-                    <Field label="Notes">
-                        <textarea className="h-20 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={form.data.review_notes} onChange={(event) => form.setData('review_notes', event.target.value)} />
+                    <Field label="Purpose" required error={form.errors.purpose}>
+                        <textarea
+                            rows={3}
+                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-red-500 focus:ring-1 focus:ring-red-500 bg-white"
+                            value={form.data.purpose}
+                            onChange={(event) => form.setData('purpose', event.target.value)}
+                            placeholder="State the purpose or justification for this supply request..."
+                            required
+                        />
                     </Field>
 
-                    <div className="flex justify-end">
-                        <button type="submit" className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white">Update Request Details</button>
+                    <Field label="Notes / Remarks" hint="Optional notes or instructions for reviewing officers." error={form.errors.review_notes}>
+                        <textarea
+                            rows={2}
+                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-red-500 focus:ring-1 focus:ring-red-500 bg-white"
+                            value={form.data.review_notes}
+                            onChange={(event) => form.setData('review_notes', event.target.value)}
+                            placeholder="Optional notes or remarks..."
+                        />
+                    </Field>
+
+                    <div className="flex justify-end pt-2">
+                        <button
+                            type="submit"
+                            disabled={form.processing}
+                            className="inline-flex items-center gap-2 rounded-lg bg-red-700 px-5 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-xs hover:bg-red-800 focus:outline-hidden focus:ring-2 focus:ring-red-500/20 active:bg-red-900 transition disabled:opacity-50"
+                        >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span>{form.processing ? 'Saving Changes...' : 'Update Request Details'}</span>
+                        </button>
                     </div>
                 </form>
 
-                <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <h4 className="text-xl font-semibold text-slate-800">Edit Existing Items</h4>
+                {/* Edit Existing Items Section */}
+                <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                        <div className="flex items-center gap-2.5">
+                            <h4 className="text-lg font-bold text-slate-800">Requested Items</h4>
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
+                                {supplyRequest.items.length} {supplyRequest.items.length === 1 ? 'line' : 'lines'}
+                            </span>
+                        </div>
+                    </div>
+
                     {scheduleMismatchExistingLineCount > 0 ? (
-                        <div className="rounded-lg border border-orange-300 bg-orange-50 px-3 py-2 text-xs text-orange-900">
-                            <p className="font-semibold">{scheduleMismatchExistingLineCount} out-of-schedule PPMP line(s) detected.</p>
-                            <p>GSO may still process this SR, but early consumption will be flagged in Executive anomaly monitoring.</p>
+                        <div className="rounded-xl border border-orange-200 bg-orange-50/80 p-3.5 text-xs text-orange-900 flex items-start gap-2.5">
+                            <svg className="w-4 h-4 text-orange-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                            <div>
+                                <p className="font-semibold">{scheduleMismatchExistingLineCount} out-of-schedule PPMP line(s) detected.</p>
+                                <p className="mt-0.5 text-orange-800">GSO may still process this supply request, but early consumption will be flagged in Executive anomaly monitoring.</p>
+                            </div>
                         </div>
                     ) : null}
+
                     {supplyRequest.items.length === 0 ? (
-                        <p className="text-sm text-slate-600">No items attached yet.</p>
+                        <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center">
+                            <p className="text-sm font-medium text-slate-600">No items attached to this request yet.</p>
+                            <p className="text-xs text-slate-400 mt-1">Use the "Add Item to Request" section below to select items from your PPMP.</p>
+                        </div>
                     ) : (
                         <div className="space-y-3">
-                            {supplyRequest.items.map((item) => {
+                            {supplyRequest.items.map((item, index) => {
                                 const row = editingRows[item.supply_request_item_id];
                                 const context = optionById.get(String(row.ppmp_item_id));
                                 const unit = context?.default_unit || '-';
                                 const itemSpec = context?.item_specification || item.item_specification || item.ppmp_item?.remarks;
+
                                 return (
-                                    <div key={item.supply_request_item_id} className="rounded-xl border border-slate-200 p-4">
-                                        <div className="grid gap-3 md:grid-cols-6">
-                                            <label className="md:col-span-2">
-                                                <div className="flex items-center justify-between mb-1">
-                                                    <span className="block text-xs font-semibold uppercase tracking-wide text-slate-600">Item Snapshot</span>
-                                                    {itemSpec ? (
-                                                        <span className="inline-flex items-center rounded-md bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
-                                                            {itemSpec}
-                                                        </span>
-                                                    ) : null}
-                                                </div>
-                                                <input
-                                                    className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700"
-                                                    value={row.item_name_snapshot}
-                                                    readOnly
-                                                    aria-readonly="true"
-                                                />
-                                                <span className="mt-1 block text-xs text-slate-500">Auto-filled from the selected PPMP item.</span>
-                                            </label>
-                                             <input
-                                                 type="number"
-                                                 className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                                                 min="1"
-                                                 value={row.quantity_requested}
-                                                 onChange={(event) => setEditingRows({ ...editingRows, [item.supply_request_item_id]: { ...row, quantity_requested: Number(event.target.value) } })}
-                                             />
-                                             <input
-                                                 className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700"
-                                                 value={unit}
-                                                 readOnly
-                                                 aria-readonly="true"
-                                             />
-                                            <button
-                                                type="button"
-                                                onClick={() => updateItem(item.supply_request_item_id)}
-                                                className="rounded-lg border border-red-300 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50"
-                                            >
-                                                Update
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => removeItem(item.supply_request_item_id)}
-                                                className="rounded-lg border border-rose-300 px-3 py-2 text-xs font-semibold text-rose-700"
-                                            >
-                                                Remove
-                                            </button>
+                                    <div
+                                        key={item.supply_request_item_id}
+                                        className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs hover:border-slate-300 transition"
+                                    >
+                                        {/* Card Header: Line Badge, Item Name, Specs Badge, Schedule */}
+                                        <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                                    Line #{index + 1}
+                                                </span>
+                                                <span className="text-sm font-bold text-slate-800">
+                                                    {row.item_name_snapshot}
+                                                </span>
+                                                {itemSpec ? (
+                                                    <span className="inline-flex items-center rounded-md bg-blue-50 border border-blue-200 px-2 py-0.5 text-[11px] font-medium text-blue-700">
+                                                        {itemSpec}
+                                                    </span>
+                                                ) : null}
+                                            </div>
+
+                                            {context?.procurement_schedule ? (
+                                                <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 border border-slate-200">
+                                                    <span className="text-slate-400">Schedule:</span> {context.procurement_schedule}
+                                                </span>
+                                            ) : null}
                                         </div>
 
+                                        {/* Metadata Metrics Row */}
                                         {context ? (
-                                            <div className="mt-2 grid gap-2 text-xs text-slate-600 md:grid-cols-5">
-                                                <div>Planned: <strong>{context.planned_quantity} {context.default_unit || ''}</strong></div>
-                                                <div>Already requested: <strong>{context.requested_quantity} {context.default_unit || ''}</strong></div>
-                                                <div>Remaining before this line: <strong>{context.remaining_quantity} {context.default_unit || ''}</strong></div>
-                                                <div>Schedule: <strong>{context.procurement_schedule || '-'}</strong></div>
-                                                <div>Specification: <strong className="text-blue-700">{itemSpec || 'Standard'}</strong></div>
+                                            <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs bg-slate-50/80 rounded-lg p-3 border border-slate-100">
+                                                <div>
+                                                    <span className="block text-[11px] font-medium text-slate-400 uppercase tracking-wider">Planned</span>
+                                                    <span className="font-bold text-slate-700">{context.planned_quantity} {unit}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="block text-[11px] font-medium text-slate-400 uppercase tracking-wider">Total Requested</span>
+                                                    <span className="font-bold text-slate-700">{context.requested_quantity} {unit}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="block text-[11px] font-medium text-slate-400 uppercase tracking-wider">Remaining Pre-Request</span>
+                                                    <span className="font-bold text-emerald-700">{context.remaining_quantity} {unit}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="block text-[11px] font-medium text-slate-400 uppercase tracking-wider">Schedule</span>
+                                                    <span className="font-bold text-slate-700">{context.procurement_schedule || 'All Year'}</span>
+                                                </div>
                                             </div>
                                         ) : itemSpec ? (
                                             <div className="mt-2 text-xs text-slate-600">
@@ -311,13 +412,74 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                                             </div>
                                         ) : null}
 
+                                        {/* Schedule mismatch banner */}
                                         {context?.is_schedule_mismatch ? (
-                                            <div className="mt-2 rounded-md border border-orange-300 bg-orange-50 px-3 py-2 text-xs text-orange-900">
-                                                <p className="font-semibold">Out-of-schedule PPMP consumption detected.</p>
-                                                <p>This item is planned for {context.procurement_schedule || 'a later schedule'} but the request is being made in {context.current_quarter || 'the current quarter'}. It can proceed to GSO but will be flagged for Executive anomaly review.</p>
+                                            <div className="mt-3 rounded-lg border border-orange-200 bg-orange-50/70 p-3 text-xs text-orange-900">
+                                                <div className="flex items-center gap-2 font-semibold">
+                                                    <svg className="w-4 h-4 text-orange-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                    </svg>
+                                                    <span>Out-of-schedule PPMP consumption detected</span>
+                                                </div>
+                                                <p className="mt-1 text-orange-800">
+                                                    This item is planned for {context.procurement_schedule || 'a later schedule'} but is being requested in {context.current_quarter || 'the current quarter'}. It can proceed to GSO review but will be flagged for Executive anomaly review.
+                                                </p>
                                             </div>
                                         ) : null}
 
+                                        {/* Controls Row: Quantity Input + Update / Remove Buttons */}
+                                        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
+                                            <div className="flex items-center gap-2">
+                                                <label className="text-xs font-semibold uppercase tracking-wider text-slate-600">
+                                                    Quantity Requested:
+                                                </label>
+                                                <div className="inline-flex items-center rounded-lg border border-slate-300 bg-white shadow-2xs focus-within:border-red-500 focus-within:ring-1 focus-within:ring-red-500 overflow-hidden">
+                                                    <input
+                                                        type="number"
+                                                        min="0.01"
+                                                        step="any"
+                                                        className="w-24 border-0 px-3 py-1.5 text-sm font-semibold text-slate-800 focus:ring-0 focus:outline-hidden"
+                                                        value={row.quantity_requested}
+                                                        onChange={(event) =>
+                                                            setEditingRows({
+                                                                ...editingRows,
+                                                                [item.supply_request_item_id]: {
+                                                                    ...row,
+                                                                    quantity_requested: Number(event.target.value),
+                                                                },
+                                                            })
+                                                        }
+                                                    />
+                                                    <span className="bg-slate-50 border-l border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 select-none">
+                                                        {unit}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => updateItem(item.supply_request_item_id)}
+                                                    disabled={!row.quantity_requested || row.quantity_requested <= 0}
+                                                    className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-1.5 text-xs font-semibold shadow-2xs transition disabled:opacity-50"
+                                                >
+                                                    <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                    <span>Save Quantity</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeItem(item.supply_request_item_id)}
+                                                    className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 px-3 py-1.5 text-xs font-semibold shadow-2xs transition"
+                                                >
+                                                    <svg className="w-3.5 h-3.5 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                    </svg>
+                                                    <span>Remove</span>
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
                                 );
                             })}
@@ -325,85 +487,184 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                     )}
                 </section>
 
-                <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <h4 className="text-xl font-semibold text-slate-800">Add New Item</h4>
-                    {!hasPpmp ? <p className="text-sm font-medium text-amber-700">Select a PPMP on the header first.</p> : null}
-                    <div className="grid gap-3 md:grid-cols-5">
-                        <select
-                            className="rounded-lg border border-slate-300 px-3 py-2 text-sm md:col-span-2"
-                            value={newItem.ppmp_item_id}
-                            onChange={(event) => onNewItemOptionChange(event.target.value)}
-                            disabled={!hasPpmp}
-                        >
-                            <option value="">{hasPpmp ? 'Select PPMP Item' : 'Select PPMP first'}</option>
-                            {itemOptions.map((option) => {
-                                const specTag = option.item_specification ? ` — ${option.item_specification}` : '';
-                                return (
-                                    <option key={option.ppmp_item_id} value={option.ppmp_item_id}>
-                                        {option.item_name}{specTag} {option.procurement_schedule ? `[${option.procurement_schedule}]` : ''} (remaining: {option.remaining_quantity})
-                                    </option>
-                                );
-                            })}
-                        </select>
-                        <input
-                            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                            value={newItem.quantity_requested}
-                            onChange={(event) => setNewItem({ ...newItem, quantity_requested: event.target.value })}
-                            type="number"
-                            min="1"
-                        />
-                        <input
-                            className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700"
-                            value={newItemOption?.default_unit || '-'}
-                            readOnly
-                            aria-readonly="true"
-                        />
-                        <button type="button" onClick={addItem} disabled={!hasPpmp || newItemIsDuplicate} className="rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-60">
-                            Add Item
-                        </button>
+                {/* Add New Item Section */}
+                <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+                    <div>
+                        <h4 className="text-lg font-bold text-slate-800">Add Item to Request</h4>
+                        <p className="text-xs text-slate-500 mt-0.5">Select from approved PPMP items to attach to this supply request.</p>
                     </div>
 
-                    {newItemOption?.item_specification ? (
-                        <div className="flex items-center gap-1.5 text-xs text-blue-800 bg-blue-50/80 border border-blue-200 rounded-md px-3 py-1.5">
-                            <span className="font-semibold uppercase tracking-wider text-[11px] text-blue-700">Specification:</span>
-                            <span className="font-bold">{newItemOption.item_specification}</span>
+                    {!hasPpmp ? (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs font-medium text-amber-800">
+                            Please select an approved PPMP in the request header first before adding items.
                         </div>
-                    ) : null}
+                    ) : (
+                        <div className="space-y-4">
+                            <div className="grid gap-3 sm:grid-cols-12 items-end">
+                                <div className="sm:col-span-6 lg:col-span-7">
+                                    <label className="block">
+                                        <span className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-600">
+                                            PPMP Item <span className="text-rose-500">*</span>
+                                        </span>
+                                        <select
+                                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:border-red-500 focus:ring-1 focus:ring-red-500 bg-white"
+                                            value={newItem.ppmp_item_id}
+                                            onChange={(event) => onNewItemOptionChange(event.target.value)}
+                                            disabled={!hasPpmp}
+                                        >
+                                            <option value="">-- Choose an approved item --</option>
+                                            {itemOptions.map((option) => {
+                                                const specTag = option.item_specification ? ` — ${option.item_specification}` : '';
+                                                const scheduleTag = option.procurement_schedule ? ` [${option.procurement_schedule}]` : '';
+                                                return (
+                                                    <option key={option.ppmp_item_id} value={option.ppmp_item_id}>
+                                                        {option.item_name}{specTag}{scheduleTag} (remaining: {option.remaining_quantity})
+                                                    </option>
+                                                );
+                                            })}
+                                        </select>
+                                    </label>
+                                </div>
 
-                    {newItem.ppmp_item_id ? (
-                        <div className="text-xs text-slate-600">
-                            Remaining quantity: <strong>{optionById.get(newItem.ppmp_item_id)?.remaining_quantity ?? 0}</strong>
+                                <div className="sm:col-span-3 lg:col-span-3">
+                                    <label className="block">
+                                        <span className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-600">
+                                            Quantity <span className="text-rose-500">*</span>
+                                        </span>
+                                        <div className="inline-flex w-full items-center rounded-lg border border-slate-300 bg-white shadow-2xs focus-within:border-red-500 focus-within:ring-1 focus-within:ring-red-500 overflow-hidden">
+                                            <input
+                                                className="w-full border-0 px-3 py-2 text-xs sm:text-sm font-semibold text-slate-800 focus:ring-0 focus:outline-hidden"
+                                                value={newItem.quantity_requested}
+                                                onChange={(event) => setNewItem({ ...newItem, quantity_requested: event.target.value })}
+                                                type="number"
+                                                step="any"
+                                                min="0.01"
+                                                placeholder="Qty"
+                                            />
+                                            <span className="bg-slate-50 border-l border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 min-w-[3.5rem] text-center select-none">
+                                                {newItemOption?.default_unit || '-'}
+                                            </span>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                <div className="sm:col-span-3 lg:col-span-2">
+                                    <button
+                                        type="button"
+                                        onClick={addItem}
+                                        disabled={!hasPpmp || !newItem.ppmp_item_id || newItemIsDuplicate || Number(newItem.quantity_requested) <= 0}
+                                        className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-red-700 hover:bg-red-800 disabled:opacity-50 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-xs transition"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                                        </svg>
+                                        <span>Add Item</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Selected item preview card */}
+                            {newItemOption ? (
+                                <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-2">
+                                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-bold text-slate-800">{newItemOption.item_name}</span>
+                                            {newItemOption.item_specification ? (
+                                                <span className="inline-flex items-center rounded-md bg-blue-50 border border-blue-200 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
+                                                    {newItemOption.item_specification}
+                                                </span>
+                                            ) : null}
+                                        </div>
+                                        {newItemOption.procurement_schedule ? (
+                                            <span className="rounded-md bg-slate-200/80 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                                                Schedule: {newItemOption.procurement_schedule}
+                                            </span>
+                                        ) : null}
+                                    </div>
+
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs pt-2 border-t border-slate-200/60">
+                                        <div>
+                                            <span className="text-slate-500">Planned:</span>{' '}
+                                            <strong className="text-slate-800">{newItemOption.planned_quantity} {newItemOption.default_unit || ''}</strong>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-500">Already requested:</span>{' '}
+                                            <strong className="text-slate-800">{newItemOption.requested_quantity} {newItemOption.default_unit || ''}</strong>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-500">Remaining:</span>{' '}
+                                            <strong className="text-emerald-700">{newItemOption.remaining_quantity} {newItemOption.default_unit || ''}</strong>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-500">Est. Unit Cost:</span>{' '}
+                                            <strong className="text-slate-800">
+                                                {newItemOption.suggested_unit_cost
+                                                    ? `₱${Number(newItemOption.suggested_unit_cost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                                    : '-'}
+                                            </strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : null}
+
+                            {/* Warnings */}
+                            {newItemIsDuplicate ? (
+                                <div className="rounded-lg border border-rose-300 bg-rose-50 p-3 text-xs text-rose-900 flex items-start gap-2">
+                                    <svg className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    <div>
+                                        <p className="font-semibold">This PPMP item line is already included in this supply request.</p>
+                                        <p className="mt-0.5">Please update the existing row quantity above instead of adding a duplicate line.</p>
+                                    </div>
+                                </div>
+                            ) : null}
+
+                            {newItemOption?.is_schedule_mismatch ? (
+                                <div className="rounded-lg border border-orange-300 bg-orange-50 p-3 text-xs text-orange-900 flex items-start gap-2">
+                                    <svg className="w-4 h-4 text-orange-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    <div>
+                                        <p className="font-semibold">Out-of-schedule PPMP consumption detected.</p>
+                                        <p className="mt-0.5">
+                                            This item is planned for {newItemOption.procurement_schedule || 'a later schedule'} but is being requested in {newItemOption.current_quarter || 'the current quarter'}. It can proceed to GSO review but will be flagged in Executive anomaly monitoring.
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : null}
                         </div>
-                    ) : null}
-
-                    {newItemIsDuplicate ? (
-                        <div className="rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-xs text-rose-900">
-                            <p className="font-semibold">This PPMP item line is already included.</p>
-                            <p>Update the existing row quantity instead of adding the same PPMP line again.</p>
-                        </div>
-                    ) : null}
-
-                    {newItemOption?.is_schedule_mismatch ? (
-                        <div className="rounded-md border border-orange-300 bg-orange-50 px-3 py-2 text-xs text-orange-900">
-                            <p className="font-semibold">Out-of-schedule PPMP consumption detected.</p>
-                            <p>This item is planned for {newItemOption.procurement_schedule || 'a later schedule'} but the request is being made in {newItemOption.current_quarter || 'the current quarter'}. It can proceed to GSO but will be flagged for Executive anomaly review.</p>
-                        </div>
-                    ) : null}
-
+                    )}
                 </section>
             </div>
         </AuthenticatedLayout>
     );
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+function Field({
+    label,
+    hint,
+    required,
+    error,
+    children,
+}: {
+    label: string;
+    hint?: string;
+    required?: boolean;
+    error?: string;
+    children: ReactNode;
+}) {
     return (
         <label className="block">
-            <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-600">
+                {label} {required ? <span className="text-rose-500">*</span> : null}
+            </span>
             {children}
-            {hint ? <span className="mt-1 block text-xs text-slate-500">{hint}</span> : null}
+            {error ? (
+                <p className="mt-1 text-xs text-rose-600 font-medium">{error}</p>
+            ) : hint ? (
+                <p className="mt-1 text-xs text-slate-500">{hint}</p>
+            ) : null}
         </label>
     );
 }
-
-
