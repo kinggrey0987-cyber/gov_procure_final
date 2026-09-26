@@ -38,8 +38,19 @@ class ProcurementStatusSyncService
                 $this->transitionPurchaseOrders($supplyRequest->purchaseOrders, $actor, $remarks);
             }
 
-            $parent = $this->followUpService->resolveParentSupplyRequest($supplyRequest);
-            if ($parent instanceof SupplyRequest && (int) $parent->supply_request_id !== (int) $supplyRequest->supply_request_id) {
+            $current = $supplyRequest;
+            $visitedParentIds = [(int) $supplyRequest->supply_request_id => true];
+            while (true) {
+                $parent = $this->followUpService->resolveParentSupplyRequest($current);
+                if (! $parent instanceof SupplyRequest) {
+                    break;
+                }
+                $parentId = (int) $parent->supply_request_id;
+                if (isset($visitedParentIds[$parentId])) {
+                    break;
+                }
+                $visitedParentIds[$parentId] = true;
+
                 $parent->loadMissing([
                     'items',
                     'distributionRecords.items',
@@ -52,6 +63,8 @@ class ProcurementStatusSyncService
                     $this->transitionPurchaseRequests($parent->purchaseRequests, $actor, $remarks);
                     $this->transitionPurchaseOrders($parent->purchaseOrders, $actor, $remarks);
                 }
+
+                $current = $parent;
             }
         });
     }

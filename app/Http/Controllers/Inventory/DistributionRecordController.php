@@ -191,6 +191,10 @@ class DistributionRecordController
 
     private function releaseRowFromAvailableInventory(SupplyRequest $request): ?array
     {
+        if ($request->purchaseRequests()->exists()) {
+            return null;
+        }
+
         if (! $this->hasRemainingQuantity($request)) {
             return null;
         }
@@ -448,14 +452,36 @@ class DistributionRecordController
         $parentSr = $targetSr ? $this->followUpService->resolveParentSupplyRequest($targetSr) : null;
 
         if ($targetSr) {
+            $isProcurementBacked = $targetSr->purchaseRequests()->exists();
+            $targetSr->loadMissing('purchaseOrders.items', 'distributionRecords.items');
+
             foreach ($targetSr->items as $item) {
                 $itemId = (int) $item->item_id;
                 $requestedQuantity = (float) $item->quantity_requested;
-                $requestRemaining = max($requestedQuantity - (float) ($requestReleasedByItemId->get($itemId) ?? 0.0), 0);
+                $releasedQuantity = (float) ($requestReleasedByItemId->get($itemId) ?? 0.0);
+                $requestRemaining = max($requestedQuantity - $releasedQuantity, 0);
                 $inv = $item->item?->inventory;
                 $availableStock = (float) ($inv?->available_stock ?? 0) + (float) ($inv?->reserved_quantity ?? 0);
 
-                if ($requestRemaining > 0.0001 && $availableStock > 0.0001) {
+                $releasableStock = $availableStock;
+                if ($isProcurementBacked) {
+                    $totalOrdered = (float) $targetSr->purchaseOrders
+                        ->flatMap(fn ($po) => $po->items)
+                        ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
+                        ->sum('quantity_ordered');
+                    $inventoryPortion = max($requestedQuantity - $totalOrdered, 0.0);
+                    $totalDeliveredReleased = (float) $targetSr->distributionRecords
+                        ->whereNotNull('delivery_id')
+                        ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
+                        ->flatMap(fn ($dr) => $dr->items)
+                        ->where('item_id', $itemId)
+                        ->sum('quantity_released');
+                    $alreadyReleasedInventory = max($releasedQuantity - $totalDeliveredReleased, 0.0);
+                    $remainingInventoryPortion = max($inventoryPortion - $alreadyReleasedInventory, 0.0);
+                    $releasableStock = min($remainingInventoryPortion, $availableStock);
+                }
+
+                if ($requestRemaining > 0.0001 && $releasableStock > 0.0001) {
                     $unreleasedStockItems[] = [
                         'supply_request_id' => (int) $targetSr->supply_request_id,
                         'supply_request_item_id' => (int) $item->supply_request_item_id,
@@ -466,7 +492,7 @@ class DistributionRecordController
                         'quantity_requested' => $requestedQuantity,
                         'quantity_remaining' => $requestRemaining,
                         'available_stock' => $availableStock,
-                        'releasable_quantity' => min($requestRemaining, $availableStock),
+                        'releasable_quantity' => min($requestRemaining, $releasableStock),
                         'is_parent' => false,
                         'request_code' => (string) $targetSr->request_code,
                     ];
@@ -474,13 +500,15 @@ class DistributionRecordController
             }
 
             if (empty($unreleasedStockItems) && $parentSr instanceof SupplyRequest) {
+                $parentSr->loadMissing('items.item.inventory', 'purchaseOrders.items', 'distributionRecords.items');
                 $parentReleasedByItemId = $this->allFulfillmentDistributionRecords($parentSr)
                     ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
                     ->flatMap(fn ($record) => $record->items)
                     ->groupBy(fn ($item) => (int) $item->item_id)
                     ->map(fn ($group) => (float) $group->sum('quantity_released'));
 
-                $parentSr->loadMissing('items.item.inventory');
+                $isParentProcurementBacked = $parentSr->purchaseRequests()->exists();
+
                 foreach ($parentSr->items as $item) {
                     $itemId = (int) $item->item_id;
                     $pRequested = (float) $item->quantity_requested;
@@ -489,7 +517,25 @@ class DistributionRecordController
                     $pInv = $item->item?->inventory;
                     $availableStock = (float) ($pInv?->available_stock ?? 0) + (float) ($pInv?->reserved_quantity ?? 0);
 
-                    if ($pRemaining > 0.0001 && $availableStock > 0.0001) {
+                    $releasableStock = $availableStock;
+                    if ($isParentProcurementBacked) {
+                        $totalOrdered = (float) $parentSr->purchaseOrders
+                            ->flatMap(fn ($po) => $po->items)
+                            ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
+                            ->sum('quantity_ordered');
+                        $inventoryPortion = max($pRequested - $totalOrdered, 0.0);
+                        $totalDeliveredReleased = (float) $parentSr->distributionRecords
+                            ->whereNotNull('delivery_id')
+                            ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
+                            ->flatMap(fn ($dr) => $dr->items)
+                            ->where('item_id', $itemId)
+                            ->sum('quantity_released');
+                        $alreadyReleasedInventory = max($pReleased - $totalDeliveredReleased, 0.0);
+                        $remainingInventoryPortion = max($inventoryPortion - $alreadyReleasedInventory, 0.0);
+                        $releasableStock = min($remainingInventoryPortion, $availableStock);
+                    }
+
+                    if ($pRemaining > 0.0001 && $releasableStock > 0.0001) {
                         $unreleasedStockItems[] = [
                             'supply_request_id' => (int) $parentSr->supply_request_id,
                             'supply_request_item_id' => (int) $item->supply_request_item_id,
@@ -500,7 +546,7 @@ class DistributionRecordController
                             'quantity_requested' => $pRequested,
                             'quantity_remaining' => $pRemaining,
                             'available_stock' => $availableStock,
-                            'releasable_quantity' => min($pRemaining, $availableStock),
+                            'releasable_quantity' => min($pRemaining, $releasableStock),
                             'is_parent' => true,
                             'request_code' => (string) $parentSr->request_code,
                         ];
@@ -537,14 +583,24 @@ class DistributionRecordController
 
                         $inventoryPortion = 0.0;
                         if ($distribution_record->supplyRequest) {
-                            $distribution_record->supplyRequest->loadMissing('purchaseOrders.items');
+                            $distribution_record->supplyRequest->loadMissing('purchaseOrders.items', 'distributionRecords.items');
                             $totalOrdered = (float) $distribution_record->supplyRequest->purchaseOrders
                                 ->flatMap(fn ($po) => $po->items)
                                 ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
                                 ->sum('quantity_ordered');
                             $inventoryPortion = max($requestedQuantity - $totalOrdered, 0.0);
                         }
-                        $releasableInventory = min($inventoryPortion, $availableStock);
+
+                        $totalDeliveredReleased = (float) $distribution_record->supplyRequest?->distributionRecords
+                            ->whereNotNull('delivery_id')
+                            ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
+                            ->flatMap(fn ($dr) => $dr->items)
+                            ->where('item_id', $itemId)
+                            ->sum('quantity_released');
+                        $allReleasedForRequest = (float) ($requestReleasedByItemId->get($itemId) ?? 0.0);
+                        $alreadyReleasedInventory = max($allReleasedForRequest - $totalDeliveredReleased, 0.0);
+                        $remainingInventoryPortion = max($inventoryPortion - $alreadyReleasedInventory, 0.0);
+                        $releasableInventory = min($remainingInventoryPortion, $availableStock);
 
                         $deliveryRemaining = $deliveryRemainingByItemId !== null ? (float) ($deliveryRemainingByItemId->get($itemId) ?? 0.0) : 0.0;
                         $maxReleasable = $deliveryRemainingByItemId !== null
@@ -695,7 +751,26 @@ class DistributionRecordController
             $inv = $requestItem->item?->inventory;
             $availableStock = (float) ($inv?->available_stock ?? 0) + (float) ($inv?->reserved_quantity ?? 0);
 
-            $releasable = min($remaining, $availableStock);
+            $supplyRequest->loadMissing('purchaseOrders.items', 'distributionRecords.items');
+            $totalOrdered = (float) $supplyRequest->purchaseOrders
+                ->flatMap(fn ($po) => $po->items)
+                ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
+                ->sum('quantity_ordered');
+
+            if ($totalOrdered > 0 || $supplyRequest->purchaseRequests()->exists()) {
+                $inventoryPortion = max($requested - $totalOrdered, 0.0);
+                $totalDeliveredReleased = (float) $supplyRequest->distributionRecords
+                    ->whereNotNull('delivery_id')
+                    ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
+                    ->flatMap(fn ($dr) => $dr->items)
+                    ->where('item_id', $itemId)
+                    ->sum('quantity_released');
+                $alreadyReleasedInventory = max($released - $totalDeliveredReleased, 0.0);
+                $remainingInventoryPortion = max($inventoryPortion - $alreadyReleasedInventory, 0.0);
+                $releasable = min($remainingInventoryPortion, $availableStock);
+            } else {
+                $releasable = min($remaining, $availableStock);
+            }
             if ($releasable > 0.0001) {
                 $this->distributionService->addDistributionItem(
                     $distribution_record,

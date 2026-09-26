@@ -510,16 +510,25 @@ class DistributionRecordService
 
                 $deliveryRemaining = max((float) $acceptedFromDelivery - (float) $releasedForDelivery, 0);
 
-                $record->supplyRequest->loadMissing('purchaseOrders.items');
+                $record->supplyRequest->loadMissing('purchaseOrders.items', 'distributionRecords.items');
                 $totalOrdered = (float) $record->supplyRequest->purchaseOrders
                     ->flatMap(fn ($po) => $po->items)
                     ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
                     ->sum('quantity_ordered');
 
                 $inventoryPortion = max($requestedQuantity - $totalOrdered, 0.0);
+                $totalDeliveredReleased = (float) $record->supplyRequest->distributionRecords
+                    ->whereNotNull('delivery_id')
+                    ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
+                    ->flatMap(fn ($dr) => $dr->items)
+                    ->where('item_id', $itemId)
+                    ->sum('quantity_released');
+                $alreadyReleasedInventory = max((float) $releasedForRequest - $totalDeliveredReleased, 0.0);
+                $remainingInventoryPortion = max($inventoryPortion - $alreadyReleasedInventory, 0.0);
+
                 $inv = Inventory::query()->where('item_id', $itemId)->first();
                 $availableWarehouseStock = (float) ($inv?->available_stock ?? 0) + (float) ($inv?->reserved_quantity ?? 0);
-                $releasableInventory = min($inventoryPortion, $availableWarehouseStock);
+                $releasableInventory = min($remainingInventoryPortion, $availableWarehouseStock);
 
                 $maxReleasable = min($maxReleasable, $deliveryRemaining + $releasableInventory);
             }
@@ -591,7 +600,30 @@ class DistributionRecordService
 
                     if ($isItemInDelivery) {
                         $deliveryRemaining = (float) ($deliveryRemainingByItemId->get($itemId) ?? 0.0);
-                        $quantity = min($quantity, $deliveryRemaining);
+                        $deliveryPortion = min($requestRemaining, $deliveryRemaining);
+
+                        $record->supplyRequest->loadMissing('purchaseOrders.items', 'distributionRecords.items');
+                        $totalOrdered = (float) $record->supplyRequest->purchaseOrders
+                            ->flatMap(fn ($po) => $po->items)
+                            ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
+                            ->sum('quantity_ordered');
+                        $inventoryPortion = max($requested - $totalOrdered, 0.0);
+
+                        $totalDeliveredReleased = (float) $record->supplyRequest->distributionRecords
+                            ->whereNotNull('delivery_id')
+                            ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
+                            ->flatMap(fn ($dr) => $dr->items)
+                            ->where('item_id', $itemId)
+                            ->sum('quantity_released');
+
+                        $alreadyReleasedForRequest = (float) ($requestReleasedByItemId->get($itemId) ?? 0.0);
+                        $alreadyReleasedInventory = max($alreadyReleasedForRequest - $totalDeliveredReleased, 0.0);
+                        $remainingInventoryPortion = max($inventoryPortion - $alreadyReleasedInventory, 0.0);
+
+                        $availableWarehouseStock = max($releasableStock - $deliveryRemaining, 0.0);
+                        $releasableInventory = min($remainingInventoryPortion, $availableWarehouseStock);
+
+                        $quantity = min($requestRemaining, $deliveryPortion + $releasableInventory);
                     }
                 }
 
