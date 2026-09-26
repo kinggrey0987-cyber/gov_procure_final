@@ -26,6 +26,7 @@ class SupplyRequestController extends Controller
     public function __construct(
         private readonly SupplyRequestService $service,
         private readonly HistoryTimelineService $historyTimelineService,
+        private readonly \App\Services\Inventory\SupplyRequestFollowUpService $followUpService,
     ) {
     }
 
@@ -47,8 +48,14 @@ class SupplyRequestController extends Controller
             ->unique()
             ->values();
 
-        $supplyRequests = SupplyRequest::query()
-            ->with(['items.item.inventory', 'purchaseRequests', 'purchaseOrders', 'distributionRecords'])
+        $paginator = SupplyRequest::query()
+            ->with([
+                'items.item.inventory',
+                'purchaseRequests.sourceDelivery.purchaseOrder.supplyRequest',
+                'purchaseRequests.sourceClaim.supplyRequest',
+                'purchaseOrders',
+                'distributionRecords',
+            ])
             ->forOffice((int) $request->user()?->office_id)
             ->when($status !== '', function ($query) use ($status): void {
                 $this->applyTrackingStatusFilter($query, $status);
@@ -69,23 +76,33 @@ class SupplyRequestController extends Controller
             })
             ->orderByRaw("CASE WHEN UPPER(priority_level) = 'URGENT' THEN 0 ELSE 1 END ASC")
             ->latest('supply_request_id')
-            ->paginate(5)
-            ->through(function (SupplyRequest $supplyRequest): array {
-                $requiresProcurement = $this->requiresProcurement($supplyRequest);
-                $trackingStatus = $this->resolveTrackingStatus($supplyRequest, $requiresProcurement);
+            ->paginate(5);
 
-                return [
-                    'supply_request_id' => (int) $supplyRequest->supply_request_id,
-                    'request_code' => (string) $supplyRequest->request_code,
-                    'status' => $trackingStatus,
-                    'raw_status' => (string) $supplyRequest->status,
-                    'priority_level' => strtoupper((string) ($supplyRequest->priority_level ?? 'NORMAL')),
-                    'request_date' => optional($supplyRequest->request_date)?->toDateString(),
-                    'items_count' => (int) $supplyRequest->items->count(),
-                    'items_summary' => $supplyRequest->items->take(2)->pluck('item_name_snapshot')->implode(', '),
-                ];
-            })
-            ->withQueryString();
+        $batchFollowUp = $this->followUpService->resolveBatchContext($paginator->items());
+
+        $supplyRequests = $paginator->through(function (SupplyRequest $supplyRequest) use ($batchFollowUp): array {
+            $requiresProcurement = $this->requiresProcurement($supplyRequest);
+            $trackingStatus = $this->resolveTrackingStatus($supplyRequest, $requiresProcurement);
+
+            return [
+                'supply_request_id' => (int) $supplyRequest->supply_request_id,
+                'request_code' => (string) $supplyRequest->request_code,
+                'status' => $trackingStatus,
+                'raw_status' => (string) $supplyRequest->status,
+                'priority_level' => strtoupper((string) ($supplyRequest->priority_level ?? 'NORMAL')),
+                'request_date' => optional($supplyRequest->request_date)?->toDateString(),
+                'items_count' => (int) $supplyRequest->items->count(),
+                'items_summary' => $supplyRequest->items->take(2)->pluck('item_name_snapshot')->implode(', '),
+                'follow_up_context' => $batchFollowUp[(int) $supplyRequest->supply_request_id] ?? [
+                    'is_follow_up' => false,
+                    'type' => 'STANDARD',
+                    'label' => 'Standard Requisition',
+                    'parent' => null,
+                    'children' => [],
+                ],
+            ];
+        })
+        ->withQueryString();
 
         return Inertia::render('Office/SupplyRequests/Index', [
             'supplyRequests' => $supplyRequests,
@@ -285,6 +302,7 @@ class SupplyRequestController extends Controller
             'purpose' => (string) $supplyRequest->purpose,
             'priority_level' => (string) $supplyRequest->priority_level,
             'review_notes' => $supplyRequest->review_notes,
+            'follow_up_context' => $this->followUpService->resolveContext($supplyRequest),
             'purchase_requests' => $supplyRequest->purchaseRequests
                 ->sortByDesc('purchase_request_id')
                 ->map(fn ($purchaseRequest): array => [

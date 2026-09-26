@@ -26,6 +26,7 @@ class RequestWorkflowController
         private readonly PurchaseRequestService $purchaseRequestService,
         private readonly AlertService $alertService,
         private readonly DistributionRecordService $distributionService,
+        private readonly \App\Services\Inventory\SupplyRequestFollowUpService $followUpService,
     ) {
     }
 
@@ -133,7 +134,14 @@ class RequestWorkflowController
     private function officeSupplyRequestRows(string $search, int $officeId): Collection
     {
         $query = SupplyRequest::query()
-            ->with(['office', 'requester', 'items.item.inventory', 'purchaseRequests', 'distributionRecords.items'])
+            ->with([
+                'office',
+                'requester',
+                'items.item.inventory',
+                'purchaseRequests.sourceDelivery.purchaseOrder.supplyRequest',
+                'purchaseRequests.sourceClaim.supplyRequest',
+                'distributionRecords.items',
+            ])
             ->whereHas('office', fn ($officeQuery) => $officeQuery->where('code', '!=', 'GSO'))
             ->withCount('distributionRecords')
             ->orderByRaw("CASE WHEN UPPER(priority_level) = 'URGENT' THEN 0 ELSE 1 END ASC")
@@ -153,10 +161,15 @@ class RequestWorkflowController
         }
 
         $distributionReadyLookup = $this->distributionReadySupplyRequestLookup();
+        $supplyRequests = $query->get();
+        $batchFollowUp = $this->followUpService->resolveBatchContext($supplyRequests);
 
-        return $query
-            ->get()
-            ->map(fn (SupplyRequest $request): array => $this->officeSupplyRequestRow($request, $distributionReadyLookup));
+        return $supplyRequests
+            ->map(fn (SupplyRequest $request): array => $this->officeSupplyRequestRow(
+                $request,
+                $distributionReadyLookup,
+                $batchFollowUp[(int) $request->supply_request_id] ?? null
+            ));
     }
 
     /**
@@ -180,9 +193,10 @@ class RequestWorkflowController
 
     /**
      * @param  array<int, int>  $distributionReadyLookup
+     * @param  array<string, mixed>|null  $followUpContext
      * @return array<string, mixed>
      */
-    private function officeSupplyRequestRow(SupplyRequest $request, array $distributionReadyLookup): array
+    private function officeSupplyRequestRow(SupplyRequest $request, array $distributionReadyLookup, ?array $followUpContext = null): array
     {
         $requestedTotal = 0.0;
         $shortageTotal = 0.0;
@@ -238,6 +252,13 @@ class RequestWorkflowController
             'has_distribution_candidate' => isset($distributionReadyLookup[(int) $request->supply_request_id]) || $canCreateInventoryDistribution,
             'distribution_records_count' => $distributionRecordsCount,
             'workflow_bucket' => $this->workflowBucket($hasPurchaseRequest, $stockAssessment, $canCreateInventoryDistribution, (string) $request->status),
+            'follow_up_context' => $followUpContext ?? [
+                'is_follow_up' => false,
+                'type' => 'STANDARD',
+                'label' => 'Standard Requisition',
+                'parent' => null,
+                'children' => [],
+            ],
         ];
     }
 
@@ -370,6 +391,7 @@ class RequestWorkflowController
                 'purchase_request_count' => $supplyRequest->purchaseRequests->count(),
                 'distribution_records_count' => $supplyRequest->distributionRecords->count(),
                 'items' => $items,
+                'follow_up_context' => $this->followUpService->resolveContext($supplyRequest),
             ],
             'backFilters' => [
                 'q' => trim((string) $request->query('q', '')),

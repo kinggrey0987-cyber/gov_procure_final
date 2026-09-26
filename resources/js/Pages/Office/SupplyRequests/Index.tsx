@@ -6,6 +6,14 @@ import useDebouncedValue from '@/hooks/useDebouncedValue';
 import { Head, Link, router } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+type FollowUpContext = {
+    is_follow_up: boolean;
+    type: string;
+    label: string;
+    parent?: { supply_request_id: number; request_code: string } | null;
+    children?: Array<{ supply_request_id: number; request_code: string; status: string; reason?: string }>;
+};
+
 type RequestRow = {
     supply_request_id: number;
     request_code: string;
@@ -14,6 +22,7 @@ type RequestRow = {
     priority_level?: string;
     request_date?: string | null;
     items_count?: number;
+    follow_up_context?: FollowUpContext | null;
 };
 
 type Props = {
@@ -234,7 +243,25 @@ export default function SupplyRequestsIndex({ supplyRequests, filters, filter_op
                                         return (
                                             <tr key={row.supply_request_id} className={`hover:bg-slate-50/60 transition-colors ${isUrgent ? 'border-l-4 border-l-red-600 bg-red-50/20' : ''}`}>
                                                 <td className="px-3.5 py-2 font-semibold text-red-700">
-                                                    <span>{row.request_code}</span>
+                                                    <div className="flex flex-col">
+                                                        <span>{row.request_code}</span>
+                                                        {row.follow_up_context?.is_follow_up && row.follow_up_context.parent && (
+                                                            <span className="mt-0.5 inline-flex w-fit items-center gap-1 rounded bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[10px] font-bold text-amber-900 shadow-2xs">
+                                                                <svg className="h-3 w-3 shrink-0 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                                </svg>
+                                                                Follow-up of {row.follow_up_context.parent.request_code}
+                                                            </span>
+                                                        )}
+                                                        {!row.follow_up_context?.is_follow_up && (row.follow_up_context?.children?.length ?? 0) > 0 && (
+                                                            <span className="mt-0.5 inline-flex w-fit items-center gap-1 rounded bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-[10px] font-bold text-blue-900 shadow-2xs">
+                                                                <svg className="h-3 w-3 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                </svg>
+                                                                Has Follow-Up ({row.follow_up_context!.children!.length} batch{(row.follow_up_context!.children!.length ?? 0) === 1 ? '' : 'es'})
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </td>
                                             <td className="px-3.5 py-2">
                                                 {isUrgent ? (

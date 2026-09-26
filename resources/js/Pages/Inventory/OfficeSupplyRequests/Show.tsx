@@ -28,6 +28,13 @@ type Props = {
             available_stock: number;
             shortage: number;
         }>;
+        follow_up_context?: {
+            is_follow_up: boolean;
+            type: string;
+            label: string;
+            parent?: { supply_request_id: number; request_code: string } | null;
+            children?: Array<{ supply_request_id: number; request_code: string; status: string; reason?: string }>;
+        } | null;
     };
     backFilters?: {
         q?: string;
@@ -79,6 +86,87 @@ export default function InventoryOfficeSupplyRequestShow({ request, backFilters 
                             </div>
                         </div>
                     )}
+                    {request.follow_up_context?.parent && (
+                        <div className="mb-4 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-amber-300 bg-amber-50/90 p-4 text-amber-950 shadow-xs">
+                            <div className="flex items-center gap-3.5">
+                                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white shadow">
+                                    <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                </span>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h4 className="text-sm font-extrabold uppercase tracking-wide text-amber-900">
+                                            Follow-Up Requisition (Discrepancy / Replacement)
+                                        </h4>
+                                        <span className="rounded bg-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-900">
+                                            {request.follow_up_context.label}
+                                        </span>
+                                    </div>
+                                    <p className="mt-0.5 text-xs text-amber-800">
+                                        This supply request was auto-generated to replenish deficit items from parent requisition{' '}
+                                        <span className="font-bold">{request.follow_up_context.parent.request_code}</span>.
+                                        Distributions released from this request fulfill the remaining quantity of the parent requisition.
+                                    </p>
+                                </div>
+                            </div>
+                            <Link
+                                href={route('inventory.office-supply-requests.show', request.follow_up_context.parent.supply_request_id)}
+                                className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-xs font-bold text-amber-900 shadow-2xs hover:bg-amber-100/50"
+                            >
+                                <span>View Parent ({request.follow_up_context.parent.request_code})</span>
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                            </Link>
+                        </div>
+                    )}
+
+                    {request.follow_up_context?.children && request.follow_up_context.children.length > 0 && (
+                        <div className="mb-4 rounded-xl border border-blue-300 bg-blue-50/90 p-4 text-blue-950 shadow-xs">
+                            <div className="flex flex-wrap items-start justify-between gap-4">
+                                <div className="flex items-start gap-3.5">
+                                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white shadow">
+                                        <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    </span>
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <h4 className="text-sm font-extrabold uppercase tracking-wide text-blue-900">
+                                                Linked Follow-Up Requisitions
+                                            </h4>
+                                            <span className="rounded bg-blue-200 px-2 py-0.5 text-[10px] font-bold text-blue-900">
+                                                {request.follow_up_context.children.length} Batch{request.follow_up_context.children.length === 1 ? '' : 'es'}
+                                            </span>
+                                        </div>
+                                        <p className="mt-0.5 text-xs text-blue-800">
+                                            Delivery discrepancies resulted in follow-up replenishment requisition(s).
+                                            Once distributions for all batches are released and received, this parent requisition will automatically reflect 100% full fulfillment.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-2 border-t border-blue-200/70 pt-3">
+                                {request.follow_up_context.children.map((child) => (
+                                    <Link
+                                        key={child.supply_request_id}
+                                        href={route('inventory.office-supply-requests.show', child.supply_request_id)}
+                                        className="inline-flex items-center gap-2 rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-xs font-semibold text-blue-900 shadow-2xs hover:bg-blue-100/50"
+                                    >
+                                        <span>{child.request_code}</span>
+                                        <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
+                                            {child.status.replaceAll('_', ' ')}
+                                        </span>
+                                        <svg className="h-3.5 w-3.5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                                        </svg>
+                                    </Link>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     <p className="font-mono text-sm text-slate-700">{request.request_code}</p>
                     <div className="mt-3 grid gap-3 text-sm text-slate-700 md:grid-cols-2 lg:grid-cols-3">
                         <p><span className="font-semibold">Status:</span> {request.status}</p>

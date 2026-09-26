@@ -34,6 +34,13 @@ type RequestRow = {
     has_distribution_candidate: boolean;
     distribution_records_count: number;
     workflow_bucket: 'READY_FOR_DISTRIBUTION' | 'QUEUED_FOR_PROCUREMENT' | 'UNDER_VALIDATION' | 'STOCK_READY_AWAITING_RELEASE_CONTEXT';
+    follow_up_context?: {
+        is_follow_up: boolean;
+        type: string;
+        label: string;
+        parent?: { supply_request_id: number; request_code: string } | null;
+        children?: Array<{ supply_request_id: number; request_code: string; status: string; reason?: string }>;
+    } | null;
 };
 
 type Props = {
@@ -609,6 +616,26 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
                                                     </span>
                                                 )}
                                             </div>
+                                            {request.follow_up_context?.is_follow_up && request.follow_up_context.parent && (
+                                                <div className="mt-1">
+                                                    <span className="inline-flex items-center gap-1 rounded bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[10px] font-bold text-amber-900 shadow-2xs">
+                                                        <svg className="h-3 w-3 shrink-0 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                        </svg>
+                                                        Follow-up of {request.follow_up_context.parent.request_code}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            {!request.follow_up_context?.is_follow_up && (request.follow_up_context?.children?.length ?? 0) > 0 && (
+                                                <div className="mt-1">
+                                                    <span className="inline-flex items-center gap-1 rounded bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-[10px] font-bold text-blue-900 shadow-2xs">
+                                                        <svg className="h-3 w-3 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                        </svg>
+                                                        Has Follow-Up ({request.follow_up_context!.children!.length} batch{(request.follow_up_context!.children!.length ?? 0) === 1 ? '' : 'es'})
+                                                    </span>
+                                                </div>
+                                            )}
                                             <p className="mt-1 text-xs text-slate-500">
                                                 {request.item_count} item(s) • {request.requested_total.toFixed(2)} requested
                                             </p>
