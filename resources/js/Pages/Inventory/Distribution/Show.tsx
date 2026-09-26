@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import ConfirmationModal from '@/Components/ConfirmationModal';
 import { humanizeEnum } from '@/lib/displayLabels';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
@@ -87,20 +88,35 @@ export default function DistributionShow({ record, unreleased_stock_items = [] }
     const canFileClaim = isOfficeUser && record.status === 'RECEIVED' && !record.is_claim_expired;
     const [activeTab, setActiveTab] = useState<'overview' | 'items' | 'status' | 'related' | 'notes'>('overview');
     const [isReleasingAll, setIsReleasingAll] = useState(false);
+    const [showReleaseAllModal, setShowReleaseAllModal] = useState(false);
+    const [showConfirmReceiptModal, setShowConfirmReceiptModal] = useState(false);
+    const [isConfirmingReceipt, setIsConfirmingReceipt] = useState(false);
     const isDeliveryBackedRelease = record.delivery !== null && record.delivery !== undefined;
     const releaseSource = isDeliveryBackedRelease ? 'Verified Delivery' : 'Available Inventory';
     const sourceReference = isDeliveryBackedRelease ? record.delivery?.delivery_code ?? 'Verified delivery' : 'Current inventory balance';
     const releaseDate = record.release_date ? formatDate(record.release_date) : (record.status === 'DRAFT' ? 'Pending item release' : 'Not recorded');
 
-    const handleReleaseAllStock = () => {
-        const totalUnits = unreleased_stock_items.reduce((sum, i) => sum + i.releasable_quantity, 0);
-        if (!confirm(`Are you sure you want to add all available warehouse stock (${totalUnits.toFixed(2)} units across ${unreleased_stock_items.length} item(s)) into this distribution release?`)) {
-            return;
-        }
+    const totalStockUnits = unreleased_stock_items.reduce((sum, i) => sum + i.releasable_quantity, 0);
+
+    const handleConfirmReleaseAllStock = () => {
         setIsReleasingAll(true);
         router.post(route('inventory.distribution-records.release-available-stock', record.distribution_record_id), {}, {
             preserveScroll: true,
-            onFinish: () => setIsReleasingAll(false),
+            onFinish: () => {
+                setIsReleasingAll(false);
+                setShowReleaseAllModal(false);
+            },
+        });
+    };
+
+    const handleConfirmReceipt = () => {
+        setIsConfirmingReceipt(true);
+        router.post(route('office.distribution-records.receive', record.distribution_record_id), {}, {
+            preserveScroll: true,
+            onFinish: () => {
+                setIsConfirmingReceipt(false);
+                setShowConfirmReceiptModal(false);
+            },
         });
     };
 
@@ -193,7 +209,7 @@ export default function DistributionShow({ record, unreleased_stock_items = [] }
                                     ) : record.status !== 'RECEIVED' ? (
                                         <button
                                             type="button"
-                                            onClick={handleReleaseAllStock}
+                                            onClick={() => setShowReleaseAllModal(true)}
                                             disabled={isReleasingAll}
                                             className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50 transition"
                                         >
@@ -284,18 +300,15 @@ export default function DistributionShow({ record, unreleased_stock_items = [] }
                                     type="button"
                                     onClick={() => {
                                         if (unreleased_stock_items.length > 0) {
-                                            const itemsList = unreleased_stock_items.map(i => `${i.item_name}: ${i.releasable_quantity.toFixed(2)} ${i.unit}`).join(', ');
-                                            if (!confirm(`Attention: There are still unreleased items with available warehouse stock for this request (${itemsList}). Acknowledging receipt now will only cover the items currently released. Do you want to proceed?`)) {
-                                                return;
-                                            }
+                                            setShowConfirmReceiptModal(true);
+                                        } else {
+                                            handleConfirmReceipt();
                                         }
-                                        router.post(route('office.distribution-records.receive', record.distribution_record_id), {}, {
-                                            preserveScroll: true,
-                                        });
                                     }}
-                                    className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                                    disabled={isConfirmingReceipt}
+                                    className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                                 >
-                                    Confirm Received
+                                    {isConfirmingReceipt ? 'Confirming...' : 'Confirm Received'}
                                 </button>
                             ) : null}
                         </div>
@@ -485,6 +498,64 @@ export default function DistributionShow({ record, unreleased_stock_items = [] }
                     </section>
                 ) : null}
             </div>
+
+            <ConfirmationModal
+                show={showReleaseAllModal}
+                title="Add Available Stock to Distribution"
+                message={
+                    <div className="space-y-3">
+                        <p className="text-slate-600">
+                            Are you sure you want to add all available warehouse stock (
+                            <strong className="font-semibold text-slate-900">
+                                {totalStockUnits.toFixed(2)} units across {unreleased_stock_items.length} item(s)
+                            </strong>
+                            ) into this distribution release?
+                        </p>
+                        <div className="max-h-52 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-3">
+                            <ul className="divide-y divide-slate-200 text-xs">
+                                {unreleased_stock_items.map((item) => (
+                                    <li key={item.item_id} className="flex items-center justify-between py-1.5">
+                                        <span className="font-medium text-slate-800">{item.item_name}</span>
+                                        <span className="font-semibold text-slate-600">
+                                            {item.releasable_quantity.toFixed(2)} {item.unit}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+                }
+                confirmText="Add Stock to Release"
+                cancelText="Cancel"
+                variant="primary"
+                processing={isReleasingAll}
+                onConfirm={handleConfirmReleaseAllStock}
+                onClose={() => {
+                    if (!isReleasingAll) setShowReleaseAllModal(false);
+                }}
+            />
+
+            <ConfirmationModal
+                show={showConfirmReceiptModal}
+                title="Confirm Receipt of Distribution"
+                message={
+                    <p className="text-slate-600">
+                        Attention: There are still unreleased items with available warehouse stock for this request (
+                        <strong className="font-semibold text-slate-900">
+                            {unreleased_stock_items.map((i) => `${i.item_name}: ${i.releasable_quantity.toFixed(2)} ${i.unit}`).join(', ')}
+                        </strong>
+                        ). Acknowledging receipt now will only cover the items currently released. Do you want to proceed?
+                    </p>
+                }
+                confirmText="Confirm Receipt"
+                cancelText="Cancel"
+                variant="warning"
+                processing={isConfirmingReceipt}
+                onConfirm={handleConfirmReceipt}
+                onClose={() => {
+                    if (!isConfirmingReceipt) setShowConfirmReceiptModal(false);
+                }}
+            />
         </AuthenticatedLayout>
     );
 }
