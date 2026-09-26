@@ -15,6 +15,8 @@ type Option = {
     ppmp_item_id: number;
     ppmp_id: number;
     item_id: number;
+    item_category_id?: number;
+    category_name?: string;
     item_name: string;
     item_specification?: string | null;
     default_unit?: string | null;
@@ -37,22 +39,29 @@ type RequestItemDraft = {
     quantity_requested: string;
 };
 
+type CategoryOption = {
+    item_category_id: number;
+    category_name: string;
+};
+
 type Props = {
     ppmpOptions: PpmpOption[];
     selectedPpmpId: number | null;
     ppmpItemOptions: Option[];
     requestDate: string;
+    categories?: CategoryOption[];
 };
 
-export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpItemOptions: initialOptions, requestDate }: Props) {
+export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpItemOptions: initialOptions, requestDate, categories = [] }: Props) {
     const [itemOptions, setItemOptions] = useState<Option[]>(initialOptions);
     const [loadingOptions, setLoadingOptions] = useState(false);
     const today = todayInputValue();
 
     const form = useForm({
         ppmp_id: selectedPpmpId ? String(selectedPpmpId) : '',
+        item_category_id: '',
         needed_by_date: today,
-        request_category: 'GENERAL',
+        request_category: '',
         purpose: '',
         priority_level: 'NORMAL',
         review_notes: '',
@@ -63,6 +72,26 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
     const fetchedItemsForPpmpRef = useRef<string | null>(initialOptions.length > 0 && selectedPpmpId ? String(selectedPpmpId) : null);
 
     const hasPpmp = form.data.ppmp_id !== '';
+    const hasCategory = form.data.item_category_id !== '';
+
+    const handleCategoryChange = (categoryId: string) => {
+        const cat = categories.find((c) => String(c.item_category_id) === categoryId);
+        form.setData((prev) => ({
+            ...prev,
+            item_category_id: categoryId,
+            request_category: cat ? cat.category_name : '',
+            items: [emptyItem()], // reset lines when switching category to ensure strict category purity
+        }));
+    };
+
+    const filteredItemOptions = useMemo(() => {
+        if (!form.data.item_category_id) {
+            return itemOptions;
+        }
+        const selectedCatId = Number(form.data.item_category_id);
+        return itemOptions.filter((opt) => !opt.item_category_id || opt.item_category_id === selectedCatId);
+    }, [itemOptions, form.data.item_category_id]);
+
     const neededByDateError = useMemo(() => {
         if (form.data.needed_by_date.trim() === '') {
             return '';
@@ -76,15 +105,15 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
     const isFormComplete = useMemo(() => {
         return Boolean(
             form.data.ppmp_id.trim() !== ''
+            && form.data.item_category_id.trim() !== ''
             && form.data.needed_by_date.trim() !== ''
             && neededByDateError === ''
-            && form.data.request_category.trim() !== ''
             && form.data.priority_level.trim() !== ''
             && form.data.purpose.trim() !== ''
             && form.data.items.length > 0
             && form.data.items.every((item) => item.ppmp_item_id.trim() !== '' && Number(item.quantity_requested) > 0),
         );
-    }, [form.data.items, form.data.needed_by_date, form.data.ppmp_id, form.data.priority_level, form.data.purpose, form.data.request_category, neededByDateError]);
+    }, [form.data.items, form.data.needed_by_date, form.data.ppmp_id, form.data.item_category_id, form.data.priority_level, form.data.purpose, neededByDateError]);
 
     const totalRequestedItems = useMemo(() => {
         return form.data.items.reduce((sum, item) => {
@@ -273,10 +302,10 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                         </div>
                     </div>
 
-                    {/* Source PPMP Box */}
-                    <div className="mb-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+                    {/* Source PPMP & Commodity Category Box */}
+                    <div className="mb-2 grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5">
                         <label className="block">
-                            <span className="mb-1 block text-xs font-medium text-slate-700">Source PPMP</span>
+                            <span className="mb-1 block text-xs font-semibold text-slate-700">1. Source PPMP <span className="text-rose-500">*</span></span>
                             <select
                                 className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium"
                                 value={form.data.ppmp_id}
@@ -290,15 +319,36 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                     </option>
                                 ))}
                             </select>
-                            <p className="mt-0.5 text-[10px] text-slate-500">Only approved PPMPs for the active fiscal year can be used as the basis for a supply request.</p>
+                            <p className="mt-0.5 text-[10px] text-slate-500">Only approved PPMPs for active fiscal year can be selected.</p>
                         </label>
+
+                        <label className="block">
+                            <span className="mb-1 block text-xs font-semibold text-slate-700">2. Requisition Category <span className="text-rose-500">*</span></span>
+                            <select
+                                className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium"
+                                value={form.data.item_category_id}
+                                onChange={(event) => handleCategoryChange(event.target.value)}
+                                required
+                            >
+                                <option value="">-- Choose Commodity Category --</option>
+                                {categories.map((cat) => (
+                                    <option key={cat.item_category_id} value={cat.item_category_id}>
+                                        {cat.category_name}
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="mt-0.5 text-[10px] text-slate-500">Request lines will be strictly filtered to items matching this category for unified delivery.</p>
+                        </label>
+
                         {ppmpOptions.length === 0 ? (
-                            <p className="mt-1 text-[11px] font-medium text-amber-700">No approved PPMP found for the active fiscal year. Your office must have an approved PPMP before submitting supply requests.</p>
+                            <div className="col-span-full">
+                                <p className="mt-1 text-[11px] font-medium text-amber-700">No approved PPMP found for the active fiscal year. Your office must have an approved PPMP before submitting supply requests.</p>
+                            </div>
                         ) : null}
                     </div>
 
-                    {/* Compact 4-column row for dates & categories */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {/* Compact 3-column row for dates & priority */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                         <label className="block">
                             <span className="mb-0.5 block text-xs font-medium text-slate-700">Request Date</span>
                             <input
@@ -312,7 +362,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                         </label>
 
                         <label className="block">
-                            <span className="mb-0.5 block text-xs font-medium text-slate-700">Needed By Date</span>
+                            <span className="mb-0.5 block text-xs font-medium text-slate-700">Needed By Date <span className="text-rose-500">*</span></span>
                             <input
                                 type="date"
                                 className="w-full rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium"
@@ -330,22 +380,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                         </label>
 
                         <label className="block">
-                            <span className="mb-0.5 block text-xs font-medium text-slate-700">Request Category</span>
-                            <select
-                                className="w-full rounded-lg border border-slate-300 px-2.5 py-1 text-xs"
-                                value={form.data.request_category}
-                                onChange={(event) => form.setData('request_category', event.target.value)}
-                                required
-                            >
-                                <option value="GENERAL">General</option>
-                                <option value="OFFICE_SUPPLIES">Office Supplies</option>
-                                <option value="IT_EQUIPMENT">IT Equipment</option>
-                                <option value="FACILITY">Facility</option>
-                            </select>
-                        </label>
-
-                        <label className="block">
-                            <span className="mb-0.5 block text-xs font-medium text-slate-700">Priority Level</span>
+                            <span className="mb-0.5 block text-xs font-medium text-slate-700">Priority Level <span className="text-rose-500">*</span></span>
                             <select
                                 className="w-full rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium"
                                 value={form.data.priority_level}
@@ -398,7 +433,7 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                         <button
                             type="button"
                             onClick={addItem}
-                            disabled={!hasPpmp}
+                            disabled={!hasPpmp || !hasCategory}
                             className="inline-flex items-center gap-1 rounded-lg border border-red-300 px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 transition shadow-xs"
                         >
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -409,6 +444,11 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                     </div>
 
                     {loadingOptions ? <p className="mb-1 text-xs text-slate-500">Loading approved PPMP items...</p> : null}
+                    {!hasCategory && hasPpmp ? (
+                        <div className="mb-2 rounded-lg border border-blue-200 bg-blue-50/80 px-3 py-2 text-xs text-blue-900 font-medium">
+                            ℹ️ Please select a <strong>Requisition Category</strong> above to filter approved PPMP items for this request.
+                        </div>
+                    ) : null}
 
                     {scheduleMismatchLineCount > 0 ? (
                         <div className="mb-1.5 shrink-0 rounded-md border border-orange-300 bg-orange-50 px-2.5 py-1 text-[11px] text-orange-900">
@@ -483,11 +523,19 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                                 value={item.ppmp_item_id}
                                                 onChange={(event) => handleOptionChange(index, event.target.value)}
                                                 className="w-full rounded-lg border border-slate-300 px-2.5 py-1 text-xs"
-                                                disabled={!hasPpmp || loadingOptions}
+                                                disabled={!hasPpmp || !hasCategory || loadingOptions}
                                                 required
                                             >
-                                                <option value="">{hasPpmp ? 'Select PPMP item' : 'Select PPMP first'}</option>
-                                                {itemOptions.map((entry) => {
+                                                <option value="">
+                                                    {!hasPpmp
+                                                        ? 'Select PPMP first'
+                                                        : !hasCategory
+                                                        ? 'Select Requisition Category above first'
+                                                        : filteredItemOptions.length === 0
+                                                        ? `No items found under "${form.data.request_category}" in chosen PPMP`
+                                                        : `Select PPMP item (${filteredItemOptions.length} available under ${form.data.request_category})`}
+                                                </option>
+                                                {filteredItemOptions.map((entry) => {
                                                     const isExhausted = Number(entry.remaining_quantity) <= 0;
                                                     const isOutSchedule = Boolean(entry.is_schedule_mismatch);
 

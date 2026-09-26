@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Procurement;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Procurement\StoreSupplierRequest;
 use App\Http\Requests\Procurement\UpdateSupplierRequest;
+use App\Models\ItemCategory;
 use App\Models\Supplier;
 use App\Services\Procurement\SupplierService;
 use Illuminate\Http\RedirectResponse;
@@ -23,7 +24,7 @@ class SupplierController extends Controller
         abort_unless($request->user()?->can('procurement.supplier.view-any'), 403);
 
         $suppliers = Supplier::query()
-            ->with(['purchaseOrders.items.item.category'])
+            ->with(['categories', 'purchaseOrders.items.item.category'])
             ->withCount('purchaseOrders')
             ->latest('supplier_id')
             ->paginate(5)
@@ -56,7 +57,14 @@ class SupplierController extends Controller
     {
         abort_unless($request->user()?->can('procurement.supplier.create'), 403);
 
-        return Inertia::render('Procurement/Suppliers/Create');
+        $categories = ItemCategory::query()
+            ->where('status', 'ACTIVE')
+            ->orderBy('category_name')
+            ->get(['item_category_id', 'category_name']);
+
+        return Inertia::render('Procurement/Suppliers/Create', [
+            'categories' => $categories,
+        ]);
     }
 
     public function store(StoreSupplierRequest $request): RedirectResponse
@@ -73,6 +81,8 @@ class SupplierController extends Controller
     {
         abort_unless($request->user()?->can('procurement.supplier.view', $supplier), 403);
 
+        $supplier->load(['categories', 'purchaseOrders.items.item.category']);
+
         return Inertia::render('Procurement/Suppliers/Show', [
             'supplier' => $supplier,
             'permissions' => [
@@ -85,8 +95,16 @@ class SupplierController extends Controller
     {
         abort_unless($request->user()?->can('procurement.supplier.update', $supplier), 403);
 
+        $categories = ItemCategory::query()
+            ->where('status', 'ACTIVE')
+            ->orderBy('category_name')
+            ->get(['item_category_id', 'category_name']);
+
+        $supplier->load('categories');
+
         return Inertia::render('Procurement/Suppliers/Edit', [
             'supplier' => $supplier,
+            'categories' => $categories,
         ]);
     }
 

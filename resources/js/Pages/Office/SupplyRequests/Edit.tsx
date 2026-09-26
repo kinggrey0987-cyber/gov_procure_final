@@ -37,11 +37,18 @@ type ExistingItem = {
     ppmp_item?: { remarks?: string | null } | null;
 };
 
+type CategoryOption = {
+    item_category_id: number;
+    category_name: string;
+};
+
 type Props = {
     supplyRequest: {
         supply_request_id: number;
         request_code?: string;
         ppmp_id?: number | null;
+        item_category_id?: number | null;
+        category?: CategoryOption | null;
         request_date: string;
         needed_by_date: string;
         request_category: string;
@@ -53,16 +60,18 @@ type Props = {
     ppmpOptions: PpmpOption[];
     selectedPpmpId: number | null;
     ppmpItemOptions: Option[];
+    categories?: CategoryOption[];
 };
 
-export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selectedPpmpId, ppmpItemOptions: initialOptions }: Props) {
+export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selectedPpmpId, ppmpItemOptions: initialOptions, categories = [] }: Props) {
     const [itemOptions, setItemOptions] = useState<Option[]>(initialOptions);
 
     const form = useForm({
         ppmp_id: selectedPpmpId ? String(selectedPpmpId) : '',
+        item_category_id: supplyRequest.item_category_id ? String(supplyRequest.item_category_id) : '',
         request_date: dateInputValue(supplyRequest.request_date),
         needed_by_date: dateInputValue(supplyRequest.needed_by_date),
-        request_category: supplyRequest.request_category,
+        request_category: supplyRequest.category?.category_name ?? supplyRequest.request_category,
         purpose: supplyRequest.purpose,
         priority_level: supplyRequest.priority_level,
         review_notes: supplyRequest.review_notes ?? '',
@@ -257,17 +266,31 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                         <Field label="Request Category" required error={form.errors.request_category}>
                             <select
                                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-red-500 focus:ring-1 focus:ring-red-500 bg-white"
-                                value={form.data.request_category}
-                                onChange={(event) => form.setData('request_category', event.target.value)}
+                                value={form.data.item_category_id || form.data.request_category}
+                                onChange={(event) => {
+                                    const val = event.target.value;
+                                    const cat = categories.find((c) => String(c.item_category_id) === val);
+                                    if (cat) {
+                                        form.setData((prev) => ({
+                                            ...prev,
+                                            item_category_id: String(cat.item_category_id),
+                                            request_category: cat.category_name,
+                                        }));
+                                    } else {
+                                        form.setData('request_category', val);
+                                    }
+                                }}
                                 required
                             >
-                                <option value="GENERAL">General</option>
-                                <option value="OFFICE_SUPPLIES">Office Supplies</option>
-                                <option value="IT_EQUIPMENT">IT Equipment</option>
-                                <option value="FACILITY">Facility</option>
-                                {!['GENERAL', 'OFFICE_SUPPLIES', 'IT_EQUIPMENT', 'FACILITY'].includes(form.data.request_category) && form.data.request_category ? (
+                                <option value="">Select Category</option>
+                                {categories.map((cat) => (
+                                    <option key={cat.item_category_id} value={cat.item_category_id}>
+                                        {cat.category_name}
+                                    </option>
+                                ))}
+                                {categories.length === 0 && form.data.request_category && (
                                     <option value={form.data.request_category}>{form.data.request_category}</option>
-                                ) : null}
+                                )}
                             </select>
                         </Field>
 

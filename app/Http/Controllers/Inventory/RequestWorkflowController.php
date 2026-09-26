@@ -342,6 +342,8 @@ class RequestWorkflowController
             abort(404);
         }
 
+        $supplyRequest->loadMissing(['category']);
+
         $allDistributions = $this->allFulfillmentDistributionRecords($supplyRequest)
             ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED']);
         $releasedByItemId = $allDistributions
@@ -397,6 +399,8 @@ class RequestWorkflowController
                 'purpose' => (string) $supplyRequest->purpose,
                 'needed_by_date' => optional($supplyRequest->needed_by_date)?->toDateString(),
                 'request_date' => optional($supplyRequest->request_date)?->toDateString(),
+                'item_category_id' => $supplyRequest->item_category_id ? (int) $supplyRequest->item_category_id : null,
+                'category_name' => (string) ($supplyRequest->category?->category_name ?? $supplyRequest->request_category ?? ''),
                 'office' => $supplyRequest->office ? [
                     'id' => (int) $supplyRequest->office->id,
                     'name' => (string) $supplyRequest->office->name,

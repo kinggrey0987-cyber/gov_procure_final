@@ -9,6 +9,10 @@ type Supplier = {
     phone: string | null;
     address: string | null;
     status: string;
+    categories?: Array<{
+        item_category_id: number;
+        category_name: string;
+    }>;
 };
 
 type Props = {
@@ -40,6 +44,24 @@ export default function SuppliersShow({ supplier, permissions }: Props) {
                             <Info label="Phone" value={supplier.phone ?? '-'} />
                             <Info label="Address" value={supplier.address ?? '-'} />
                         </dl>
+
+                        <div className="mt-4 pt-4 border-t border-slate-100">
+                            <dt className="text-xs uppercase tracking-wide text-slate-500 mb-2">Accredited Commodity Categories</dt>
+                            {supplier.categories && supplier.categories.length > 0 ? (
+                                <div className="flex flex-wrap gap-2">
+                                    {supplier.categories.map((cat) => (
+                                        <span
+                                            key={cat.item_category_id}
+                                            className="inline-flex items-center rounded-lg border border-red-200 bg-red-50/60 px-3 py-1 text-xs font-semibold text-red-800"
+                                        >
+                                            {cat.category_name}
+                                        </span>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-xs text-slate-500 italic">No specific commodity categories accredited yet. This vendor can be selected for any unconstrained purchases.</p>
+                            )}
+                        </div>
                     </section>
 
                     <div className="flex flex-wrap gap-3">

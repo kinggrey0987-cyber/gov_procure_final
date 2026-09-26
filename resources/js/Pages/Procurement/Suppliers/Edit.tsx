@@ -3,6 +3,11 @@ import InputError from '@/Components/InputError';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEvent } from 'react';
 
+type CategoryOption = {
+    item_category_id: number;
+    category_name: string;
+};
+
 type Supplier = {
     supplier_id: number;
     supplier_name: string;
@@ -11,13 +16,15 @@ type Supplier = {
     phone: string | null;
     address: string | null;
     status: string;
+    categories?: CategoryOption[];
 };
 
 type Props = {
     supplier: Supplier;
+    categories?: CategoryOption[];
 };
 
-export default function SuppliersEdit({ supplier }: Props) {
+export default function SuppliersEdit({ supplier, categories = [] }: Props) {
     const form = useForm({
         supplier_name: supplier.supplier_name,
         contact_person: supplier.contact_person ?? '',
@@ -25,7 +32,17 @@ export default function SuppliersEdit({ supplier }: Props) {
         phone: supplier.phone ?? '',
         address: supplier.address ?? '',
         status: supplier.status,
+        category_ids: (supplier.categories ?? []).map((c) => c.item_category_id),
     });
+
+    const toggleCategory = (categoryId: number) => {
+        const current = form.data.category_ids;
+        if (current.includes(categoryId)) {
+            form.setData('category_ids', current.filter((id) => id !== categoryId));
+        } else {
+            form.setData('category_ids', [...current, categoryId]);
+        }
+    };
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
@@ -107,6 +124,38 @@ export default function SuppliersEdit({ supplier }: Props) {
                                     rows={3}
                                 />
                                 <InputError message={form.errors.address} className="mt-1" />
+                            </div>
+
+                            <div className="md:col-span-2">
+                                <label className="mb-1 block text-sm font-medium text-slate-700">Accredited Item Categories</label>
+                                <p className="mb-2 text-xs text-slate-500">Select the commodity categories this vendor is accredited to supply. Purchase Orders will match vendors by these categories.</p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                    {categories.map((cat) => {
+                                        const isChecked = form.data.category_ids.includes(cat.item_category_id);
+                                        return (
+                                            <label
+                                                key={cat.item_category_id}
+                                                className={`flex items-center gap-2 rounded border px-3 py-2 text-xs font-medium cursor-pointer transition ${
+                                                    isChecked
+                                                        ? 'border-red-300 bg-red-50 text-red-900 font-semibold shadow-xs'
+                                                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
+                                                }`}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isChecked}
+                                                    onChange={() => toggleCategory(cat.item_category_id)}
+                                                    className="rounded border-slate-300 text-red-600 focus:ring-red-500"
+                                                />
+                                                <span>{cat.category_name}</span>
+                                            </label>
+                                        );
+                                    })}
+                                    {categories.length === 0 && (
+                                        <p className="text-xs text-slate-500">No active categories found in catalog.</p>
+                                    )}
+                                </div>
+                                <InputError message={form.errors.category_ids} className="mt-1" />
                             </div>
 
                             <div>

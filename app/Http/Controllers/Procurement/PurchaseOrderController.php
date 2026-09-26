@@ -94,7 +94,8 @@ class PurchaseOrderController extends Controller
             ->whereYear('created_at', $currentYear)
             ->with([
                 'office:id,code,name',
-                'supplyRequest:supply_request_id,request_code,requested_by',
+                'supplyRequest:supply_request_id,request_code,requested_by,item_category_id',
+                'supplyRequest.category:item_category_id,category_name',
                 'supplyRequest.requester:id,name',
                 'items.item.category:item_category_id,category_name',
                 'sourceDelivery.supplier:supplier_id,supplier_name',
@@ -109,10 +110,20 @@ class PurchaseOrderController extends Controller
                 $parentPo = $sourceDelivery?->purchaseOrder;
                 $parentSupplier = $sourceDelivery?->supplier ?? $parentPo?->supplier;
 
+                $prCategoryId = $purchaseRequest->supplyRequest?->item_category_id
+                    ?: ($purchaseRequest->items->first()?->item?->item_category_id ?? null);
+                $prCategoryName = (string) (
+                    $purchaseRequest->supplyRequest?->category?->category_name
+                    ?? $purchaseRequest->items->first()?->item?->category?->category_name
+                    ?? 'General / Uncategorized'
+                );
+
                 return [
                     'purchase_request_id' => (int) $purchaseRequest->purchase_request_id,
                     'pr_number' => (string) $purchaseRequest->pr_number,
                     'status' => (string) $purchaseRequest->status,
+                    'item_category_id' => $prCategoryId ? (int) $prCategoryId : null,
+                    'category_name' => $prCategoryName,
                     'created_at' => optional($purchaseRequest->created_at)?->toIso8601String(),
                     'source_type' => (string) ($purchaseRequest->source_type ?? ''),
                     'source_delivery_id' => $purchaseRequest->source_delivery_id ? (int) $purchaseRequest->source_delivery_id : null,
@@ -148,11 +159,14 @@ class PurchaseOrderController extends Controller
 
         $suppliers = Supplier::query()
             ->active()
+            ->with('categories:item_categories.item_category_id,category_name')
             ->orderBy('supplier_name')
             ->get(['supplier_id', 'supplier_name'])
             ->map(fn (Supplier $supplier): array => [
                 'supplier_id' => (int) $supplier->supplier_id,
                 'supplier_name' => (string) $supplier->supplier_name,
+                'category_ids' => $supplier->categories->pluck('item_category_id')->map(fn ($id) => (int) $id)->values()->all(),
+                'category_names' => $supplier->categories->pluck('category_name')->values()->all(),
             ])
             ->values();
 

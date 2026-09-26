@@ -28,6 +28,8 @@ type PurchaseRequestOption = {
         id: number;
         name: string;
     } | null;
+    item_category_id?: number | null;
+    category_name?: string | null;
     items: Array<{
         purchase_request_item_id: number;
         item_name: string;
@@ -41,6 +43,8 @@ type PurchaseRequestOption = {
 type SupplierOption = {
     supplier_id: number;
     supplier_name: string;
+    category_ids?: number[];
+    category_names?: string[];
 };
 
 type Props = {
@@ -73,6 +77,25 @@ export default function PurchaseOrdersCreate({
         () => eligiblePurchaseRequests.find((row) => row.purchase_request_id === Number(form.data.purchase_request_id)) ?? null,
         [eligiblePurchaseRequests, form.data.purchase_request_id],
     );
+
+    const prCategoryId = selectedPurchaseRequest?.item_category_id;
+    const prCategoryName = selectedPurchaseRequest?.category_name;
+
+    const { accreditedSuppliers, otherSuppliers } = useMemo(() => {
+        if (!prCategoryId) {
+            return { accreditedSuppliers: [], otherSuppliers: suppliers };
+        }
+        const accredited: SupplierOption[] = [];
+        const other: SupplierOption[] = [];
+        suppliers.forEach((s) => {
+            if (s.category_ids && s.category_ids.includes(prCategoryId)) {
+                accredited.push(s);
+            } else {
+                other.push(s);
+            }
+        });
+        return { accreditedSuppliers: accredited, otherSuppliers: other };
+    }, [suppliers, prCategoryId]);
 
     // Auto-lock supplier and preset replacement details if PR is a discrepancy follow-up
     useEffect(() => {
@@ -202,14 +225,35 @@ export default function PurchaseOrdersCreate({
                             required
                         >
                             <option value={0}>-- Select a Supplier --</option>
-                            {hasSuppliers ? (
-                                suppliers.map((row) => (
-                                    <option key={row.supplier_id} value={row.supplier_id}>
-                                        {row.supplier_name}
-                                    </option>
-                                ))
-                            ) : null}
+                            {accreditedSuppliers.length > 0 && (
+                                <optgroup label={`⭐ Accredited for ${prCategoryName || 'Requested Category'}`}>
+                                    {accreditedSuppliers.map((row) => (
+                                        <option key={row.supplier_id} value={row.supplier_id}>
+                                            ✓ {row.supplier_name} (Accredited)
+                                        </option>
+                                    ))}
+                                </optgroup>
+                            )}
+                            {otherSuppliers.length > 0 && (
+                                <optgroup label={accreditedSuppliers.length > 0 ? 'Other Registered Vendors' : 'All Registered Vendors'}>
+                                    {otherSuppliers.map((row) => (
+                                        <option key={row.supplier_id} value={row.supplier_id}>
+                                            {row.supplier_name}
+                                        </option>
+                                    ))}
+                                </optgroup>
+                            )}
                         </select>
+                        {prCategoryName ? (
+                            <p className="mt-1 text-xs text-slate-600">
+                                Requisition Commodity: <span className="font-semibold text-slate-800">{prCategoryName}</span>
+                                {accreditedSuppliers.length > 0 ? (
+                                    <span className="text-emerald-700 font-medium"> ({accreditedSuppliers.length} accredited vendor{accreditedSuppliers.length === 1 ? '' : 's'})</span>
+                                ) : (
+                                    <span className="text-amber-700"> (No specialized vendor accredited)</span>
+                                )}
+                            </p>
+                        ) : null}
                         {selectedPurchaseRequest?.is_discrepancy_follow_up ? (
                             <p className="mt-1 text-xs text-amber-700 font-medium">
                                 Locked to original delivery contractor under warranty terms.
@@ -234,8 +278,9 @@ export default function PurchaseOrdersCreate({
 
                 <section className="rounded-2xl border border-red-100 bg-red-50/40 p-6 shadow-sm">
                     <p className="text-xs font-semibold uppercase tracking-[0.15em] text-red-700">Derived Request Context</p>
-                    <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                         <ContextField label="Requesting Office" value={selectedPurchaseRequest?.office ? `${selectedPurchaseRequest.office.code} - ${selectedPurchaseRequest.office.name}` : 'N/A'} />
+                        <ContextField label="Commodity Category" value={selectedPurchaseRequest?.category_name || 'General / Uncategorized'} />
                         <ContextField
                             label="Request Reference"
                             value={selectedPurchaseRequest?.supply_request?.request_code || (selectedPurchaseRequest?.supply_request?.supply_request_id ? `SR #${selectedPurchaseRequest.supply_request.supply_request_id}` : 'N/A')}

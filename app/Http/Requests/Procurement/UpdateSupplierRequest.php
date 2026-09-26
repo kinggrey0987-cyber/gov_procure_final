@@ -22,6 +22,8 @@ class UpdateSupplierRequest extends FormRequest
             'phone' => ['nullable', 'string', 'max:50'],
             'address' => ['nullable', 'string'],
             'status' => ['required', 'string', 'max:50'],
+            'category_ids' => ['nullable', 'array'],
+            'category_ids.*' => ['integer', 'exists:item_categories,item_category_id'],
         ];
     }
 }

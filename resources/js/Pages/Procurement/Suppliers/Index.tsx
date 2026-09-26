@@ -11,6 +11,10 @@ type SupplierRow = {
     phone?: string | null;
     primary_category?: string | null;
     purchase_orders_count?: number;
+    categories?: Array<{
+        item_category_id: number;
+        category_name: string;
+    }>;
 };
 
 type Props = {
@@ -53,7 +57,7 @@ export default function SuppliersIndex({ suppliers }: Props) {
                                 <tr>
                                     <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Supplier Name</th>
                                     <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Contact Info</th>
-                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Category</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Accredited Categories</th>
                                     <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Status</th>
                                     <th className="px-3.5 py-2 text-right font-semibold text-slate-700">Actions</th>
                                 </tr>
@@ -69,7 +73,22 @@ export default function SuppliersIndex({ suppliers }: Props) {
                                             <p className="font-medium">{row.contact_person || '-'}</p>
                                             <p className="text-[11px] text-slate-500">{row.email || row.phone || '-'}</p>
                                         </td>
-                                        <td className="px-3.5 py-2 text-slate-700">{row.primary_category || 'Uncategorized'}</td>
+                                        <td className="px-3.5 py-2 text-slate-700">
+                                            {row.categories && row.categories.length > 0 ? (
+                                                <div className="flex flex-wrap gap-1">
+                                                    {row.categories.map((cat) => (
+                                                        <span
+                                                            key={cat.item_category_id}
+                                                            className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700"
+                                                        >
+                                                            {cat.category_name}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <span className="text-slate-500">{row.primary_category || 'Uncategorized'}</span>
+                                            )}
+                                        </td>
                                         <td className="px-3.5 py-2">
                                             <span className={statusClass(row.status)}>{row.status}</span>
                                         </td>

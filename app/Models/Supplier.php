@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Supplier extends Model
@@ -26,6 +27,12 @@ class Supplier extends Model
         'address',
         'status',
     ];
+
+    public function categories(): BelongsToMany
+    {
+        return $this->belongsToMany(ItemCategory::class, 'supplier_item_categories', 'supplier_id', 'item_category_id')
+            ->withTimestamps();
+    }
 
     public function purchaseOrders(): HasMany
     {

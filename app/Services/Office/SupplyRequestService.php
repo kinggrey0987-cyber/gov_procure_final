@@ -42,6 +42,7 @@ class SupplyRequestService
                 'requested_by' => $actor->id,
                 'ppmp_id' => (int) $payload['ppmp_id'],
                 'request_date' => now()->toDateString(),
+                'item_category_id' => isset($payload['item_category_id']) && $payload['item_category_id'] !== '' ? (int) $payload['item_category_id'] : null,
                 'needed_by_date' => $payload['needed_by_date'],
                 'request_category' => $payload['request_category'],
                 'purpose' => $payload['purpose'],
@@ -55,7 +56,7 @@ class SupplyRequestService
             $this->recordStatus($supplyRequest, null, 'DRAFT', $actor, 'Supply request created');
             $this->recordAudit($actor, 'CREATE', $supplyRequest);
 
-            return $supplyRequest->fresh(['office', 'requester', 'approver', 'ppmp']) ?? $supplyRequest;
+            return $supplyRequest->fresh(['office', 'requester', 'approver', 'ppmp', 'category']) ?? $supplyRequest;
         });
     }
 
@@ -84,14 +85,20 @@ class SupplyRequestService
         return DB::transaction(function () use ($supplyRequest, $actor, $payload): SupplyRequest {
             $oldStatus = (string) $supplyRequest->status;
 
-            $supplyRequest->fill([
+            $updateData = [
                 'ppmp_id' => (int) $payload['ppmp_id'],
                 'needed_by_date' => $payload['needed_by_date'],
                 'request_category' => $payload['request_category'],
                 'purpose' => $payload['purpose'],
                 'priority_level' => $payload['priority_level'],
                 'review_notes' => $payload['review_notes'] ?? $supplyRequest->review_notes,
-            ])->save();
+            ];
+
+            if (isset($payload['item_category_id']) && $payload['item_category_id'] !== '') {
+                $updateData['item_category_id'] = (int) $payload['item_category_id'];
+            }
+
+            $supplyRequest->fill($updateData)->save();
 
             $this->recordStatus($supplyRequest, $oldStatus, 'DRAFT', $actor, 'Supply request updated');
             $this->recordAudit($actor, 'UPDATE', $supplyRequest);
@@ -326,7 +333,7 @@ class SupplyRequestService
     /**
      * @return array<int, array<string, mixed>>
      */
-    public function ppmpItemOptionsForRequestContext(int $officeId, int $ppmpId): array
+    public function ppmpItemOptionsForRequestContext(int $officeId, int $ppmpId, ?int $itemCategoryId = null): array
     {
         $ppmp = Ppmp::query()
             ->where('office_id', $officeId)
@@ -338,11 +345,17 @@ class SupplyRequestService
         }
 
         $ppmpItems = PpmpItem::query()
-            ->with('item:item_id,item_name,status,default_unit,pieces_per_box,sub_unit')
+            ->with(['item.category', 'itemCategory'])
             ->where('ppmp_id', $ppmpId)
             ->whereHas('item', fn ($query) => $query->whereRaw('LOWER(status) = ?', ['active']))
+            ->when($itemCategoryId !== null && $itemCategoryId > 0, function ($query) use ($itemCategoryId): void {
+                $query->where(function ($sub) use ($itemCategoryId): void {
+                    $sub->where('item_category_id', $itemCategoryId)
+                        ->orWhereHas('item', fn ($q) => $q->where('item_category_id', $itemCategoryId));
+                });
+            })
             ->orderBy('ppmp_item_id')
-            ->get(['ppmp_item_id', 'ppmp_id', 'item_id', 'quantity', 'unit_cost', 'procurement_schedule', 'remarks']);
+            ->get(['ppmp_item_id', 'ppmp_id', 'item_id', 'item_category_id', 'quantity', 'unit_cost', 'procurement_schedule', 'remarks']);
 
         $consumptionRows = SupplyRequestItem::query()
             ->selectRaw('ppmp_item_id, COALESCE(SUM(quantity_requested), 0) as requested_quantity')
@@ -358,10 +371,15 @@ class SupplyRequestService
             $remainingQuantity = round($plannedQuantity - $requestedQuantity, 2);
             $overRequestedQuantity = max(0, round($requestedQuantity - $plannedQuantity, 2));
 
+            $categoryId = (int) ($ppmpItem->item_category_id ?: ($ppmpItem->item?->item_category_id ?? 0));
+            $categoryName = (string) ($ppmpItem->itemCategory?->category_name ?? $ppmpItem->item?->category?->category_name ?? '');
+
             return [
                 'ppmp_item_id' => (int) $ppmpItem->ppmp_item_id,
                 'ppmp_id' => (int) $ppmpItem->ppmp_id,
                 'item_id' => (int) $ppmpItem->item_id,
+                'item_category_id' => $categoryId,
+                'category_name' => $categoryName,
                 'item_name' => (string) ($ppmpItem->item?->item_name ?? 'Unknown Item'),
                 'default_unit' => (string) ($ppmpItem->item?->default_unit ?? ''),
                 'pieces_per_box' => (int) ($ppmpItem->item?->pieces_per_box ?? 1),

@@ -188,10 +188,16 @@ class SupplyRequestController extends Controller
             $selectedPpmpId = 0;
         }
 
+        $categories = \App\Models\ItemCategory::query()
+            ->where('status', 'ACTIVE')
+            ->orderBy('category_name')
+            ->get(['item_category_id', 'category_name']);
+
         return Inertia::render('Office/SupplyRequests/Create', [
             'ppmpOptions' => $ppmpOptions,
             'selectedPpmpId' => $selectedPpmpId > 0 ? $selectedPpmpId : null,
             'requestDate' => now()->toDateString(),
+            'categories' => $categories,
             'ppmpItemOptions' => $selectedPpmpId > 0
                 ? $this->service->ppmpItemOptionsForRequestContext($officeId, $selectedPpmpId)
                 : [],
@@ -228,6 +234,7 @@ class SupplyRequestController extends Controller
         $supplyRequest->loadMissing([
             'items.ppmpItem.item.inventory',
             'office',
+            'category',
             'requester.role',
             'requester.office',
             'approver.role',
@@ -293,12 +300,17 @@ class SupplyRequestController extends Controller
             'supply_request_id' => (int) $supplyRequest->supply_request_id,
             'office_id' => (int) $supplyRequest->office_id,
             'ppmp_id' => $supplyRequest->ppmp_id ? (int) $supplyRequest->ppmp_id : null,
+            'item_category_id' => $supplyRequest->item_category_id ? (int) $supplyRequest->item_category_id : null,
+            'category' => $supplyRequest->category ? [
+                'item_category_id' => (int) $supplyRequest->category->item_category_id,
+                'category_name' => (string) $supplyRequest->category->category_name,
+            ] : null,
             'request_code' => (string) $supplyRequest->request_code,
             'status' => $trackingStatus,
             'raw_status' => (string) $supplyRequest->status,
             'request_date' => optional($supplyRequest->request_date)?->toDateString(),
             'needed_by_date' => optional($supplyRequest->needed_by_date)?->toDateString(),
-            'request_category' => (string) $supplyRequest->request_category,
+            'request_category' => (string) ($supplyRequest->category?->category_name ?? $supplyRequest->request_category),
             'purpose' => (string) $supplyRequest->purpose,
             'priority_level' => (string) $supplyRequest->priority_level,
             'review_notes' => $supplyRequest->review_notes,
@@ -1058,12 +1070,18 @@ class SupplyRequestController extends Controller
         $officeId = (int) $request->user()?->office_id;
         $selectedPpmpId = (int) ($supplyRequest->ppmp_id ?? 0);
 
+        $categories = \App\Models\ItemCategory::query()
+            ->where('status', 'ACTIVE')
+            ->orderBy('category_name')
+            ->get(['item_category_id', 'category_name']);
+
         return Inertia::render('Office/SupplyRequests/Edit', [
-            'supplyRequest' => $supplyRequest->load(['items.ppmpItem', 'items.item']),
+            'supplyRequest' => $supplyRequest->load(['items.ppmpItem', 'items.item', 'category']),
+            'categories' => $categories,
             'ppmpOptions' => $this->service->ppmpOptionsForOffice($officeId),
             'selectedPpmpId' => $selectedPpmpId > 0 ? $selectedPpmpId : null,
             'ppmpItemOptions' => $selectedPpmpId > 0
-                ? $this->service->ppmpItemOptionsForRequestContext($officeId, $selectedPpmpId)
+                ? $this->service->ppmpItemOptionsForRequestContext($officeId, $selectedPpmpId, (int) ($supplyRequest->item_category_id ?? 0))
                 : [],
         ]);
     }
@@ -1077,8 +1095,10 @@ class SupplyRequestController extends Controller
             abort(403);
         }
 
+        $categoryId = $request->query('category_id') ? (int) $request->query('category_id') : null;
+
         return response()->json([
-            'ppmp_item_options' => $this->service->ppmpItemOptionsForRequestContext($officeId, (int) $ppmp->ppmp_id),
+            'ppmp_item_options' => $this->service->ppmpItemOptionsForRequestContext($officeId, (int) $ppmp->ppmp_id, $categoryId),
         ]);
     }
 

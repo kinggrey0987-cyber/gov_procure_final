@@ -29,9 +29,13 @@ class SupplierService
             'status' => 'ACTIVE',
         ]);
 
+        if (array_key_exists('category_ids', $payload)) {
+            $supplier->categories()->sync($payload['category_ids'] ?? []);
+        }
+
         $this->audit($actor, 'CREATE', $supplier);
 
-        return $supplier;
+        return $supplier->fresh('categories') ?? $supplier;
     }
 
     /**
@@ -50,9 +54,13 @@ class SupplierService
             'status' => $payload['status'],
         ])->save();
 
+        if (array_key_exists('category_ids', $payload)) {
+            $supplier->categories()->sync($payload['category_ids'] ?? []);
+        }
+
         $this->audit($actor, 'UPDATE', $supplier);
 
-        return $supplier;
+        return $supplier->fresh('categories') ?? $supplier;
     }
 
     private function assertProcurementActor(User $actor): void

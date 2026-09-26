@@ -29,6 +29,11 @@ class StoreSupplyRequestRequest extends FormRequest
                     $query->where('office_id', $officeId);
                 }),
             ],
+            'item_category_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('item_categories', 'item_category_id'),
+            ],
             'needed_by_date' => ['required', 'date', 'after_or_equal:today'],
             'request_category' => ['required', 'string', 'max:50'],
             'purpose' => ['required', 'string'],
@@ -100,11 +105,13 @@ class StoreSupplyRequestRequest extends FormRequest
                 return;
             }
 
+            $selectedCategoryId = (int) $this->input('item_category_id');
+
             $ppmpItems = PpmpItem::query()
-                ->with('item:item_id,item_name,status')
+                ->with('item:item_id,item_name,status,item_category_id')
                 ->where('ppmp_id', $ppmpId)
                 ->whereIn('ppmp_item_id', $ppmpItemIds->all())
-                ->get(['ppmp_item_id', 'ppmp_id', 'item_id', 'quantity'])
+                ->get(['ppmp_item_id', 'ppmp_id', 'item_id', 'item_category_id', 'quantity'])
                 ->keyBy('ppmp_item_id');
 
             foreach ($items as $index => $row) {
@@ -116,6 +123,13 @@ class StoreSupplyRequestRequest extends FormRequest
                 if (! $ppmpItem) {
                     $validator->errors()->add("items.$index.ppmp_item_id", 'Selected PPMP item does not belong to the selected PPMP.');
                     continue;
+                }
+
+                if ($selectedCategoryId > 0) {
+                    $itemCatId = (int) ($ppmpItem->item_category_id ?: $ppmpItem->item?->item_category_id);
+                    if ($itemCatId > 0 && $itemCatId !== $selectedCategoryId) {
+                        $validator->errors()->add("items.$index.ppmp_item_id", 'Selected item does not belong to the chosen category.');
+                    }
                 }
 
                 if ($payloadItemId !== null && $payloadItemId !== (int) $ppmpItem->item_id) {

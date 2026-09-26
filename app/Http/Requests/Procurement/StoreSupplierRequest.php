@@ -19,6 +19,8 @@ class StoreSupplierRequest extends FormRequest
             'email' => ['nullable', 'email', 'max:150'],
             'phone' => ['nullable', 'string', 'max:50'],
             'address' => ['nullable', 'string'],
+            'category_ids' => ['nullable', 'array'],
+            'category_ids.*' => ['integer', 'exists:item_categories,item_category_id'],
         ];
     }
 }

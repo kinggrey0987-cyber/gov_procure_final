@@ -28,6 +28,7 @@ class SupplyRequest extends Model
         'request_date',
         'needed_by_date',
         'request_category',
+        'item_category_id',
         'purpose',
         'priority_level',
         'status',
@@ -40,11 +41,17 @@ class SupplyRequest extends Model
         'office_id' => 'integer',
         'requested_by' => 'integer',
         'ppmp_id' => 'integer',
+        'item_category_id' => 'integer',
         'approved_by' => 'integer',
         'request_date' => 'date',
         'needed_by_date' => 'date',
         'approved_at' => 'datetime',
     ];
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(ItemCategory::class, 'item_category_id', 'item_category_id');
+    }
 
     public function office(): BelongsTo
     {

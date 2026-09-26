@@ -45,6 +45,11 @@ class UpdateSupplyRequestRequest extends FormRequest
                     $query->where('office_id', $officeId);
                 }),
             ],
+            'item_category_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('item_categories', 'item_category_id'),
+            ],
             'needed_by_date' => ['required', 'date'],
             'request_category' => ['required', 'string', 'max:50'],
             'purpose' => ['required', 'string'],

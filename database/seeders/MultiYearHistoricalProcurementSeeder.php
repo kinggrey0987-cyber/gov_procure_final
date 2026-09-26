@@ -79,30 +79,57 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
                 'status' => 'ACTIVE',
             ]
         );
+        $supplier1->categories()->syncWithoutDetaching([1]);
 
         $supplier2 = Supplier::query()->firstOrCreate(
-            ['supplier_name' => 'Northbay General Merchandising'],
+            ['supplier_name' => 'ByteCore IT Solutions & Electronics'],
             [
-                'contact_person' => 'Arvin Reyes',
-                'email' => 'sales@northbaymerch.example',
-                'phone' => '09179876543',
-                'address' => 'Industrial Road, City Proper',
+                'contact_person' => 'Engr. Ronald Tan',
+                'email' => 'enterprise@bytecore-it.example',
+                'phone' => '09182345678',
+                'address' => 'Cyberzone Park, Technology Corridor',
                 'status' => 'ACTIVE',
             ]
         );
+        $supplier2->categories()->syncWithoutDetaching([2]);
 
         $supplier3 = Supplier::query()->firstOrCreate(
-            ['supplier_name' => 'Pacific Health & Safety Solutions'],
+            ['supplier_name' => 'CleanTech Sanitation & Hygiene Supplies'],
             [
-                'contact_person' => 'Elena Bautista',
-                'email' => 'supplies@pacifichealth.example',
-                'phone' => '09187654321',
-                'address' => 'Healthcare District, Metro Avenue',
+                'contact_person' => 'Carmela Gomez',
+                'email' => 'institutional@cleantech-supplies.example',
+                'phone' => '09193456789',
+                'address' => 'San Isidro Industrial Estate, Metro',
                 'status' => 'ACTIVE',
             ]
         );
+        $supplier3->categories()->syncWithoutDetaching([3]);
 
-        $suppliers = [$supplier1, $supplier2, $supplier3];
+        $supplier4 = Supplier::query()->firstOrCreate(
+            ['supplier_name' => 'Apex Maintenance & Hardware Depot'],
+            [
+                'contact_person' => 'Danilo Cruz',
+                'email' => 'supply@apexhardware.example',
+                'phone' => '09204567890',
+                'address' => 'Highway 4 Construction Hub, West District',
+                'status' => 'ACTIVE',
+            ]
+        );
+        $supplier4->categories()->syncWithoutDetaching([4]);
+
+        $supplier5 = Supplier::query()->firstOrCreate(
+            ['supplier_name' => 'Grand Alliance Commercial Corp.'],
+            [
+                'contact_person' => 'Beatrice Lim',
+                'email' => 'tenders@grandalliance.example',
+                'phone' => '09215678901',
+                'address' => 'Commercial Center Blvd, East District',
+                'status' => 'ACTIVE',
+            ]
+        );
+        $supplier5->categories()->syncWithoutDetaching([1, 3]);
+
+        $suppliers = [$supplier1, $supplier2, $supplier3, $supplier4, $supplier5];
 
         $items = Item::query()->with('specifications')->get()->keyBy('item_name');
         if ($items->isEmpty()) {
@@ -307,14 +334,24 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
                 $delDate = $poDate->copy()->addDays(6);
                 $distDate = $delDate->copy()->addDays(2);
 
-                // Select supplier realistically: Medical/Cleaning -> Supplier 3; IT -> Supplier 2; General -> Supplier 1
                 $category = $planDef['category'];
-                if ($category === 'Medical & Safety' || $category === 'Janitorial Supplies') {
-                    $supplier = $suppliers[2] ?? $suppliers[0];
-                } elseif ($category === 'IT Equipment') {
-                    $supplier = $suppliers[1] ?? $suppliers[0];
+                $categoryId = match ($category) {
+                    'Office Supplies & Consumables', 'Office Supplies' => 1,
+                    'IT Equipment' => 2,
+                    'Janitorial Supplies', 'Medical & Safety', 'Cleaning Supplies' => 3,
+                    'Hardware & Maintenance', 'Maintenance Supplies' => 4,
+                    default => 1,
+                };
+
+                // Select supplier realistically based on accredited commodity category
+                if ($categoryId === 2) {
+                    $supplier = $suppliers[1]; // ByteCore IT Solutions
+                } elseif ($categoryId === 3) {
+                    $supplier = ($i % 2 === 0) ? $suppliers[2] : $suppliers[4]; // CleanTech or Grand Alliance
+                } elseif ($categoryId === 4) {
+                    $supplier = $suppliers[3]; // Apex Maintenance Depot
                 } else {
-                    $supplier = $suppliers[0];
+                    $supplier = ($i % 2 === 0) ? $suppliers[0] : $suppliers[4]; // Metro Office Depot or Grand Alliance
                 }
 
                 $method = $methods[$i % count($methods)];
@@ -329,6 +366,7 @@ class MultiYearHistoricalProcurementSeeder extends Seeder
                         'office_id' => $office->id,
                         'requested_by' => $officeUser->id,
                         'ppmp_id' => $ppmp->ppmp_id,
+                        'item_category_id' => $categoryId,
                         'request_date' => $reqDate,
                         'needed_by_date' => $neededDate,
                         'request_category' => $category,

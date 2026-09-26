@@ -10,6 +10,7 @@ type Props = {
         purpose: string;
         needed_by_date?: string | null;
         request_date?: string | null;
+        category_name?: string | null;
         office?: { id: number; name: string } | null;
         requester?: { id: number; name: string } | null;
         item_count: number;
@@ -220,6 +221,7 @@ export default function InventoryOfficeSupplyRequestShow({ request, backFilters 
                                 </span>
                             )}
                         </p>
+                        <p><span className="font-semibold">Category:</span> {request.category_name || '-'}</p>
                         <p><span className="font-semibold">Needed By:</span> {request.needed_by_date ?? '-'}</p>
                         <p><span className="font-semibold">Request Date:</span> {request.request_date ?? '-'}</p>
                         <p><span className="font-semibold">Office:</span> {request.office?.name ?? '-'}</p>
