@@ -1732,21 +1732,6 @@ class InventoryDistributionFoundationTest extends TestCase
             );
     }
 
-    public function test_urgent_supply_request_is_prioritized_at_top_of_inventory_office_supply_request_listing(): void
-    {
-        $normalShortage = $this->createSubmittedSupplyRequestForQueue($this->officeA, $this->officeUserA, 9025, 10, 0);
-        $normalStockReady = $this->createSubmittedSupplyRequestForQueue($this->officeA, $this->officeUserA, 9026, 2, 10);
-        $urgentStockReady = $this->createSubmittedSupplyRequestForQueue($this->officeA, $this->officeUserA, 9027, 1, 10);
-        $urgentStockReady['supplyRequest']->update(['priority_level' => 'URGENT']);
-
-        $this->actingAs($this->gsoOfficer)
-            ->get(route('inventory.office-supply-requests.index'))
-            ->assertInertia(fn (Assert $page) => $page
-                ->where('requests.data.0.request_code', $urgentStockReady['supplyRequest']->request_code)
-                ->where('requests.data.0.priority_level', 'URGENT')
-            );
-    }
-
     public function test_gso_origin_supply_request_is_excluded_from_inventory_office_supply_request_listing(): void
     {
         $gsoOffice = $this->createOffice('General Services Office', 'GSO');

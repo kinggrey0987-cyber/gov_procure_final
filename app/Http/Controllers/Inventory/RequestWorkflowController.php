@@ -74,26 +74,13 @@ class RequestWorkflowController
             $rows = $rows->where('workflow_bucket', $workflowBucketFilter);
         }
 
-        // Prioritize Urgent requests first (pinned to top), then actionable shortage requests, then latest requests
+        // Prioritize actionable shortage requests at the top so GSO sees pending consolidation work immediately
         $rows = $rows->sort(function ($a, $b) {
-            $isUrgentA = strtoupper((string) ($a['priority_level'] ?? '')) === 'URGENT';
-            $isUrgentB = strtoupper((string) ($b['priority_level'] ?? '')) === 'URGENT';
+            $priorityA = ($a['status'] === 'SUBMITTED' && $a['stock_assessment'] === 'SHORTAGE_REQUIRES_PROCUREMENT' && ! $a['has_purchase_request']) ? 2 : 1;
+            $priorityB = ($b['status'] === 'SUBMITTED' && $b['stock_assessment'] === 'SHORTAGE_REQUIRES_PROCUREMENT' && ! $b['has_purchase_request']) ? 2 : 1;
 
-            $isCompletedA = in_array((string) ($a['status'] ?? ''), ['COMPLETED', 'FULFILLED', 'RECEIVED', 'REJECTED', 'CANCELLED'], true);
-            $isCompletedB = in_array((string) ($b['status'] ?? ''), ['COMPLETED', 'FULFILLED', 'RECEIVED', 'REJECTED', 'CANCELLED'], true);
-
-            $isShortageActionableA = ($a['status'] === 'SUBMITTED' && $a['stock_assessment'] === 'SHORTAGE_REQUIRES_PROCUREMENT' && ! $a['has_purchase_request']);
-            $isShortageActionableB = ($b['status'] === 'SUBMITTED' && $b['stock_assessment'] === 'SHORTAGE_REQUIRES_PROCUREMENT' && ! $b['has_purchase_request']);
-
-            $rankA = ($isUrgentA && ! $isCompletedA)
-                ? ($isShortageActionableA ? 5 : 4)
-                : ($isUrgentA ? 3 : ($isShortageActionableA ? 2 : 1));
-            $rankB = ($isUrgentB && ! $isCompletedB)
-                ? ($isShortageActionableB ? 5 : 4)
-                : ($isUrgentB ? 3 : ($isShortageActionableB ? 2 : 1));
-
-            if ($rankA !== $rankB) {
-                return $rankB <=> $rankA;
+            if ($priorityA !== $priorityB) {
+                return $priorityB <=> $priorityA;
             }
 
             return (int) $b['supply_request_id'] <=> (int) $a['supply_request_id'];
