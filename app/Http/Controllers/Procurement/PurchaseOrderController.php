@@ -233,7 +233,7 @@ class PurchaseOrderController extends Controller
                     'receiver:id,name',
                     'verifications.verifier:id,name',
                     'documents.uploader:id,name',
-                    'items.item',
+                    'items.purchaseOrderItem.item',
                 ])
                 ->latest('delivery_id')
                 ->get()
@@ -260,7 +260,7 @@ class PurchaseOrderController extends Controller
                     ])->values(),
                     'items' => $delivery->items->map(fn ($di): array => [
                         'delivery_item_id' => (int) $di->delivery_item_id,
-                        'item_name' => (string) ($di->item?->item_name ?? 'Item'),
+                        'item_name' => (string) ($di->purchaseOrderItem?->item?->item_name ?? $di->purchaseOrderItem?->item_name_snapshot ?? $di->item?->item_name ?? 'Item'),
                         'expected_quantity' => (float) $di->expected_quantity,
                         'received_quantity' => (float) $di->received_quantity,
                         'damaged_quantity' => (float) $di->damaged_quantity,

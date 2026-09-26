@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 
 class DeliveryItem extends Model
 {
@@ -45,5 +46,17 @@ class DeliveryItem extends Model
     public function purchaseOrderItem(): BelongsTo
     {
         return $this->belongsTo(PurchaseOrderItem::class, 'purchase_order_item_id', 'purchase_order_item_id');
+    }
+
+    public function item(): HasOneThrough
+    {
+        return $this->hasOneThrough(
+            Item::class,
+            PurchaseOrderItem::class,
+            'purchase_order_item_id',
+            'item_id',
+            'purchase_order_item_id',
+            'item_id'
+        );
     }
 }

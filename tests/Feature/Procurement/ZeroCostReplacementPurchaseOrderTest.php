@@ -5,6 +5,7 @@ namespace Tests\Feature\Procurement;
 use App\Enums\UserRole;
 use App\Models\Delivery;
 use App\Models\DeliveryItem;
+use App\Models\Item;
 use App\Models\Office;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
@@ -393,6 +394,25 @@ class ZeroCostReplacementPurchaseOrderTest extends TestCase
             'procurement_method' => 'SHOPPING',
         ]);
 
+        $category = \App\Models\ItemCategory::query()->firstOrCreate(['category_name' => 'Office Supplies']);
+        $item = Item::query()->firstOrCreate(['item_name' => 'Laser Printer Paper'], ['item_category_id' => $category->item_category_id, 'default_unit' => 'ream', 'status' => 'ACTIVE']);
+        $srItem = SupplyRequestItem::query()->create([
+            'supply_request_id' => $sr->supply_request_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Laser Printer Paper',
+            'quantity_requested' => 50,
+        ]);
+        $poItem = PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $po->purchase_order_id,
+            'supply_request_item_id' => $srItem->supply_request_item_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Laser Printer Paper',
+            'quantity_ordered' => 50,
+            'unit' => 'ream',
+            'unit_price' => 500,
+            'total_price' => 25000,
+        ]);
+
         $delivery = Delivery::query()->create([
             'delivery_code' => 'DEL-2026-MO-001',
             'purchase_order_id' => $po->purchase_order_id,
@@ -406,6 +426,17 @@ class ZeroCostReplacementPurchaseOrderTest extends TestCase
             'remarks' => 'Complete delivery verified by GSO',
         ]);
 
+        $deliveryItem = DeliveryItem::query()->create([
+            'delivery_id' => $delivery->delivery_id,
+            'purchase_order_item_id' => $poItem->purchase_order_item_id,
+            'expected_quantity' => 50,
+            'received_quantity' => 50,
+            'damaged_quantity' => 0,
+            'missing_quantity' => 0,
+            'item_condition' => 'GOOD',
+            'remarks' => 'All in good condition',
+        ]);
+
         // 1. Executive accesses PO via Executive route -> isExecutive is true, deliveries & DR/SI are present
         $this->actingAs($mayorUser)
             ->get(route('executive.procurement-records.purchase-orders.show', $po->purchase_order_id))
@@ -417,6 +448,7 @@ class ZeroCostReplacementPurchaseOrderTest extends TestCase
                 ->where('deliveries.0.sales_invoice_no', 'SI-2026-8802')
                 ->where('deliveries.0.sales_invoice_amount', 25000)
                 ->where('deliveries.0.receipt_status', 'VERIFIED')
+                ->where('deliveries.0.items.0.item_name', 'Laser Printer Paper')
             );
 
         // 2. Non-executive (Procurement Officer) accesses PO -> isExecutive is false, deliveries array is empty
