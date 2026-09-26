@@ -82,7 +82,7 @@ export default function NotificationIndex({ notifications }: Props) {
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                     <div className="min-w-0 flex-1">
                                         <h3 className="text-sm font-semibold text-slate-900">{notification.title}</h3>
-                                        <p className="mt-1 text-sm text-slate-700">{notification.message}</p>
+                                        <p className="mt-1 text-sm text-slate-700">{formatNotificationMessage(notification.message)}</p>
                                         <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
                                             <span className="rounded-full bg-slate-100 px-2 py-1 font-medium text-slate-600">{formatType(notification.notification_type)}</span>
                                             {notification.reference_label ? (
@@ -131,6 +131,27 @@ export default function NotificationIndex({ notifications }: Props) {
 
 function formatType(value: string): string {
     return value.replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatNotificationMessage(message: string): string {
+    const anomalyAliases: Record<string, string> = {
+        PRICE_Z_SCORE: 'Price Anomaly',
+        PRICE_ANOMALY: 'Price Anomaly',
+        Z_SCORE_PRICE_ANOMALY: 'Price Anomaly',
+        FREQUENT_REQUEST_WINDOW: 'Frequent Request Spike',
+        FREQUENT_REQUEST_SPIKE: 'Frequent Request Spike',
+        EXCESSIVE_QUANTITY: 'Excessive Quantity Anomaly',
+        PPMP_OVER_REQUEST: 'PPMP Over-Request',
+        PPMP_EARLY_DEPLETION: 'PPMP Early Depletion',
+        PPMP_FREQUENCY_IRREGULARITY: 'PPMP Frequency Irregularity',
+        PPMP_SCHEDULE_MISMATCH: 'PPMP Schedule Mismatch',
+    };
+
+    return message.replace(/Anomaly\s+([A-Z0-9_]+)\s+was\s+detected/gi, (_, rawType: string) => {
+        const normalized = rawType.toUpperCase();
+        const human = anomalyAliases[normalized] ?? rawType.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+        return `${human} was detected`;
+    });
 }
 
 

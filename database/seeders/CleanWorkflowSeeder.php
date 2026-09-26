@@ -610,7 +610,7 @@ class CleanWorkflowSeeder extends Seeder
             // Delivery with realistic DR & Invoice tracking
             $deliveryHistorical = Delivery::query()->create([
                 'purchase_order_id' => $poHistorical->purchase_order_id,
-                'delivery_code' => 'DEL-2026-05-001',
+                'delivery_code' => 'DEL-2026-05-0001',
                 'supplier_id' => $supplier->supplier_id,
                 'received_by' => $gsoUser->id,
                 'actual_delivery_date' => Carbon::parse('2026-05-15'),
@@ -635,7 +635,7 @@ class CleanWorkflowSeeder extends Seeder
 
             // Distribution to MPDO
             $distributionHistorical = DistributionRecord::query()->create([
-                'distribution_code' => 'DIST-2026-05-001',
+                'distribution_code' => 'DIST-2026-05-0001',
                 'supply_request_id' => $srHistorical->supply_request_id,
                 'delivery_id' => $deliveryHistorical->delivery_id,
                 'office_id' => $mpdo->id,
@@ -662,7 +662,7 @@ class CleanWorkflowSeeder extends Seeder
         // Active Distribution ready for Office Acknowledgment Demo (ENG Office)
         if ($eng && isset($srConsolidatedSource2)) {
             $distActive = DistributionRecord::query()->create([
-                'distribution_code' => 'DIST-2026-09-001',
+                'distribution_code' => 'DIST-2026-09-0001',
                 'supply_request_id' => $srConsolidatedSource2->supply_request_id,
                 'office_id' => $eng->id,
                 'prepared_by' => $gsoUser->id,

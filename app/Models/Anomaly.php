@@ -116,4 +116,28 @@ class Anomaly extends Model
             self::TYPE_PPMP_SCHEDULE_MISMATCH,
         ];
     }
+
+    public static function humanizeType(string $type): string
+    {
+        $aliases = [
+            self::TYPE_PRICE_Z_SCORE => 'Price Anomaly',
+            'PRICE_ANOMALY' => 'Price Anomaly',
+            'Z_SCORE_PRICE_ANOMALY' => 'Price Anomaly',
+            self::TYPE_FREQUENT_REQUEST_WINDOW => 'Frequent Request Spike',
+            'FREQUENT_REQUEST_SPIKE' => 'Frequent Request Spike',
+            self::TYPE_EXCESSIVE_QUANTITY => 'Excessive Quantity Anomaly',
+            self::TYPE_PPMP_OVER_REQUEST => 'PPMP Over-Request',
+            self::TYPE_PPMP_EARLY_DEPLETION => 'PPMP Early Depletion',
+            self::TYPE_PPMP_FREQUENCY_IRREGULARITY => 'PPMP Frequency Irregularity',
+            self::TYPE_PPMP_SCHEDULE_MISMATCH => 'PPMP Schedule Mismatch',
+        ];
+
+        $normalized = strtoupper(trim($type));
+
+        if (isset($aliases[$normalized])) {
+            return $aliases[$normalized];
+        }
+
+        return ucwords(strtolower(str_replace('_', ' ', $type)));
+    }
 }

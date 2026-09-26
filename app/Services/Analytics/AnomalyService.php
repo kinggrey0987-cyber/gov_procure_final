@@ -160,10 +160,12 @@ class AnomalyService
                 'changed_at' => now(),
             ]);
 
+            $humanType = Anomaly::humanizeType($anomalyType);
+
             $this->notificationService->notifyRole(
                 role: UserRole::EXECUTIVE_OFFICER,
                 title: 'New Anomaly Detected',
-                message: sprintf('Anomaly %s was detected and needs executive review.', $anomalyType),
+                message: sprintf('%s was detected and needs executive review.', $humanType),
                 notificationType: 'EXEC_ANOMALY_DETECTED',
                 referenceType: Anomaly::class,
                 referenceId: (int) $anomaly->anomaly_id,

@@ -10,6 +10,8 @@ use App\Models\User;
 use App\Services\AuditLogService;
 use App\Services\NotificationService;
 use App\Services\Procurement\ProcurementStatusSyncService;
+use DateTimeInterface;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -30,7 +32,13 @@ class DistributionRecordService
     {
         $this->assertGsoOfficer($actor);
 
-        $distributionCode = $payload['distribution_code'] ?? $this->generateDistributionCode();
+        $releaseDate = !empty($payload['release_date'])
+            ? Carbon::parse($payload['release_date'])
+            : now();
+
+        $distributionCode = !empty($payload['distribution_code'])
+            ? trim((string) $payload['distribution_code'])
+            : $this->generateNextDistributionCode($releaseDate);
 
         return DB::transaction(function () use ($actor, $payload, $distributionCode): DistributionRecord {
             $record = DistributionRecord::query()->create([
@@ -543,12 +551,37 @@ class DistributionRecordService
             ->all();
     }
 
-    private function generateDistributionCode(): string
+    public function generateNextDistributionCode(?DateTimeInterface $date = null): string
     {
-        $last = DistributionRecord::query()->latest('distribution_record_id')->first();
-        $next = ((int) ($last?->distribution_record_id ?? 0)) + 1;
 
-        return sprintf('DIST-%s-%05d', date('Y'), $next);
+
+
+        $targetDate = $date ?? now();
+        $prefix = sprintf('DIST-%s-', $targetDate->format('Y-m'));
+
+        $codes = DistributionRecord::query()
+            ->where('distribution_code', 'like', $prefix.'%')
+            ->pluck('distribution_code');
+
+        $maxSequence = 0;
+        foreach ($codes as $code) {
+            if (preg_match('/^DIST-\d{4}-\d{2}-(\d+)$/', (string) $code, $matches) === 1) {
+                $maxSequence = max($maxSequence, (int) $matches[1]);
+            }
+        }
+
+        $nextSequence = $maxSequence + 1;
+        do {
+            $candidate = sprintf('%s%04d', $prefix, $nextSequence);
+            $nextSequence++;
+        } while (DistributionRecord::query()->where('distribution_code', $candidate)->exists());
+
+        return $candidate;
+    }
+
+    private function generateDistributionCode(?DateTimeInterface $date = null): string
+    {
+        return $this->generateNextDistributionCode($date);
     }
 
     private function assertGsoOfficer(User $actor): void

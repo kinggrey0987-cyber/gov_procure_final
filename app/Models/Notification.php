@@ -59,4 +59,15 @@ class Notification extends Model
     {
         return $query->where('user_id', $userId);
     }
+
+    public function getMessageAttribute(?string $value): string
+    {
+        $message = (string) ($value ?? '');
+
+        return (string) preg_replace_callback(
+            '/Anomaly\s+([A-Z0-9_]+)\s+was\s+detected/i',
+            fn ($matches) => Anomaly::humanizeType($matches[1]) . ' was detected',
+            $message
+        );
+    }
 }

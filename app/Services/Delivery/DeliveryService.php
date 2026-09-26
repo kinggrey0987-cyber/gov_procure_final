@@ -10,6 +10,8 @@ use App\Models\StatusHistory;
 use App\Models\User;
 use App\Services\AuditLogService;
 use App\Services\NotificationService;
+use DateTimeInterface;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -46,7 +48,13 @@ class DeliveryService
 
         return DB::transaction(function () use ($actor, $payload, $purchaseOrder): Delivery {
             // Generate delivery code if not provided
-            $deliveryCode = $payload['delivery_code'] ?? $this->generateDeliveryCode();
+            $targetDate = !empty($payload['actual_delivery_date'])
+                ? Carbon::parse($payload['actual_delivery_date'])
+                : (!empty($payload['expected_arrival_date']) ? Carbon::parse($payload['expected_arrival_date']) : now());
+
+            $deliveryCode = !empty($payload['delivery_code'])
+                ? trim((string) $payload['delivery_code'])
+                : $this->generateNextDeliveryCode($targetDate);
 
             $delivery = Delivery::query()->create([
                 'delivery_code' => $deliveryCode,
@@ -237,12 +245,37 @@ class DeliveryService
         });
     }
 
-    private function generateDeliveryCode(): string
+    public function generateNextDeliveryCode(?DateTimeInterface $date = null): string
     {
-        $lastDelivery = Delivery::query()->latest('delivery_id')->first();
-        $nextNumber = ((int) ($lastDelivery?->delivery_id ?? 0)) + 1;
 
-        return sprintf('DEL-%s-%05d', date('Y'), $nextNumber);
+
+
+        $targetDate = $date ?? now();
+        $prefix = sprintf('DEL-%s-', $targetDate->format('Y-m'));
+
+        $codes = Delivery::query()
+            ->where('delivery_code', 'like', $prefix.'%')
+            ->pluck('delivery_code');
+
+        $maxSequence = 0;
+        foreach ($codes as $code) {
+            if (preg_match('/^DEL-\d{4}-\d{2}-(\d+)$/', (string) $code, $matches) === 1) {
+                $maxSequence = max($maxSequence, (int) $matches[1]);
+            }
+        }
+
+        $nextSequence = $maxSequence + 1;
+        do {
+            $candidate = sprintf('%s%04d', $prefix, $nextSequence);
+            $nextSequence++;
+        } while (Delivery::query()->where('delivery_code', $candidate)->exists());
+
+        return $candidate;
+    }
+
+    private function generateDeliveryCode(?DateTimeInterface $date = null): string
+    {
+        return $this->generateNextDeliveryCode($date);
     }
 
     private function assertGsoOfficer(User $actor): void
