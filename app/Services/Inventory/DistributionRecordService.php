@@ -22,6 +22,7 @@ class DistributionRecordService
         private readonly AuditLogService $auditLogService,
         private readonly NotificationService $notificationService,
         private readonly ProcurementStatusSyncService $procurementStatusSyncService,
+        private readonly SupplyRequestFollowUpService $followUpService,
     ) {
     }
 
@@ -333,13 +334,45 @@ class DistributionRecordService
                 'notes' => $remarks ?? $record->notes,
             ])->save();
 
+            $record->loadMissing('items');
+            foreach ($record->items as $item) {
+                if ((float) $item->quantity_received <= 0) {
+                    $item->forceFill([
+                        'quantity_received' => (float) $item->quantity_released,
+                        'received_by' => (int) $actor->id,
+                        'receipt_condition' => $item->receipt_condition ?? 'GOOD',
+                    ])->save();
+                }
+            }
+
             $this->recordStatus($record, $oldStatus, 'RECEIVED', $actor, 'Distribution record acknowledged as received.');
             $this->recordApproval($record, $actor, 'RECEIVED', 'Distribution received confirmation recorded.');
             $this->recordAudit($actor, 'MARK_RECEIVED', $record, []);
             $this->procurementStatusSyncService->syncCompletedStatusesForReceivedSupplyRequest($record->supplyRequest()->firstOrFail(), $actor);
 
-            return $record->fresh(['office', 'receiver']) ?? $record;
+            return $record->fresh(['office', 'receiver', 'items']) ?? $record;
         });
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, DistributionRecord>
+     */
+    private function allFulfillmentDistributionRecords(\App\Models\SupplyRequest $supplyRequest): \Illuminate\Support\Collection
+    {
+        $supplyRequest->loadMissing('distributionRecords.items');
+        $directRecords = $supplyRequest->distributionRecords;
+        $childIds = $this->followUpService->resolveAllFollowUpChildSupplyRequestIds($supplyRequest);
+
+        if (empty($childIds)) {
+            return $directRecords;
+        }
+
+        $childRecords = DistributionRecord::query()
+            ->with('items')
+            ->whereIn('supply_request_id', $childIds)
+            ->get();
+
+        return $directRecords->concat($childRecords)->values();
     }
 
     private function assertContextConsistency(DistributionRecord $record): void
@@ -355,7 +388,7 @@ class DistributionRecordService
         $isProcurementBacked = $record->supplyRequest->purchaseRequests->isNotEmpty();
         $hasDeliveryContext = $record->delivery_id !== null;
         $shortageTotal = 0.0;
-        $releasedByItemId = $record->supplyRequest->distributionRecords
+        $releasedByItemId = $this->allFulfillmentDistributionRecords($record->supplyRequest)
             ->whereIn('status', ['RELEASED', 'RECEIVED'])
             ->flatMap(fn ($distributionRecord) => $distributionRecord->items)
             ->groupBy(fn ($item) => (int) $item->item_id)
@@ -436,7 +469,7 @@ class DistributionRecordService
             ]);
         }
 
-        $releasedForRequest = $record->supplyRequest->distributionRecords
+        $releasedForRequest = $this->allFulfillmentDistributionRecords($record->supplyRequest)
             ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
             ->flatMap(fn ($distributionRecord) => $distributionRecord->items)
             ->filter(function ($distributionItem) use ($itemId, $ignoreDistributionItemId): bool {
@@ -451,25 +484,41 @@ class DistributionRecordService
 
         $maxReleasable = max($requestedQuantity - (float) $releasedForRequest, 0);
 
-        if ($record->delivery_id !== null) {
-            $acceptedFromDelivery = $record->delivery->items
-                ->filter(fn ($deliveryItem): bool => (int) ($deliveryItem->purchaseOrderItem?->item_id ?? 0) === $itemId)
-                ->sum(fn ($deliveryItem): float => max((float) $deliveryItem->received_quantity - (float) $deliveryItem->damaged_quantity, 0));
+        if ($record->delivery_id !== null && $record->delivery !== null) {
+            $isItemInDelivery = $record->delivery->items->contains(
+                fn ($deliveryItem): bool => (int) ($deliveryItem->purchaseOrderItem?->item_id ?? 0) === $itemId
+            );
 
-            $releasedForDelivery = $record->delivery->distributionRecords
-                ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
-                ->flatMap(fn ($distributionRecord) => $distributionRecord->items)
-                ->filter(function ($distributionItem) use ($itemId, $ignoreDistributionItemId): bool {
-                    if ((int) $distributionItem->item_id !== $itemId) {
-                        return false;
-                    }
+            if ($isItemInDelivery) {
+                $acceptedFromDelivery = $record->delivery->items
+                    ->filter(fn ($deliveryItem): bool => (int) ($deliveryItem->purchaseOrderItem?->item_id ?? 0) === $itemId)
+                    ->sum(fn ($deliveryItem): float => max((float) $deliveryItem->received_quantity - (float) $deliveryItem->damaged_quantity - (float) $deliveryItem->missing_quantity, 0));
 
-                    return $ignoreDistributionItemId === null
-                        || (int) $distributionItem->distribution_item_id !== $ignoreDistributionItemId;
-                })
-                ->sum(fn ($distributionItem): float => (float) $distributionItem->quantity_released);
+                $releasedForDelivery = $record->delivery->distributionRecords
+                    ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
+                    ->flatMap(fn ($distributionRecord) => $distributionRecord->items)
+                    ->filter(function ($distributionItem) use ($itemId, $ignoreDistributionItemId): bool {
+                        if ((int) $distributionItem->item_id !== $itemId) {
+                            return false;
+                        }
 
-            $maxReleasable = min($maxReleasable, max((float) $acceptedFromDelivery - (float) $releasedForDelivery, 0));
+                        return $ignoreDistributionItemId === null
+                            || (int) $distributionItem->distribution_item_id !== $ignoreDistributionItemId;
+                    })
+                    ->sum(fn ($distributionItem): float => (float) $distributionItem->quantity_released);
+
+                $deliveryRemaining = max((float) $acceptedFromDelivery - (float) $releasedForDelivery, 0);
+
+                $record->supplyRequest->loadMissing('purchaseOrders.items');
+                $totalOrdered = (float) $record->supplyRequest->purchaseOrders
+                    ->flatMap(fn ($po) => $po->items)
+                    ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
+                    ->sum('quantity_ordered');
+
+                $inventoryPortion = max($requestedQuantity - $totalOrdered, 0.0);
+
+                $maxReleasable = min($maxReleasable, $deliveryRemaining + $inventoryPortion);
+            }
         }
 
         if ($quantity - $maxReleasable > 0.0001) {
@@ -491,11 +540,12 @@ class DistributionRecordService
         $record->load([
             'supplyRequest.items.item.inventory',
             'supplyRequest.distributionRecords.items',
+            'supplyRequest.purchaseOrders.items',
             'delivery.items.purchaseOrderItem',
             'delivery.distributionRecords.items',
         ]);
 
-        $requestReleasedByItemId = $record->supplyRequest->distributionRecords
+        $requestReleasedByItemId = $this->allFulfillmentDistributionRecords($record->supplyRequest)
             ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
             ->flatMap(fn ($distributionRecord) => $distributionRecord->items)
             ->groupBy(fn ($item) => (int) $item->item_id)
@@ -506,7 +556,7 @@ class DistributionRecordService
             $deliveryAcceptedByItemId = $record->delivery->items
                 ->groupBy(fn ($item) => (int) ($item->purchaseOrderItem?->item_id ?? 0))
                 ->map(fn ($items): float => (float) $items->sum(
-                    fn ($item): float => max((float) $item->received_quantity - (float) $item->damaged_quantity, 0)
+                    fn ($item): float => max((float) $item->received_quantity - (float) $item->damaged_quantity - (float) $item->missing_quantity, 0)
                 ));
 
             $deliveryReleasedByItemId = $record->delivery->distributionRecords
@@ -530,8 +580,21 @@ class DistributionRecordService
                 $releasableStock = $availableStock + $reservedStock;
                 $quantity = min($requestRemaining, $releasableStock);
 
-                if ($record->delivery_id !== null) {
-                    $quantity = min($quantity, (float) ($deliveryRemainingByItemId->get($itemId) ?? 0.0));
+                if ($record->delivery_id !== null && $record->delivery !== null) {
+                    $isItemInDelivery = $record->delivery->items->contains(
+                        fn ($di) => (int) ($di->purchaseOrderItem?->item_id ?? 0) === $itemId
+                    );
+
+                    if ($isItemInDelivery) {
+                        $deliveryRemaining = (float) ($deliveryRemainingByItemId->get($itemId) ?? 0.0);
+                        $totalOrdered = (float) $record->supplyRequest->purchaseOrders
+                            ->flatMap(fn ($po) => $po->items)
+                            ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
+                            ->sum('quantity_ordered');
+                        $inventoryPortion = max($requested - $totalOrdered, 0.0);
+
+                        $quantity = min($quantity, $deliveryRemaining + $inventoryPortion);
+                    }
                 }
 
                 if ($quantity <= 0.0001) {

@@ -18,7 +18,10 @@ use Inertia\Response;
 
 class DistributionRecordController
 {
-    public function __construct(private readonly DistributionRecordService $distributionService)
+    public function __construct(
+        private readonly DistributionRecordService $distributionService,
+        private readonly \App\Services\Inventory\SupplyRequestFollowUpService $followUpService,
+    )
     {
     }
 
@@ -125,7 +128,7 @@ class DistributionRecordController
                     ->whereHas('supplyRequest.office', fn ($officeQuery) => $officeQuery->where('code', '!=', 'GSO'));
             })
             ->whereDoesntHave('distributionRecords')
-            ->with(['purchaseOrder.supplyRequest.office'])
+            ->with(['purchaseOrder.supplyRequest.office', 'items.purchaseOrderItem', 'distributionRecords.items'])
             ->latest('delivery_id')
             ->get()
             ->map(fn (Delivery $delivery): ?array => $this->releaseRowFromVerifiedDelivery($delivery))
@@ -137,7 +140,20 @@ class DistributionRecordController
     {
         $supplyRequest = $delivery->purchaseOrder?->supplyRequest;
 
-        if (!$supplyRequest instanceof SupplyRequest) {
+        if (! $supplyRequest instanceof SupplyRequest) {
+            return null;
+        }
+
+        $acceptedTotal = (float) $delivery->items->sum(function ($item): float {
+            return max((float) $item->received_quantity - (float) $item->damaged_quantity - (float) $item->missing_quantity, 0);
+        });
+
+        $releasedTotal = (float) $delivery->distributionRecords
+            ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
+            ->flatMap(fn ($record) => $record->items)
+            ->sum('quantity_released');
+
+        if ($acceptedTotal - $releasedTotal <= 0.0001) {
             return null;
         }
 
@@ -256,12 +272,33 @@ class DistributionRecordController
      */
     private function releasedQuantityByItemId(SupplyRequest $request): array
     {
-        return $request->distributionRecords
+        return $this->allFulfillmentDistributionRecords($request)
             ->whereIn('status', ['RELEASED', 'RECEIVED'])
             ->flatMap(fn ($record) => $record->items)
             ->groupBy(fn ($item) => (int) $item->item_id)
             ->map(fn ($items): float => (float) $items->sum('quantity_released'))
             ->all();
+    }
+
+    /**
+     * @return Collection<int, DistributionRecord>
+     */
+    private function allFulfillmentDistributionRecords(SupplyRequest $request): Collection
+    {
+        $request->loadMissing('distributionRecords.items');
+        $directRecords = $request->distributionRecords;
+
+        $childIds = $this->followUpService->resolveAllFollowUpChildSupplyRequestIds($request);
+        if (empty($childIds)) {
+            return $directRecords;
+        }
+
+        $childRecords = DistributionRecord::query()
+            ->with('items')
+            ->whereIn('supply_request_id', $childIds)
+            ->get();
+
+        return $directRecords->concat($childRecords)->values();
     }
 
     private function resolveFocusReason(?SupplyRequest $request): ?string
@@ -302,7 +339,12 @@ class DistributionRecordController
                     $query->where('supply_request_id', (int) $request->supply_request_id);
                 })
                 ->whereDoesntHave('distributionRecords')
-                ->exists();
+                ->with(['items'])
+                ->get()
+                ->contains(function (Delivery $del): bool {
+                    $accepted = (float) $del->items->sum(fn ($i) => max((float) $i->received_quantity - (float) $i->damaged_quantity - (float) $i->missing_quantity, 0));
+                    return $accepted > 0.0001;
+                });
 
             if (! $hasVerifiedDelivery) {
                 return 'This request is procurement-backed and awaits verified delivery before distribution release.';

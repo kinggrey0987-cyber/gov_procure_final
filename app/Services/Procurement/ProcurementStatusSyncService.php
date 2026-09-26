@@ -9,11 +9,17 @@ use App\Models\PurchaseRequest;
 use App\Models\StatusHistory;
 use App\Models\SupplyRequest;
 use App\Models\User;
+use App\Services\Inventory\SupplyRequestFollowUpService;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Facades\DB;
 
 class ProcurementStatusSyncService
 {
+    public function __construct(
+        private readonly SupplyRequestFollowUpService $followUpService,
+    ) {
+    }
+
     public function syncCompletedStatusesForReceivedSupplyRequest(SupplyRequest $supplyRequest, ?User $actor = null): void
     {
         DB::transaction(function () use ($supplyRequest, $actor): void {
@@ -24,15 +30,29 @@ class ProcurementStatusSyncService
                 'purchaseOrders',
             ]);
 
-            if (! $this->isFullyReceived($supplyRequest)) {
-                return;
+            if ($this->isFullyReceived($supplyRequest)) {
+                $remarks = 'Linked supply request was fully received by the requesting office.';
+
+                $this->transitionSupplyRequest($supplyRequest, $actor, $remarks);
+                $this->transitionPurchaseRequests($supplyRequest->purchaseRequests, $actor, $remarks);
+                $this->transitionPurchaseOrders($supplyRequest->purchaseOrders, $actor, $remarks);
             }
 
-            $remarks = 'Linked supply request was fully received by the requesting office.';
-
-            $this->transitionSupplyRequest($supplyRequest, $actor, $remarks);
-            $this->transitionPurchaseRequests($supplyRequest->purchaseRequests, $actor, $remarks);
-            $this->transitionPurchaseOrders($supplyRequest->purchaseOrders, $actor, $remarks);
+            $parent = $this->followUpService->resolveParentSupplyRequest($supplyRequest);
+            if ($parent instanceof SupplyRequest && (int) $parent->supply_request_id !== (int) $supplyRequest->supply_request_id) {
+                $parent->loadMissing([
+                    'items',
+                    'distributionRecords.items',
+                    'purchaseRequests',
+                    'purchaseOrders',
+                ]);
+                if ($this->isFullyReceived($parent)) {
+                    $remarks = 'Linked supply request was fully received across follow-up deliveries.';
+                    $this->transitionSupplyRequest($parent, $actor, $remarks);
+                    $this->transitionPurchaseRequests($parent->purchaseRequests, $actor, $remarks);
+                    $this->transitionPurchaseOrders($parent->purchaseOrders, $actor, $remarks);
+                }
+            }
         });
     }
 
@@ -65,12 +85,33 @@ class ProcurementStatusSyncService
             return false;
         }
 
-        $received = (float) $supplyRequest->distributionRecords
+        $received = (float) $this->allFulfillmentDistributionRecords($supplyRequest)
             ->where('status', 'RECEIVED')
             ->flatMap(fn (DistributionRecord $record) => $record->items)
             ->sum('quantity_received');
 
         return $received + 0.0001 >= $requested;
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, DistributionRecord>
+     */
+    private function allFulfillmentDistributionRecords(SupplyRequest $supplyRequest): \Illuminate\Support\Collection
+    {
+        $supplyRequest->loadMissing('distributionRecords.items');
+        $directRecords = $supplyRequest->distributionRecords;
+        $childIds = $this->followUpService->resolveAllFollowUpChildSupplyRequestIds($supplyRequest);
+
+        if (empty($childIds)) {
+            return $directRecords;
+        }
+
+        $childRecords = DistributionRecord::query()
+            ->with('items')
+            ->whereIn('supply_request_id', $childIds)
+            ->get();
+
+        return $directRecords->concat($childRecords)->values();
     }
 
     private function transitionSupplyRequest(SupplyRequest $supplyRequest, ?User $actor, string $remarks): void

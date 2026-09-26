@@ -222,4 +222,49 @@ class SupplyRequestFollowUpService
 
         return $results;
     }
+
+    /**
+     * Recursively resolve all follow-up child supply request IDs for a given supply request.
+     *
+     * @return array<int, int>
+     */
+    public function resolveAllFollowUpChildSupplyRequestIds(SupplyRequest $supplyRequest): array
+    {
+        $visited = [(int) $supplyRequest->supply_request_id => true];
+        $allChildIds = [];
+        $currentParentIds = [(int) $supplyRequest->supply_request_id];
+
+        while (! empty($currentParentIds)) {
+            $childrenMap = $this->resolveChildrenForParentIds($currentParentIds);
+            $nextParentIds = [];
+
+            foreach ($childrenMap as $children) {
+                foreach ($children as $child) {
+                    $childId = (int) ($child['supply_request_id'] ?? 0);
+                    if ($childId > 0 && ! isset($visited[$childId])) {
+                        $visited[$childId] = true;
+                        $allChildIds[] = $childId;
+                        $nextParentIds[] = $childId;
+                    }
+                }
+            }
+
+            $currentParentIds = $nextParentIds;
+        }
+
+        return $allChildIds;
+    }
+
+    /**
+     * Resolve the parent supply request if the given request is a follow-up.
+     */
+    public function resolveParentSupplyRequest(SupplyRequest $supplyRequest): ?SupplyRequest
+    {
+        $context = $this->resolveContext($supplyRequest);
+        if ($context['is_follow_up'] && ! empty($context['parent']['supply_request_id'])) {
+            return SupplyRequest::query()->find((int) $context['parent']['supply_request_id']);
+        }
+
+        return null;
+    }
 }

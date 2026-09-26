@@ -1,7 +1,16 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PaginationNav from '@/Components/PaginationNav';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
+import { PageProps as AppPageProps } from '@/types';
+
+type PageProps = AppPageProps & {
+    flash?: {
+        success?: string | null;
+        error?: string | null;
+        message?: string | null;
+    };
+};
 
 type EligibleRow = {
     supply_request_id: number;
@@ -36,6 +45,9 @@ export default function DistributionCreate({ eligibleRows, focusSupplyRequestId 
         storage_location: '',
         notes: '',
     });
+
+    const { flash } = usePage<PageProps>().props;
+    const errorMessages = Object.values(form.errors);
 
     const rows = useMemo(() => eligibleRows.data, [eligibleRows.data]);
     const focusedRowExists = focusSupplyRequestId ? rows.some((row) => row.supply_request_id === focusSupplyRequestId) : false;
@@ -78,6 +90,18 @@ export default function DistributionCreate({ eligibleRows, focusSupplyRequestId 
         >
             <Head title="Supply Distribution" />
             <div className="space-y-3">
+                {flash?.error ? (
+                    <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-900 shadow-xs">
+                        {flash.error}
+                    </div>
+                ) : null}
+                {errorMessages.length > 0 ? (
+                    <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-900 shadow-xs space-y-1">
+                        {errorMessages.map((msg, idx) => (
+                            <p key={idx} className="font-medium text-red-800">• {msg}</p>
+                        ))}
+                    </div>
+                ) : null}
                 {focusSupplyRequestId ? (
                     <div className={`rounded-xl border p-3 text-xs shadow-xs ${focusedRowExists ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
                         {focusedRowExists
