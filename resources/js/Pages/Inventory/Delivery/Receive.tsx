@@ -216,7 +216,7 @@ export default function DeliveryReceive({ delivery }: Props) {
             return;
         }
 
-        if (!delivery.has_existing_si && siFiles.length === 0 && !data.sales_invoice_file) {
+        if (!isZeroCost && !delivery.has_existing_si && siFiles.length === 0 && !data.sales_invoice_file) {
             setFileError('Mandatory: Scanned copy or camera photo of the Supplier Sales Invoice (SI) is required.');
             return;
         }
@@ -228,6 +228,10 @@ export default function DeliveryReceive({ delivery }: Props) {
             delivery_receipt_files: drFiles,
             sales_invoice_file: siFiles[0] ?? null,
             sales_invoice_files: siFiles,
+            sales_invoice_no: isZeroCost && !formData.sales_invoice_no.trim()
+                ? 'N/A (Warranty Replacement)'
+                : formData.sales_invoice_no,
+            sales_invoice_amount: isZeroCost ? '0.00' : formData.sales_invoice_amount,
             supporting_files: supportingFiles,
             items: formData.items.map((item) => ({
                 ...item,
@@ -286,6 +290,20 @@ export default function DeliveryReceive({ delivery }: Props) {
                             </div>
 
                             <div className="p-6 space-y-6">
+                                {isZeroCost && (
+                                    <div className="rounded-lg border border-emerald-300 bg-emerald-50/90 p-4 text-xs text-emerald-950 flex items-start gap-3 shadow-xs">
+                                        <span className="text-xl">🛡️</span>
+                                        <div className="space-y-1">
+                                            <p className="font-bold text-emerald-900 text-sm">Zero-Cost Warranty Replacement Delivery</p>
+                                            <p className="text-emerald-800 leading-relaxed">
+                                                This delivery rectifies and replaces previously damaged or missing items under contractor warranty at ₱0.00.
+                                                <strong> Physical Supplier Delivery Receipt (DR) is mandatory</strong> for physical dock intake.
+                                                <strong> Supplier Sales Invoice (SI) is optional</strong> because no additional municipal funds are disbursed.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {/* Number Inputs */}
                                 <div className="grid gap-5 sm:grid-cols-2">
                                     <FormField label="Supplier Delivery Receipt (DR) No." required error={errors.delivery_receipt_no}>
@@ -299,15 +317,19 @@ export default function DeliveryReceive({ delivery }: Props) {
                                         <p className="mt-1 text-xs text-slate-500">Official Delivery Receipt number printed on the supplier's physical delivery receipt.</p>
                                     </FormField>
 
-                                    <FormField label="Supplier Sales Invoice (SI) No." required error={errors.sales_invoice_no}>
+                                    <FormField label={isZeroCost ? "Supplier Sales Invoice (SI) No. (Optional for Replacements)" : "Supplier Sales Invoice (SI) No."} required={!isZeroCost} error={errors.sales_invoice_no}>
                                         <input
                                             type="text"
                                             value={data.sales_invoice_no}
                                             onChange={(e) => setData('sales_invoice_no', e.target.value)}
-                                            placeholder="e.g., SI-2026-4402 or 44102"
+                                            placeholder={isZeroCost ? "Optional — e.g. N/A or original SI" : "e.g., SI-2026-4402 or 44102"}
                                             className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-900 placeholder-slate-400 focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600"
                                         />
-                                        <p className="mt-1 text-xs text-slate-500">Official BIR-registered Sales Invoice number issued by the winning supplier.</p>
+                                        <p className="mt-1 text-xs text-slate-500">
+                                            {isZeroCost
+                                                ? "Zero-cost replacement orders do not require a new BIR Sales Invoice. You may enter the original invoice number, 'N/A', or leave blank."
+                                                : "Official BIR-registered Sales Invoice number issued by the winning supplier."}
+                                        </p>
                                     </FormField>
                                 </div>
 
@@ -320,7 +342,9 @@ export default function DeliveryReceive({ delivery }: Props) {
                                             onChange={(e) => setData('sales_invoice_date', e.target.value)}
                                             className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-900 focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600"
                                         />
-                                        <p className="mt-1 text-xs text-slate-500">Date indicated on the supplier's Sales Invoice.</p>
+                                        <p className="mt-1 text-xs text-slate-500">
+                                            {isZeroCost ? "Optional for replacement deliveries." : "Date indicated on the supplier's Sales Invoice."}
+                                        </p>
                                     </FormField>
 
                                     <FormField label="Billed Invoice Amount (₱)" error={errors.sales_invoice_amount}>
@@ -364,7 +388,9 @@ export default function DeliveryReceive({ delivery }: Props) {
                                                 </span>
                                             )}
                                         </p>
-                                        <span className="text-xs font-semibold text-rose-600">* DR and SI attachments are mandatory for inspection compliance</span>
+                                        <span className="text-xs font-semibold text-rose-600">
+                                            {isZeroCost ? "* DR attachment is mandatory for warranty intake" : "* DR and SI attachments are mandatory for inspection compliance"}
+                                        </span>
                                     </div>
                                     {fileError && (
                                         <div className="mb-4 rounded-lg border border-rose-300 bg-rose-50 p-3 text-xs font-bold text-rose-700 flex items-center gap-2">
@@ -429,7 +455,7 @@ export default function DeliveryReceive({ delivery }: Props) {
                                         </div>
 
                                         {/* Upload Sales Invoice */}
-                                        <div className={`rounded-xl border border-dashed p-4 transition ${!delivery.has_existing_si && siFiles.length === 0 ? 'border-rose-300 bg-rose-50/30' : 'border-slate-300 bg-slate-50/70 hover:border-indigo-400'}`}>
+                                        <div className={`rounded-xl border border-dashed p-4 transition ${!isZeroCost && !delivery.has_existing_si && siFiles.length === 0 ? 'border-rose-300 bg-rose-50/30' : 'border-slate-300 bg-slate-50/70 hover:border-indigo-400'}`}>
                                             <div className="flex items-start justify-between">
                                                 <div className="space-y-1">
                                                     <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
@@ -440,11 +466,15 @@ export default function DeliveryReceive({ delivery }: Props) {
                                                             </span>
                                                         ) : delivery.has_existing_si ? (
                                                             <span className="rounded bg-emerald-100 border border-emerald-300 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">✓ On File</span>
+                                                        ) : isZeroCost ? (
+                                                            <span className="rounded bg-slate-100 border border-slate-300 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 uppercase">Optional for Replacements</span>
                                                         ) : (
                                                             <span className="rounded bg-rose-100 border border-rose-300 px-1.5 py-0.5 text-[10px] font-black text-rose-700 uppercase">* Required</span>
                                                         )}
                                                     </p>
-                                                    <p className="text-[11px] text-slate-500">Take photos with your camera or browse files (multi-page invoices supported)</p>
+                                                    <p className="text-[11px] text-slate-500">
+                                                        {isZeroCost ? "Optional for replacement orders. Attach original invoice or replacement slip if available." : "Take photos with your camera or browse files (multi-page invoices supported)"}
+                                                    </p>
                                                 </div>
                                                 <span className="text-lg">🧾</span>
                                             </div>
@@ -711,6 +741,27 @@ export default function DeliveryReceive({ delivery }: Props) {
                                 </FormField>
                             </div>
                         </div>
+
+                        {/* Error Alert Box (Always visible above action buttons when validation or required documents fail) */}
+                        {(fileError || Object.keys(errors).length > 0 || hasLineErrors) && (
+                            <div className="rounded-xl border border-rose-300 bg-rose-50 p-4 text-rose-900 shadow-sm">
+                                <div className="flex items-start gap-3">
+                                    <span className="text-xl leading-none">⚠️</span>
+                                    <div className="space-y-1">
+                                        <h4 className="text-sm font-bold text-rose-950">Please resolve the following before confirming receipt:</h4>
+                                        <ul className="list-disc pl-5 text-xs font-semibold text-rose-800 space-y-1">
+                                            {fileError && <li>{fileError}</li>}
+                                            {Object.entries(errors).map(([field, msg]) => (
+                                                <li key={field}>{msg}</li>
+                                            ))}
+                                            {lineErrors.map((le, idx) => (
+                                                <li key={`line_err_${idx}`}>{le}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Action Buttons */}
                         <div className="flex flex-wrap items-center gap-3">

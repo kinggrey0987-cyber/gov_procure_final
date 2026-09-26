@@ -1214,4 +1214,59 @@ class DeliveryFeatureTest extends TestCase
 
         $response->assertForbidden();
     }
+
+    public function test_zero_cost_warranty_replacement_delivery_can_be_received_without_sales_invoice(): void
+    {
+        Storage::fake('private');
+
+        $parentDelivery = $this->createDelivery();
+
+        $this->purchaseOrder->purchaseRequest->update([
+            'source_type' => 'PARTIAL_DELIVERY_FOLLOW_UP',
+            'source_delivery_id' => $parentDelivery->delivery_id,
+        ]);
+
+        $delivery = $this->createDelivery();
+        $item = DeliveryItem::query()->create([
+            'delivery_id' => $delivery->delivery_id,
+            'purchase_order_item_id' => $this->purchaseOrderItem->purchase_order_item_id,
+            'expected_quantity' => 1,
+            'received_quantity' => 0,
+            'damaged_quantity' => 0,
+            'missing_quantity' => 0,
+            'item_condition' => 'PENDING_RECEIPT',
+        ]);
+
+        $drFile = UploadedFile::fake()->create('dr_replacement.pdf', 200, 'application/pdf');
+
+        $response = $this->actingAs($this->gsoOfficer)
+            ->put(route('inventory.deliveries.update', $delivery->delivery_id), [
+                'actual_delivery_date' => now()->toDateString(),
+                'delivery_receipt_no' => 'DR-REPLACE-001',
+                'delivery_receipt_file' => $drFile,
+                'remarks' => 'Replacement unit received in good order.',
+                'items' => [[
+                    'delivery_item_id' => $item->delivery_item_id,
+                    'received_quantity' => 1,
+                    'damaged_quantity' => 0,
+                ]],
+            ]);
+
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect(route('inventory.deliveries.show', $delivery->delivery_id));
+
+        $this->assertDatabaseHas('deliveries', [
+            'delivery_id' => $delivery->delivery_id,
+            'delivery_receipt_no' => 'DR-REPLACE-001',
+            'sales_invoice_no' => 'N/A (Warranty Replacement)',
+            'sales_invoice_amount' => 0.00,
+            'receipt_status' => 'RECEIVED',
+        ]);
+
+        $this->assertDatabaseHas('documents', [
+            'related_module' => 'deliveries',
+            'related_reference_id' => $delivery->delivery_id,
+            'document_kind' => 'delivery_receipt',
+        ]);
+    }
 }

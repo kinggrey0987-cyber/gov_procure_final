@@ -159,7 +159,9 @@ class DeliveryService
                 'actual_delivery_date' => $payload['actual_delivery_date'] ?? $delivery->actual_delivery_date,
                 'expected_arrival_date' => $payload['expected_arrival_date'] ?? $delivery->expected_arrival_date,
                 'delivery_receipt_no' => $payload['delivery_receipt_no'] ?? $delivery->delivery_receipt_no,
-                'sales_invoice_no' => $payload['sales_invoice_no'] ?? $delivery->sales_invoice_no,
+                'sales_invoice_no' => !empty(trim((string) ($payload['sales_invoice_no'] ?? '')))
+                    ? $payload['sales_invoice_no']
+                    : (($delivery->purchaseOrder?->is_zero_cost_replacement ?? false) ? 'N/A (Warranty Replacement)' : $delivery->sales_invoice_no),
                 'sales_invoice_date' => $payload['sales_invoice_date'] ?? $delivery->sales_invoice_date,
                 'sales_invoice_amount' => ($delivery->purchaseOrder?->is_zero_cost_replacement ?? false)
                     ? 0.00
@@ -315,7 +317,10 @@ class DeliveryService
                 'receipt_status' => $delivery->receipt_status,
             ],
             logDomain: 'BUSINESS',
-            officeId: $delivery->purchaseOrder->supplyRequest->office_id ?? null,
+            officeId: $delivery->purchaseOrder?->supplyRequest?->office_id
+                ?? $delivery->purchaseOrder?->purchaseRequest?->office_id
+                ?? $delivery->purchaseOrder?->purchaseRequest?->supplyRequest?->office_id
+                ?? null,
         );
     }
 }

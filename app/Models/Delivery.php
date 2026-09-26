@@ -45,6 +45,15 @@ class Delivery extends Model
         'sales_invoice_amount' => 'decimal:2',
     ];
 
+    protected $appends = [
+        'is_zero_cost_replacement',
+    ];
+
+    public function getIsZeroCostReplacementAttribute(): bool
+    {
+        return (bool) ($this->purchaseOrder?->is_zero_cost_replacement ?? false);
+    }
+
     public function documents(): HasMany
     {
         return $this->hasMany(Document::class, 'related_reference_id', 'delivery_id')

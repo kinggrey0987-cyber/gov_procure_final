@@ -231,7 +231,10 @@ class DeliveryVerificationService
                 'verification_status' => $delivery->receipt_status,
             ],
             logDomain: 'BUSINESS',
-            officeId: $delivery->purchaseOrder->supplyRequest->office_id ?? null,
+            officeId: $delivery->purchaseOrder?->supplyRequest?->office_id
+                ?? $delivery->purchaseOrder?->purchaseRequest?->office_id
+                ?? $delivery->purchaseOrder?->purchaseRequest?->supplyRequest?->office_id
+                ?? null,
         );
     }
 }

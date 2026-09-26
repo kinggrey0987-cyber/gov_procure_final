@@ -15,27 +15,68 @@ class UpdateDeliveryRequest extends FormRequest
         return auth()->user()?->can('delivery.update', $this->route('delivery')) ?? false;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $delivery = $this->route('delivery');
+        if (! $delivery instanceof \App\Models\Delivery && is_numeric($delivery)) {
+            $delivery = \App\Models\Delivery::find($delivery);
+        }
+
+        $isZeroCost = ($delivery instanceof \App\Models\Delivery)
+            && (
+                (bool) ($delivery->purchaseOrder?->is_zero_cost_replacement ?? false)
+                || (int) ($delivery->purchaseOrder?->purchaseRequest?->source_delivery_id ?? 0) > 0
+                || in_array((string) ($delivery->purchaseOrder?->purchaseRequest?->source_type ?? ''), ['PARTIAL_DELIVERY_FOLLOW_UP', 'CLAIM_REPLACEMENT_FOLLOW_UP'], true)
+            );
+
+        if ($isZeroCost) {
+            $currentSiNo = trim((string) $this->input('sales_invoice_no', ''));
+            if ($currentSiNo === '') {
+                $this->merge([
+                    'sales_invoice_no' => 'N/A (Warranty Replacement)',
+                    'sales_invoice_amount' => 0.00,
+                ]);
+            }
+        }
+    }
+
     /**
      * @return array<string, array<string>>
      */
     public function rules(): array
     {
-        $earliestAllowedDeliveryDate = $this->poPlacedDate() ?? now()->toDateString();
         $delivery = $this->route('delivery');
+        if (! $delivery instanceof \App\Models\Delivery && is_numeric($delivery)) {
+            $delivery = \App\Models\Delivery::find($delivery);
+        }
+
+        $poPlacedDate = $this->poPlacedDate();
+        $earliestAllowedDeliveryDate = $poPlacedDate
+            ? \Carbon\Carbon::parse($poPlacedDate)->subDays(7)->toDateString()
+            : now()->subYear()->toDateString();
+        $maxAllowedDeliveryDate = now('Asia/Manila')->addDay()->toDateString();
+
+        $isZeroCost = ($delivery instanceof \App\Models\Delivery)
+            && (
+                (bool) ($delivery->purchaseOrder?->is_zero_cost_replacement ?? false)
+                || (int) ($delivery->purchaseOrder?->purchaseRequest?->source_delivery_id ?? 0) > 0
+                || in_array((string) ($delivery->purchaseOrder?->purchaseRequest?->source_type ?? ''), ['PARTIAL_DELIVERY_FOLLOW_UP', 'CLAIM_REPLACEMENT_FOLLOW_UP'], true)
+            );
+
         $hasExistingDr = $delivery instanceof \App\Models\Delivery
             && $delivery->documents()->where('document_kind', 'delivery_receipt')->exists();
         $hasExistingSi = $delivery instanceof \App\Models\Delivery
             && $delivery->documents()->where('document_kind', 'sales_invoice')->exists();
 
         $drRule = ($this->has('items') && ! $hasExistingDr && ! $this->hasFile('delivery_receipt_file') && ! $this->hasFile('delivery_receipt_files') && ! app()->environment('testing')) ? 'required' : 'nullable';
-        $siRule = ($this->has('items') && ! $hasExistingSi && ! $this->hasFile('sales_invoice_file') && ! $this->hasFile('sales_invoice_files') && ! app()->environment('testing')) ? 'required' : 'nullable';
+        $siRule = ($this->has('items') && ! $isZeroCost && ! $hasExistingSi && ! $this->hasFile('sales_invoice_file') && ! $this->hasFile('sales_invoice_files') && ! app()->environment('testing')) ? 'required' : 'nullable';
 
         return [
-            'actual_delivery_date' => [$this->has('items') ? 'required' : 'nullable', 'date', 'after_or_equal:'.$earliestAllowedDeliveryDate, 'before_or_equal:today'],
+            'actual_delivery_date' => [$this->has('items') ? 'required' : 'nullable', 'date', 'after_or_equal:'.$earliestAllowedDeliveryDate, 'before_or_equal:'.$maxAllowedDeliveryDate],
             'expected_arrival_date' => ['nullable', 'date'],
             'delivery_receipt_no' => [$this->has('items') ? 'required' : 'nullable', 'string', 'max:100'],
-            'sales_invoice_no' => [$this->has('items') ? 'required' : 'nullable', 'string', 'max:100'],
-            'sales_invoice_date' => ['nullable', 'date', 'before_or_equal:today'],
+            'sales_invoice_no' => [($this->has('items') && ! $isZeroCost) ? 'required' : 'nullable', 'string', 'max:100'],
+            'sales_invoice_date' => ['nullable', 'date', 'before_or_equal:'.$maxAllowedDeliveryDate],
             'sales_invoice_amount' => ['nullable', 'numeric', 'min:0'],
             'delivery_receipt_file' => [$drRule, 'file', 'max:10240', 'mimes:pdf,png,jpg,jpeg,webp'],
             'delivery_receipt_files' => ['nullable', 'array'],
