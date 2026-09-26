@@ -74,7 +74,22 @@ class TransactionalDataRefreshSeeder extends Seeder
 
         $existingTables = array_filter($tablesToTruncate, fn (string $table) => Schema::hasTable($table));
         if (! empty($existingTables)) {
-            DB::statement('TRUNCATE TABLE ' . implode(', ', $existingTables) . ' RESTART IDENTITY CASCADE;');
+            Schema::disableForeignKeyConstraints();
+
+            $driver = DB::getDriverName();
+            if ($driver === 'pgsql') {
+                DB::statement('TRUNCATE TABLE ' . implode(', ', $existingTables) . ' RESTART IDENTITY CASCADE;');
+            } else {
+                foreach ($existingTables as $table) {
+                    try {
+                        DB::table($table)->truncate();
+                    } catch (\Throwable $e) {
+                        DB::table($table)->delete();
+                    }
+                }
+            }
+
+            Schema::enableForeignKeyConstraints();
         }
 
         // -------------------------------------------------------------------------
