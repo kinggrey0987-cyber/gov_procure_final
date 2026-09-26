@@ -107,8 +107,13 @@ export default function PurchaseOrdersCreate({
                 remarks: prev.remarks || `Zero-cost warranty replacement for delivery discrepancy under delivery ${selectedPurchaseRequest.parent_delivery_code} (PO ${selectedPurchaseRequest.parent_po_number}).`,
                 terms_notes: prev.terms_notes || 'Zero-cost supplier replacement under warranty rectification (RA 9184 & COA).',
             }));
+        } else if (accreditedSuppliers.length > 0 && form.data.supplier_id !== 0) {
+            const isAccredited = accreditedSuppliers.some((s) => s.supplier_id === form.data.supplier_id);
+            if (!isAccredited) {
+                form.setData('supplier_id', 0);
+            }
         }
-    }, [selectedPurchaseRequest?.purchase_request_id]);
+    }, [selectedPurchaseRequest?.purchase_request_id, accreditedSuppliers]);
 
     const hasEligiblePurchaseRequests = eligiblePurchaseRequests.length > 0;
     const hasSuppliers = suppliers.length > 0;
@@ -171,7 +176,11 @@ export default function PurchaseOrdersCreate({
                         {selectedPurchaseRequest?.is_discrepancy_follow_up ? (
                             <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900 shadow-sm md:col-span-2">
                                 <div className="flex items-start gap-3">
-                                    <span className="text-2xl">🛡️</span>
+                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-200 text-amber-900 flex-shrink-0">
+                                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                        </svg>
+                                    </div>
                                     <div>
                                         <h4 className="font-bold text-amber-950">
                                             Zero-Cost Supplier Replacement Order (COA & RA 9184 Compliant)
@@ -202,7 +211,7 @@ export default function PurchaseOrdersCreate({
                             {hasEligiblePurchaseRequests ? (
                                 eligiblePurchaseRequests.map((row) => (
                                     <option key={row.purchase_request_id} value={row.purchase_request_id}>
-                                        {row.is_discrepancy_follow_up ? '🛡️ [WARRANTY REPLACEMENT] ' : ''}
+                                        {row.is_discrepancy_follow_up ? '[WARRANTY REPLACEMENT] ' : ''}
                                         PR #{row.purchase_request_id} | {row.supply_request?.request_code || `SR #${row.supply_request?.supply_request_id ?? '-'}`} | {row.office?.code || row.office?.name || 'Unknown Office'}
                                     </option>
                                 ))
@@ -224,19 +233,18 @@ export default function PurchaseOrdersCreate({
                             disabled={!hasSuppliers || Boolean(selectedPurchaseRequest?.is_discrepancy_follow_up)}
                             required
                         >
-                            <option value={0}>-- Select a Supplier --</option>
-                            {accreditedSuppliers.length > 0 && (
-                                <optgroup label={`⭐ Accredited for ${prCategoryName || 'Requested Category'}`}>
+                            <option value={0}>-- Select Supplier --</option>
+                            {accreditedSuppliers.length > 0 ? (
+                                <optgroup label={`Accredited Suppliers for ${prCategoryName || 'Requested Category'}`}>
                                     {accreditedSuppliers.map((row) => (
                                         <option key={row.supplier_id} value={row.supplier_id}>
-                                            ✓ {row.supplier_name} (Accredited)
+                                            {row.supplier_name}
                                         </option>
                                     ))}
                                 </optgroup>
-                            )}
-                            {otherSuppliers.length > 0 && (
-                                <optgroup label={accreditedSuppliers.length > 0 ? 'Other Registered Vendors' : 'All Registered Vendors'}>
-                                    {otherSuppliers.map((row) => (
+                            ) : (
+                                <optgroup label={prCategoryName ? `No accredited suppliers for ${prCategoryName}` : 'Registered Vendors'}>
+                                    {suppliers.map((row) => (
                                         <option key={row.supplier_id} value={row.supplier_id}>
                                             {row.supplier_name}
                                         </option>
@@ -250,7 +258,7 @@ export default function PurchaseOrdersCreate({
                                 {accreditedSuppliers.length > 0 ? (
                                     <span className="text-emerald-700 font-medium"> ({accreditedSuppliers.length} accredited vendor{accreditedSuppliers.length === 1 ? '' : 's'})</span>
                                 ) : (
-                                    <span className="text-amber-700"> (No specialized vendor accredited)</span>
+                                    <span className="text-amber-700"> (No accredited vendor registered for this category)</span>
                                 )}
                             </p>
                         ) : null}

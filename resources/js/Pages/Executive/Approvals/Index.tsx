@@ -388,6 +388,7 @@ export default function ExecutiveApprovalsIndex({ records, recordsExport, summar
                             data={statusMix}
                             centerLabel="Queue"
                             emptyText="No approval status metrics are available."
+                            paletteType="status"
                         />
                     </ExecutiveChartCard>
                     </div>

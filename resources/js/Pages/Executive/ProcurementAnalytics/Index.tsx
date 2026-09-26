@@ -715,6 +715,7 @@ export default function ProcurementAnalyticsIndex({
                                         data={statusMixPr}
                                         centerLabel="PR"
                                         emptyText="No PR data in current filter scope"
+                                        paletteType="status"
                                     />
                                 </div>
                                 <div className="pt-4">
@@ -727,6 +728,7 @@ export default function ProcurementAnalyticsIndex({
                                         data={statusMixPo}
                                         centerLabel="PO"
                                         emptyText="No PO data in current filter scope"
+                                        paletteType="status"
                                     />
                                 </div>
                             </div>

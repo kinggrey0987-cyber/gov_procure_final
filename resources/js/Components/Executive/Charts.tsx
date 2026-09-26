@@ -454,7 +454,7 @@ export function DonutChart({
     emptyText: string;
     centerLabel?: string;
     layout?: 'auto' | 'col';
-    paletteType?: 'default' | 'severity';
+    paletteType?: 'default' | 'severity' | 'status';
 }) {
     const filteredData = data.filter((row) => row.value > 0);
 
@@ -466,7 +466,63 @@ export function DonutChart({
     const radius = 72;
     const strokeWidth = 24;
     const circumference = 2 * Math.PI * radius;
-    const defaultPalette = ['rgb(185 28 28)', 'rgb(245 158 11)', 'rgb(37 99 235)', 'rgb(22 163 74)', 'rgb(71 85 105)', 'rgb(225 29 72)'];
+    const defaultPalette = [
+        'rgb(37 99 235)', // Blue
+        'rgb(16 185 129)', // Emerald
+        'rgb(245 158 11)', // Amber
+        'rgb(139 92 246)', // Violet
+        'rgb(14 165 233)', // Sky
+        'rgb(225 29 72)', // Rose
+    ];
+
+    const getStatusColor = (label: string): string => {
+        const upper = label.toUpperCase().trim();
+        if (
+            upper.includes('COMPLETED') ||
+            upper.includes('APPROVED') ||
+            upper.includes('DELIVERED') ||
+            upper.includes('PUBLISHED') ||
+            upper.includes('RESOLVED')
+        ) {
+            return 'rgb(16 185 129)'; // Emerald
+        }
+        if (
+            upper.includes('PROCESSING') ||
+            upper.includes('IN_PROGRESS') ||
+            upper.includes('IN_REVIEW') ||
+            upper.includes('REVIEW')
+        ) {
+            return 'rgb(37 99 235)'; // Blue
+        }
+        if (upper.includes('PLACED') || upper.includes('ISSUED')) {
+            return 'rgb(79 70 229)'; // Indigo
+        }
+        if (upper.includes('RECEIVED') || upper.includes('CLAIMED')) {
+            return 'rgb(2 132 199)'; // Sky
+        }
+        if (
+            upper.includes('OPEN') ||
+            upper.includes('DRAFT') ||
+            upper.includes('PENDING') ||
+            upper.includes('SUBMITTED')
+        ) {
+            return 'rgb(245 158 11)'; // Amber
+        }
+        if (upper.includes('RETURNED') || upper.includes('REVISION')) {
+            return 'rgb(139 92 246)'; // Violet
+        }
+        if (
+            upper.includes('REJECTED') ||
+            upper.includes('CANCELLED') ||
+            upper.includes('DISAPPROVED')
+        ) {
+            return 'rgb(225 29 72)'; // Rose
+        }
+        if (upper.includes('CLOSED') || upper.includes('ARCHIVED')) {
+            return 'rgb(100 116 139)'; // Slate
+        }
+        return '';
+    };
 
     const getColor = (label: string, index: number) => {
         if (paletteType === 'severity') {
@@ -476,9 +532,39 @@ export function DonutChart({
             if (upper.includes('LOW')) return 'rgb(100 116 139)';
             if (upper.includes('RESOLVED') || upper.includes('APPROVED')) return 'rgb(16 185 129)';
         }
+        if (paletteType === 'status') {
+            const statusColor = getStatusColor(label);
+            if (statusColor) return statusColor;
+        }
+        const autoStatusColor = getStatusColor(label);
+        if (autoStatusColor) return autoStatusColor;
+
         return defaultPalette[index % defaultPalette.length];
     };
 
+    const minFraction = filteredData.length > 1 ? 0.025 : 0;
+    const hasSmallSegments = filteredData.length > 1 && filteredData.some((row) => row.value / total < minFraction);
+
+    let displayFractions: number[] = [];
+    if (hasSmallSegments) {
+        const smallCount = filteredData.filter((row) => row.value / total < minFraction).length;
+        const smallTotal = smallCount * minFraction;
+        const largeSum = filteredData
+            .filter((row) => row.value / total >= minFraction)
+            .reduce((sum, row) => sum + row.value, 0);
+
+        displayFractions = filteredData.map((row) => {
+            const rawFrac = row.value / total;
+            if (rawFrac < minFraction) {
+                return minFraction;
+            }
+            return largeSum > 0 ? (row.value / largeSum) * (1 - smallTotal) : rawFrac;
+        });
+    } else {
+        displayFractions = filteredData.map((row) => row.value / total);
+    }
+
+    const gap = filteredData.length > 1 ? 2.5 : 0;
     let runningOffset = 0;
 
     const isColLayout = layout === 'col';
@@ -497,9 +583,10 @@ export function DonutChart({
                     />
 
                     {filteredData.map((segment, index) => {
-                        const segmentLength = (segment.value / total) * circumference;
-                        const segmentOffset = runningOffset;
-                        runningOffset += segmentLength;
+                        const arcLength = displayFractions[index] * circumference;
+                        const segmentOffset = runningOffset + gap / 2;
+                        runningOffset += arcLength;
+                        const strokeLength = Math.max(1, arcLength - gap);
                         const color = getColor(segment.label, index);
 
                         return (
@@ -511,7 +598,7 @@ export function DonutChart({
                                 fill="none"
                                 stroke={color}
                                 strokeWidth={strokeWidth}
-                                strokeDasharray={`${segmentLength} ${circumference - segmentLength}`}
+                                strokeDasharray={`${strokeLength} ${circumference - strokeLength}`}
                                 strokeDashoffset={-segmentOffset}
                                 transform="rotate(-90 110 110)"
                                 strokeLinecap="butt"
