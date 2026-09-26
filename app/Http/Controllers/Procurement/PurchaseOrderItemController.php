@@ -106,11 +106,18 @@ class PurchaseOrderItemController extends Controller
             }
         }
 
-        $encodedSrItemIds = $purchaseOrder->items()
-            ->whereNotNull('supply_request_item_id')
-            ->pluck('supply_request_item_id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
+        $encodedSrItemIds = collect();
+        foreach ($purchaseOrder->items as $poItem) {
+            if ($poItem->supply_request_item_id) {
+                $encodedSrItemIds->push((int) $poItem->supply_request_item_id);
+            }
+            if (! empty($poItem->source_request_item_ids) && is_array($poItem->source_request_item_ids)) {
+                foreach ($poItem->source_request_item_ids as $srcId) {
+                    $encodedSrItemIds->push((int) $srcId);
+                }
+            }
+        }
+        $encodedSrItemIds = $encodedSrItemIds->map(fn ($id) => (int) $id)->unique()->all();
 
         $encodedSourceItemIds = $sourceItems->filter(function ($si) use ($encodedSrItemIds) {
             return in_array((int) $si['supply_request_item_id'], $encodedSrItemIds, true);

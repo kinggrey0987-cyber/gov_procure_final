@@ -44,6 +44,16 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('purchase_order_items') && ! \Illuminate\Support\Facades\Schema::hasColumn('purchase_order_items', 'source_request_item_ids')) {
+                \Illuminate\Support\Facades\Schema::table('purchase_order_items', function (\Illuminate\Database\Schema\Blueprint $table) {
+                    $table->json('source_request_item_ids')->nullable()->after('supply_request_item_id');
+                });
+            }
+        } catch (\Throwable) {
+            // DB connection or migration not ready yet
+        }
+
         \Illuminate\Support\Facades\Storage::extend('google', function ($app, $config) {
             $options = [];
             if (! empty($config['teamDriveId'] ?? null)) {

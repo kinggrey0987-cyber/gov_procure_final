@@ -17,6 +17,7 @@ type PurchaseOrder = {
 type PurchaseOrderItem = {
     purchase_order_item_id: number;
     supply_request_item_id: number;
+    source_request_item_ids?: number[] | null;
     item_id: number;
     item_name_snapshot: string;
     specification?: string | null;
@@ -369,7 +370,11 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                                         <td className="px-3 py-2">{row.item_id}</td>
                                         <td className="px-3 py-2 font-medium text-slate-900">
                                             {row.item_name_snapshot}
-                                            {row.supply_request_item_id ? (
+                                            {row.source_request_item_ids && row.source_request_item_ids.length > 1 ? (
+                                                <span className="ml-1.5 inline-flex items-center rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] font-mono font-semibold text-blue-700">
+                                                    SR Lines: #{row.source_request_item_ids.join(', #')} (Merged)
+                                                </span>
+                                            ) : row.supply_request_item_id ? (
                                                 <span className="ml-1.5 inline-flex items-center rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono text-slate-500">
                                                     SR Line #{row.supply_request_item_id}
                                                 </span>

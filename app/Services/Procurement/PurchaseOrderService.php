@@ -215,12 +215,18 @@ class PurchaseOrderService
                 ]);
             }
         } elseif ($allSourceItemIds->isNotEmpty()) {
-            $encodedItemIds = $purchaseOrder->items()
-                ->whereNotNull('supply_request_item_id')
-                ->where('supply_request_item_id', '>', 0)
-                ->pluck('supply_request_item_id')
-                ->map(fn ($id) => (int) $id)
-                ->unique();
+            $encodedItemIds = collect();
+            foreach ($purchaseOrder->items as $item) {
+                if ($item->supply_request_item_id) {
+                    $encodedItemIds->push((int) $item->supply_request_item_id);
+                }
+                if (! empty($item->source_request_item_ids) && is_array($item->source_request_item_ids)) {
+                    foreach ($item->source_request_item_ids as $srcId) {
+                        $encodedItemIds->push((int) $srcId);
+                    }
+                }
+            }
+            $encodedItemIds = $encodedItemIds->map(fn ($id) => (int) $id)->unique();
 
             $missingItemIds = $allSourceItemIds->diff($encodedItemIds);
 
@@ -351,11 +357,22 @@ class PurchaseOrderService
 
         $incomingSupplyRequestItemId = (int) $payload['supply_request_item_id'];
 
-        $alreadyExists = $purchaseOrder->items()
-            ->where('supply_request_item_id', $incomingSupplyRequestItemId)
-            ->exists();
+        // Block re-adding an already encoded source request line
+        $alreadyEncoded = false;
+        foreach ($purchaseOrder->items as $existingPoItem) {
+            if ((int) $existingPoItem->supply_request_item_id === $incomingSupplyRequestItemId) {
+                $alreadyEncoded = true;
+                break;
+            }
+            if (! empty($existingPoItem->source_request_item_ids) && is_array($existingPoItem->source_request_item_ids)) {
+                if (in_array($incomingSupplyRequestItemId, array_map('intval', $existingPoItem->source_request_item_ids), true)) {
+                    $alreadyEncoded = true;
+                    break;
+                }
+            }
+        }
 
-        if ($alreadyExists) {
+        if ($alreadyEncoded) {
             throw ValidationException::withMessages([
                 'supply_request_item_id' => 'This source request item is already encoded in the purchase order. Update the existing line instead of adding a duplicate.',
             ]);
@@ -374,7 +391,7 @@ class PurchaseOrderService
 
         $this->assertItemMatchesOrderContext($purchaseOrder, $supplyRequestItem);
 
-        return DB::transaction(function () use ($purchaseOrder, $actor, $payload, $supplyRequestItem): PurchaseOrderItem {
+        return DB::transaction(function () use ($purchaseOrder, $actor, $payload, $supplyRequestItem, $incomingSupplyRequestItemId): PurchaseOrderItem {
             $purchaseRequestItem = $purchaseOrder->purchaseRequest?->items
                 ?->firstWhere('item_id', $supplyRequestItem->item_id);
             $approvedShortage = $purchaseRequestItem ? (float) $purchaseRequestItem->quantity_requested : null;
@@ -387,8 +404,41 @@ class PurchaseOrderService
             $unit = trim((string) ($payload['unit'] ?? ($supplyRequestItem->item?->default_unit ?? '')));
             $specification = $this->resolveItemSpecification($payload, $supplyRequestItem);
 
+            // Auto-merge: if the same item_id + specification already exists as
+            // a PO line, add the quantity to the existing line at the same unit
+            // price rather than creating a duplicate line. Show it once!
+            $existingItem = $purchaseOrder->items()
+                ->where('item_id', (int) $supplyRequestItem->item_id)
+                ->where('specification', $specification)
+                ->first();
+
+            if ($existingItem) {
+                $mergedQuantity = round((float) $existingItem->quantity_ordered + $quantity, 2);
+                $currentSourceIds = (array) ($existingItem->source_request_item_ids ?? [(int) $existingItem->supply_request_item_id]);
+                $currentSourceIds[] = $incomingSupplyRequestItemId;
+                $updatedSourceIds = array_values(array_unique(array_map('intval', $currentSourceIds)));
+
+                $existingItem->forceFill([
+                    'quantity_ordered' => $mergedQuantity,
+                    'total_price' => round($mergedQuantity * (float) $existingItem->unit_price, 2),
+                    'source_request_item_ids' => $updatedSourceIds,
+                ])->save();
+
+                $this->recomputeTotalAmount($purchaseOrder);
+                $this->recordStatus($purchaseOrder, (string) $purchaseOrder->status, (string) $purchaseOrder->status, $actor, sprintf(
+                    'Merged %s qty into existing line (new total qty: %s).',
+                    number_format($quantity, 2),
+                    number_format($mergedQuantity, 2),
+                ));
+                $this->recordAudit($actor, 'MERGE_ITEM', $purchaseOrder);
+                $this->createOrUpdatePriceZScoreAnomaly($existingItem);
+
+                return $existingItem;
+            }
+
             $item = $purchaseOrder->items()->create([
-                'supply_request_item_id' => (int) $supplyRequestItem->supply_request_item_id,
+                'supply_request_item_id' => $incomingSupplyRequestItemId,
+                'source_request_item_ids' => [$incomingSupplyRequestItemId],
                 'item_id' => (int) $supplyRequestItem->item_id,
                 'item_name_snapshot' => $supplyRequestItem->item_name_snapshot ?: ($supplyRequestItem->item?->item_name ?? 'Unknown item'),
                 'specification' => $specification,

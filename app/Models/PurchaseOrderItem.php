@@ -21,6 +21,7 @@ class PurchaseOrderItem extends Model
     protected $fillable = [
         'purchase_order_id',
         'supply_request_item_id',
+        'source_request_item_ids',
         'item_id',
         'item_name_snapshot',
         'specification',
@@ -33,6 +34,7 @@ class PurchaseOrderItem extends Model
     protected $casts = [
         'purchase_order_id' => 'integer',
         'supply_request_item_id' => 'integer',
+        'source_request_item_ids' => 'array',
         'item_id' => 'integer',
         'quantity_ordered' => 'decimal:2',
         'unit_price' => 'decimal:2',
