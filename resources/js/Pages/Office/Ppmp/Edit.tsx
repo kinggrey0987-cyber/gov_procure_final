@@ -6,21 +6,12 @@ import { FormEvent, useMemo, useState } from 'react';
 import { FUND_SOURCES } from '@/constants/fundSources';
 import { dateInputValue } from '@/lib/dateInput';
 
-type SpecificationOption = {
-    item_specification_id: number;
-    specification: string;
-};
-
-type ItemOption = {
-    item_id: number;
-    item_name: string;
-    item_category_id: number;
-    item_category_name: string;
-    default_unit?: string | null;
-    pieces_per_box?: number | null;
-    sub_unit?: string | null;
-    specifications?: SpecificationOption[];
-};
+import {
+    buildCatalogGroups,
+    findGroupByItemId,
+    findVariantByItemId,
+    ItemOption,
+} from '@/lib/catalogGrouping';
 
 type ExistingItem = {
     ppmp_item_id: number;
@@ -83,6 +74,8 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
         remarks: ppmp.remarks ?? '',
     });
 
+    const [selectedNewGroupKey, setSelectedNewGroupKey] = useState<string>('');
+
     const newItem = useForm({
         item_id: '',
         item_category_id: '',
@@ -122,6 +115,7 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                 newItem.reset('item_id', 'item_category_id', 'quantity', 'unit_cost', 'procurement_schedule', 'remarks');
                 newItem.setData('quantity', '1');
                 newItem.setData('unit_cost', '');
+                setSelectedNewGroupKey('');
             },
         });
     };
@@ -152,9 +146,16 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
         });
     };
 
-    const onOptionChange = (value: string) => {
-        const option = itemOptions.find((entry) => String(entry.item_id) === value);
-        if (!option) {
+    const catalogGroups = useMemo(() => buildCatalogGroups(itemOptions), [itemOptions]);
+    const selectedNewGroup = useMemo(
+        () => catalogGroups.find((g) => g.group_key === selectedNewGroupKey),
+        [catalogGroups, selectedNewGroupKey]
+    );
+
+    const chooseNewGroup = (groupKey: string) => {
+        setSelectedNewGroupKey(groupKey);
+        const group = catalogGroups.find((g) => g.group_key === groupKey);
+        if (!group) {
             newItem.setData((prev) => ({
                 ...prev,
                 item_id: '',
@@ -164,18 +165,49 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
             return;
         }
 
-        const specs = option.specifications || [];
-        const autoRemarks = specs.length === 1 ? specs[0].specification : '';
+        if (group.variants.length === 1) {
+            const single = group.variants[0];
+            newItem.setData((prev) => ({
+                ...prev,
+                item_id: String(single.item_id),
+                item_category_id: String(single.item_category_id),
+                remarks: single.specification,
+            }));
+        } else {
+            newItem.setData((prev) => ({
+                ...prev,
+                item_id: '',
+                item_category_id: String(group.item_category_id),
+                remarks: '',
+            }));
+        }
+    };
+
+    const chooseNewVariant = (variantItemId: string) => {
+        const variant = selectedNewGroup?.variants.find((v) => String(v.item_id) === variantItemId)
+            || findVariantByItemId(catalogGroups, variantItemId);
+
+        if (!variant) {
+            newItem.setData((prev) => ({
+                ...prev,
+                item_id: '',
+                remarks: '',
+            }));
+            return;
+        }
 
         newItem.setData((prev) => ({
             ...prev,
-            item_id: String(option.item_id),
-            item_category_id: String(option.item_category_id),
-            remarks: autoRemarks,
+            item_id: String(variant.item_id),
+            item_category_id: String(variant.item_category_id),
+            remarks: variant.specification,
         }));
     };
 
-    const itemOptionById = new Map(itemOptions.map((option) => [String(option.item_id), option]));
+    const itemOptionById = useMemo(
+        () => new Map(itemOptions.map((option) => [String(option.item_id), option])),
+        [itemOptions]
+    );
     const selectedNewItemUnit = itemOptionById.get(newItem.data.item_id)?.default_unit || '-';
     const newItemDuplicateMessage = useMemo(
         () => duplicateMessageForNewItem(newItem.data.item_id, newItem.data.procurement_schedule, newItem.data.remarks, ppmp.items, itemOptionById),
@@ -471,11 +503,11 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                         <p className="mt-1 text-sm text-slate-600">Add a planning line to this PPMP using the required fields. The same catalog item cannot be repeated for the same procurement quarter.</p>
                     </div>
                     {(() => {
-                        const selectedNewOpt = itemOptionById.get(newItem.data.item_id);
-                        const selectedNewSpecs = selectedNewOpt?.specifications || [];
-                        const newUnit = selectedNewOpt?.default_unit || 'box';
-                        const newPieces = selectedNewOpt?.pieces_per_box || 1;
-                        const newSubUnit = selectedNewOpt?.sub_unit || 'piece';
+                        const selectedNewOpt = itemOptionById.get(String(newItem.data.item_id))
+                            || (selectedNewGroup?.variants[0] ? itemOptionById.get(String(selectedNewGroup.variants[0].item_id)) : undefined);
+                        const newUnit = selectedNewOpt?.default_unit || selectedNewGroup?.default_unit || 'box';
+                        const newPieces = selectedNewOpt?.pieces_per_box || selectedNewGroup?.pieces_per_box || 1;
+                        const newSubUnit = selectedNewOpt?.sub_unit || selectedNewGroup?.sub_unit || 'piece';
                         const newQtyNum = Number(newItem.data.quantity || 0);
                         const newCostNum = Number(newItem.data.unit_cost || 0);
                         const newTotalPieces = newQtyNum * newPieces;
@@ -486,11 +518,16 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
                                 <label className="block xl:col-span-2">
                                     <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Item</span>
-                                    <select className={`w-full rounded-lg border px-3 py-2 text-sm ${newItemDuplicateMessage ? 'border-amber-300 bg-amber-50' : 'border-slate-300'}`} value={newItem.data.item_id} onChange={(event) => onOptionChange(event.target.value)} required>
+                                    <select
+                                        className={`w-full rounded-lg border px-3 py-2 text-sm ${newItemDuplicateMessage ? 'border-amber-300 bg-amber-50' : 'border-slate-300'}`}
+                                        value={selectedNewGroupKey}
+                                        onChange={(event) => chooseNewGroup(event.target.value)}
+                                        required
+                                    >
                                         <option value="">Select Item</option>
-                                        {itemOptions.map((option) => (
-                                            <option key={option.item_id} value={option.item_id}>
-                                                {option.item_name} {option.pieces_per_box && option.pieces_per_box > 1 ? `(${option.pieces_per_box} ${option.sub_unit || 'piece'}s/${option.default_unit || 'box'})` : ''}
+                                        {catalogGroups.map((group) => (
+                                            <option key={group.group_key} value={group.group_key}>
+                                                {group.base_name} {group.pieces_per_box > 1 ? `(${group.pieces_per_box} ${group.sub_unit}s/${group.default_unit})` : `(${group.default_unit})`}
                                             </option>
                                         ))}
                                     </select>
@@ -550,40 +587,40 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                                 <label className="block xl:col-span-2">
                                     <div className="flex items-center justify-between mb-1">
                                         <span className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
-                                            Item Specification <span className="text-rose-600">*</span>
+                                            Standard Specification / Technical Details <span className="text-rose-600">*</span>
                                         </span>
-                                        {selectedNewSpecs.length === 1 ? (
+                                        {selectedNewGroup && selectedNewGroup.variants.length > 1 ? (
+                                            <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700 border border-indigo-200">
+                                                {selectedNewGroup.variants.length} Approved Specifications Available
+                                            </span>
+                                        ) : selectedNewGroup && selectedNewGroup.variants.length === 1 ? (
                                             <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 border border-slate-200">
                                                 <svg className="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                                 </svg>
                                                 Standard Catalog Specification (Locked)
                                             </span>
-                                        ) : selectedNewSpecs.length > 1 ? (
-                                            <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700 border border-indigo-200">
-                                                {selectedNewSpecs.length} GSO Approved Options
-                                            </span>
                                         ) : null}
                                     </div>
-                                    {selectedNewSpecs.length > 1 ? (
+                                    {selectedNewGroup && selectedNewGroup.variants.length > 1 ? (
                                         <select
-                                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                                            value={newItem.data.remarks}
-                                            onChange={(event) => newItem.setData('remarks', event.target.value)}
+                                            className={`w-full rounded-lg border px-3 py-2 text-sm ${newItem.errors.remarks || newItem.errors.item_id ? 'border-rose-400 bg-rose-50/30' : 'border-slate-300'}`}
+                                            value={newItem.data.item_id}
+                                            onChange={(event) => chooseNewVariant(event.target.value)}
                                             required
                                         >
-                                            <option value="">Select standard specification...</option>
-                                            {selectedNewSpecs.map((s) => (
-                                                <option key={s.item_specification_id} value={s.specification}>
-                                                    {s.specification}
+                                            <option value="">Select standard specification (A4, Letter, Legal...)</option>
+                                            {selectedNewGroup.variants.map((v) => (
+                                                <option key={v.item_id} value={v.item_id}>
+                                                    {v.specification}
                                                 </option>
                                             ))}
                                         </select>
-                                    ) : selectedNewSpecs.length === 1 ? (
+                                    ) : selectedNewGroup && selectedNewGroup.variants.length === 1 ? (
                                         <input
                                             type="text"
                                             className="w-full rounded-lg border border-slate-300 bg-slate-100/70 px-3 py-2 text-sm text-slate-800 font-medium cursor-not-allowed"
-                                            value={newItem.data.remarks || selectedNewSpecs[0].specification}
+                                            value={newItem.data.remarks || selectedNewGroup.variants[0].specification}
                                             readOnly
                                             aria-readonly="true"
                                             required
@@ -591,11 +628,9 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                                     ) : (
                                         <input
                                             type="text"
-                                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                                            value={newItem.data.remarks}
-                                            onChange={(event) => newItem.setData('remarks', event.target.value)}
-                                            placeholder="Required item specification for SR and PO"
-                                            required
+                                            className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-400 cursor-not-allowed"
+                                            placeholder="Select an item above to choose specifications"
+                                            disabled
                                         />
                                     )}
                                     <span className="mt-1 block text-xs text-slate-500">This becomes the item specification shown on Supply Requests and auto-filled on Purchase Orders.</span>

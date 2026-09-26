@@ -208,13 +208,29 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
     const alertExportPages = useMemo(() => chunkRows(recent.alerts.slice(0, 24), 12), [recent.alerts]);
     const totalPdfPages = 1 + (anomalyExportPages.length > 0 ? anomalyExportPages.length : 1) + (alertExportPages.length > 0 ? alertExportPages.length : 1);
 
+    const selectedOfficeName = useMemo(() => {
+        if (!form.office_id) return 'All Offices';
+        const match = filter_options.offices.find((o) => String(o.id) === String(form.office_id));
+        return match ? match.name : `Office #${form.office_id}`;
+    }, [filter_options.offices, form.office_id]);
+
+    const filterScopeSummary = useMemo(() => {
+        const parts: string[] = [];
+        parts.push(`Office: ${selectedOfficeName}`);
+        parts.push(`Fiscal Year: ${form.year || 'All Years'}`);
+        if (form.status) parts.push(`Status: ${form.status}`);
+        if (form.month) parts.push(`Month: ${form.month}`);
+        return parts.join(' | ');
+    }, [selectedOfficeName, form.year, form.status, form.month]);
+
     const baseMetadata: GovDocumentMetadata = {
         title: 'EXECUTIVE RISK SIGNALS & PROCUREMENT ANOMALIES REPORT',
         formCode: 'FDP Form - Risk Management & Anomaly Detection',
         trackingCode: `EBM-RISK-${form.year || new Date().getFullYear()}`,
         fiscalYear: form.year || new Date().getFullYear(),
         period: form.year ? `Fiscal Year ${form.year}${form.month ? ` - Month ${form.month}` : ''}` : `Fiscal Year ${new Date().getFullYear()}`,
-        moduleScope: 'Automated Anomaly Detection & High-Severity Alerts Monitoring',
+        moduleScope: `Automated Anomaly Detection & High-Severity Alerts Monitoring (${selectedOfficeName})`,
+        filterScopeSummary,
         preparedByName: auth?.user?.name || 'Mayor Jeron',
         preparedByRole: auth?.user?.role_code || 'Municipal Mayor / Local Chief Executive',
         preparedAt: new Date().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }),

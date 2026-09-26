@@ -78,6 +78,18 @@ class ItemCatalogSeeder extends Seeder
                 ],
             ],
             [
+                'item_name' => 'Bond Paper, Letter (80 GSM)',
+                'category_name' => 'Office Supplies',
+                'description' => 'Letter white copy paper, 80 GSM, 500 sheets/ream (Box of 5 reams).',
+                'default_unit' => 'box',
+                'pieces_per_box' => 5,
+                'sub_unit' => 'ream',
+                'status' => 'active',
+                'specifications' => [
+                    'Letter (Short, 216mm x 279mm), 80 GSM, 500 sheets/ream (Box of 5 reams)',
+                ],
+            ],
+            [
                 'item_name' => 'Folder, Tagboard (Legal size)',
                 'category_name' => 'Office Supplies',
                 'description' => 'Standard legal filing folder, 14pt tagboard (Pack of 100 pcs).',
@@ -248,13 +260,13 @@ class ItemCatalogSeeder extends Seeder
             [
                 'item_name' => 'HP 680 Tri-Color Ink',
                 'category_name' => 'IT Equipment',
-                'description' => 'HP 680 original tri-color ink cartridge (Box of 5 cartridges).',
+                'description' => 'Standard tri-color ink cartridge (Box of 5 cartridges).',
                 'default_unit' => 'box',
                 'pieces_per_box' => 5,
                 'sub_unit' => 'cartridge',
                 'status' => 'active',
                 'specifications' => [
-                    'HP 680 original tri-color ink cartridge (Box of 5 cartridges)',
+                    'Tri-color ink cartridge, standard yield (Box of 5 cartridges)',
                 ],
             ],
             [

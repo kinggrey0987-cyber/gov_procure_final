@@ -23,6 +23,7 @@ type CloneItem = {
     sub_unit: string;
     description: string;
     specification: string;
+    existing_variant_specs?: string[];
 };
 
 type Props = {
@@ -35,38 +36,86 @@ export default function CreateItem({ categories, units, cloneItem }: Props) {
     const isCloning = Boolean(cloneItem);
 
     const { data, setData, post, processing, errors } = useForm({
-        item_name: cloneItem ? `${cloneItem.item_name} - ` : '',
+        item_name: cloneItem ? cloneItem.item_name : '',
         item_category_id: cloneItem ? String(cloneItem.item_category_id) : (categories[0]?.item_category_id ? String(categories[0].item_category_id) : ''),
         default_unit: cloneItem ? cloneItem.default_unit : (units[0]?.name ?? 'box'),
         pieces_per_box: cloneItem ? String(cloneItem.pieces_per_box) : '1',
         sub_unit: cloneItem ? cloneItem.sub_unit : 'piece',
         description: cloneItem ? cloneItem.description : '',
         status: 'active',
-        specification: cloneItem ? cloneItem.specification : '',
+        specification: '',
     });
+
+    const existingSpecs = (cloneItem?.existing_variant_specs ?? []).map((s) => s.trim().toLowerCase());
+    const currentSpecTrimmed = data.specification.trim().toLowerCase();
+    const isDuplicateSpec = Boolean(
+        isCloning &&
+        currentSpecTrimmed !== '' &&
+        existingSpecs.includes(currentSpecTrimmed)
+    );
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
+        if (isDuplicateSpec) {
+            return;
+        }
         post(route('inventory.items.store'));
     };
 
     return (
         <AuthenticatedLayout
-            header={<h2 className="text-xl font-semibold leading-tight text-gray-800">{isCloning ? 'Add Item Variant SKU' : 'Create Catalog Item'}</h2>}
+            header={<h2 className="text-xl font-semibold leading-tight text-gray-800">{isCloning ? 'Add Item Variant' : 'Create Catalog Item'}</h2>}
         >
-            <Head title={isCloning ? 'Add Item Variant SKU' : 'Create Catalog Item'} />
+            <Head title={isCloning ? 'Add Item Variant' : 'Create Catalog Item'} />
 
             <div className="py-8">
                 <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
                     {isCloning ? (
-                        <div className="mb-6 rounded-lg border border-indigo-200 bg-indigo-50/80 p-4 text-sm text-indigo-900 flex items-start gap-3">
-                            <span className="text-xl">📦</span>
-                            <div>
-                                <p className="font-semibold">Creating a Variant SKU from: <span className="underline">{cloneItem?.item_name}</span></p>
-                                <p className="mt-0.5 text-xs text-indigo-700">
-                                    Category, packaging units, and descriptions have been pre-filled. Adjust the variant name and technical specification below. Its warehouse inventory lane will be automatically created with 0 initial stock upon saving.
-                                </p>
+                        <div className="mb-6 rounded-xl border border-indigo-200 bg-indigo-50/90 p-5 text-sm text-indigo-950 shadow-2xs space-y-3">
+                            <div className="flex items-start gap-3">
+                                <div className="rounded-lg bg-indigo-600/10 p-2 text-indigo-700">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                                    </svg>
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="font-bold text-indigo-900 text-base">
+                                        Adding Variant for: <span className="underline decoration-indigo-400">{cloneItem?.item_name}</span>
+                                    </h3>
+                                    <p className="mt-1 text-xs text-indigo-800 leading-relaxed">
+                                        Adding a variant automatically creates a new catalog item sharing the <strong>same item name, category, and packaging unit</strong>, but with a <strong>different technical specification</strong> (e.g. dimensions, grammage, color, or model).
+                                    </p>
+                                    <p className="mt-0.5 text-xs text-indigo-700 leading-relaxed">
+                                        An independent warehouse inventory lane will be initialized with 0 stock. Duplicate specifications for this item are strictly blocked.
+                                    </p>
+                                </div>
                             </div>
+
+                            {cloneItem?.existing_variant_specs && cloneItem.existing_variant_specs.length > 0 ? (
+                                <div className="rounded-lg border border-indigo-200/70 bg-white/90 p-3 text-xs">
+                                    <p className="font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                                        <span>📋</span> Already registered specifications for this item (duplicates blocked):
+                                    </p>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {cloneItem.existing_variant_specs.map((spec, idx) => {
+                                            const isMatching = currentSpecTrimmed !== '' && currentSpecTrimmed === spec.trim().toLowerCase();
+                                            return (
+                                                <span
+                                                    key={idx}
+                                                    className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs border transition ${
+                                                        isMatching
+                                                            ? 'bg-rose-100 border-rose-300 text-rose-800 font-semibold ring-2 ring-rose-400'
+                                                            : 'bg-slate-100 border-slate-200 text-slate-700'
+                                                    }`}
+                                                >
+                                                    {isMatching ? '⚠️' : '•'} {spec}
+                                                    {isMatching ? ' (Duplicate!)' : ''}
+                                                </span>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ) : null}
                         </div>
                     ) : null}
 
@@ -82,7 +131,11 @@ export default function CreateItem({ categories, units, cloneItem }: Props) {
                                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                                 required
                             />
-                            <p className="mt-1 text-xs text-slate-500">Include the physical variant, size, or color in the name so requesting offices can easily distinguish it in PPMP and Supply Requests.</p>
+                            <p className="mt-1 text-xs text-slate-500">
+                                {isCloning
+                                    ? 'Variants of the same product share this exact item name in the catalog.'
+                                    : 'Include the physical variant, size, or color in the name so requesting offices can easily distinguish it in PPMP and Supply Requests.'}
+                            </p>
                             <InputError message={errors.item_name} className="mt-1" />
                         </div>
 
@@ -183,10 +236,22 @@ export default function CreateItem({ categories, units, cloneItem }: Props) {
                                 type="text"
                                 value={data.specification}
                                 onChange={(e) => setData('specification', e.target.value)}
-                                placeholder="e.g. Heavy-duty retractable cutter with auto-lock carbon steel blade (Box of 12 pcs)"
-                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                                placeholder="e.g. Legal (215.9mm x 355.6mm), 80 GSM, 500 sheets/ream (Box of 5 reams)"
+                                className={`w-full rounded-lg border px-3 py-2 text-sm bg-white focus:ring-1 ${
+                                    isDuplicateSpec
+                                        ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-500'
+                                        : 'border-slate-300 focus:border-red-500 focus:ring-red-500'
+                                }`}
                                 required
                             />
+                            {isDuplicateSpec ? (
+                                <div className="rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 flex items-center gap-2">
+                                    <svg className="w-4 h-4 text-rose-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    <span>Duplicate blocked: A variant of &quot;{data.item_name}&quot; with this exact specification already exists. Please specify a different specification.</span>
+                                </div>
+                            ) : null}
                             <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1 leading-snug">
                                 ℹ️ <strong>Warehouse Stock Tracking:</strong> Each catalog item represents a distinct physical product with its own warehouse stock tracking. An inventory record with 0 initial stock is automatically initialized upon creation.
                             </p>
@@ -211,10 +276,10 @@ export default function CreateItem({ categories, units, cloneItem }: Props) {
                             </Link>
                             <button
                                 type="submit"
-                                disabled={processing}
-                                className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-50"
+                                disabled={processing || isDuplicateSpec}
+                                className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                {processing ? 'Saving…' : (isCloning ? 'Create Variant SKU' : 'Create Catalog Item')}
+                                {processing ? 'Saving…' : (isCloning ? 'Create Variant' : 'Create Catalog Item')}
                             </button>
                         </div>
                     </form>

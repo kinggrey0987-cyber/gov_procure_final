@@ -73,6 +73,21 @@ class ItemCatalogController
         if ($cloneId > 0) {
             $source = Item::query()->with('specifications')->find($cloneId);
             if ($source) {
+                $allVariants = Item::query()
+                    ->whereRaw('LOWER(TRIM(item_name)) = ?', [strtolower(trim($source->item_name))])
+                    ->with('specifications')
+                    ->get();
+
+                $existingSpecs = [];
+                foreach ($allVariants as $var) {
+                    foreach ($var->specifications as $spec) {
+                        $specText = trim((string) $spec->specification);
+                        if ($specText !== '') {
+                            $existingSpecs[] = $specText;
+                        }
+                    }
+                }
+
                 $cloneItem = [
                     'item_id' => (int) $source->item_id,
                     'item_name' => (string) $source->item_name,
@@ -82,6 +97,7 @@ class ItemCatalogController
                     'sub_unit' => (string) ($source->sub_unit ?? 'piece'),
                     'description' => (string) ($source->description ?? ''),
                     'specification' => (string) ($source->specifications->first()?->specification ?? ''),
+                    'existing_variant_specs' => array_values(array_unique($existingSpecs)),
                 ];
             }
         }

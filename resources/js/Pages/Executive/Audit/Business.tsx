@@ -132,7 +132,7 @@ export default function BusinessAudit({ auditLogs, auditLogsExport, filters, ana
     const activeActions = actionSummary.length;
     const auditLogsExportPages = useMemo(() => {
         const pageSize = 14;
-        const targetLogs = auditLogsExport;
+        const targetLogs = auditLogsExport.slice(0, 42);
         const pages: typeof auditLogsExport[] = [];
 
         for (let index = 0; index < targetLogs.length; index += pageSize) {

@@ -179,13 +179,29 @@ export default function TransparencyMonitoringIndex({
     const { auth } = usePage<PageProps>().props;
     const totalPdfPages = 1 + (disclosureExportPages.length > 0 ? disclosureExportPages.length : 1);
 
+    const selectedOfficeName = useMemo(() => {
+        if (!form.office_id) return 'All Offices';
+        const match = filter_options.offices.find((o) => String(o.id) === String(form.office_id));
+        return match ? match.name : `Office #${form.office_id}`;
+    }, [filter_options.offices, form.office_id]);
+
+    const filterScopeSummary = useMemo(() => {
+        const parts: string[] = [];
+        parts.push(`Office: ${selectedOfficeName}`);
+        parts.push(`Fiscal Year: ${form.year || 'All Years'}`);
+        if (form.status) parts.push(`Status: ${form.status}`);
+        if (form.month) parts.push(`Month: ${form.month}`);
+        return parts.join(' | ');
+    }, [selectedOfficeName, form.year, form.status, form.month]);
+
     const baseMetadata: GovDocumentMetadata = {
         title: 'PUBLIC TRANSPARENCY & STATUTORY DISCLOSURE REPORT',
         formCode: 'FDP Form - Public Disclosure Monitoring',
         trackingCode: `EBM-TRANSP-${form.year || new Date().getFullYear()}`,
         fiscalYear: form.year || new Date().getFullYear(),
         period: form.year ? `Fiscal Year ${form.year}${form.month ? ` - Month ${form.month}` : ''}` : `Fiscal Year ${new Date().getFullYear()}`,
-        moduleScope: 'Full Disclosure Policy (FDP) Compliance & Portal Disclosures',
+        moduleScope: `Full Disclosure Policy (FDP) Compliance & Portal Disclosures (${selectedOfficeName})`,
+        filterScopeSummary,
         preparedByName: auth?.user?.name || 'Mayor Jeron',
         preparedByRole: auth?.user?.role_code || 'Municipal Mayor / Local Chief Executive',
         preparedAt: new Date().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }),

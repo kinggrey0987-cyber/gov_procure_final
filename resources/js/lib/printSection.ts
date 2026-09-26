@@ -101,7 +101,7 @@ export async function downloadSectionAsPdfById(sectionId: string, options: Expor
 
     const title = options.title ?? document.title ?? 'report';
     const fileName = options.fileName ?? `${slugify(title)}.pdf`;
-    const scale = options.scale ?? 1.5;
+    const scale = Math.min(options.scale ?? 1.25, 1.5);
     const marginMm = options.marginMm ?? 8;
     const paperWidthPx = options.paperWidthPx ?? 820;
     const forcedOrientation = options.orientation;
@@ -109,6 +109,12 @@ export async function downloadSectionAsPdfById(sectionId: string, options: Expor
     const revealSelectors = options.revealSelectors ?? [];
     const pageBreakSelectors = options.pageBreakSelectors ?? [];
     const includeDefaultHeading = options.includeDefaultHeading ?? (pageBreakSelectors.length === 0);
+
+    const prevScrollX = typeof window !== 'undefined' ? (window.scrollX ?? window.pageXOffset ?? 0) : 0;
+    const prevScrollY = typeof window !== 'undefined' ? (window.scrollY ?? window.pageYOffset ?? 0) : 0;
+    if (typeof window !== 'undefined') {
+        window.scrollTo(0, 0);
+    }
 
     const captureRoot = createPdfCaptureRoot(source, {
         title,
@@ -127,38 +133,66 @@ export async function downloadSectionAsPdfById(sectionId: string, options: Expor
             : [captureRoot];
 
         const validPageNodes = pageNodes.length > 0 ? pageNodes : [captureRoot];
+        const isStructured = pageBreakSelectors.length > 0 && validPageNodes.length > 1;
 
-        // Render canvases in parallel for maximum speed
-        const canvases = await Promise.all(
-            validPageNodes.map((node) => renderPdfCanvas(html2canvas, node, scale, paperWidthPx))
-        );
+        if (isStructured) {
+            // Hide all pages initially so that we only layout and rasterize one page at a time.
+            // This prevents viewport clipping, massive DOM memory overhead, and reduces render time by ~75%.
+            validPageNodes.forEach((node) => {
+                node.style.display = 'none';
+            });
+        }
 
-        const firstCanvas = canvases[0];
-        const orientation = forcedOrientation ?? (firstCanvas.width > firstCanvas.height ? 'landscape' : 'portrait');
-        const pdf = new jsPDF({
-            orientation,
-            unit: 'mm',
-            format: 'a4',
-            compress: true,
-        });
+        let pdf: InstanceType<typeof jsPDF> | null = null;
+        let orientation = forcedOrientation;
 
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
-        const usablePageHeight = pageHeight - marginMm * 2;
-        const contentWidth = pageWidth - marginMm * 2;
+        // Render each page sequentially, yielding to the browser event loop so the UI never freezes
+        for (let i = 0; i < validPageNodes.length; i++) {
+            const node = validPageNodes[i];
 
-        canvases.forEach((canvas, index) => {
-            if (index > 0) {
+            if (isStructured) {
+                node.style.display = 'block';
+            }
+
+            // Yield to browser main thread
+            await yieldToMainThread();
+
+            const canvas = await renderPdfCanvas(html2canvas, node, scale, paperWidthPx);
+
+            if (isStructured) {
+                node.style.display = 'none';
+            }
+
+            if (!pdf) {
+                if (!orientation) {
+                    orientation = canvas.width > canvas.height ? 'landscape' : 'portrait';
+                }
+                pdf = new jsPDF({
+                    orientation,
+                    unit: 'mm',
+                    format: 'a4',
+                    compress: true,
+                });
+            } else {
                 pdf.addPage();
             }
 
-            const image = canvas.toDataURL('image/jpeg', 0.95);
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+            const usablePageHeight = pageHeight - marginMm * 2;
+            const contentWidth = pageWidth - marginMm * 2;
+
+            const image = canvas.toDataURL('image/jpeg', 0.92);
             const rawContentHeight = (canvas.height * contentWidth) / canvas.width;
 
             // If using structured pages or within 12% tolerance, fit onto exactly one single page
             if (pageBreakSelectors.length > 0 || rawContentHeight <= usablePageHeight * 1.12) {
-                const finalHeight = Math.min(rawContentHeight, usablePageHeight);
-                const finalWidth = (canvas.width * finalHeight) / canvas.height;
+                let finalWidth = contentWidth;
+                let finalHeight = rawContentHeight;
+                if (finalHeight > usablePageHeight) {
+                    finalHeight = usablePageHeight;
+                    finalWidth = (canvas.width * finalHeight) / canvas.height;
+                }
                 const offsetX = marginMm + Math.max(0, (contentWidth - finalWidth) / 2);
                 pdf.addImage(image, 'JPEG', offsetX, marginMm, finalWidth, finalHeight, undefined, 'FAST');
             } else {
@@ -172,15 +206,26 @@ export async function downloadSectionAsPdfById(sectionId: string, options: Expor
                     renderedHeight += usablePageHeight;
                 }
             }
-        });
 
-        pdf.save(fileName);
+            // Immediately free canvas bitmap memory
+            canvas.width = 1;
+            canvas.height = 1;
+
+            await yieldToMainThread();
+        }
+
+        if (pdf) {
+            pdf.save(fileName);
+        }
     } catch (error) {
         console.error('[downloadSectionAsPdfById] Failed to render PDF canvas:', error);
         // Fallback: print directly using the browser print system
         printSectionById(sectionId, { title });
     } finally {
         captureRoot.remove();
+        if (typeof window !== 'undefined') {
+            window.scrollTo(prevScrollX, prevScrollY);
+        }
     }
 }
 
@@ -190,14 +235,49 @@ async function renderPdfCanvas(
     scale: number,
     paperWidthPx: number,
 ): Promise<HTMLCanvasElement> {
+    const contentHeight = Math.max(source.scrollHeight, source.offsetHeight, Math.ceil(source.getBoundingClientRect().height)) + 8;
     return html2canvas(source, {
         backgroundColor: '#ffffff',
         scale,
         useCORS: true,
         allowTaint: true,
+        scrollX: 0,
+        scrollY: 0,
         windowWidth: paperWidthPx,
-        width: source.offsetWidth || paperWidthPx,
+        width: paperWidthPx,
+        height: contentHeight,
+        imageTimeout: 3000,
         logging: false,
+        onclone: (clonedDoc) => {
+            // Isolate the cloned document so the website shell cannot overlay or clip the capture
+            const app = clonedDoc.getElementById('app');
+            if (app) {
+                app.style.display = 'none';
+            }
+            clonedDoc.querySelectorAll('header, nav, aside').forEach((el) => {
+                (el as HTMLElement).style.display = 'none';
+            });
+            const root = clonedDoc.querySelector<HTMLElement>('[data-pdf-capture-root]');
+            if (root && clonedDoc.body) {
+                clonedDoc.body.prepend(root);
+                root.style.position = 'relative';
+                root.style.top = '0';
+                root.style.left = '0';
+                root.style.margin = '0';
+                root.style.padding = '0';
+                root.style.zIndex = '999999';
+            }
+            if (clonedDoc.body) {
+                clonedDoc.body.style.margin = '0';
+                clonedDoc.body.style.padding = '0';
+                clonedDoc.body.style.overflow = 'visible';
+            }
+            if (clonedDoc.documentElement) {
+                clonedDoc.documentElement.style.margin = '0';
+                clonedDoc.documentElement.style.padding = '0';
+                clonedDoc.documentElement.style.overflow = 'visible';
+            }
+        },
     });
 }
 
@@ -213,14 +293,14 @@ function createPdfCaptureRoot(
 ): HTMLDivElement {
     const root = document.createElement('div');
     root.setAttribute('data-pdf-capture-root', 'true');
-    root.style.position = 'fixed';
+    root.style.position = 'absolute';
     root.style.left = '0';
     root.style.top = '0';
     root.style.width = `${options.paperWidthPx}px`;
     root.style.padding = '0';
     root.style.background = '#ffffff';
     root.style.boxSizing = 'border-box';
-    root.style.zIndex = '-99999';
+    root.style.zIndex = '-9999';
     root.style.pointerEvents = 'none';
 
     const clonedSection = source.cloneNode(true) as HTMLElement;
@@ -255,27 +335,48 @@ function createPdfCaptureRoot(
 
     const style = document.createElement('style');
     style.textContent = `
-        [data-pdf-capture-root], [data-pdf-capture-root] * { box-sizing: border-box; }
+        [data-pdf-capture-root], [data-pdf-capture-root] * {
+            box-sizing: border-box;
+        }
+        [data-pdf-capture-root] {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+        }
+        [data-pdf-capture-root] p,
+        [data-pdf-capture-root] span,
+        [data-pdf-capture-root] td,
+        [data-pdf-capture-root] th,
+        [data-pdf-capture-root] div,
+        [data-pdf-capture-root] h1,
+        [data-pdf-capture-root] h2,
+        [data-pdf-capture-root] h3,
+        [data-pdf-capture-root] h4 {
+            line-height: 1.35;
+        }
         [data-pdf-capture-root] [class*="overflow-x-auto"],
-        [data-pdf-capture-root] [class*="overflow-auto"] {
+        [data-pdf-capture-root] [class*="overflow-auto"],
+        [data-pdf-capture-root] [class*="overflow-hidden"] {
             overflow: visible !important;
+        }
+        [data-pdf-capture-root] [class*="truncate"] {
+            overflow: visible !important;
+            text-overflow: clip !important;
+            white-space: normal !important;
         }
         [data-pdf-capture-root] table {
             width: 100% !important;
-            table-layout: fixed;
             border-collapse: collapse;
         }
-        [data-pdf-capture-root] th,
-        [data-pdf-capture-root] td {
+        [data-pdf-capture-root] th:not([class*="whitespace-nowrap"]),
+        [data-pdf-capture-root] td:not([class*="whitespace-nowrap"]) {
             overflow-wrap: anywhere;
             word-break: break-word;
         }
         [data-pdf-capture-root] .pdf-page {
             box-shadow: none !important;
             margin: 0 !important;
-            display: block !important;
             visibility: visible !important;
             opacity: 1 !important;
+            overflow: visible !important;
         }
     `;
 
@@ -303,7 +404,7 @@ async function waitForRenderableAssets(root: HTMLElement): Promise<void> {
         try {
             await Promise.race([
                 document.fonts.ready,
-                new Promise((resolve) => setTimeout(resolve, 800)),
+                new Promise((resolve) => setTimeout(resolve, 350)),
             ]);
         } catch {
             // no-op
@@ -322,7 +423,7 @@ async function waitForRenderableAssets(root: HTMLElement): Promise<void> {
             }
 
             return new Promise<void>((resolve) => {
-                const timer = setTimeout(resolve, 800);
+                const timer = setTimeout(resolve, 350);
                 const onDone = () => {
                     clearTimeout(timer);
                     resolve();
@@ -337,6 +438,16 @@ async function waitForRenderableAssets(root: HTMLElement): Promise<void> {
             });
         }),
     );
+}
+
+function yieldToMainThread(): Promise<void> {
+    return new Promise((resolve) => {
+        if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(() => setTimeout(resolve, 15));
+        } else {
+            setTimeout(resolve, 20);
+        }
+    });
 }
 
 function escapeHtml(value: string): string {

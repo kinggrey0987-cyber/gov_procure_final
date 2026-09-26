@@ -1,4 +1,4 @@
-import { PropsWithChildren } from 'react';
+import { Fragment, PropsWithChildren } from 'react';
 
 export type ChartPoint = {
     label: string;
@@ -211,38 +211,46 @@ export function HorizontalBarChart({
     };
 
     return (
-        <div className="space-y-1.5 py-0.5 flex-1 overflow-y-auto min-h-0">
-            {data.map((item, index) => {
-                const widthPercent = Math.max((item.value / max) * 100, item.value > 0 ? 5 : 0);
-                const sharePercent = total > 0 ? Math.round((item.value / total) * 100) : 0;
-                const gradientClass = getBarGradient(item.label, index);
+        <div className="py-0.5 flex-1 overflow-y-auto min-h-0">
+            <table className="w-full table-fixed text-xs border-collapse">
+                <tbody>
+                    {data.map((item, index) => {
+                        const widthPercent = Math.max((item.value / max) * 100, item.value > 0 ? 5 : 0);
+                        const sharePercent = total > 0 ? Math.round((item.value / total) * 100) : 0;
+                        const gradientClass = getBarGradient(item.label, index);
 
-                return (
-                    <div key={item.label} className="group min-w-0 space-y-0.5">
-                        <div className="flex items-center justify-between text-xs">
-                            <span className="truncate text-xs font-semibold text-slate-700 pr-2 group-hover:text-slate-900 transition" title={item.label}>
-                                {item.label}
-                            </span>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                                {showPercentage && total > 0 ? (
-                                    <span className="text-[10px] font-medium text-slate-500">
-                                        ({sharePercent}%)
-                                    </span>
-                                ) : null}
-                                <span className="text-xs font-bold text-slate-900">
-                                    {valueFormatter ? valueFormatter(item.value) : item.value.toLocaleString()}
-                                </span>
-                            </div>
-                        </div>
-                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                            <div
-                                className={`h-full rounded-full ${gradientClass} transition-all duration-500`}
-                                style={{ width: `${widthPercent}%` }}
-                            />
-                        </div>
-                    </div>
-                );
-            })}
+                        return (
+                            <Fragment key={item.label}>
+                                <tr className="group">
+                                    <td className="truncate font-semibold text-slate-700 pr-2 group-hover:text-slate-900 transition pt-1" title={item.label}>
+                                        {item.label}
+                                    </td>
+                                    <td className="text-right whitespace-nowrap w-[40%] pt-1">
+                                        {showPercentage && total > 0 ? (
+                                            <span className="text-[10px] font-medium text-slate-500 mr-1.5">
+                                                ({sharePercent}%)
+                                            </span>
+                                        ) : null}
+                                        <span className="text-xs font-bold text-slate-900">
+                                            {valueFormatter ? valueFormatter(item.value) : item.value.toLocaleString()}
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td colSpan={2} className="pt-0.5 pb-2">
+                                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 block">
+                                            <div
+                                                className={`h-full rounded-full ${gradientClass} transition-all duration-500 block`}
+                                                style={{ width: `${widthPercent}%` }}
+                                            />
+                                        </div>
+                                    </td>
+                                </tr>
+                            </Fragment>
+                        );
+                    })}
+                </tbody>
+            </table>
         </div>
     );
 }
@@ -310,10 +318,10 @@ export function TrendLineChart({
     }
 
     const width = 680;
-    const height = 200;
+    const height = 150;
     const paddingX = 35;
-    const paddingY = 22;
-    const paddingBottom = 32;
+    const paddingY = 16;
+    const paddingBottom = 26;
     const plotWidth = width - paddingX * 2;
     const plotHeight = height - paddingY - paddingBottom;
     const max = Math.max(...data.map((point) => point.value), 1);
@@ -334,9 +342,9 @@ export function TrendLineChart({
     const areaPolygonPoints = `${points[0].x},${height - paddingBottom} ` + points.map((p) => `${p.x},${p.y}`).join(' ') + ` ${points[points.length - 1].x},${height - paddingBottom}`;
 
     return (
-        <div className="space-y-3">
+        <div className="space-y-2">
             {/* Executive Quick Stats Banner */}
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50/80 px-3.5 py-2 text-xs border border-slate-200">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50/80 px-3 py-1.5 text-xs border border-slate-200">
                 <div className="flex items-center gap-2">
                     <span className="h-2 w-2 rounded-full bg-red-600 animate-pulse"></span>
                     <span className="text-slate-600 font-medium">Latest Period:</span>
@@ -349,8 +357,8 @@ export function TrendLineChart({
                 </div>
             </div>
 
-            <div className="overflow-x-auto">
-                <svg viewBox={`0 0 ${width} ${height}`} className="h-48 w-full min-w-[500px]">
+            <div className="overflow-hidden">
+                <svg viewBox={`0 0 ${width} ${height}`} className="h-32 sm:h-36 w-full min-w-0">
                     <defs>
                         <linearGradient id="trendAreaGradientRed" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="0%" stopColor="rgb(220 38 38)" stopOpacity="0.25" />
@@ -649,11 +657,11 @@ export function SpendTrendBarChart({
     };
 
     const width = Math.max(760, data.length * 44);
-    const height = 240;
+    const height = 185;
     const paddingLeft = 48;
     const paddingRight = 16;
-    const chartTop = 22;
-    const chartBottom = 185;
+    const chartTop = 18;
+    const chartBottom = 140;
     const plotWidth = width - paddingLeft - paddingRight;
     const plotHeight = chartBottom - chartTop;
 
@@ -663,32 +671,32 @@ export function SpendTrendBarChart({
     const ySteps = [1, 0.75, 0.5, 0.25, 0];
 
     return (
-        <div className="space-y-3 flex-1 flex flex-col justify-between">
+        <div className="space-y-2.5 flex-1 flex flex-col justify-between">
             {/* Executive Spend KPI Header */}
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 rounded-xl border border-red-100 bg-gradient-to-r from-red-50/70 via-white to-slate-50 p-2.5 text-xs shadow-xs shrink-0">
-                <div>
+            <div className="grid grid-cols-2 gap-2 rounded-xl border border-red-100 bg-gradient-to-r from-red-50/70 via-white to-slate-50 p-2 text-xs shadow-xs shrink-0">
+                <div className="min-w-0">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Expenditure</p>
-                    <p className="mt-0.5 text-xs sm:text-sm font-extrabold text-red-900">{formatFull(totalSpend)}</p>
+                    <p className="mt-0.5 text-xs font-extrabold text-red-900 leading-normal" title={formatFull(totalSpend)}>{formatFull(totalSpend)}</p>
                 </div>
-                <div>
+                <div className="min-w-0">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Peak Period</p>
-                    <p className="mt-0.5 text-xs sm:text-sm font-extrabold text-slate-900" title={`${peak?.label}: ${formatFull(peak?.value ?? 0)}`}>
-                        {peak?.label ?? '—'} <span className="text-[10.5px] font-semibold text-red-700">({formatFull(peak?.value ?? 0)})</span>
+                    <p className="mt-0.5 text-xs font-extrabold text-slate-900 leading-normal" title={`${peak?.label}: ${formatFull(peak?.value ?? 0)}`}>
+                        {peak?.label ?? '—'} <span className="text-[10px] font-semibold text-red-700">({formatShort(peak?.value ?? 0)})</span>
                     </p>
                 </div>
-                <div>
+                <div className="min-w-0">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Monthly Average</p>
-                    <p className="mt-0.5 text-xs sm:text-sm font-extrabold text-slate-900">{formatFull(average)}</p>
+                    <p className="mt-0.5 text-xs font-extrabold text-slate-900 leading-normal" title={formatFull(average)}>{formatFull(average)}</p>
                 </div>
-                <div>
+                <div className="min-w-0">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Orders Processed</p>
-                    <p className="mt-0.5 text-xs sm:text-sm font-extrabold text-slate-900">{totalOrders} <span className="text-[11px] font-medium text-slate-500">POs</span></p>
+                    <p className="mt-0.5 text-xs font-extrabold text-slate-900 leading-normal">{totalOrders} <span className="text-[10.5px] font-medium text-slate-500">POs</span></p>
                 </div>
             </div>
 
             {/* SVG Bar Chart - 100% Fluid & Responsive, Zero Scrollbars */}
-            <div className="w-full flex-1 flex items-center justify-center pt-2 overflow-x-auto min-w-0">
-                <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto max-h-[235px] min-w-[580px] overflow-visible">
+            <div className="w-full flex-1 flex items-center justify-center pt-1 overflow-hidden min-w-0">
+                <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto max-h-[160px] min-w-0 overflow-visible">
                     <defs>
                         <linearGradient id="spendBarGradient" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="0%" stopColor="rgb(220 38 38)" />

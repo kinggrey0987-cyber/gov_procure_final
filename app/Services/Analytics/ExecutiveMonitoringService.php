@@ -113,6 +113,7 @@ class ExecutiveMonitoringService
                     ->select(['anomaly_id', 'anomaly_type', 'severity', 'status', 'office_id', 'detected_at', 'created_at', 'reference_type', 'reference_id', 'item_id'])
                     ->with('office:id,name')
                     ->latest('detected_at')
+                    ->limit(50)
                     ->get(),
                 'recent_alerts' => Alert::query()
                     ->select(['alerts_id', 'alert_type', 'severity', 'status', 'office_id', 'detected_at', 'created_at'])
@@ -124,6 +125,7 @@ class ExecutiveMonitoringService
                     ->select(['alerts_id', 'alert_type', 'severity', 'status', 'office_id', 'detected_at', 'created_at'])
                     ->with('office:id,name')
                     ->latest('detected_at')
+                    ->limit(50)
                     ->get(),
                 'recent_disclosures' => PublicDisclosure::query()
                     ->select(['disclosure_id', 'title', 'type', 'status', 'published_at', 'created_at'])
@@ -133,6 +135,7 @@ class ExecutiveMonitoringService
                 'recent_disclosures_export' => PublicDisclosure::query()
                     ->select(['disclosure_id', 'title', 'type', 'status', 'published_at', 'created_at'])
                     ->latest('published_at')
+                    ->limit(50)
                     ->get(),
                 'recent_business_logs' => AuditLog::query()
                     ->business()
@@ -144,6 +147,7 @@ class ExecutiveMonitoringService
                     ->business()
                     ->with(['user:id,name', 'office:id,name'])
                     ->latest('created_at')
+                    ->limit(50)
                     ->get(['id', 'user_id', 'office_id', 'module_name', 'action_type', 'created_at']),
             ];
         } catch (Throwable $throwable) {

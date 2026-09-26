@@ -265,12 +265,23 @@ export default function ExecutiveDashboardIndex({
 
     const anomalyPreviewRows = useMemo(() => filteredAnomalyGroups.slice(0, 5), [filteredAnomalyGroups]);
     const alertPreviewRows = useMemo(() => filteredAlerts.slice(0, 5), [filteredAlerts]);
-    const anomalyExportPages = useMemo(() => chunkRows(recent_anomalies_export, 12), [recent_anomalies_export]);
-    const alertExportPages = useMemo(() => chunkRows(recent_alerts_export, 12), [recent_alerts_export]);
-    const disclosureExportPages = useMemo(() => chunkRows(recent_disclosures_export, 12), [recent_disclosures_export]);
-    const businessLogExportPages = useMemo(() => chunkRows(recent_business_logs_export, 12), [recent_business_logs_export]);
+    const anomalyExportPages = useMemo(() => chunkRows(recent_anomalies_export.slice(0, 24), 12), [recent_anomalies_export]);
+    const alertExportPages = useMemo(() => chunkRows(recent_alerts_export.slice(0, 24), 12), [recent_alerts_export]);
+    const disclosureExportPages = useMemo(() => chunkRows(recent_disclosures_export.slice(0, 12), 12), [recent_disclosures_export]);
+    const businessLogExportPages = useMemo(() => chunkRows(recent_business_logs_export.slice(0, 12), 12), [recent_business_logs_export]);
 
     const totalPdfPages = 1 + anomalyExportPages.length + alertExportPages.length + disclosureExportPages.length + businessLogExportPages.length;
+
+    const filterScopeSummary = useMemo(() => {
+        const parts: string[] = [];
+        parts.push(`Fiscal Year: ${new Date().getFullYear()}`);
+        parts.push('Office: All Offices');
+        if (anomalySeverity !== 'ALL') parts.push(`Anomaly Severity: ${anomalySeverity}`);
+        if (alertSeverity !== 'ALL') parts.push(`Alert Severity: ${alertSeverity}`);
+        if (anomalySearch.trim()) parts.push(`Anomaly Search: "${anomalySearch.trim()}"`);
+        if (alertSearch.trim()) parts.push(`Alert Search: "${alertSearch.trim()}"`);
+        return parts.join(' | ');
+    }, [anomalySeverity, alertSeverity, anomalySearch, alertSearch]);
 
     const baseMetadata: GovDocumentMetadata = {
         title: 'CONSOLIDATED EXECUTIVE OVERSIGHT & MONITORING REPORT',
@@ -279,6 +290,7 @@ export default function ExecutiveDashboardIndex({
         fiscalYear: new Date().getFullYear(),
         period: `Fiscal Year ${new Date().getFullYear()}`,
         moduleScope: 'Executive Overview & Comprehensive Risk Monitoring',
+        filterScopeSummary,
         preparedByName,
         preparedByRole,
         preparedAt,
@@ -514,6 +526,7 @@ export default function ExecutiveDashboardIndex({
                             <div className="xl:col-span-7 h-full min-h-0">
                                 <ExecutiveChartCard
                                     title="Procurement Velocity & Trend"
+                                    subtitle={`Total Combined Activity (${procurement.purchase_request_count} PRs + ${procurement.purchase_order_count} POs = ${procurement.purchase_request_count + procurement.purchase_order_count} documents)`}
                                     tone="critical"
                                     action={
                                         <Link
@@ -543,6 +556,7 @@ export default function ExecutiveDashboardIndex({
                                         <TrendLineChart
                                             data={totalActivityTrend}
                                             emptyText="No data in current filter scope"
+                                            valueFormatter={(v) => `${v} docs`}
                                             showPointCards={false}
                                         />
                                     )}
@@ -866,48 +880,55 @@ export default function ExecutiveDashboardIndex({
                         showSignatories={totalPdfPages === 1}
                         showAttestation={totalPdfPages === 1}
                     >
-                        <div className="rounded-lg border border-slate-300 bg-slate-50/50 p-4">
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-2 mb-3">
+                        <div className="rounded-lg border border-slate-300 bg-slate-50/50 p-3">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2.5">
                                 Executive Activity & Spend Highlights
                             </h3>
-                            <div className="grid grid-cols-3 gap-3">
-                                <div className="rounded-md border border-slate-300 bg-white p-3 text-center">
+                            <div className="grid grid-cols-3 gap-2.5">
+                                <div className="rounded-md border border-slate-300 bg-white p-2.5 text-center">
                                     <p className="text-[10px] font-bold uppercase text-slate-600">Purchase Requests</p>
-                                    <p className="mt-1 text-2xl font-extrabold text-slate-900">{procurement.purchase_request_count}</p>
+                                    <p className="mt-0.5 text-xl font-extrabold text-slate-900">{procurement.purchase_request_count}</p>
                                 </div>
-                                <div className="rounded-md border border-slate-300 bg-white p-3 text-center">
+                                <div className="rounded-md border border-slate-300 bg-white p-2.5 text-center">
                                     <p className="text-[10px] font-bold uppercase text-slate-600">Purchase Orders</p>
-                                    <p className="mt-1 text-2xl font-extrabold text-slate-900">{procurement.purchase_order_count}</p>
+                                    <p className="mt-0.5 text-xl font-extrabold text-slate-900">{procurement.purchase_order_count}</p>
                                 </div>
-                                <div className="rounded-md border border-slate-300 bg-white p-3 text-center">
+                                <div className="rounded-md border border-slate-300 bg-white p-2.5 text-center">
                                     <p className="text-[10px] font-bold uppercase text-slate-600">Published Disclosures</p>
-                                    <p className="mt-1 text-2xl font-extrabold text-emerald-700">{transparency.published_disclosure_count}</p>
+                                    <p className="mt-0.5 text-xl font-extrabold text-emerald-700">{transparency.published_disclosure_count}</p>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <section className="rounded-lg border border-slate-300 bg-white p-3.5">
-                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2.5">
+                        <div className="grid grid-cols-2 gap-3.5">
+                            <section className="rounded-lg border border-slate-300 bg-white p-3">
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2">
                                     Active Risk Exposure Summary
                                 </h3>
-                                <div className="space-y-2">
+                                <div className="space-y-1.5">
                                     <RiskStrip label="Active Anomalies" value={activeAnomalies} max={Math.max(activeAnomalies, activeAlerts, highSeverityTotal, 1)} tone="rose" />
                                     <RiskStrip label="Active Alerts" value={activeAlerts} max={Math.max(activeAnomalies, activeAlerts, highSeverityTotal, 1)} tone="amber" />
                                     <RiskStrip label="High Severity Incidents" value={highSeverityTotal} max={Math.max(activeAnomalies, activeAlerts, highSeverityTotal, 1)} tone="slate" />
                                 </div>
                             </section>
 
-                            <section className="rounded-lg border border-slate-300 bg-white p-3.5">
-                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2.5">
-                                    Office Risk Concentration
-                                </h3>
-                                <HorizontalBarChart data={officeRanking} emptyText="No data in current filter scope" />
+                            <section className="rounded-lg border border-slate-300 bg-white p-3 flex flex-col justify-between">
+                                <div>
+                                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2">
+                                        Office Risk Concentration
+                                    </h3>
+                                    <HorizontalBarChart data={officeRanking.slice(0, 4)} emptyText="No data in current filter scope" />
+                                </div>
+                                {officeRanking.length > 4 && (
+                                    <p className="mt-1 text-[10px] text-slate-400 italic text-right">
+                                        Top 4 of {officeRanking.length} offices shown
+                                    </p>
+                                )}
                             </section>
                         </div>
 
-                        <section className="rounded-lg border border-slate-300 bg-white p-3.5 mt-3">
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2.5">
+                        <section className="rounded-lg border border-slate-300 bg-white p-3 mt-2.5">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1.5 mb-2">
                                 Procurement Velocity & Activity Trend
                             </h3>
                             <TrendLineChart
