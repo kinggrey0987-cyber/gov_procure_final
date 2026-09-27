@@ -89,7 +89,7 @@ class DistributionRecordController
         /** @var Collection<int, array<string, mixed>> $eligibleRows */
         $eligibleRows = $inventoryBackedRows
             ->concat($procurementBackedRows)
-            ->unique('supply_request_id')
+            ->unique(fn (array $row): string => ($row['delivery_id'] ?? null) !== null ? 'del_' . $row['delivery_id'] : 'inv_' . $row['supply_request_id'])
             ->sortByDesc(fn (array $row): int => (int) $row['sort_timestamp'])
             ->values();
 
@@ -124,13 +124,19 @@ class DistributionRecordController
     private function procurementBackedReleaseRows(): Collection
     {
         return Delivery::query()
-            ->verified()
+            ->whereIn('receipt_status', ['VERIFIED', 'PARTIALLY_RECEIVED'])
             ->whereHas('purchaseOrder', function ($query): void {
-                $query->where('supply_request_id', '!=', null)
-                    ->whereHas('supplyRequest.office', fn ($officeQuery) => $officeQuery->where('code', '!=', 'GSO'));
+                $query->where(function ($poQuery) {
+                    $poQuery->whereNotNull('supply_request_id')
+                        ->orWhereHas('purchaseRequest', fn ($prQ) => $prQ->whereNotNull('supply_request_id'));
+                })
+                ->where(function ($subQ) {
+                    $subQ->whereHas('supplyRequest.office', fn ($officeQuery) => $officeQuery->where('code', '!=', 'GSO'))
+                        ->orWhereHas('purchaseRequest.supplyRequest.office', fn ($officeQuery) => $officeQuery->where('code', '!=', 'GSO'));
+                });
             })
-            ->whereDoesntHave('distributionRecords')
-            ->with(['purchaseOrder.supplyRequest.office', 'items.purchaseOrderItem', 'distributionRecords.items'])
+            ->whereDoesntHave('distributionRecords', fn ($q) => $q->where('status', 'DRAFT'))
+            ->with(['purchaseOrder.supplyRequest.office', 'purchaseOrder.purchaseRequest.supplyRequest.office', 'items.purchaseOrderItem', 'distributionRecords.items'])
             ->latest('delivery_id')
             ->get()
             ->map(fn (Delivery $delivery): ?array => $this->releaseRowFromVerifiedDelivery($delivery))
@@ -140,14 +146,15 @@ class DistributionRecordController
 
     private function releaseRowFromVerifiedDelivery(Delivery $delivery): ?array
     {
-        $supplyRequest = $delivery->purchaseOrder?->supplyRequest;
+        $supplyRequest = $delivery->purchaseOrder?->supplyRequest
+            ?? $delivery->purchaseOrder?->purchaseRequest?->supplyRequest;
 
         if (! $supplyRequest instanceof SupplyRequest) {
             return null;
         }
 
         $acceptedTotal = (float) $delivery->items->sum(function ($item): float {
-            return max((float) $item->received_quantity - (float) $item->damaged_quantity - (float) $item->missing_quantity, 0);
+            return max((float) $item->received_quantity - (float) $item->damaged_quantity, 0);
         });
 
         $releasedTotal = (float) $delivery->distributionRecords
@@ -180,7 +187,7 @@ class DistributionRecordController
     private function inventoryBackedReleaseRows(): Collection
     {
         return SupplyRequest::query()
-            ->whereIn('status', ['SUBMITTED', 'APPROVED', 'PARTIALLY_RECEIVED'])
+            ->whereIn('status', ['SUBMITTED', 'APPROVED', 'PARTIALLY_RECEIVED', 'FOR_PROCUREMENT'])
             ->whereHas('office', fn ($officeQuery) => $officeQuery->where('code', '!=', 'GSO'))
             ->whereDoesntHave('distributionRecords', fn ($query) => $query->where('status', 'DRAFT'))
             ->with(['office', 'items.item.inventory', 'distributionRecords.items'])
@@ -359,7 +366,7 @@ class DistributionRecordController
 
             $acceptedInDelivery = (float) $dr->delivery->items
                 ->filter(fn ($di) => (int) ($di->purchaseOrderItem?->item_id ?? 0) === $itemId)
-                ->sum(fn ($di) => max((float) $di->received_quantity - (float) $di->damaged_quantity - (float) $di->missing_quantity, 0.0));
+                ->sum(fn ($di) => max((float) $di->received_quantity - (float) $di->damaged_quantity, 0.0));
 
             return max($releasedInDr - $acceptedInDelivery, 0.0);
         });
@@ -421,7 +428,7 @@ class DistributionRecordController
                 ->with(['items'])
                 ->get()
                 ->contains(function (Delivery $del): bool {
-                    $accepted = (float) $del->items->sum(fn ($i) => max((float) $i->received_quantity - (float) $i->damaged_quantity - (float) $i->missing_quantity, 0));
+                    $accepted = (float) $del->items->sum(fn ($i) => max((float) $i->received_quantity - (float) $i->damaged_quantity, 0));
                     return $accepted > 0.0001;
                 });
 
@@ -485,7 +492,7 @@ class DistributionRecordController
             $deliveryAcceptedByItemId = $distribution_record->delivery->items
                 ->groupBy(fn ($item) => (int) ($item->purchaseOrderItem?->item_id ?? 0))
                 ->map(fn ($group): float => (float) $group->sum(
-                    fn ($item): float => max((float) $item->received_quantity - (float) $item->damaged_quantity - (float) $item->missing_quantity, 0)
+                    fn ($item): float => max((float) $item->received_quantity - (float) $item->damaged_quantity, 0)
                 ));
 
             $deliveryReleasedByItemId = $distribution_record->delivery->distributionRecords
@@ -500,7 +507,8 @@ class DistributionRecordController
 
         $unreleasedStockItems = [];
         $targetSr = $distribution_record->supplyRequest;
-        $parentSr = $targetSr ? $this->followUpService->resolveParentSupplyRequest($targetSr) : null;
+        $rootSr = $targetSr ? $this->followUpService->resolveRootSupplyRequest($targetSr) : null;
+        $parentSr = ($rootSr && (int) $rootSr->supply_request_id !== (int) ($targetSr?->supply_request_id ?? 0)) ? $rootSr : null;
 
         if ($targetSr) {
             $isProcurementBacked = $targetSr->purchaseRequests()->exists();

@@ -373,7 +373,7 @@ class InventoryService
             ->with(['delivery.distributionRecords.items'])
             ->get()
             ->sum(function (DeliveryItem $di) use ($itemId): float {
-                $accepted = max((float) $di->received_quantity - (float) $di->damaged_quantity - (float) $di->missing_quantity, 0.0);
+                $accepted = max((float) $di->received_quantity - (float) $di->damaged_quantity, 0.0);
                 $released = (float) ($di->delivery?->distributionRecords ?? collect())
                     ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
                     ->flatMap(fn ($dr) => $dr->items)
@@ -401,6 +401,11 @@ class InventoryService
         $excludeIds = is_array($excludeDeliveryIds)
             ? array_filter(array_map('intval', $excludeDeliveryIds))
             : ($excludeDeliveryIds !== null ? [(int) $excludeDeliveryIds] : []);
+
+        if ($supplyRequest instanceof SupplyRequest) {
+            $lineageDeliveryIds = $this->followUpService->resolveDeliveryIdsForSupplyRequest($supplyRequest);
+            $excludeIds = array_values(array_unique(array_merge($excludeIds, $lineageDeliveryIds)));
+        }
 
         $undistributed = $this->getUndistributedDeliveryStock($itemId, $excludeIds);
 

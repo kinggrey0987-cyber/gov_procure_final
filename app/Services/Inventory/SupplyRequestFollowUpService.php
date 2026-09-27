@@ -288,16 +288,13 @@ class SupplyRequestFollowUpService
     }
 
     /**
-     * Resolve all supply request IDs in the lineage (root parent + all follow-up descendants + self).
-     *
-     * @return array<int>
+     * Resolve the root supply request by walking up the parent follow-up chain.
      */
-    public function resolveLineageSupplyRequestIds(SupplyRequest $supplyRequest): array
+    public function resolveRootSupplyRequest(SupplyRequest $supplyRequest): SupplyRequest
     {
         $current = $supplyRequest;
         $visited = [(int) $current->supply_request_id => true];
 
-        // Walk up to find root parent
         while ($parent = $this->resolveParentSupplyRequest($current)) {
             $parentId = (int) $parent->supply_request_id;
             if (isset($visited[$parentId])) {
@@ -306,6 +303,18 @@ class SupplyRequestFollowUpService
             $visited[$parentId] = true;
             $current = $parent;
         }
+
+        return $current;
+    }
+
+    /**
+     * Resolve all supply request IDs in the lineage (root parent + all follow-up descendants + self).
+     *
+     * @return array<int>
+     */
+    public function resolveLineageSupplyRequestIds(SupplyRequest $supplyRequest): array
+    {
+        $current = $this->resolveRootSupplyRequest($supplyRequest);
 
         $allIds = [(int) $current->supply_request_id];
         $allIds = array_merge($allIds, $this->resolveAllFollowUpChildSupplyRequestIds($current));

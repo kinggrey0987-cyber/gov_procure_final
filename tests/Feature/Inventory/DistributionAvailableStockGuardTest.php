@@ -857,7 +857,7 @@ class DistributionAvailableStockGuardTest extends TestCase
             'delivery_id' => $delivery1->delivery_id,
             'purchase_order_item_id' => $poi1->purchase_order_item_id,
             'expected_quantity' => 46,
-            'received_quantity' => 46,
+            'received_quantity' => 41,
             'damaged_quantity' => 5,
             'missing_quantity' => 5,
             'item_status' => 'PARTIALLY_RECEIVED',
@@ -1580,6 +1580,225 @@ class DistributionAvailableStockGuardTest extends TestCase
         $srResponse->assertOk();
         $srProps = $srResponse->viewData('page')['props']['request'];
         $this->assertFalse((bool) $srProps['has_unreleased_available_stock'], 'Banner should not show for procurement-backed request.');
+    }
+
+    public function test_partially_received_delivery_and_unreleased_warehouse_stock_appear_in_supply_distribution(): void
+    {
+        $gsoRole = Role::query()->firstOrCreate(['code' => UserRole::GSO_OFFICER->value], ['name' => 'GSO Officer']);
+        $gsoUser = User::factory()->create(['role_id' => $gsoRole->id]);
+
+        $office = Office::factory()->create(['code' => 'MPDO', 'name' => 'Municipal Planning and Development Office']);
+        $officeUser = User::factory()->create(['role_id' => Role::query()->firstOrCreate(['code' => UserRole::OFFICE_USER->value], ['name' => 'Office User'])->id, 'office_id' => $office->id]);
+
+        $category = ItemCategory::query()->create([
+            'category_name' => 'Office Supplies',
+            'status' => 'ACTIVE',
+        ]);
+        $item = Item::query()->create([
+            'item_code' => 'ITEM-BOND-A4-TEST-PARTIAL',
+            'item_name' => 'Bond Paper, A4 (80 GSM)',
+            'item_category_id' => $category->item_category_id,
+            'default_unit' => 'box',
+            'status' => 'ACTIVE',
+        ]);
+
+        $inv = Inventory::query()->create([
+            'item_id' => $item->item_id,
+            'stock_on_hand' => 5,
+            'available_stock' => 0,
+            'reserved_quantity' => 5,
+        ]);
+
+        // Requisition for 15 boxes (5 reserved, 10 shortage)
+        $sr = SupplyRequest::query()->create([
+            'request_code' => 'SR-MPDO-2026-09-0007',
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(7)->toDateString(),
+            'request_category' => 'GENERAL',
+            'priority_level' => 'NORMAL',
+            'status' => 'FOR_PROCUREMENT',
+            'purpose' => 'Test scenario',
+        ]);
+
+        $sri = SupplyRequestItem::query()->create([
+            'supply_request_id' => $sr->supply_request_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Bond Paper, A4 (80 GSM)',
+            'quantity_requested' => 15,
+        ]);
+
+        // PO 1 for 10 boxes shortage
+        $supplier = Supplier::query()->create([
+            'supplier_name' => 'Paper Supplier',
+            'contact_person' => 'Contact',
+            'email' => 'paper@test.local',
+            'phone' => '09123456789',
+            'address' => 'Supplier Address',
+            'status' => 'ACTIVE',
+        ]);
+
+        $pr1 = PurchaseRequest::query()->create([
+            'pr_number' => 'PR-2026-09-0001',
+            'supply_request_id' => $sr->supply_request_id,
+            'office_id' => $office->id,
+            'requested_by' => $gsoUser->id,
+            'status' => 'APPROVED',
+        ]);
+
+        $po1 = PurchaseOrder::query()->create([
+            'po_number' => 'PO-2026-09-0001',
+            'purchase_request_id' => $pr1->purchase_request_id,
+            'supply_request_id' => $sr->supply_request_id,
+            'supplier_id' => $supplier->supplier_id,
+            'created_by' => $gsoUser->id,
+            'procurement_method' => 'SHOPPING',
+            'status' => 'APPROVED',
+            'total_amount' => 1000,
+        ]);
+
+        $poi1 = PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $po1->purchase_order_id,
+            'supply_request_item_id' => $sri->supply_request_item_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Bond Paper, A4 (80 GSM)',
+            'quantity_ordered' => 10,
+            'unit' => 'box',
+            'unit_price' => 100,
+            'total_price' => 1000,
+        ]);
+
+        // Delivery 1 arrives: 10 expected, 5 received, 5 missing. receipt_status = PARTIALLY_RECEIVED
+        $del1 = Delivery::query()->create([
+            'delivery_code' => 'DEL-2026-09-0001',
+            'purchase_order_id' => $po1->purchase_order_id,
+            'supplier_id' => $supplier->supplier_id,
+            'received_by' => $gsoUser->id,
+            'actual_delivery_date' => now()->toDateString(),
+            'status' => 'VERIFIED',
+            'receipt_status' => 'PARTIALLY_RECEIVED',
+        ]);
+
+        DeliveryItem::query()->create([
+            'delivery_id' => $del1->delivery_id,
+            'purchase_order_item_id' => $poi1->purchase_order_item_id,
+            'expected_quantity' => 10,
+            'received_quantity' => 5,
+            'damaged_quantity' => 0,
+            'missing_quantity' => 5,
+            'item_status' => 'PARTIALLY_RECEIVED',
+        ]);
+
+        $invService = app(\App\Services\Inventory\InventoryService::class);
+        $invService->updateFromVerifiedDelivery($del1, $gsoUser);
+
+        // Follow-up child SR for 5 missing boxes
+        $childSr = SupplyRequest::query()->create([
+            'request_code' => 'SR-MPDO-2026-09-0008',
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(7)->toDateString(),
+            'request_category' => 'GENERAL',
+            'priority_level' => 'NORMAL',
+            'status' => 'FOR_PROCUREMENT',
+            'purpose' => 'Follow up for DEL-2026-09-0001',
+        ]);
+
+        $childSri = SupplyRequestItem::query()->create([
+            'supply_request_id' => $childSr->supply_request_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Bond Paper, A4 (80 GSM)',
+            'quantity_requested' => 5,
+        ]);
+
+        $pr2 = PurchaseRequest::query()->create([
+            'pr_number' => 'PR-2026-09-0002',
+            'supply_request_id' => $childSr->supply_request_id,
+            'source_delivery_id' => $del1->delivery_id,
+            'source_type' => 'PARTIAL_DELIVERY_FOLLOW_UP',
+            'office_id' => $office->id,
+            'requested_by' => $gsoUser->id,
+            'status' => 'APPROVED',
+        ]);
+
+        $po2 = PurchaseOrder::query()->create([
+            'po_number' => 'PO-2026-09-0002',
+            'purchase_request_id' => $pr2->purchase_request_id,
+            'supply_request_id' => $childSr->supply_request_id,
+            'supplier_id' => $supplier->supplier_id,
+            'created_by' => $gsoUser->id,
+            'procurement_method' => 'SHOPPING',
+            'status' => 'APPROVED',
+            'total_amount' => 500,
+        ]);
+
+        $poi2 = PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $po2->purchase_order_id,
+            'supply_request_item_id' => $childSri->supply_request_item_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Bond Paper, A4 (80 GSM)',
+            'quantity_ordered' => 5,
+            'unit' => 'box',
+            'unit_price' => 100,
+            'total_price' => 500,
+        ]);
+
+        // Delivery 2 arrives: 5 expected, 5 received, 0 missing. receipt_status = VERIFIED
+        $del2 = Delivery::query()->create([
+            'delivery_code' => 'DEL-2026-09-0002',
+            'purchase_order_id' => $po2->purchase_order_id,
+            'supplier_id' => $supplier->supplier_id,
+            'received_by' => $gsoUser->id,
+            'actual_delivery_date' => now()->toDateString(),
+            'status' => 'VERIFIED',
+            'receipt_status' => 'VERIFIED',
+        ]);
+
+        DeliveryItem::query()->create([
+            'delivery_id' => $del2->delivery_id,
+            'purchase_order_item_id' => $poi2->purchase_order_item_id,
+            'expected_quantity' => 5,
+            'received_quantity' => 5,
+            'damaged_quantity' => 0,
+            'missing_quantity' => 0,
+            'item_status' => 'VERIFIED',
+        ]);
+
+        $invService->updateFromVerifiedDelivery($del2, $gsoUser);
+
+        // Process release for Delivery 2 only
+        $distService = app(\App\Services\Inventory\DistributionRecordService::class);
+        $dist2 = $distService->createRecord($gsoUser, [
+            'supply_request_id' => $childSr->supply_request_id,
+            'delivery_id' => $del2->delivery_id,
+            'office_id' => $office->id,
+            'release_date' => now()->toDateString(),
+        ]);
+        $distService->addDistributionItem($dist2, $gsoUser, [
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Bond Paper, A4 (80 GSM)',
+            'quantity_released' => 5,
+            'unit' => 'box',
+        ]);
+
+        // Warehouse now has: 5 (initial) + 5 (from Del 1) = 10 units!
+        // Now viewing Supply Distribution (/inventory/distribution-records/create):
+        $distCreateResponse = $this->actingAs($gsoUser)->get(route('inventory.distribution-records.create'));
+        $distCreateResponse->assertOk();
+        $eligible = $distCreateResponse->viewData('page')['props']['eligibleRows']['data'];
+
+        // Both Delivery 1 (partially received delivery) and Parent SR (available inventory) must appear as releasable!
+        $this->assertNotEmpty($eligible, 'Releasable requests should not be empty.');
+
+        $deliveryRow = collect($eligible)->firstWhere('release_basis', 'VERIFIED_DELIVERY');
+        $this->assertNotNull($deliveryRow, 'Delivery 1 (PARTIALLY_RECEIVED) must be visible in releasable requests.');
+        $this->assertEquals((int) $del1->delivery_id, (int) $deliveryRow['delivery_id']);
+
+        $inventoryRow = collect($eligible)->firstWhere('release_basis', 'AVAILABLE_INVENTORY');
+        $this->assertNotNull($inventoryRow, 'Parent SR with available warehouse inventory must be visible in releasable requests.');
+        $this->assertEquals((int) $sr->supply_request_id, (int) $inventoryRow['supply_request_id']);
     }
 }
 
