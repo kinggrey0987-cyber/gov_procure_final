@@ -1441,6 +1441,136 @@ class DistributionAvailableStockGuardTest extends TestCase
         $this->assertEquals(0.0, (float) $inv->available_stock);
         $this->assertEquals(0.0, (float) $inv->stock_on_hand);
     }
+
+    public function test_releasing_delivery_with_existing_stock_releases_both_delivery_and_initial_inventory(): void
+    {
+        $gsoRole = Role::query()->firstOrCreate(['code' => UserRole::GSO_OFFICER->value], ['name' => 'GSO Officer']);
+        $gsoUser = User::factory()->create(['role_id' => $gsoRole->id]);
+
+        $office = Office::factory()->create(['code' => 'MPDO', 'name' => 'Planning Office']);
+        $officeRole = Role::query()->firstOrCreate(['code' => UserRole::OFFICE_USER->value], ['name' => 'Office User']);
+        $officeUser = User::factory()->create(['role_id' => $officeRole->id, 'office_id' => $office->id]);
+
+        $category = ItemCategory::query()->firstOrCreate(
+            ['category_name' => 'Office Supplies'],
+            ['description' => 'Supplies']
+        );
+        $item = Item::query()->create([
+            'item_category_id' => $category->item_category_id,
+            'item_name' => 'Bond Paper A4',
+            'default_unit' => 'box',
+            'status' => 'active',
+        ]);
+
+        // Initial inventory: 5 boxes in warehouse
+        $inv = Inventory::query()->create([
+            'item_id' => $item->item_id,
+            'stock_on_hand' => 5,
+            'available_stock' => 5,
+            'reserved_quantity' => 0,
+            'low_stock_threshold' => 10,
+        ]);
+
+        // 1. MPDO requests 50 boxes
+        $sr = SupplyRequest::query()->create([
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'request_code' => 'SR-MPDO-TEST-0001',
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(7)->toDateString(),
+            'request_category' => 'GENERAL',
+            'priority_level' => 'NORMAL',
+            'status' => 'SUBMITTED',
+            'purpose' => 'Office supplies',
+            'submitted_at' => now(),
+        ]);
+        $sri = SupplyRequestItem::query()->create([
+            'supply_request_id' => $sr->supply_request_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Bond Paper A4',
+            'quantity_requested' => 50,
+        ]);
+
+        // 2. Queued for procurement by GSO: Net shortage of 45 queued, 5 reserved
+        $prService = app(\App\Services\Procurement\PurchaseRequestService::class);
+        $pr = $prService->queueFromSupplyRequest($gsoUser, [
+            'supply_request_id' => $sr->supply_request_id,
+            'remarks' => 'Shortage queued for procurement',
+        ]);
+
+        $inv->refresh();
+        $this->assertEquals(0.0, (float) $inv->available_stock);
+        $this->assertEquals(5.0, (float) $inv->reserved_quantity);
+
+        // 3. Purchase Order placed for 45 boxes
+        $supplier = Supplier::query()->create([
+            'supplier_name' => 'Supplier Test',
+            'contact_person' => 'Supplier',
+        ]);
+        $po = PurchaseOrder::query()->create([
+            'purchase_request_id' => $pr->purchase_request_id,
+            'supply_request_id' => $sr->supply_request_id,
+            'supplier_id' => $supplier->supplier_id,
+            'created_by' => $gsoUser->id,
+            'po_number' => 'PO-TEST-0001',
+            'procurement_method' => 'SHOPPING',
+            'status' => 'ORDERED',
+            'total_amount' => 4500,
+        ]);
+        $poItem = PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $po->purchase_order_id,
+            'supply_request_item_id' => $sri->supply_request_item_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Bond Paper A4',
+            'unit' => 'box',
+            'quantity_ordered' => 50,
+            'unit_price' => 100,
+            'total_price' => 5000,
+        ]);
+
+        // 4. Delivery arrives partially: 35 received, 10 missing
+        $delivery = Delivery::query()->create([
+            'purchase_order_id' => $po->purchase_order_id,
+            'supplier_id' => $supplier->supplier_id,
+            'received_by' => $gsoUser->id,
+            'delivery_code' => 'DEL-TEST-0001',
+            'receipt_status' => 'PARTIALLY_RECEIVED',
+            'delivery_date' => now()->toDateString(),
+        ]);
+        $deliveryItem = DeliveryItem::query()->create([
+            'delivery_id' => $delivery->delivery_id,
+            'purchase_order_item_id' => $poItem->purchase_order_item_id,
+            'expected_quantity' => 45,
+            'received_quantity' => 35,
+            'damaged_quantity' => 0,
+            'missing_quantity' => 0,
+        ]);
+
+        $invService = app(\App\Services\Inventory\InventoryService::class);
+        $invService->updateFromVerifiedDelivery($delivery, $gsoUser);
+
+        $inv->refresh();
+        // SOH should be 5 + 35 = 40. Available = 35. Reserved = 5.
+        $this->assertEquals(40.0, (float) $inv->stock_on_hand);
+        $this->assertEquals(35.0, (float) $inv->available_stock);
+        $this->assertEquals(5.0, (float) $inv->reserved_quantity);
+
+        // 5. GSO clicks Process Release for this delivery:
+        // Releasable stock should be 35 (from delivery) + 5 (from initial warehouse stock) = 40!
+        $response = $this->actingAs($gsoUser)->post(route('inventory.distribution-records.store'), [
+            'supply_request_id' => $sr->supply_request_id,
+            'delivery_id' => $delivery->delivery_id,
+            'office_id' => $office->id,
+            'release_date' => now()->toDateString(),
+        ]);
+        $response->assertSessionHasNoErrors();
+
+        $dr = DistributionRecord::query()->where('supply_request_id', $sr->supply_request_id)->first();
+        $this->assertNotNull($dr);
+        $releasedQty = (float) $dr->items()->sum('quantity_released');
+        $this->assertEquals(40.0, $releasedQty, 'Releasing delivery should include both 35 from delivery and 5 from warehouse inventory');
+    }
 }
+
 
 

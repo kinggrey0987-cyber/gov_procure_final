@@ -416,15 +416,10 @@ class InventoryService
 
         $reservedPortion = 0.0;
         if ($supplyRequest instanceof SupplyRequest && $supplyRequest->purchaseRequests()->exists()) {
-            $supplyRequest->loadMissing(['items', 'purchaseOrders.items', 'distributionRecords.items']);
+            $supplyRequest->loadMissing(['items', 'distributionRecords.items']);
             $itemRequested = (float) $supplyRequest->items
                 ->where('item_id', $itemId)
                 ->sum('quantity_requested');
-            $totalOrdered = (float) $supplyRequest->purchaseOrders
-                ->flatMap(fn ($po) => $po->items)
-                ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
-                ->sum('quantity_ordered');
-            $invPortion = max($itemRequested - $totalOrdered, 0.0);
 
             $alreadyReleasedInv = (float) $supplyRequest->distributionRecords
                 ->whereNull('delivery_id')
@@ -433,8 +428,8 @@ class InventoryService
                 ->where('item_id', $itemId)
                 ->sum('quantity_released');
 
-            $remainingInvPortion = max($invPortion - $alreadyReleasedInv, 0.0);
-            $reservedPortion = min($remainingInvPortion, (float) $inventory->reserved_quantity);
+            $remainingNeeded = max($itemRequested - $alreadyReleasedInv, 0.0);
+            $reservedPortion = min($remainingNeeded, (float) $inventory->reserved_quantity);
         }
 
         $freeStock = max((float) $inventory->available_stock - $undistributed, 0.0);

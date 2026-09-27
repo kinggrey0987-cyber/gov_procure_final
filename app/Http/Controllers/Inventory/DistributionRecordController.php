@@ -212,17 +212,7 @@ class DistributionRecordController
             $remaining = max($requested - $released, 0);
             $available = $this->inventoryService->getAvailableStockForSupplyRequest($itemId, $request);
 
-            $releasableStock = $available;
-            if ($isProcurementBacked) {
-                $totalOrdered = (float) $request->purchaseOrders
-                    ->flatMap(fn ($po) => $po->items)
-                    ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
-                    ->sum('quantity_ordered');
-                $inventoryPortion = max($requested - $totalOrdered, 0.0);
-                $alreadyReleasedInventory = $this->calculateAlreadyReleasedInventory($request, $itemId);
-                $remainingInventoryPortion = max($inventoryPortion - $alreadyReleasedInventory, 0.0);
-                $releasableStock = min($remainingInventoryPortion, $available);
-            }
+            $releasableStock = min($remaining, $available);
 
             if ($remaining > 0.0001 && $releasableStock > 0.0001) {
                 $hasReleasableStock = true;
@@ -410,18 +400,7 @@ class DistributionRecordController
             $available = $this->inventoryService->getAvailableStockForSupplyRequest($itemId, $request);
             $shortageTotal += max($remaining - $available, 0);
 
-            $releasableStock = $available;
-            if ($hasPurchaseRequest) {
-                $request->loadMissing('purchaseOrders.items');
-                $totalOrdered = (float) $request->purchaseOrders
-                    ->flatMap(fn ($po) => $po->items)
-                    ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
-                    ->sum('quantity_ordered');
-                $inventoryPortion = max($requested - $totalOrdered, 0.0);
-                $alreadyReleasedInventory = $this->calculateAlreadyReleasedInventory($request, $itemId);
-                $remainingInventoryPortion = max($inventoryPortion - $alreadyReleasedInventory, 0.0);
-                $releasableStock = min($remainingInventoryPortion, $available);
-            }
+            $releasableStock = min($remaining, $available);
 
             if ($remaining > 0.0001 && $releasableStock > 0.0001) {
                 $hasAvailableStock = true;
@@ -534,18 +513,31 @@ class DistributionRecordController
                 $requestRemaining = max($requestedQuantity - $releasedQuantity, 0);
                 $inv = $item->item?->inventory;
                 $undistributed = $this->undistributedDeliveryStock($itemId, $distribution_record->delivery_id ? (int) $distribution_record->delivery_id : null);
-                $availableStock = max((float) ($inv?->available_stock ?? 0) + (float) ($inv?->reserved_quantity ?? 0) - $undistributed, 0.0);
+                $reservedStock = (float) ($inv?->reserved_quantity ?? 0);
+                $availableStock = max((float) ($inv?->available_stock ?? 0) + $reservedStock - $undistributed, 0.0);
 
-                $releasableStock = $availableStock;
-                if ($isProcurementBacked) {
-                    $totalOrdered = (float) $targetSr->purchaseOrders
+                if ($distribution_record->delivery_id !== null) {
+                    $targetSr->loadMissing(['purchaseRequests.items', 'purchaseOrders.items', 'purchaseOrders.purchaseRequest']);
+                    $orderedFromPr = (float) $targetSr->purchaseRequests
+                        ->filter(fn ($pr) => empty($pr->source_type) || $pr->source_type === 'SHORTAGE')
+                        ->flatMap(fn ($pr) => $pr->items)
+                        ->where('item_id', $itemId)
+                        ->sum('quantity_requested');
+                    $orderedFromPo = (float) $targetSr->purchaseOrders
+                        ->filter(fn ($po) => $po->purchaseRequest === null || empty($po->purchaseRequest->source_type) || $po->purchaseRequest->source_type === 'SHORTAGE')
                         ->flatMap(fn ($po) => $po->items)
                         ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
                         ->sum('quantity_ordered');
-                    $inventoryPortion = max($requestedQuantity - $totalOrdered, 0.0);
+                    $originalOrdered = max($orderedFromPr, $orderedFromPo);
+                    $unprocuredPortion = $originalOrdered > 0 ? max($requestedQuantity - $originalOrdered, 0.0) : 0.0;
+
+                    $earmarkedWarehouseStock = max($reservedStock, $unprocuredPortion);
                     $alreadyReleasedInventory = $this->calculateAlreadyReleasedInventory($targetSr, $itemId);
-                    $remainingInventoryPortion = max($inventoryPortion - $alreadyReleasedInventory, 0.0);
-                    $releasableStock = min($remainingInventoryPortion, $availableStock);
+                    $remainingWarehouseQuota = max($earmarkedWarehouseStock - $alreadyReleasedInventory, 0.0);
+
+                    $releasableStock = min($requestRemaining, min($remainingWarehouseQuota, $availableStock));
+                } else {
+                    $releasableStock = min($requestRemaining, $availableStock);
                 }
 
                 if ($requestRemaining > 0.0001 && $releasableStock > 0.0001) {
@@ -559,7 +551,7 @@ class DistributionRecordController
                         'quantity_requested' => $requestedQuantity,
                         'quantity_remaining' => $requestRemaining,
                         'available_stock' => $availableStock,
-                        'releasable_quantity' => min($requestRemaining, $releasableStock),
+                        'releasable_quantity' => $releasableStock,
                         'is_parent' => false,
                         'request_code' => (string) $targetSr->request_code,
                     ];
@@ -583,18 +575,31 @@ class DistributionRecordController
                     $pRemaining = max($pRequested - $pReleased, 0);
                     $pInv = $item->item?->inventory;
                     $undistributed = $this->undistributedDeliveryStock($itemId, $distribution_record->delivery_id ? (int) $distribution_record->delivery_id : null);
-                    $availableStock = max((float) ($pInv?->available_stock ?? 0) + (float) ($pInv?->reserved_quantity ?? 0) - $undistributed, 0.0);
+                    $pReservedStock = (float) ($pInv?->reserved_quantity ?? 0);
+                    $availableStock = max((float) ($pInv?->available_stock ?? 0) + $pReservedStock - $undistributed, 0.0);
 
-                    $releasableStock = $availableStock;
-                    if ($isParentProcurementBacked) {
-                        $totalOrdered = (float) $parentSr->purchaseOrders
+                    if ($distribution_record->delivery_id !== null) {
+                        $parentSr->loadMissing(['purchaseRequests.items', 'purchaseOrders.items', 'purchaseOrders.purchaseRequest']);
+                        $orderedFromPr = (float) $parentSr->purchaseRequests
+                            ->filter(fn ($pr) => empty($pr->source_type) || $pr->source_type === 'SHORTAGE')
+                            ->flatMap(fn ($pr) => $pr->items)
+                            ->where('item_id', $itemId)
+                            ->sum('quantity_requested');
+                        $orderedFromPo = (float) $parentSr->purchaseOrders
+                            ->filter(fn ($po) => $po->purchaseRequest === null || empty($po->purchaseRequest->source_type) || $po->purchaseRequest->source_type === 'SHORTAGE')
                             ->flatMap(fn ($po) => $po->items)
                             ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
                             ->sum('quantity_ordered');
-                        $inventoryPortion = max($pRequested - $totalOrdered, 0.0);
+                        $originalOrdered = max($orderedFromPr, $orderedFromPo);
+                        $unprocuredPortion = $originalOrdered > 0 ? max($pRequested - $originalOrdered, 0.0) : 0.0;
+
+                        $earmarkedWarehouseStock = max($pReservedStock, $unprocuredPortion);
                         $alreadyReleasedInventory = $this->calculateAlreadyReleasedInventory($parentSr, $itemId);
-                        $remainingInventoryPortion = max($inventoryPortion - $alreadyReleasedInventory, 0.0);
-                        $releasableStock = min($remainingInventoryPortion, $availableStock);
+                        $remainingWarehouseQuota = max($earmarkedWarehouseStock - $alreadyReleasedInventory, 0.0);
+
+                        $releasableStock = min($pRemaining, min($remainingWarehouseQuota, $availableStock));
+                    } else {
+                        $releasableStock = min($pRemaining, $availableStock);
                     }
 
                     if ($pRemaining > 0.0001 && $releasableStock > 0.0001) {
@@ -608,7 +613,7 @@ class DistributionRecordController
                             'quantity_requested' => $pRequested,
                             'quantity_remaining' => $pRemaining,
                             'available_stock' => $availableStock,
-                            'releasable_quantity' => min($pRemaining, $releasableStock),
+                            'releasable_quantity' => $releasableStock,
                             'is_parent' => true,
                             'request_code' => (string) $parentSr->request_code,
                         ];
@@ -642,32 +647,39 @@ class DistributionRecordController
                         $requestRemaining = max($requestedQuantity - (float) ($requestReleasedByItemId->get($itemId) ?? 0.0), 0);
                         $inv = $item->item?->inventory;
                         $undistributed = $this->undistributedDeliveryStock($itemId, $distribution_record->delivery_id ? (int) $distribution_record->delivery_id : null);
-                        $availableStock = max((float) ($inv?->available_stock ?? 0) + (float) ($inv?->reserved_quantity ?? 0) - $undistributed, 0.0);
+                        $reservedStock = (float) ($inv?->reserved_quantity ?? 0);
+                        $availableStock = max((float) ($inv?->available_stock ?? 0) + $reservedStock - $undistributed, 0.0);
 
-                        $inventoryPortion = 0.0;
-                        $remainingInventoryPortion = 0.0;
-                        if ($distribution_record->supplyRequest) {
-                            $distribution_record->supplyRequest->loadMissing('purchaseOrders.items');
-                            $totalOrdered = (float) $distribution_record->supplyRequest->purchaseOrders
+                        if ($deliveryRemainingByItemId !== null) {
+                            $deliveryRemaining = (float) ($deliveryRemainingByItemId->get($itemId) ?? 0.0);
+                            $deliveryPortion = min($requestRemaining, $deliveryRemaining);
+                            $unmetRequest = max($requestRemaining - $deliveryPortion, 0.0);
+
+                            $distribution_record->supplyRequest->loadMissing(['purchaseRequests.items', 'purchaseOrders.items', 'purchaseOrders.purchaseRequest']);
+                            $orderedFromPr = (float) $distribution_record->supplyRequest->purchaseRequests
+                                ->filter(fn ($pr) => empty($pr->source_type) || $pr->source_type === 'SHORTAGE')
+                                ->flatMap(fn ($pr) => $pr->items)
+                                ->where('item_id', $itemId)
+                                ->sum('quantity_requested');
+                            $orderedFromPo = (float) $distribution_record->supplyRequest->purchaseOrders
+                                ->filter(fn ($po) => $po->purchaseRequest === null || empty($po->purchaseRequest->source_type) || $po->purchaseRequest->source_type === 'SHORTAGE')
                                 ->flatMap(fn ($po) => $po->items)
                                 ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
                                 ->sum('quantity_ordered');
-                            $isProcurementBacked = $totalOrdered > 0 || $distribution_record->supplyRequest->purchaseRequests()->exists();
-                            if ($isProcurementBacked) {
-                                $inventoryPortion = max($requestedQuantity - $totalOrdered, 0.0);
-                                $alreadyReleasedInventory = $this->calculateAlreadyReleasedInventory($distribution_record->supplyRequest, $itemId);
-                                $remainingInventoryPortion = max($inventoryPortion - $alreadyReleasedInventory, 0.0);
-                            } else {
-                                $remainingInventoryPortion = $requestRemaining;
-                            }
+                            $originalOrdered = max($orderedFromPr, $orderedFromPo);
+                            $unprocuredPortion = $originalOrdered > 0 ? max($requestedQuantity - $originalOrdered, 0.0) : 0.0;
+
+                            $earmarkedWarehouseStock = max($reservedStock, $unprocuredPortion);
+                            $alreadyReleasedInventory = $this->calculateAlreadyReleasedInventory($distribution_record->supplyRequest, $itemId);
+                            $remainingWarehouseQuota = max($earmarkedWarehouseStock - $alreadyReleasedInventory, 0.0);
+
+                            $availableWarehouseStock = max($availableStock - $deliveryRemaining, 0.0);
+                            $releasableInventory = min($unmetRequest, min($remainingWarehouseQuota, $availableWarehouseStock));
+
+                            $maxReleasable = min($requestRemaining, $deliveryPortion + $releasableInventory);
+                        } else {
+                            $maxReleasable = min($requestRemaining, $availableStock);
                         }
-
-                        $releasableInventory = min($remainingInventoryPortion, $availableStock);
-
-                        $deliveryRemaining = $deliveryRemainingByItemId !== null ? (float) ($deliveryRemainingByItemId->get($itemId) ?? 0.0) : 0.0;
-                        $maxReleasable = $deliveryRemainingByItemId !== null
-                            ? min($requestRemaining, $deliveryRemaining + $releasableInventory)
-                            : min($requestRemaining, min($remainingInventoryPortion, $availableStock));
 
                         return [
                             'supply_request_item_id' => (int) $item->supply_request_item_id,
@@ -812,19 +824,29 @@ class DistributionRecordController
             $remaining = max($requested - $released, 0);
             $inv = $requestItem->item?->inventory;
             $undistributed = $this->undistributedDeliveryStock($itemId, $distribution_record->delivery_id ? (int) $distribution_record->delivery_id : null);
-            $availableStock = max((float) ($inv?->available_stock ?? 0) + (float) ($inv?->reserved_quantity ?? 0) - $undistributed, 0.0);
+            $reservedStock = (float) ($inv?->reserved_quantity ?? 0);
+            $availableStock = max((float) ($inv?->available_stock ?? 0) + $reservedStock - $undistributed, 0.0);
 
-            $supplyRequest->loadMissing('purchaseOrders.items');
-            $totalOrdered = (float) $supplyRequest->purchaseOrders
-                ->flatMap(fn ($po) => $po->items)
-                ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
-                ->sum('quantity_ordered');
+            if ($distribution_record->delivery_id !== null) {
+                $supplyRequest->loadMissing(['purchaseRequests.items', 'purchaseOrders.items', 'purchaseOrders.purchaseRequest']);
+                $orderedFromPr = (float) $supplyRequest->purchaseRequests
+                    ->filter(fn ($pr) => empty($pr->source_type) || $pr->source_type === 'SHORTAGE')
+                    ->flatMap(fn ($pr) => $pr->items)
+                    ->where('item_id', $itemId)
+                    ->sum('quantity_requested');
+                $orderedFromPo = (float) $supplyRequest->purchaseOrders
+                    ->filter(fn ($po) => $po->purchaseRequest === null || empty($po->purchaseRequest->source_type) || $po->purchaseRequest->source_type === 'SHORTAGE')
+                    ->flatMap(fn ($po) => $po->items)
+                    ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
+                    ->sum('quantity_ordered');
+                $originalOrdered = max($orderedFromPr, $orderedFromPo);
+                $unprocuredPortion = $originalOrdered > 0 ? max($requested - $originalOrdered, 0.0) : 0.0;
 
-            if ($totalOrdered > 0 || $supplyRequest->purchaseRequests()->exists()) {
-                $inventoryPortion = max($requested - $totalOrdered, 0.0);
+                $earmarkedWarehouseStock = max($reservedStock, $unprocuredPortion);
                 $alreadyReleasedInventory = $this->calculateAlreadyReleasedInventory($supplyRequest, $itemId);
-                $remainingInventoryPortion = max($inventoryPortion - $alreadyReleasedInventory, 0.0);
-                $releasable = min($remainingInventoryPortion, $availableStock);
+                $remainingWarehouseQuota = max($earmarkedWarehouseStock - $alreadyReleasedInventory, 0.0);
+
+                $releasable = min($remaining, min($remainingWarehouseQuota, $availableStock));
             } else {
                 $releasable = min($remaining, $availableStock);
             }
