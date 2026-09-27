@@ -39,7 +39,7 @@ export default function MovementShow({ movement }: Props) {
                         <div className="grid gap-4 md:grid-cols-2">
                             <Info label="Movement Type" value={humanizeEnum(movement.movement_type)} />
                             <Info label="Quantity" value={movement.quantity.toFixed(2)} />
-                            <Info label="Date" value={movement.movement_date} />
+                            <Info label="Date" value={formatDate(movement.movement_date)} />
                             <Info label="Performed By" value={movement.performed_by?.name ?? 'System'} />
                             <Info label="Affected Item" value={movement.inventory?.item_name ?? 'Unknown Item'} />
                             <Info label="Inventory Reference" value={movement.inventory ? `#${movement.inventory.inventory_id}` : '-'} />
@@ -51,6 +51,19 @@ export default function MovementShow({ movement }: Props) {
             </div>
         </AuthenticatedLayout>
     );
+}
+
+function formatDate(value?: string | null): string {
+    if (!value) {
+        return '-';
+    }
+
+    const datePart = value.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
+    const parsed = new Date(datePart ? `${datePart}T00:00:00` : value);
+
+    return Number.isNaN(parsed.getTime())
+        ? value
+        : parsed.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 function Info({ label, value }: { label: string; value: string }) {

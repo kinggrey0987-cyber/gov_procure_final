@@ -7,6 +7,7 @@ use App\Http\Requests\Inventory\UpdateInventoryRequest;
 use App\Models\Delivery;
 use App\Models\Inventory;
 use App\Models\ItemCategory;
+use App\Models\InventoryMovement;
 use App\Services\Inventory\InventoryService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -92,7 +93,16 @@ class InventoryController
             ->orderByDesc('movement_date')
             ->orderByDesc('movement_id')
             ->limit(10)
-            ->get();
+            ->get()
+            ->map(function (InventoryMovement $movement): array {
+                return [
+                    'movement_id' => (int) $movement->movement_id,
+                    'movement_type' => (string) $movement->movement_type,
+                    'quantity' => (float) $movement->quantity,
+                    'movement_date' => optional($movement->movement_date)?->toDateString(),
+                    'remarks' => $movement->remarks,
+                ];
+            });
 
         return Inertia::render('Inventory/Inventory/Show', [
             'inventory' => $inventory,

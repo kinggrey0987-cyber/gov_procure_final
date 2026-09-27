@@ -38,7 +38,7 @@ class InventoryMovement extends Model
         'quantity' => 'decimal:2',
         'performed_by' => 'integer',
         'last_updated' => 'datetime',
-        'movement_date' => 'date',
+        'movement_date' => 'date:Y-m-d',
     ];
 
     public function inventory(): BelongsTo

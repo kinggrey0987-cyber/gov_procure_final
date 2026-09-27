@@ -2118,6 +2118,50 @@ class InventoryDistributionFoundationTest extends TestCase
         ]);
     }
 
+    public function test_inventory_show_formats_recent_movement_activity_date_without_iso_timestamp(): void
+    {
+        $category = ItemCategory::query()->create([
+            'category_name' => 'Cat '.uniqid(),
+            'standard_delivery_days' => 7,
+            'status' => 'ACTIVE',
+        ]);
+
+        $item = Item::query()->create([
+            'item_category_id' => $category->item_category_id,
+            'item_name' => 'Movement Test Item '.uniqid(),
+            'default_unit' => 'PCS',
+            'status' => 'ACTIVE',
+        ]);
+
+        $inventory = Inventory::query()->create([
+            'item_id' => $item->item_id,
+            'available_stock' => 10,
+            'stock_on_hand' => 10,
+            'reserved_quantity' => 0,
+            'released_quantity' => 0,
+            'low_stock_threshold' => 4,
+        ]);
+
+        InventoryMovement::query()->create([
+            'inventory_id' => $inventory->inventory_id,
+            'movement_type' => 'RELEASE',
+            'reference_type' => 'App\\Models\\DistributionRecord',
+            'reference_id' => 1,
+            'quantity' => 5,
+            'performed_by' => $this->gsoOfficer->id,
+            'movement_date' => '2026-09-27',
+            'remarks' => 'Test release',
+        ]);
+
+        $response = $this->actingAs($this->gsoOfficer)->get(route('inventory.inventory.show', $inventory->inventory_id));
+        $response->assertOk();
+
+        $movements = $response->viewData('page')['props']['recentMovements'];
+        $this->assertNotEmpty($movements);
+        $this->assertEquals('2026-09-27', $movements[0]['movement_date']);
+        $this->assertStringNotContainsString('T00:00:00', (string) $movements[0]['movement_date']);
+    }
+
     private function createUser(UserRole $role, Office $office): User
     {
         $roleModel = Role::query()->firstOrCreate(

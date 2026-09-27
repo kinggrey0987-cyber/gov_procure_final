@@ -144,7 +144,7 @@ export default function InventoryShow({ inventory, recentMovements }: Props) {
                                 <tr key={movement.movement_id} className="hover:bg-slate-50/60">
                                     <td className="px-4 py-2 text-slate-700">{humanizeEnum(movement.movement_type)}</td>
                                     <td className="px-4 py-2 text-right text-slate-700">{movement.quantity}</td>
-                                    <td className="px-4 py-2 text-slate-600">{movement.movement_date}</td>
+                                    <td className="px-4 py-2 text-slate-600">{formatDate(movement.movement_date)}</td>
                                     <td className="px-4 py-2 text-right">
                                         <Link href={route('inventory.inventory-movements.show', movement.movement_id)} className="text-sm font-semibold text-blue-600 hover:text-blue-800">
                                             View
@@ -175,6 +175,19 @@ function Metric({ label, value, subValue, tone = 'default' }: { label: string; v
             {subValue ? <p className="mt-0.5 text-xs font-medium text-indigo-700">{subValue}</p> : null}
         </div>
     );
+}
+
+function formatDate(value?: string | null): string {
+    if (!value) {
+        return '-';
+    }
+
+    const datePart = value.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
+    const parsed = new Date(datePart ? `${datePart}T00:00:00` : value);
+
+    return Number.isNaN(parsed.getTime())
+        ? value
+        : parsed.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 

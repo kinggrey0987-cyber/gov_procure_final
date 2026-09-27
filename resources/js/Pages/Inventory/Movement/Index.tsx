@@ -124,7 +124,7 @@ export default function MovementIndex({ movements }: Props) {
                                             <p className="text-[10px] text-slate-500">Inventory #{row.inventory_id}</p>
                                         </td>
                                         <td className="px-3.5 py-2 text-right font-bold text-slate-900">{row.quantity.toFixed(2)}</td>
-                                        <td className="px-3.5 py-2 text-slate-500">{row.movement_date}</td>
+                                        <td className="px-3.5 py-2 text-slate-500">{formatDate(row.movement_date)}</td>
                                         <td className="px-3.5 py-2 text-slate-600">{row.reference_label}</td>
                                         <td className="px-3.5 py-2 text-right">
                                             <Link
@@ -157,6 +157,19 @@ export default function MovementIndex({ movements }: Props) {
             </div>
         </AuthenticatedLayout>
     );
+}
+
+function formatDate(value?: string | null): string {
+    if (!value) {
+        return '-';
+    }
+
+    const datePart = value.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
+    const parsed = new Date(datePart ? `${datePart}T00:00:00` : value);
+
+    return Number.isNaN(parsed.getTime())
+        ? value
+        : parsed.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 
