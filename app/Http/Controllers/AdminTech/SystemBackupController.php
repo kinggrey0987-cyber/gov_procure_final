@@ -56,7 +56,7 @@ class SystemBackupController extends Controller
         return Inertia::render('AdminTech/SystemBackups/Index', [
             'records' => $records,
             'telemetry' => $telemetry,
-            'backupTypes' => ['database_backup', 'server_backup', 'storage_backup'],
+            'backupTypes' => ['database_backup', 'storage_backup'],
             'backupStatuses' => ['completed', 'failed', 'pending'],
         ]);
     }

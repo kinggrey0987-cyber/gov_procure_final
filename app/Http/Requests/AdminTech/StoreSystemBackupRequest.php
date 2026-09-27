@@ -17,7 +17,7 @@ class StoreSystemBackupRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'backup_type' => ['required', 'string', 'in:database_backup,server_backup,storage_backup'],
+            'backup_type' => ['required', 'string', 'in:database_backup,storage_backup'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ];
     }

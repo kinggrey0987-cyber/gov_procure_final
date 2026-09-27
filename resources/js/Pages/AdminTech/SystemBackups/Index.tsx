@@ -53,11 +53,6 @@ const backupTypeMetadata: Record<string, { label: string; desc: string; icon: st
         desc: 'Backs up uploaded PDFs, inspection photos, and public disclosure documents.',
         icon: '📦',
     },
-    server_backup: {
-        label: 'Server Snapshot Registration',
-        desc: 'Registers manual or automated external server snapshots.',
-        icon: '🖥️',
-    },
 };
 
 export default function AdminSystemBackupsIndex({ records, telemetry, backupTypes }: Props) {

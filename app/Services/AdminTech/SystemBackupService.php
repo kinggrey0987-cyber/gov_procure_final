@@ -35,33 +35,15 @@ class SystemBackupService
         $tableMetrics = null;
 
         try {
-            if ($type === 'server_backup') {
-                $status = 'pending';
-                $fileName = sprintf('%s_%s.txt', $type, $timestamp->format('Ymd_His'));
-                $filePath = sprintf('external://%s/%s', $type, Str::uuid()->toString());
-                $notes = trim(((string) $notes).' External/manual server backup registration only.');
-                $snapshot = [
-                    'backup_type' => $type,
-                    'created_at' => $timestamp->toIso8601String(),
-                    'created_by' => [
-                        'id' => (int) $actor->id,
-                        'name' => (string) $actor->name,
-                        'email' => (string) $actor->email,
-                    ],
-                    'status' => 'pending',
-                    'note' => 'External/manual server backup registration only.',
-                ];
-            } else {
-                $snapshot = $this->buildSnapshot($type, $actor, $timestamp, $notes);
+            $snapshot = $this->buildSnapshot($type, $actor, $timestamp, $notes);
 
-                Storage::disk('local')->put($filePath, json_encode($snapshot, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-                $fileSize = Storage::disk('local')->size($filePath);
-                $absPath = Storage::disk('local')->path($filePath);
-                $checksum = file_exists($absPath) ? hash_file('sha256', $absPath) : hash('sha256', (string) Storage::disk('local')->get($filePath));
+            Storage::disk('local')->put($filePath, json_encode($snapshot, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+            $fileSize = Storage::disk('local')->size($filePath);
+            $absPath = Storage::disk('local')->path($filePath);
+            $checksum = file_exists($absPath) ? hash_file('sha256', $absPath) : hash('sha256', (string) Storage::disk('local')->get($filePath));
 
-                if ($type === 'database_backup' && isset($snapshot['database']['tables'])) {
-                    $tableMetrics = collect($snapshot['database']['tables'])->map(fn ($tbl) => $tbl['row_count'] ?? 0)->all();
-                }
+            if ($type === 'database_backup' && isset($snapshot['database']['tables'])) {
+                $tableMetrics = collect($snapshot['database']['tables'])->map(fn ($tbl) => $tbl['row_count'] ?? 0)->all();
             }
         } catch (\Throwable $throwable) {
             $status = 'failed';
