@@ -707,12 +707,12 @@ export default function ExecutiveDashboardIndex({
                                         value={anomalySearch}
                                         onChange={(event) => setAnomalySearch(event.target.value)}
                                         placeholder="Search anomaly or office"
-                                        className="sm:col-span-7 h-7 rounded-lg border border-slate-300 px-2 text-xs shadow-xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                                        className="sm:col-span-6 h-8 rounded-lg border border-slate-300 px-2.5 py-1 text-xs shadow-xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                                     />
                                     <select
                                         value={anomalySeverity}
                                         onChange={(event) => setAnomalySeverity(event.target.value)}
-                                        className="sm:col-span-3 h-7 rounded-lg border border-slate-300 px-2 text-xs shadow-xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                                        className="sm:col-span-4 h-8 rounded-lg border border-slate-300 pl-2.5 pr-8 py-1 text-xs shadow-xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                                     >
                                         {anomalySeverityOptions.map((value) => (
                                             <option key={value} value={value}>{value === 'ALL' ? 'All severities' : formatStatusLabel(value)}</option>
@@ -724,7 +724,7 @@ export default function ExecutiveDashboardIndex({
                                             setAnomalySearch('');
                                             setAnomalySeverity('ALL');
                                         }}
-                                        className="sm:col-span-2 h-7 rounded-lg border border-slate-300 px-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
+                                        className="sm:col-span-2 h-8 rounded-lg border border-slate-300 px-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition flex items-center justify-center"
                                     >
                                         Clear
                                     </button>
@@ -775,12 +775,12 @@ export default function ExecutiveDashboardIndex({
                                         value={alertSearch}
                                         onChange={(event) => setAlertSearch(event.target.value)}
                                         placeholder="Search alert or office"
-                                        className="sm:col-span-7 h-7 rounded-lg border border-slate-300 px-2 text-xs shadow-xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                                        className="sm:col-span-6 h-8 rounded-lg border border-slate-300 px-2.5 py-1 text-xs shadow-xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                                     />
                                     <select
                                         value={alertSeverity}
                                         onChange={(event) => setAlertSeverity(event.target.value)}
-                                        className="sm:col-span-3 h-7 rounded-lg border border-slate-300 px-2 text-xs shadow-xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                                        className="sm:col-span-4 h-8 rounded-lg border border-slate-300 pl-2.5 pr-8 py-1 text-xs shadow-xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                                     >
                                         {alertSeverityOptions.map((value) => (
                                             <option key={value} value={value}>{value === 'ALL' ? 'All severities' : formatStatusLabel(value)}</option>
@@ -792,7 +792,7 @@ export default function ExecutiveDashboardIndex({
                                             setAlertSearch('');
                                             setAlertSeverity('ALL');
                                         }}
-                                        className="sm:col-span-2 h-7 rounded-lg border border-slate-300 px-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
+                                        className="sm:col-span-2 h-8 rounded-lg border border-slate-300 px-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition flex items-center justify-center"
                                     >
                                         Clear
                                     </button>

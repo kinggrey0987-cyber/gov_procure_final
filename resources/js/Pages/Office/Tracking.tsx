@@ -245,12 +245,12 @@ export default function OfficeTracking({ summary, recentRequests, notificationPr
                                     value={requestSearch}
                                     onChange={(event) => setRequestSearch(event.target.value)}
                                     placeholder="Search request ID, date, status"
-                                    className="sm:col-span-7 h-7 rounded-lg border border-slate-300 px-2 text-xs shadow-xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                                    className="sm:col-span-6 h-8 rounded-lg border border-slate-300 px-2.5 py-1 text-xs shadow-xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                                 />
                                 <select
                                     value={requestStatus}
                                     onChange={(event) => setRequestStatus(event.target.value)}
-                                    className="sm:col-span-3 h-7 rounded-lg border border-slate-300 px-2 text-xs shadow-xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                                    className="sm:col-span-4 h-8 rounded-lg border border-slate-300 pl-2.5 pr-8 py-1 text-xs shadow-xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                                 >
                                     <option value="ALL">All statuses</option>
                                     <option value="PENDING_GROUP">Pending Review</option>
@@ -269,7 +269,7 @@ export default function OfficeTracking({ summary, recentRequests, notificationPr
                                         setRequestSearch('');
                                         setRequestStatus('ALL');
                                     }}
-                                    className="sm:col-span-2 h-7 rounded-lg border border-slate-300 px-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
+                                    className="sm:col-span-2 h-8 rounded-lg border border-slate-300 px-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition flex items-center justify-center"
                                 >
                                     Clear
                                 </button>

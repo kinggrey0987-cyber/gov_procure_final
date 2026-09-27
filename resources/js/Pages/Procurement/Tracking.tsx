@@ -303,13 +303,13 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
                                     value={requestSearch}
                                     onChange={(event) => setRequestSearch(event.target.value)}
                                     placeholder="Search PR ID, office, date"
-                                    className="sm:col-span-7 h-7 rounded-lg border border-slate-300 px-2 text-xs shadow-xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                                    className="sm:col-span-6 h-8 rounded-lg border border-slate-300 px-2.5 py-1 text-xs shadow-xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                                 />
                                 <select
                                     id="procurement-request-status"
                                     value={requestStatus}
                                     onChange={(event) => setRequestStatus(event.target.value)}
-                                    className="sm:col-span-3 h-7 rounded-lg border border-slate-300 px-2 text-xs shadow-xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                                    className="sm:col-span-4 h-8 rounded-lg border border-slate-300 pl-2.5 pr-8 py-1 text-xs shadow-xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                                 >
                                     {REQUEST_STATUS_FILTERS.map((status) => (
                                         <option key={status} value={status}>
@@ -323,7 +323,7 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
                                         setRequestSearch('');
                                         setRequestStatus('ALL');
                                     }}
-                                    className="sm:col-span-2 h-7 rounded-lg border border-slate-300 px-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
+                                    className="sm:col-span-2 h-8 rounded-lg border border-slate-300 px-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition flex items-center justify-center"
                                 >
                                     Clear
                                 </button>
@@ -368,13 +368,13 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
                                     value={orderSearch}
                                     onChange={(event) => setOrderSearch(event.target.value)}
                                     placeholder="Search PO, supplier, amount"
-                                    className="sm:col-span-7 h-7 rounded-lg border border-slate-300 px-2 text-xs shadow-xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                                    className="sm:col-span-6 h-8 rounded-lg border border-slate-300 px-2.5 py-1 text-xs shadow-xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                                 />
                                 <select
                                     id="procurement-order-status"
                                     value={orderStatus}
                                     onChange={(event) => setOrderStatus(event.target.value)}
-                                    className="sm:col-span-3 h-7 rounded-lg border border-slate-300 px-2 text-xs shadow-xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                                    className="sm:col-span-4 h-8 rounded-lg border border-slate-300 pl-2.5 pr-8 py-1 text-xs shadow-xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                                 >
                                     {ORDER_STATUS_FILTERS.map((status) => (
                                         <option key={status} value={status}>
@@ -388,7 +388,7 @@ export default function ProcurementTracking({ summary, recentPurchaseRequests, r
                                         setOrderSearch('');
                                         setOrderStatus('ALL');
                                     }}
-                                    className="sm:col-span-2 h-7 rounded-lg border border-slate-300 px-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
+                                    className="sm:col-span-2 h-8 rounded-lg border border-slate-300 px-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition flex items-center justify-center"
                                 >
                                     Clear
                                 </button>
