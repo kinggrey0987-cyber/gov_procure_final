@@ -49,11 +49,11 @@ class DistributionRecordService
                 'delivery_id' => isset($payload['delivery_id']) ? (int) $payload['delivery_id'] : null,
                 'office_id' => (int) $payload['office_id'],
                 'prepared_by' => (int) $actor->id,
-                'received_by' => $payload['received_by'] ?? null,
-                'release_date' => $payload['release_date'] ?? null,
-                'storage_location' => $payload['storage_location'] ?? null,
+                'received_by' => !empty($payload['received_by']) ? (int) $payload['received_by'] : null,
+                'release_date' => !empty($payload['release_date']) ? Carbon::parse($payload['release_date'])->toDateString() : null,
+                'storage_location' => !empty($payload['storage_location']) ? trim((string) $payload['storage_location']) : null,
                 'status' => 'DRAFT',
-                'notes' => $payload['notes'] ?? null,
+                'notes' => !empty($payload['notes']) ? trim((string) $payload['notes']) : null,
             ]);
 
             $this->assertContextConsistency($record);
@@ -380,7 +380,7 @@ class DistributionRecordService
     {
         return (float) \App\Models\DeliveryItem::query()
             ->whereHas('purchaseOrderItem', fn ($q) => $q->where('item_id', $itemId))
-            ->whereHas('delivery', fn ($q) => $q->where('status', 'VERIFIED'))
+            ->whereHas('delivery', fn ($q) => $q->whereIn('receipt_status', ['VERIFIED', 'PARTIALLY_RECEIVED']))
             ->when($excludeDeliveryId !== null, fn ($q) => $q->where('delivery_id', '!=', $excludeDeliveryId))
             ->with(['delivery.distributionRecords.items'])
             ->get()

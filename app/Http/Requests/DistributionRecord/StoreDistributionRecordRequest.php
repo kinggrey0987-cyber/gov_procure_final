@@ -11,6 +11,17 @@ class StoreDistributionRecordRequest extends FormRequest
         return auth()->user()?->can('distribution.manage') ?? false;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'release_date' => !empty($this->release_date) ? $this->release_date : null,
+            'storage_location' => !empty($this->storage_location) ? trim((string) $this->storage_location) : null,
+            'notes' => !empty($this->notes) ? trim((string) $this->notes) : null,
+            'received_by' => !empty($this->received_by) ? (int) $this->received_by : null,
+            'delivery_id' => !empty($this->delivery_id) ? (int) $this->delivery_id : null,
+        ]);
+    }
+
     /**
      * @return array<string, array<int, string>>
      */

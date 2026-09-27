@@ -1128,5 +1128,133 @@ class DistributionAvailableStockGuardTest extends TestCase
             + (float) $dist3->fresh()->items->sum('quantity_released');
         $this->assertEquals(50.0, $totalReleased);
     }
+
+    public function test_process_release_endpoint_handles_empty_string_payload_and_verified_delivery(): void
+    {
+        $gsoRole = Role::query()->firstOrCreate(['code' => UserRole::GSO_OFFICER->value], ['name' => 'GSO Officer']);
+        $gsoUser = User::factory()->create(['role_id' => $gsoRole->id]);
+
+        $office = Office::factory()->create(['code' => 'MPDO', 'name' => 'Municipal Planning and Development Office']);
+
+        $category = ItemCategory::query()->create([
+            'category_name' => 'Office Supplies',
+            'status' => 'ACTIVE',
+        ]);
+
+        $item = Item::query()->create([
+            'item_code' => 'ITEM-BOND-A4-PROCESS',
+            'item_name' => 'Bond Paper, A4 (80 GSM)',
+            'item_category_id' => $category->item_category_id,
+            'default_unit' => 'box',
+            'status' => 'ACTIVE',
+        ]);
+
+        Inventory::query()->create([
+            'item_id' => $item->item_id,
+            'stock_on_hand' => 10,
+            'available_stock' => 10,
+            'reserved_quantity' => 0,
+            'released_quantity' => 0,
+            'low_stock_threshold' => 5,
+        ]);
+
+        $rootSr = SupplyRequest::query()->create([
+            'request_code' => 'SR-MPDO-2026-09-0099',
+            'office_id' => $office->id,
+            'requested_by' => $gsoUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(7)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Annual Office Supplies',
+            'priority_level' => 'NORMAL',
+            'status' => 'APPROVED',
+        ]);
+
+        $rootSri = SupplyRequestItem::query()->create([
+            'supply_request_id' => $rootSr->supply_request_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Bond Paper, A4 (80 GSM)',
+            'quantity_requested' => 10,
+        ]);
+
+        $pr1 = PurchaseRequest::query()->create([
+            'pr_number' => 'PR-2026-09-0099',
+            'supply_request_id' => $rootSr->supply_request_id,
+            'office_id' => $office->id,
+            'requested_by' => $gsoUser->id,
+            'status' => 'APPROVED',
+        ]);
+
+        $supplier = Supplier::query()->create([
+            'supplier_name' => 'Supplier Agent Inc',
+            'contact_person' => 'Supplier Agent',
+            'email' => 'supplier@agent.local',
+            'phone' => '09123456789',
+            'address' => 'Supplier Address',
+            'status' => 'ACTIVE',
+        ]);
+
+        $po1 = PurchaseOrder::query()->create([
+            'po_number' => 'PO-2026-09-0099',
+            'purchase_request_id' => $pr1->purchase_request_id,
+            'supply_request_id' => $rootSr->supply_request_id,
+            'supplier_id' => $supplier->supplier_id,
+            'created_by' => $gsoUser->id,
+            'procurement_method' => 'PUBLIC_BIDDING',
+            'status' => 'APPROVED',
+            'total_amount' => 1000,
+        ]);
+
+        $poi1 = PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $po1->purchase_order_id,
+            'supply_request_item_id' => $rootSri->supply_request_item_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Bond Paper, A4 (80 GSM)',
+            'quantity_ordered' => 10,
+            'unit' => 'box',
+            'unit_price' => 100,
+            'total_price' => 1000,
+        ]);
+
+        $delivery1 = Delivery::query()->create([
+            'delivery_code' => 'DEL-2026-09-0099',
+            'purchase_order_id' => $po1->purchase_order_id,
+            'supplier_id' => $supplier->supplier_id,
+            'received_by' => $gsoUser->id,
+            'actual_delivery_date' => now()->toDateString(),
+            'receipt_status' => 'VERIFIED',
+        ]);
+
+        DeliveryItem::query()->create([
+            'delivery_id' => $delivery1->delivery_id,
+            'purchase_order_item_id' => $poi1->purchase_order_item_id,
+            'expected_quantity' => 10,
+            'received_quantity' => 10,
+            'damaged_quantity' => 0,
+            'missing_quantity' => 0,
+            'item_status' => 'VERIFIED',
+        ]);
+
+        // Post exactly what the frontend submits when clicking Process Release
+        $response = $this->actingAs($gsoUser)->post(route('inventory.distribution-records.store'), [
+            'supply_request_id' => $rootSr->supply_request_id,
+            'delivery_id' => $delivery1->delivery_id,
+            'office_id' => $office->id,
+            'release_date' => '',
+            'storage_location' => '',
+            'notes' => '',
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $record = DistributionRecord::query()->where('supply_request_id', $rootSr->supply_request_id)->first();
+        $this->assertNotNull($record);
+        $response->assertRedirect(route('inventory.distribution-records.show', $record->distribution_record_id));
+        $this->assertEquals('RELEASED', $record->status);
+        $this->assertEquals(10.0, (float) $record->items()->sum('quantity_released'));
+
+        // View the show page
+        $showResponse = $this->actingAs($gsoUser)->get(route('inventory.distribution-records.show', $record->distribution_record_id));
+        $showResponse->assertOk();
+    }
 }
 

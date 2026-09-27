@@ -41,9 +41,9 @@ export default function DistributionCreate({ eligibleRows, focusSupplyRequestId 
         supply_request_id: 0,
         delivery_id: null as number | null,
         office_id: 0,
-        release_date: '',
-        storage_location: '',
-        notes: '',
+        release_date: null as string | null,
+        storage_location: null as string | null,
+        notes: null as string | null,
     });
 
     const { flash } = usePage<PageProps>().props;
@@ -56,11 +56,13 @@ export default function DistributionCreate({ eligibleRows, focusSupplyRequestId 
         const rowKey = `${row.supply_request_id}-${row.delivery_id ?? 'inventory'}`;
         setProcessingRowKey(rowKey);
 
-        form.transform((data) => ({
-            ...data,
+        form.transform(() => ({
             supply_request_id: row.supply_request_id,
-            delivery_id: row.delivery_id,
+            delivery_id: row.delivery_id ?? null,
             office_id: row.office_id,
+            release_date: null,
+            storage_location: null,
+            notes: null,
         }));
 
         form.post(route('inventory.distribution-records.store'), {

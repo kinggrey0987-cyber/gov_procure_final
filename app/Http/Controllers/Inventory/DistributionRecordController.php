@@ -349,7 +349,7 @@ class DistributionRecordController
     {
         return (float) DeliveryItem::query()
             ->whereHas('purchaseOrderItem', fn ($q) => $q->where('item_id', $itemId))
-            ->whereHas('delivery', fn ($q) => $q->where('status', 'VERIFIED'))
+            ->whereHas('delivery', fn ($q) => $q->whereIn('receipt_status', ['VERIFIED', 'PARTIALLY_RECEIVED']))
             ->when($excludeDeliveryId !== null, fn ($q) => $q->where('delivery_id', '!=', $excludeDeliveryId))
             ->with(['delivery.distributionRecords.items'])
             ->get()
