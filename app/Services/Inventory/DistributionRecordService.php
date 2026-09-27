@@ -389,20 +389,29 @@ class DistributionRecordService
         $isProcurementBacked = $record->supplyRequest->purchaseRequests->isNotEmpty();
         $hasDeliveryContext = $record->delivery_id !== null;
         $shortageTotal = 0.0;
-        $releasedByItemId = $this->allFulfillmentDistributionRecords($record->supplyRequest)
-            ->whereIn('status', ['RELEASED', 'RECEIVED'])
+        $releasedPool = $this->allFulfillmentDistributionRecords($record->supplyRequest)
+            ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
             ->flatMap(fn ($distributionRecord) => $distributionRecord->items)
             ->groupBy(fn ($item) => (int) $item->item_id)
             ->map(fn ($items): float => (float) $items->sum('quantity_released'));
         $hasRemainingQuantity = false;
+        $hasAvailableWarehouseStock = false;
 
         foreach ($record->supplyRequest->items as $item) {
+            $itemId = (int) $item->item_id;
             $requested = (float) $item->quantity_requested;
-            $released = (float) ($releasedByItemId->get((int) $item->item_id) ?? 0.0);
-            $remaining = max($requested - $released, 0);
-            $available = (float) ($item->item?->inventory?->available_stock ?? 0);
-            $shortageTotal += max($remaining - $available, 0);
+            $availReleased = (float) ($releasedPool->get($itemId) ?? 0.0);
+            $released = min($requested, $availReleased);
+            $releasedPool->put($itemId, max($availReleased - $released, 0.0));
+
+            $remaining = max($requested - $released, 0.0);
+            $inv = $item->item?->inventory;
+            $available = (float) ($inv?->available_stock ?? 0) + (float) ($inv?->reserved_quantity ?? 0);
+            $shortageTotal += max($remaining - $available, 0.0);
             $hasRemainingQuantity = $hasRemainingQuantity || $remaining > 0.0001;
+            if ($remaining > 0.0001 && $available > 0.0001) {
+                $hasAvailableWarehouseStock = true;
+            }
         }
 
         if (! $hasRemainingQuantity) {
@@ -411,19 +420,13 @@ class DistributionRecordService
             ]);
         }
 
-        if (! $hasDeliveryContext && $isProcurementBacked && $shortageTotal > 0) {
+        if (! $hasDeliveryContext && ! $hasAvailableWarehouseStock) {
             throw ValidationException::withMessages([
-                'delivery_id' => 'Procurement-backed requests require a verified delivery context before distribution release.',
+                'supply_request_id' => 'This request has no available warehouse stock to release. Queue this request for procurement instead.',
             ]);
         }
 
         if (! $hasDeliveryContext) {
-            if ($shortageTotal > 0) {
-                throw ValidationException::withMessages([
-                    'supply_request_id' => 'This request has stock shortages and must be queued for procurement instead of direct inventory release.',
-                ]);
-            }
-
             if ((int) $record->supplyRequest->office_id !== (int) $record->office_id) {
                 throw ValidationException::withMessages([
                     'office_id' => 'Distribution office must match the linked supply request office.',
@@ -532,6 +535,10 @@ class DistributionRecordService
 
                 $maxReleasable = min($maxReleasable, $deliveryRemaining + $releasableInventory);
             }
+        } else {
+            $inv = Inventory::query()->where('item_id', $itemId)->first();
+            $availableWarehouseStock = (float) ($inv?->available_stock ?? 0) + (float) ($inv?->reserved_quantity ?? 0);
+            $maxReleasable = min($maxReleasable, $availableWarehouseStock);
         }
 
         if ($quantity - $maxReleasable > 0.0001) {
@@ -539,7 +546,7 @@ class DistributionRecordService
                 'quantity_released' => sprintf(
                     'Quantity released cannot exceed the remaining releasable quantity of %.2f for this request%s.',
                     $maxReleasable,
-                    $record->delivery_id !== null ? ' and verified delivery/warehouse stock' : ''
+                    $record->delivery_id !== null ? ' and verified delivery/warehouse stock' : ' and available warehouse stock'
                 ),
             ]);
         }

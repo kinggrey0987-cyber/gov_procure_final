@@ -201,18 +201,26 @@ class RequestWorkflowController
         $requestedTotal = 0.0;
         $shortageTotal = 0.0;
         $requestedItems = [];
-        $releasedByItemId = $this->releasedQuantityByItemId($request);
+        $releasedPool = $this->releasedQuantityByItemId($request);
         $hasRemainingQuantity = false;
+        $hasAvailableStock = false;
 
         foreach ($request->items as $item) {
+            $itemId = (int) $item->item_id;
             $requested = (float) $item->quantity_requested;
-            $released = (float) ($releasedByItemId[(int) $item->item_id] ?? 0.0);
-            $remaining = max($requested - $released, 0);
-            $available = (float) ($item->item?->inventory?->available_stock ?? 0);
+            $availReleased = (float) ($releasedPool[$itemId] ?? 0.0);
+            $released = min($requested, $availReleased);
+            $releasedPool[$itemId] = max($availReleased - $released, 0.0);
+
+            $remaining = max($requested - $released, 0.0);
+            $available = (float) ($item->item?->inventory?->available_stock ?? 0) + (float) ($item->item?->inventory?->reserved_quantity ?? 0);
 
             $requestedTotal += $requested;
-            $shortageTotal += max($remaining - $available, 0);
+            $shortageTotal += max($remaining - $available, 0.0);
             $hasRemainingQuantity = $hasRemainingQuantity || $remaining > 0.0001;
+            if ($remaining > 0.0001 && $available > 0.0001) {
+                $hasAvailableStock = true;
+            }
 
             $requestedItems[] = [
                 'item_name' => (string) ($item->item?->item_name ?? $item->item_name_snapshot ?? 'Unknown Item'),
@@ -228,7 +236,7 @@ class RequestWorkflowController
         $distributionRecordsCount = (int) $request->distribution_records_count;
         $hasDraftDistribution = $request->distributionRecords->contains(fn ($record): bool => (string) $record->status === 'DRAFT');
         $isSubmitted = (string) $request->status === 'SUBMITTED';
-        $canCreateInventoryDistribution = $isSubmitted && $stockAssessment === 'STOCK_READY' && ! $hasPurchaseRequest && $hasRemainingQuantity && ! $hasDraftDistribution;
+        $canCreateInventoryDistribution = $isSubmitted && ($stockAssessment === 'STOCK_READY' || $hasAvailableStock) && ! $hasPurchaseRequest && $hasRemainingQuantity && ! $hasDraftDistribution;
 
         return [
             'supply_request_id' => (int) $request->supply_request_id,
@@ -346,10 +354,10 @@ class RequestWorkflowController
 
         $allDistributions = $this->allFulfillmentDistributionRecords($supplyRequest)
             ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED']);
-        $releasedByItemId = $allDistributions
+        $releasedPool = $allDistributions
             ->flatMap(fn ($record) => $record->items)
             ->groupBy(fn ($item) => (int) $item->item_id)
-            ->map(fn ($group) => (float) $group->sum('quantity_released'));
+            ->map(fn ($group): float => (float) $group->sum('quantity_released'));
 
         $requestedTotal = 0.0;
         $releasedTotal = 0.0;
@@ -357,14 +365,17 @@ class RequestWorkflowController
         $hasUnreleasedAvailableStock = false;
 
         $items = $supplyRequest->items
-            ->map(function (SupplyRequestItem $item) use ($releasedByItemId, &$requestedTotal, &$releasedTotal, &$shortageTotal, &$hasUnreleasedAvailableStock): array {
+            ->map(function (SupplyRequestItem $item) use (&$releasedPool, &$requestedTotal, &$releasedTotal, &$shortageTotal, &$hasUnreleasedAvailableStock): array {
                 $itemId = (int) $item->item_id;
                 $requested = (float) $item->quantity_requested;
-                $released = (float) ($releasedByItemId->get($itemId) ?? 0.0);
-                $remaining = max($requested - $released, 0);
+                $availReleased = (float) ($releasedPool->get($itemId) ?? 0.0);
+                $released = min($requested, $availReleased);
+                $releasedPool->put($itemId, max($availReleased - $released, 0.0));
+
+                $remaining = max($requested - $released, 0.0);
                 $inv = $item->item?->inventory;
                 $available = (float) ($inv?->available_stock ?? 0) + (float) ($inv?->reserved_quantity ?? 0);
-                $shortage = max($remaining - $available, 0);
+                $shortage = max($remaining - $available, 0.0);
 
                 if ($remaining > 0.0001 && $available > 0.0001) {
                     $hasUnreleasedAvailableStock = true;
@@ -711,12 +722,15 @@ class RequestWorkflowController
                 ->with('success', 'An existing draft distribution record was found. Continue releasing items in that draft.');
         }
 
-        $releasedByItemId = $this->releasedQuantityByItemId($supplyRequest);
+        $releasedPool = $this->releasedQuantityByItemId($supplyRequest);
         $hasRemainingQuantity = false;
 
         foreach ($supplyRequest->items as $item) {
+            $itemId = (int) $item->item_id;
             $requested = (float) $item->quantity_requested;
-            $released = (float) ($releasedByItemId[(int) $item->item_id] ?? 0.0);
+            $availReleased = (float) ($releasedPool[$itemId] ?? 0.0);
+            $released = min($requested, $availReleased);
+            $releasedPool[$itemId] = max($availReleased - $released, 0.0);
 
             if ($requested - $released > 0.0001) {
                 $hasRemainingQuantity = true;
@@ -730,25 +744,33 @@ class RequestWorkflowController
                 ->with('error', 'All requested quantities have already been released for this request.');
         }
 
-        if ($supplyRequest->purchaseRequests->isNotEmpty()) {
-            return redirect()
-                ->route('inventory.office-supply-requests.index', $request->query())
-                ->with('error', 'This request is already queued for procurement and cannot be processed for direct distribution.');
-        }
-
-        $shortageTotal = 0.0;
+        $hasAvailableStock = false;
+        $releasedPoolForStock = $this->releasedQuantityByItemId($supplyRequest);
         foreach ($supplyRequest->items as $item) {
+            $itemId = (int) $item->item_id;
             $requested = (float) $item->quantity_requested;
-            $released = (float) ($releasedByItemId[(int) $item->item_id] ?? 0.0);
+            $availReleased = (float) ($releasedPoolForStock[$itemId] ?? 0.0);
+            $released = min($requested, $availReleased);
+            $releasedPoolForStock[$itemId] = max($availReleased - $released, 0.0);
+
             $remaining = max($requested - $released, 0);
-            $available = (float) ($item->item?->inventory?->available_stock ?? 0);
-            $shortageTotal += max($remaining - $available, 0);
+            $available = (float) ($item->item?->inventory?->available_stock ?? 0) + (float) ($item->item?->inventory?->reserved_quantity ?? 0);
+            if ($remaining > 0.0001 && $available > 0.0001) {
+                $hasAvailableStock = true;
+                break;
+            }
         }
 
-        if ($shortageTotal > 0) {
+        if (! $hasAvailableStock) {
+            if ($supplyRequest->purchaseRequests->isNotEmpty()) {
+                return redirect()
+                    ->route('inventory.office-supply-requests.index', $request->query())
+                    ->with('error', 'This request is already queued for procurement and has no available warehouse stock to release.');
+            }
+
             return redirect()
                 ->route('inventory.office-supply-requests.index', $request->query())
-                ->with('error', 'Stock shortage detected. Queue this request for procurement initiation instead of distribution release.');
+                ->with('error', 'No available warehouse stock to release. Queue this request for procurement initiation instead.');
         }
 
         try {

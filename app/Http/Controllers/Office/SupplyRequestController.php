@@ -348,29 +348,38 @@ class SupplyRequestController extends Controller
     {
         $distributionRecords = $this->fulfillmentDistributionRecords($supplyRequest);
 
-        $releasedByItemId = $distributionRecords
+        $releasedPool = $distributionRecords
             ->whereIn('status', ['RELEASED', 'RECEIVED'])
             ->flatMap(fn ($record) => $record->items)
             ->groupBy(fn ($item) => (int) $item->item_id)
             ->map(fn ($items): float => (float) $items->sum('quantity_released'));
-        $receivedByItemId = $distributionRecords
+        $receivedPool = $distributionRecords
             ->where('status', 'RECEIVED')
             ->flatMap(fn ($record) => $record->items)
             ->groupBy(fn ($item) => (int) $item->item_id)
             ->map(fn ($items): float => (float) $items->sum('quantity_received'));
 
         return $supplyRequest->items
-            ->map(function ($item) use ($ppmpItemContext, $releasedByItemId, $receivedByItemId): array {
+            ->map(function ($item) use ($ppmpItemContext, &$releasedPool, &$receivedPool): array {
                 $context = $ppmpItemContext->get((int) $item->ppmp_item_id, []);
                 $itemId = (int) $item->item_id;
+                $requested = (float) $item->quantity_requested;
+
+                $availReleased = (float) ($releasedPool->get($itemId) ?? 0.0);
+                $allocReleased = min($requested, $availReleased);
+                $releasedPool->put($itemId, max($availReleased - $allocReleased, 0.0));
+
+                $availReceived = (float) ($receivedPool->get($itemId) ?? 0.0);
+                $allocReceived = min($requested, $availReceived);
+                $receivedPool->put($itemId, max($availReceived - $allocReceived, 0.0));
 
                 return [
                     'supply_request_item_id' => (int) $item->supply_request_item_id,
                     'ppmp_item_id' => (int) $item->ppmp_item_id,
                     'item_name_snapshot' => (string) ($item->item_name_snapshot ?? ''),
-                    'quantity_requested' => (float) $item->quantity_requested,
-                    'quantity_released' => (float) ($releasedByItemId->get($itemId) ?? 0.0),
-                    'quantity_received' => (float) ($receivedByItemId->get($itemId) ?? 0.0),
+                    'quantity_requested' => $requested,
+                    'quantity_released' => $allocReleased,
+                    'quantity_received' => $allocReceived,
                     'default_unit' => isset($context['default_unit']) ? (string) $context['default_unit'] : (string) ($item->item?->default_unit ?? 'box'),
                     'pieces_per_box' => isset($context['pieces_per_box']) ? (int) $context['pieces_per_box'] : (int) ($item->item?->pieces_per_box ?? 1),
                     'sub_unit' => isset($context['sub_unit']) ? (string) $context['sub_unit'] : (string) ($item->item?->sub_unit ?? 'piece'),
@@ -540,53 +549,7 @@ class SupplyRequestController extends Controller
      */
     private function linkedFollowUpSupplyRequestIds(SupplyRequest $supplyRequest): array
     {
-        $sourceDeliveryIds = Delivery::query()
-            ->whereHas('purchaseOrder', fn (Builder $query) => $query->where('supply_request_id', (int) $supplyRequest->supply_request_id))
-            ->pluck('delivery_id')
-            ->map(fn ($id): int => (int) $id)
-            ->values()
-            ->all();
-
-        if ($sourceDeliveryIds === []) {
-            return [];
-        }
-
-        $visitedSupplyRequestIds = [(int) $supplyRequest->supply_request_id => true];
-        $followUpSupplyRequestIds = [];
-        $currentSourceDeliveryIds = $sourceDeliveryIds;
-
-        while ($currentSourceDeliveryIds !== []) {
-            $followUpPurchaseRequests = PurchaseRequest::query()
-                ->where('source_type', 'PARTIAL_DELIVERY_FOLLOW_UP')
-                ->whereIn('source_delivery_id', $currentSourceDeliveryIds)
-                ->get(['purchase_request_id', 'supply_request_id']);
-
-            $newSupplyRequestIds = $followUpPurchaseRequests
-                ->pluck('supply_request_id')
-                ->map(fn ($id): int => (int) $id)
-                ->filter(fn (int $id): bool => $id > 0 && ! isset($visitedSupplyRequestIds[$id]))
-                ->unique()
-                ->values()
-                ->all();
-
-            if ($newSupplyRequestIds === []) {
-                break;
-            }
-
-            foreach ($newSupplyRequestIds as $id) {
-                $visitedSupplyRequestIds[$id] = true;
-                $followUpSupplyRequestIds[] = $id;
-            }
-
-            $currentSourceDeliveryIds = Delivery::query()
-                ->whereHas('purchaseOrder', fn (Builder $query) => $query->whereIn('supply_request_id', $newSupplyRequestIds))
-                ->pluck('delivery_id')
-                ->map(fn ($id): int => (int) $id)
-                ->values()
-                ->all();
-        }
-
-        return $followUpSupplyRequestIds;
+        return $this->followUpService->resolveAllFollowUpChildSupplyRequestIds($supplyRequest);
     }
 
     /**

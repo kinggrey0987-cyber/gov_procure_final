@@ -191,19 +191,19 @@ class DistributionRecordController
 
     private function releaseRowFromAvailableInventory(SupplyRequest $request): ?array
     {
-        if ($request->purchaseRequests()->exists()) {
-            return null;
-        }
-
         if (! $this->hasRemainingQuantity($request)) {
             return null;
         }
 
         $hasReleasableStock = false;
-        $releasedByItemId = $this->releasedQuantityByItemId($request);
+        $releasedPool = $this->releasedQuantityByItemId($request);
         foreach ($request->items as $item) {
+            $itemId = (int) $item->item_id;
             $requested = (float) $item->quantity_requested;
-            $released = (float) ($releasedByItemId[(int) $item->item_id] ?? 0.0);
+            $availReleased = (float) ($releasedPool[$itemId] ?? 0.0);
+            $released = min($requested, $availReleased);
+            $releasedPool[$itemId] = max($availReleased - $released, 0.0);
+
             $remaining = max($requested - $released, 0);
             $inv = $item->item?->inventory;
             $available = (float) ($inv?->available_stock ?? 0) + (float) ($inv?->reserved_quantity ?? 0);
@@ -256,11 +256,15 @@ class DistributionRecordController
     private function supplyRequestShortageTotal(SupplyRequest $request): float
     {
         $shortageTotal = 0.0;
-        $releasedByItemId = $this->releasedQuantityByItemId($request);
+        $releasedPool = $this->releasedQuantityByItemId($request);
 
         foreach ($request->items as $item) {
+            $itemId = (int) $item->item_id;
             $requested = (float) $item->quantity_requested;
-            $released = (float) ($releasedByItemId[(int) $item->item_id] ?? 0.0);
+            $availReleased = (float) ($releasedPool[$itemId] ?? 0.0);
+            $released = min($requested, $availReleased);
+            $releasedPool[$itemId] = max($availReleased - $released, 0.0);
+
             $remaining = max($requested - $released, 0);
             $inv = $item->item?->inventory;
             $available = (float) ($inv?->available_stock ?? 0) + (float) ($inv?->reserved_quantity ?? 0);
@@ -272,11 +276,14 @@ class DistributionRecordController
 
     private function hasRemainingQuantity(SupplyRequest $request): bool
     {
-        $releasedByItemId = $this->releasedQuantityByItemId($request);
+        $releasedPool = $this->releasedQuantityByItemId($request);
 
         foreach ($request->items as $item) {
+            $itemId = (int) $item->item_id;
             $requested = (float) $item->quantity_requested;
-            $released = (float) ($releasedByItemId[(int) $item->item_id] ?? 0.0);
+            $availReleased = (float) ($releasedPool[$itemId] ?? 0.0);
+            $released = min($requested, $availReleased);
+            $releasedPool[$itemId] = max($availReleased - $released, 0.0);
 
             if ($requested - $released > 0.0001) {
                 return true;
@@ -343,10 +350,14 @@ class DistributionRecordController
 
         $shortageTotal = 0.0;
         $hasAvailableStock = false;
-        $releasedByItemId = $this->releasedQuantityByItemId($request);
+        $releasedPool = $this->releasedQuantityByItemId($request);
         foreach ($request->items as $item) {
+            $itemId = (int) $item->item_id;
             $requested = (float) $item->quantity_requested;
-            $released = (float) ($releasedByItemId[(int) $item->item_id] ?? 0.0);
+            $availReleased = (float) ($releasedPool[$itemId] ?? 0.0);
+            $released = min($requested, $availReleased);
+            $releasedPool[$itemId] = max($availReleased - $released, 0.0);
+
             $remaining = max($requested - $released, 0);
             $inv = $item->item?->inventory;
             $available = (float) ($inv?->available_stock ?? 0) + (float) ($inv?->reserved_quantity ?? 0);

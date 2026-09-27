@@ -653,8 +653,18 @@ class PurchaseRequestService
                     continue;
                 }
 
+                $sourceSupplyRequestItem = $purchaseOrderItem->supplyRequestItem;
+                $ppmpItemId = $sourceSupplyRequestItem?->ppmp_item_id;
+
+                if (! $ppmpItemId && $ppmpId > 0) {
+                    $ppmpItemId = PpmpItem::query()
+                        ->where('ppmp_id', $ppmpId)
+                        ->where('item_id', $purchaseOrderItem->item_id)
+                        ->value('ppmp_item_id');
+                }
+
                 $spec = trim((string) ($purchaseOrderItem->specification ?? ''));
-                $key = ((int) $purchaseOrderItem->item_id) . '::' . $spec;
+                $key = ((int) $purchaseOrderItem->item_id) . '::' . ((int) ($ppmpItemId ?? 0)) . '::' . $spec;
                 $quantityRequested = round((float) $deliveryItem->missing_quantity + (float) $deliveryItem->damaged_quantity, 2);
 
                 if ($quantityRequested <= 0) {
@@ -669,6 +679,7 @@ class PurchaseRequestService
                     $groupedDiscrepancies[$key] = [
                         'delivery_item' => $deliveryItem,
                         'purchase_order_item' => $purchaseOrderItem,
+                        'ppmp_item_id' => $ppmpItemId ? (int) $ppmpItemId : null,
                         'specification' => $spec,
                         'quantity_requested' => $quantityRequested,
                         'missing' => (float) $deliveryItem->missing_quantity,
@@ -682,16 +693,7 @@ class PurchaseRequestService
                 $purchaseOrderItem = $grouped['purchase_order_item'];
                 $catalogItem = $purchaseOrderItem->item;
                 $quantityRequested = round((float) $grouped['quantity_requested'], 2);
-
-                $sourceSupplyRequestItem = $purchaseOrderItem->supplyRequestItem;
-                $ppmpItemId = $sourceSupplyRequestItem?->ppmp_item_id;
-
-                if (! $ppmpItemId && $ppmpId > 0) {
-                    $ppmpItemId = PpmpItem::query()
-                        ->where('ppmp_id', $ppmpId)
-                        ->where('item_id', $purchaseOrderItem->item_id)
-                        ->value('ppmp_item_id');
-                }
+                $ppmpItemId = $grouped['ppmp_item_id'] ?? null;
 
                 $itemName = (string) (
                     $catalogItem?->item_name
