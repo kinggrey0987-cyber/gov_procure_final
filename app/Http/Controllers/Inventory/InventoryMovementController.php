@@ -125,10 +125,10 @@ class InventoryMovementController
     {
         $record = PurchaseRequest::query()
             ->where('purchase_request_id', $referenceId)
-            ->first(['purchase_request_id']);
+            ->first(['purchase_request_id', 'pr_number', 'created_at']);
 
         return $record instanceof PurchaseRequest
-            ? sprintf('Purchase Request PR-%06d', (int) $record->purchase_request_id)
+            ? sprintf('Purchase Request %s', (string) $record->pr_number)
             : sprintf('Purchase Request #%d', $referenceId);
     }
 

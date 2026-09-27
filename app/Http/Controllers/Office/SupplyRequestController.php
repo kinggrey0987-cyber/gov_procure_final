@@ -720,7 +720,7 @@ class SupplyRequestController extends Controller
                     $stage4Role = $primaryPr->requester?->role?->name ?? 'Procurement Officer';
                     $stage4Office = $primaryPr->requester?->office?->name ?? 'Bids and Awards Committee';
                     $stage4Time = optional($primaryPr->created_at)?->toIso8601String();
-                    $stage4Summary = sprintf('Purchase Request PR-%06d queued in BAC procurement review.', (int) $primaryPr->purchase_request_id);
+                    $stage4Summary = sprintf('Purchase Request %s queued in BAC procurement review.', (string) $primaryPr->pr_number);
                 } else {
                     $stage4Actor = 'BAC Procurement Secretariat';
                     $stage4Summary = 'In procurement review; evaluating supplier pricing and purchase requirements.';

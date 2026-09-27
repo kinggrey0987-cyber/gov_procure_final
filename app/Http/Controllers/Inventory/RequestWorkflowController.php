@@ -570,7 +570,7 @@ class RequestWorkflowController
     }
 
     /**
-     * @return array<int, int>
+     * @return array<int, array{purchase_request_id: int, pr_number: string}>
      */
     private function activeLowStockQueueByInventoryId(): array
     {
@@ -582,7 +582,7 @@ class RequestWorkflowController
                     ->orWhere('status', 'PROCESSING');
             })
             ->where('remarks', 'like', '%LOW_STOCK_SIGNAL:inventory:%')
-            ->get(['purchase_request_id', 'remarks'])
+            ->get(['purchase_request_id', 'pr_number', 'remarks', 'created_at'])
             ->reduce(function (array $carry, PurchaseRequest $request): array {
                 $remarks = (string) ($request->remarks ?? '');
                 if (preg_match('/LOW_STOCK_SIGNAL:inventory:(\d+)/', $remarks, $matches) !== 1) {
@@ -594,7 +594,10 @@ class RequestWorkflowController
                     return $carry;
                 }
 
-                $carry[$inventoryId] = (int) $request->purchase_request_id;
+                $carry[$inventoryId] = [
+                    'purchase_request_id' => (int) $request->purchase_request_id,
+                    'pr_number' => (string) $request->pr_number,
+                ];
 
                 return $carry;
             }, []);
@@ -646,7 +649,7 @@ class RequestWorkflowController
     }
 
     /**
-     * @param  array<int, int>  $activeLowStockQueueByInventoryId
+     * @param  array<int, mixed>  $activeLowStockQueueByInventoryId
      * @return Collection<int, array<string, mixed>>
      */
     private function lowStockItems(array $activeLowStockQueueByInventoryId): Collection
@@ -663,14 +666,20 @@ class RequestWorkflowController
     }
 
     /**
-     * @param  array<int, int>  $activeLowStockQueueByInventoryId
+     * @param  array<int, mixed>  $activeLowStockQueueByInventoryId
      * @return array<string, mixed>
      */
     private function lowStockItemRow(Inventory $inventory, array $activeLowStockQueueByInventoryId): array
     {
         $inventoryId = (int) $inventory->inventory_id;
         $deficit = round(max((float) $inventory->low_stock_threshold - (float) $inventory->available_stock, 0), 2);
-        $activePurchaseRequestId = $activeLowStockQueueByInventoryId[$inventoryId] ?? null;
+        $queuedPr = $activeLowStockQueueByInventoryId[$inventoryId] ?? null;
+        $activePurchaseRequestId = is_array($queuedPr)
+            ? (int) ($queuedPr['purchase_request_id'] ?? 0)
+            : (is_numeric($queuedPr) ? (int) $queuedPr : null);
+        $activePrNumber = is_array($queuedPr)
+            ? (string) ($queuedPr['pr_number'] ?? '')
+            : ($activePurchaseRequestId ? sprintf('PR-%s', str_pad((string) $activePurchaseRequestId, 6, '0', STR_PAD_LEFT)) : null);
 
         return [
             'inventory_id' => $inventoryId,
@@ -686,8 +695,9 @@ class RequestWorkflowController
             'low_stock_threshold' => (float) $inventory->low_stock_threshold,
             'deficit' => $deficit,
             'suggested_quantity' => $deficit,
-            'is_already_queued' => $activePurchaseRequestId !== null,
-            'active_purchase_request_id' => $activePurchaseRequestId,
+            'is_already_queued' => ! empty($activePurchaseRequestId),
+            'active_purchase_request_id' => $activePurchaseRequestId ?: null,
+            'active_pr_number' => $activePrNumber ?: null,
         ];
     }
 
@@ -881,8 +891,8 @@ class RequestWorkflowController
         return redirect()
             ->route('inventory.office-supply-requests.index', $request->query())
             ->with('success', sprintf(
-                'Consolidated purchase request PR-%06d created for %d supply request(s).',
-                (int) $purchaseRequest->purchase_request_id,
+                'Consolidated purchase request %s created for %d supply request(s).',
+                (string) $purchaseRequest->pr_number,
                 count($validated['supply_request_ids']),
             ));
     }
@@ -910,8 +920,8 @@ class RequestWorkflowController
                 'focus_inventory_id' => (int) $inventory->inventory_id,
             ])
             ->with('success', sprintf(
-                'Proactive GSO purchase request PR-%06d created from statistical demand signal for %s (Qty %.2f).',
-                (int) $queued->purchase_request_id,
+                'Proactive GSO purchase request %s created from statistical demand signal for %s (Qty %.2f).',
+                (string) $queued->pr_number,
                 (string) ($inventory->item?->item_name ?? 'selected item'),
                 $quantityRequested
             ));

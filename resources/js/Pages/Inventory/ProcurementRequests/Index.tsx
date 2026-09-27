@@ -48,6 +48,7 @@ type LowStockItem = {
     suggested_quantity: number;
     is_already_queued: boolean;
     active_purchase_request_id?: number | null;
+    active_pr_number?: string | null;
 };
 
 type Props = {
@@ -232,8 +233,20 @@ export default function ProcurementRequestsIndex({ purchaseRequests, shortageCan
                                             ? 'Creating Proactive PR...'
                                             : 'Review Proactive PR Signal'}
                                     </button>
-                                    {item.is_already_queued && item.active_purchase_request_id ? (
-                                        <p className="mt-1 text-[11px] font-semibold text-slate-500">Active PR: PR-{String(item.active_purchase_request_id).padStart(6, '0')}</p>
+                                    {item.is_already_queued && (item.active_pr_number || item.active_purchase_request_id) ? (
+                                        <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                                            Active PR:{' '}
+                                            {item.active_purchase_request_id ? (
+                                                <Link
+                                                    href={route('inventory.procurement-requests.show', item.active_purchase_request_id)}
+                                                    className="font-bold text-red-700 underline hover:text-red-900"
+                                                >
+                                                    {item.active_pr_number || `PR-${String(item.active_purchase_request_id).padStart(6, '0')}`}
+                                                </Link>
+                                            ) : (
+                                                <span className="font-bold text-slate-700">{item.active_pr_number}</span>
+                                            )}
+                                        </p>
                                     ) : null}
                                 </div>
                                 );

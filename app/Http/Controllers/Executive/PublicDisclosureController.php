@@ -312,10 +312,10 @@ class PublicDisclosureController
         }
 
         if ($referenceType === PurchaseRequest::class) {
-            $record = PurchaseRequest::query()->with('office:id,name')->find($referenceId, ['purchase_request_id', 'office_id', 'status']);
+            $record = PurchaseRequest::query()->with('office:id,name')->find($referenceId, ['purchase_request_id', 'office_id', 'status', 'pr_number', 'created_at']);
 
             if ($record) {
-                return sprintf('PR-%d | %s | %s', (int) $record->purchase_request_id, $record->office?->name ?? 'Unknown Office', (string) $record->status);
+                return sprintf('%s | %s | %s', (string) $record->pr_number, $record->office?->name ?? 'Unknown Office', (string) $record->status);
             }
         }
 

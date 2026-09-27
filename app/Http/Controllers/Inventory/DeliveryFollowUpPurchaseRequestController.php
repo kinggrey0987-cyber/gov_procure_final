@@ -26,7 +26,7 @@ class DeliveryFollowUpPurchaseRequestController
             );
 
             return Redirect::route('inventory.deliveries.show', $delivery->delivery_id)
-                ->with('success', sprintf('Follow-up purchase request PR-%06d created from delivery discrepancy and queued for Procurement Unit review.', (int) $purchaseRequest->purchase_request_id));
+                ->with('success', sprintf('Follow-up purchase request %s created from delivery discrepancy and queued for Procurement Unit review.', (string) $purchaseRequest->pr_number));
         } catch (\Illuminate\Validation\ValidationException $e) {
             $firstError = collect($e->errors())->flatten()->first() ?? 'Unable to create follow-up purchase request.';
 
