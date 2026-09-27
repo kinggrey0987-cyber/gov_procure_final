@@ -401,7 +401,7 @@ class DistributionAvailableStockGuardTest extends TestCase
         $this->assertEquals(1.0, (float) $itemProp['quantity_remaining'], 'Remaining should be 20 - 19 = 1 box.');
         $this->assertEquals(1.0, (float) $itemProp['available_stock']);
         $this->assertEquals(0.0, (float) $itemProp['shortage']);
-        $this->assertTrue($props['has_unreleased_available_stock'], 'Banner should show because 1 box remaining has 1 box available in warehouse.');
+        $this->assertFalse((bool) $props['has_unreleased_available_stock'], 'Banner should not show for procurement-backed request.');
     }
 
     public function test_multi_delivery_discrepancy_chain_releases_all_and_prevents_stock_stealing(): void
@@ -1569,6 +1569,17 @@ class DistributionAvailableStockGuardTest extends TestCase
         $this->assertNotNull($dr);
         $releasedQty = (float) $dr->items()->sum('quantity_released');
         $this->assertEquals(40.0, $releasedQty, 'Releasing delivery should include both 35 from delivery and 5 from warehouse inventory');
+
+        $distItem = $dr->items()->first();
+        $this->assertNotNull($distItem);
+        $this->assertStringContainsString('35.00 box from delivery DEL-TEST-0001, 5.00 box from warehouse inventory', (string) $distItem->remarks);
+        $this->assertStringContainsString('Includes 5.00 box from warehouse stock released alongside delivery.', (string) $dr->notes);
+
+        // 6. View supply request show: banner should NOT show for procurement-backed request
+        $srResponse = $this->actingAs($gsoUser)->get(route('inventory.office-supply-requests.show', $sr->supply_request_id));
+        $srResponse->assertOk();
+        $srProps = $srResponse->viewData('page')['props']['request'];
+        $this->assertFalse((bool) $srProps['has_unreleased_available_stock'], 'Banner should not show for procurement-backed request.');
     }
 }
 

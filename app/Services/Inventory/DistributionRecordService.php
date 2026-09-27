@@ -80,8 +80,20 @@ class DistributionRecordService
                 ]);
             }
 
+            $hasWarehouseInventoryBundled = false;
+            $bundledNotes = [];
             foreach ($releaseItems as $itemPayload) {
                 $this->addDistributionItem($record->fresh() ?? $record, $actor, $itemPayload);
+                if (isset($itemPayload['bundled_warehouse_quantity']) && (float) $itemPayload['bundled_warehouse_quantity'] > 0.0001) {
+                    $hasWarehouseInventoryBundled = true;
+                    $bundledNotes[] = sprintf('%.2f %s from warehouse stock', (float) $itemPayload['bundled_warehouse_quantity'], (string) $itemPayload['unit']);
+                }
+            }
+
+            if ($hasWarehouseInventoryBundled && empty($record->notes)) {
+                $record->forceFill([
+                    'notes' => 'Includes ' . implode(', ', $bundledNotes) . ' released alongside delivery.',
+                ])->save();
             }
 
             return $record->fresh(['supplyRequest', 'delivery', 'office', 'items.item']) ?? $record;
@@ -732,12 +744,28 @@ class DistributionRecordService
                     return null;
                 }
 
+                $unit = (string) ($first?->item?->default_unit ?? 'UNIT');
+                $remarks = sprintf('Automatically released against %s.', (string) $record->supplyRequest->request_code);
+                if ($record->delivery_id !== null && isset($deliveryPortion, $releasableInventory) && $deliveryPortion > 0.0001 && $releasableInventory > 0.0001) {
+                    $deliveryCode = $record->delivery?->delivery_code ?? 'delivery';
+                    $remarks = sprintf(
+                        'Automatically released against %s (%.2f %s from delivery %s, %.2f %s from warehouse inventory).',
+                        (string) $record->supplyRequest->request_code,
+                        $deliveryPortion,
+                        $unit,
+                        $deliveryCode,
+                        $releasableInventory,
+                        $unit
+                    );
+                }
+
                 return [
                     'item_id' => $itemId,
                     'item_name_snapshot' => (string) ($first?->item?->item_name ?? $first?->item_name_snapshot ?? 'Unknown Item'),
                     'quantity_released' => $quantity,
-                    'unit' => (string) ($first?->item?->default_unit ?? 'UNIT'),
-                    'remarks' => sprintf('Automatically released against %s.', (string) $record->supplyRequest->request_code),
+                    'unit' => $unit,
+                    'remarks' => $remarks,
+                    'bundled_warehouse_quantity' => $releasableInventory ?? 0.0,
                 ];
             })
             ->filter()

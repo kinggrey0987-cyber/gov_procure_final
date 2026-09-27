@@ -381,10 +381,11 @@ class RequestWorkflowController
         $requestedTotal = 0.0;
         $releasedTotal = 0.0;
         $shortageTotal = 0.0;
+        $isProcurementBacked = $supplyRequest->purchaseRequests()->exists() || (string) $supplyRequest->status === 'FOR_PROCUREMENT';
         $hasUnreleasedAvailableStock = false;
 
         $items = $supplyRequest->items
-            ->map(function (SupplyRequestItem $item) use ($supplyRequest, &$releasedPool, &$requestedTotal, &$releasedTotal, &$shortageTotal, &$hasUnreleasedAvailableStock): array {
+            ->map(function (SupplyRequestItem $item) use ($supplyRequest, $isProcurementBacked, &$releasedPool, &$requestedTotal, &$releasedTotal, &$shortageTotal, &$hasUnreleasedAvailableStock): array {
                 $itemId = (int) $item->item_id;
                 $requested = (float) $item->quantity_requested;
                 $availReleased = (float) ($releasedPool->get($itemId) ?? 0.0);
@@ -395,7 +396,7 @@ class RequestWorkflowController
                 $available = $this->inventoryService->getAvailableStockForSupplyRequest($itemId, $supplyRequest);
                 $shortage = max($remaining - $available, 0.0);
 
-                if ($remaining > 0.0001 && $available > 0.0001) {
+                if (! $isProcurementBacked && $remaining > 0.0001 && $available > 0.0001) {
                     $hasUnreleasedAvailableStock = true;
                 }
 

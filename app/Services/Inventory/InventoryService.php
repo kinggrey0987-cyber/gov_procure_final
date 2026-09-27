@@ -402,11 +402,6 @@ class InventoryService
             ? array_filter(array_map('intval', $excludeDeliveryIds))
             : ($excludeDeliveryIds !== null ? [(int) $excludeDeliveryIds] : []);
 
-        if ($supplyRequest instanceof SupplyRequest) {
-            $ownDeliveryIds = $this->followUpService->resolveDeliveryIdsForSupplyRequest($supplyRequest);
-            $excludeIds = array_values(array_unique(array_merge($excludeIds, $ownDeliveryIds)));
-        }
-
         $undistributed = $this->getUndistributedDeliveryStock($itemId, $excludeIds);
 
         $inventory = Inventory::query()->where('item_id', $itemId)->first();
