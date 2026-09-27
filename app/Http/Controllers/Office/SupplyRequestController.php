@@ -27,6 +27,7 @@ class SupplyRequestController extends Controller
         private readonly SupplyRequestService $service,
         private readonly HistoryTimelineService $historyTimelineService,
         private readonly \App\Services\Inventory\SupplyRequestFollowUpService $followUpService,
+        private readonly \App\Services\Inventory\InventoryService $inventoryService,
     ) {
     }
 
@@ -425,7 +426,7 @@ class SupplyRequestController extends Controller
 
         foreach ($supplyRequest->items as $item) {
             $requested = (float) $item->quantity_requested;
-            $available = (float) ($item->item?->inventory?->available_stock ?? 0);
+            $available = $this->inventoryService->getAvailableStockForSupplyRequest((int) $item->item_id, $supplyRequest);
 
             if ($requested > $available) {
                 return true;

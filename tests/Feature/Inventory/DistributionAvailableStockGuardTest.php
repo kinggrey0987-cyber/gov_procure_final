@@ -1256,5 +1256,191 @@ class DistributionAvailableStockGuardTest extends TestCase
         $showResponse = $this->actingAs($gsoUser)->get(route('inventory.distribution-records.show', $record->distribution_record_id));
         $showResponse->assertOk();
     }
+
+    public function test_unrelated_new_supply_request_does_not_steal_undistributed_delivery_stock_and_correctly_reports_shortage(): void
+    {
+        $gsoRole = Role::query()->firstOrCreate(['code' => UserRole::GSO_OFFICER->value], ['name' => 'GSO Officer']);
+        $gsoUser = User::factory()->create(['role_id' => $gsoRole->id]);
+
+        $office = Office::factory()->create(['code' => 'MPDO', 'name' => 'Planning Office']);
+        $officeRole = Role::query()->firstOrCreate(['code' => UserRole::OFFICE_USER->value], ['name' => 'Office User']);
+        $officeUser = User::factory()->create(['role_id' => $officeRole->id, 'office_id' => $office->id]);
+
+        $category = ItemCategory::query()->firstOrCreate(
+            ['category_name' => 'Office Supplies'],
+            ['description' => 'Supplies']
+        );
+        $item = Item::query()->create([
+            'item_category_id' => $category->item_category_id,
+            'item_name' => 'Bond Paper A4',
+            'default_unit' => 'box',
+            'status' => 'active',
+        ]);
+
+        $supplier = Supplier::factory()->create();
+
+        // 1. Initial inventory: 0 stock
+        $inv = Inventory::query()->create([
+            'item_id' => $item->item_id,
+            'stock_on_hand' => 0,
+            'available_stock' => 0,
+            'reserved_quantity' => 0,
+        ]);
+
+        // 2. Supply Request 1 for 50 boxes with PO and Verified Delivery of 50 boxes
+        $sr1 = SupplyRequest::query()->create([
+            'request_code' => 'SR-MPDO-2026-09-0001',
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(7)->toDateString(),
+            'request_category' => 'Office Supplies',
+            'purpose' => 'First Request',
+            'priority_level' => 'NORMAL',
+            'status' => 'DELIVERED',
+        ]);
+
+        $sri1 = SupplyRequestItem::query()->create([
+            'supply_request_id' => $sr1->supply_request_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Bond Paper A4',
+            'quantity_requested' => 50,
+        ]);
+
+        $pr1 = PurchaseRequest::query()->create([
+            'pr_number' => 'PR-2026-09-0001',
+            'supply_request_id' => $sr1->supply_request_id,
+            'office_id' => $office->id,
+            'requested_by' => $gsoUser->id,
+            'status' => 'OPEN',
+        ]);
+
+        $po1 = PurchaseOrder::query()->create([
+            'po_number' => 'PO-2026-09-0001',
+            'purchase_request_id' => $pr1->purchase_request_id,
+            'supplier_id' => $supplier->supplier_id,
+            'created_by' => $gsoUser->id,
+            'supply_request_id' => $sr1->supply_request_id,
+            'procurement_method' => 'PUBLIC_BIDDING',
+            'status' => 'DELIVERED',
+            'total_amount' => 10000,
+        ]);
+
+        $poi1 = PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $po1->purchase_order_id,
+            'supply_request_item_id' => $sri1->supply_request_item_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Bond Paper A4',
+            'quantity_ordered' => 50,
+            'unit' => 'box',
+            'unit_price' => 200,
+            'total_price' => 10000,
+        ]);
+
+        $delivery1 = Delivery::query()->create([
+            'delivery_code' => 'DEL-2026-09-0001',
+            'purchase_order_id' => $po1->purchase_order_id,
+            'supplier_id' => $supplier->supplier_id,
+            'received_by' => $gsoUser->id,
+            'receipt_status' => 'VERIFIED',
+            'actual_delivery_date' => now()->toDateString(),
+        ]);
+
+        DeliveryItem::query()->create([
+            'delivery_id' => $delivery1->delivery_id,
+            'purchase_order_item_id' => $poi1->purchase_order_item_id,
+            'expected_quantity' => 50,
+            'received_quantity' => 50,
+            'damaged_quantity' => 0,
+            'missing_quantity' => 0,
+            'item_status' => 'VERIFIED',
+        ]);
+
+        // Accepted delivery added 50 to warehouse stock
+        $inv->update([
+            'stock_on_hand' => 50,
+            'available_stock' => 50,
+        ]);
+
+        // 3. User creates a NEW, UNRELATED Supply Request 2 (e.g. SR-MPDO-2026-09-0013)
+        $sr2 = SupplyRequest::query()->create([
+            'request_code' => 'SR-MPDO-2026-09-0013',
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(7)->toDateString(),
+            'request_category' => 'Office Supplies',
+            'purpose' => 'New Requisition',
+            'priority_level' => 'NORMAL',
+            'status' => 'SUBMITTED',
+        ]);
+
+        SupplyRequestItem::query()->create([
+            'supply_request_id' => $sr2->supply_request_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Bond Paper A4',
+            'quantity_requested' => 50,
+        ]);
+
+        // 4. Inspect SR2 show page: Must NOT see delivery stock as available for SR2
+        $responseSr2 = $this->actingAs($gsoUser)->get(route('inventory.office-supply-requests.show', $sr2->supply_request_id));
+        $responseSr2->assertOk();
+        $propsSr2 = $responseSr2->viewData('page')['props']['request'];
+
+        $this->assertEquals(0.0, (float) $propsSr2['items'][0]['available_stock']);
+        $this->assertEquals(50.0, (float) $propsSr2['items'][0]['shortage']);
+        $this->assertEquals(50.0, (float) $propsSr2['shortage_total']);
+        $this->assertFalse((bool) $propsSr2['has_unreleased_available_stock'], 'Should not show warehouse stock available banner when stock belongs to another delivery');
+
+        // 5. Inspect SR2 in office supply requests list: Stock assessment must be SHORTAGE_REQUIRES_PROCUREMENT
+        $indexResponse = $this->actingAs($gsoUser)->get(route('inventory.office-supply-requests.index'));
+        $indexResponse->assertOk();
+        $allRequests = collect($indexResponse->viewData('page')['props']['requests']['data']);
+        $sr2Row = $allRequests->firstWhere('supply_request_id', $sr2->supply_request_id);
+        $this->assertNotNull($sr2Row);
+        $this->assertEquals('SHORTAGE_REQUIRES_PROCUREMENT', $sr2Row['stock_assessment']);
+
+        // 6. Attempting to process distribution release from inventory for SR2 must be blocked
+        $distResponse = $this->actingAs($gsoUser)->post(route('inventory.office-supply-requests.process-distribution', $sr2->supply_request_id));
+        $distResponse->assertRedirect(route('inventory.office-supply-requests.index'));
+        $distResponse->assertSessionHas('error');
+
+        // 7. GSO can queue SR2 for procurement because the shortage of 50 is recognized
+        $prService = app(\App\Services\Procurement\PurchaseRequestService::class);
+        $pr = $prService->queueFromSupplyRequest($gsoUser, [
+            'supply_request_id' => $sr2->supply_request_id,
+            'remarks' => 'Shortage queued for procurement',
+        ]);
+
+        $this->assertNotNull($pr);
+        $this->assertEquals('OPEN', $pr->status);
+        $this->assertCount(1, $pr->items);
+        $this->assertEquals(50.0, (float) $pr->items->first()->quantity_requested);
+
+        // Warehouse available stock is still 50 (Delivery 1 stock was not stolen/reserved by SR2)
+        $inv->refresh();
+        $this->assertEquals(50.0, (float) $inv->available_stock);
+        $this->assertEquals(0.0, (float) $inv->reserved_quantity);
+
+        // 8. Now distribute Delivery 1 to SR1: All 50 units are safely distributed to SR1
+        $dist1Response = $this->actingAs($gsoUser)->post(route('inventory.distribution-records.store'), [
+            'supply_request_id' => $sr1->supply_request_id,
+            'delivery_id' => $delivery1->delivery_id,
+            'office_id' => $office->id,
+            'release_date' => now()->toDateString(),
+        ]);
+        $dist1Response->assertSessionHasNoErrors();
+
+        $dr1 = DistributionRecord::query()->where('supply_request_id', $sr1->supply_request_id)->first();
+        $this->assertNotNull($dr1);
+        $this->assertEquals('RELEASED', $dr1->status);
+        $this->assertEquals(50.0, (float) $dr1->items()->sum('quantity_released'));
+
+        // After release, warehouse stock is 0
+        $inv->refresh();
+        $this->assertEquals(0.0, (float) $inv->available_stock);
+        $this->assertEquals(0.0, (float) $inv->stock_on_hand);
+    }
 }
+
 

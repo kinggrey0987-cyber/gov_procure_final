@@ -27,6 +27,7 @@ class RequestWorkflowController
         private readonly AlertService $alertService,
         private readonly DistributionRecordService $distributionService,
         private readonly \App\Services\Inventory\SupplyRequestFollowUpService $followUpService,
+        private readonly \App\Services\Inventory\InventoryService $inventoryService,
     ) {
     }
 
@@ -222,7 +223,7 @@ class RequestWorkflowController
             $releasedPool[$itemId] = max($availReleased - $released, 0.0);
 
             $remaining = max($requested - $released, 0.0);
-            $available = (float) ($item->item?->inventory?->available_stock ?? 0) + (float) ($item->item?->inventory?->reserved_quantity ?? 0);
+            $available = $this->inventoryService->getAvailableStockForSupplyRequest($itemId, $request);
 
             $requestedTotal += $requested;
             $shortageTotal += max($remaining - $available, 0.0);
@@ -383,7 +384,7 @@ class RequestWorkflowController
         $hasUnreleasedAvailableStock = false;
 
         $items = $supplyRequest->items
-            ->map(function (SupplyRequestItem $item) use (&$releasedPool, &$requestedTotal, &$releasedTotal, &$shortageTotal, &$hasUnreleasedAvailableStock): array {
+            ->map(function (SupplyRequestItem $item) use ($supplyRequest, &$releasedPool, &$requestedTotal, &$releasedTotal, &$shortageTotal, &$hasUnreleasedAvailableStock): array {
                 $itemId = (int) $item->item_id;
                 $requested = (float) $item->quantity_requested;
                 $availReleased = (float) ($releasedPool->get($itemId) ?? 0.0);
@@ -391,8 +392,7 @@ class RequestWorkflowController
                 $releasedPool->put($itemId, max($availReleased - $released, 0.0));
 
                 $remaining = max($requested - $released, 0.0);
-                $inv = $item->item?->inventory;
-                $available = (float) ($inv?->available_stock ?? 0) + (float) ($inv?->reserved_quantity ?? 0);
+                $available = $this->inventoryService->getAvailableStockForSupplyRequest($itemId, $supplyRequest);
                 $shortage = max($remaining - $available, 0.0);
 
                 if ($remaining > 0.0001 && $available > 0.0001) {
@@ -622,7 +622,7 @@ class RequestWorkflowController
 
         foreach ($request->items as $item) {
             $requested = (float) $item->quantity_requested;
-            $available = (float) ($item->item?->inventory?->available_stock ?? 0);
+            $available = $this->inventoryService->getAvailableStockForSupplyRequest((int) $item->item_id, $request);
 
             $requestedTotal += $requested;
             $shortageTotal += max($requested - $available, 0);
@@ -772,7 +772,7 @@ class RequestWorkflowController
             $releasedPoolForStock[$itemId] = max($availReleased - $released, 0.0);
 
             $remaining = max($requested - $released, 0);
-            $available = (float) ($item->item?->inventory?->available_stock ?? 0) + (float) ($item->item?->inventory?->reserved_quantity ?? 0);
+            $available = $this->inventoryService->getAvailableStockForSupplyRequest($itemId, $supplyRequest);
             if ($remaining > 0.0001 && $available > 0.0001) {
                 $hasAvailableStock = true;
                 break;

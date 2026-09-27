@@ -3,8 +3,10 @@
 namespace App\Services\Inventory;
 
 use App\Models\Delivery;
+use App\Models\DeliveryItem;
 use App\Models\Inventory;
 use App\Models\StatusHistory;
+use App\Models\SupplyRequest;
 use App\Models\User;
 use App\Services\AuditLogService;
 use App\Services\NotificationService;
@@ -18,6 +20,7 @@ class InventoryService
         private readonly InventoryMovementService $movementService,
         private readonly AuditLogService $auditLogService,
         private readonly NotificationService $notificationService,
+        private readonly SupplyRequestFollowUpService $followUpService,
     ) {
     }
 
@@ -348,4 +351,95 @@ class InventoryService
             officeId: $actor->office_id,
         );
     }
+
+    /**
+     * Get the quantity of stock in warehouse from verified or partially received deliveries
+     * that has not yet been distributed via a distribution record.
+     *
+     * @param  int  $itemId
+     * @param  array<int>|int|null  $excludeDeliveryIds  Delivery ID(s) to exclude
+     * @return float
+     */
+    public function getUndistributedDeliveryStock(int $itemId, array|int|null $excludeDeliveryIds = null): float
+    {
+        $excludeIds = is_array($excludeDeliveryIds)
+            ? array_filter(array_map('intval', $excludeDeliveryIds))
+            : ($excludeDeliveryIds !== null ? [(int) $excludeDeliveryIds] : []);
+
+        return (float) DeliveryItem::query()
+            ->whereHas('purchaseOrderItem', fn ($q) => $q->where('item_id', $itemId))
+            ->whereHas('delivery', fn ($q) => $q->whereIn('receipt_status', ['VERIFIED', 'PARTIALLY_RECEIVED']))
+            ->when(! empty($excludeIds), fn ($q) => $q->whereNotIn('delivery_id', $excludeIds))
+            ->with(['delivery.distributionRecords.items'])
+            ->get()
+            ->sum(function (DeliveryItem $di) use ($itemId): float {
+                $accepted = max((float) $di->received_quantity - (float) $di->damaged_quantity - (float) $di->missing_quantity, 0.0);
+                $released = (float) ($di->delivery?->distributionRecords ?? collect())
+                    ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
+                    ->flatMap(fn ($dr) => $dr->items)
+                    ->where('item_id', $itemId)
+                    ->sum('quantity_released');
+
+                return max($accepted - $released, 0.0);
+            });
+    }
+
+    /**
+     * Get the true free available stock for an item in the warehouse,
+     * deducting undistributed delivery stock from other requests.
+     *
+     * @param  int  $itemId
+     * @param  SupplyRequest|null  $supplyRequest  If provided, exclude deliveries belonging to this supply request's lineage
+     * @param  array<int>|int|null  $excludeDeliveryIds  Additional delivery ID(s) to exclude
+     * @return float
+     */
+    public function getAvailableStockForSupplyRequest(
+        int $itemId,
+        ?SupplyRequest $supplyRequest = null,
+        array|int|null $excludeDeliveryIds = null,
+    ): float {
+        $excludeIds = is_array($excludeDeliveryIds)
+            ? array_filter(array_map('intval', $excludeDeliveryIds))
+            : ($excludeDeliveryIds !== null ? [(int) $excludeDeliveryIds] : []);
+
+        if ($supplyRequest instanceof SupplyRequest) {
+            $ownDeliveryIds = $this->followUpService->resolveDeliveryIdsForSupplyRequest($supplyRequest);
+            $excludeIds = array_values(array_unique(array_merge($excludeIds, $ownDeliveryIds)));
+        }
+
+        $undistributed = $this->getUndistributedDeliveryStock($itemId, $excludeIds);
+
+        $inventory = Inventory::query()->where('item_id', $itemId)->first();
+        if (! $inventory) {
+            return 0.0;
+        }
+
+        $reservedPortion = 0.0;
+        if ($supplyRequest instanceof SupplyRequest && $supplyRequest->purchaseRequests()->exists()) {
+            $supplyRequest->loadMissing(['items', 'purchaseOrders.items', 'distributionRecords.items']);
+            $itemRequested = (float) $supplyRequest->items
+                ->where('item_id', $itemId)
+                ->sum('quantity_requested');
+            $totalOrdered = (float) $supplyRequest->purchaseOrders
+                ->flatMap(fn ($po) => $po->items)
+                ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
+                ->sum('quantity_ordered');
+            $invPortion = max($itemRequested - $totalOrdered, 0.0);
+
+            $alreadyReleasedInv = (float) $supplyRequest->distributionRecords
+                ->whereNull('delivery_id')
+                ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
+                ->flatMap(fn ($dr) => $dr->items)
+                ->where('item_id', $itemId)
+                ->sum('quantity_released');
+
+            $remainingInvPortion = max($invPortion - $alreadyReleasedInv, 0.0);
+            $reservedPortion = min($remainingInvPortion, (float) $inventory->reserved_quantity);
+        }
+
+        $freeStock = max((float) $inventory->available_stock - $undistributed, 0.0);
+
+        return $freeStock + $reservedPortion;
+    }
 }
+

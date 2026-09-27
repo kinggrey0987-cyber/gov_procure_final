@@ -2,6 +2,7 @@
 
 namespace App\Services\Inventory;
 
+use App\Models\Delivery;
 use App\Models\PurchaseRequest;
 use App\Models\SupplyRequest;
 
@@ -285,4 +286,59 @@ class SupplyRequestFollowUpService
 
         return null;
     }
+
+    /**
+     * Resolve all supply request IDs in the lineage (root parent + all follow-up descendants + self).
+     *
+     * @return array<int>
+     */
+    public function resolveLineageSupplyRequestIds(SupplyRequest $supplyRequest): array
+    {
+        $current = $supplyRequest;
+        $visited = [(int) $current->supply_request_id => true];
+
+        // Walk up to find root parent
+        while ($parent = $this->resolveParentSupplyRequest($current)) {
+            $parentId = (int) $parent->supply_request_id;
+            if (isset($visited[$parentId])) {
+                break;
+            }
+            $visited[$parentId] = true;
+            $current = $parent;
+        }
+
+        $allIds = [(int) $current->supply_request_id];
+        $allIds = array_merge($allIds, $this->resolveAllFollowUpChildSupplyRequestIds($current));
+        $allIds[] = (int) $supplyRequest->supply_request_id;
+
+        return array_values(array_unique(array_filter(array_map('intval', $allIds))));
+    }
+
+    /**
+     * Resolve all delivery IDs associated with a supply request or its lineage.
+     *
+     * @return array<int>
+     */
+    public function resolveDeliveryIdsForSupplyRequest(SupplyRequest $supplyRequest): array
+    {
+        $srIds = $this->resolveLineageSupplyRequestIds($supplyRequest);
+        $requestCode = trim((string) $supplyRequest->request_code);
+
+        return Delivery::query()
+            ->whereHas('purchaseOrder', function ($query) use ($srIds, $requestCode) {
+                $query->whereIn('supply_request_id', $srIds)
+                    ->orWhereHas('purchaseRequest', function ($prQ) use ($srIds, $requestCode) {
+                        $prQ->whereIn('supply_request_id', $srIds);
+                        if ($requestCode !== '') {
+                            $prQ->orWhere('remarks', 'like', '%' . $requestCode . '%');
+                        }
+                    });
+            })
+            ->pluck('delivery_id')
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
 }
+

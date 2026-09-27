@@ -22,6 +22,7 @@ class DistributionRecordController
     public function __construct(
         private readonly DistributionRecordService $distributionService,
         private readonly \App\Services\Inventory\SupplyRequestFollowUpService $followUpService,
+        private readonly \App\Services\Inventory\InventoryService $inventoryService,
     )
     {
     }
@@ -209,8 +210,7 @@ class DistributionRecordController
             $releasedPool[$itemId] = max($availReleased - $released, 0.0);
 
             $remaining = max($requested - $released, 0);
-            $inv = $item->item?->inventory;
-            $available = (float) ($inv?->available_stock ?? 0) + (float) ($inv?->reserved_quantity ?? 0);
+            $available = $this->inventoryService->getAvailableStockForSupplyRequest($itemId, $request);
 
             $releasableStock = $available;
             if ($isProcurementBacked) {
@@ -283,8 +283,7 @@ class DistributionRecordController
             $releasedPool[$itemId] = max($availReleased - $released, 0.0);
 
             $remaining = max($requested - $released, 0);
-            $inv = $item->item?->inventory;
-            $available = (float) ($inv?->available_stock ?? 0) + (float) ($inv?->reserved_quantity ?? 0);
+            $available = $this->inventoryService->getAvailableStockForSupplyRequest($itemId, $request);
             $shortageTotal += max($remaining - $available, 0);
         }
 
@@ -345,24 +344,9 @@ class DistributionRecordController
         return $directRecords->concat($childRecords)->values();
     }
 
-    private function undistributedDeliveryStock(int $itemId, ?int $excludeDeliveryId = null): float
+    private function undistributedDeliveryStock(int $itemId, array|int|null $excludeDeliveryId = null): float
     {
-        return (float) DeliveryItem::query()
-            ->whereHas('purchaseOrderItem', fn ($q) => $q->where('item_id', $itemId))
-            ->whereHas('delivery', fn ($q) => $q->whereIn('receipt_status', ['VERIFIED', 'PARTIALLY_RECEIVED']))
-            ->when($excludeDeliveryId !== null, fn ($q) => $q->where('delivery_id', '!=', $excludeDeliveryId))
-            ->with(['delivery.distributionRecords.items'])
-            ->get()
-            ->sum(function (DeliveryItem $di) use ($itemId): float {
-                $accepted = max((float) $di->received_quantity - (float) $di->damaged_quantity - (float) $di->missing_quantity, 0.0);
-                $released = (float) ($di->delivery?->distributionRecords ?? collect())
-                    ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
-                    ->flatMap(fn ($dr) => $dr->items)
-                    ->where('item_id', $itemId)
-                    ->sum('quantity_released');
-
-                return max($accepted - $released, 0.0);
-            });
+        return $this->inventoryService->getUndistributedDeliveryStock($itemId, $excludeDeliveryId);
     }
 
     private function calculateAlreadyReleasedInventory(SupplyRequest $supplyRequest, int $itemId): float
@@ -423,9 +407,7 @@ class DistributionRecordController
             $releasedPool[$itemId] = max($availReleased - $released, 0.0);
 
             $remaining = max($requested - $released, 0);
-            $inv = $item->item?->inventory;
-            $undistributed = $this->undistributedDeliveryStock($itemId);
-            $available = max((float) ($inv?->available_stock ?? 0) + (float) ($inv?->reserved_quantity ?? 0) - $undistributed, 0.0);
+            $available = $this->inventoryService->getAvailableStockForSupplyRequest($itemId, $request);
             $shortageTotal += max($remaining - $available, 0);
 
             $releasableStock = $available;

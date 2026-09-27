@@ -376,12 +376,16 @@ class DistributionRecordService
         return $directRecords->concat($childRecords)->values();
     }
 
-    private function undistributedDeliveryStock(int $itemId, ?int $excludeDeliveryId = null): float
+    private function undistributedDeliveryStock(int $itemId, array|int|null $excludeDeliveryId = null): float
     {
+        $excludeIds = is_array($excludeDeliveryId)
+            ? array_filter(array_map('intval', $excludeDeliveryId))
+            : ($excludeDeliveryId !== null ? [(int) $excludeDeliveryId] : []);
+
         return (float) \App\Models\DeliveryItem::query()
             ->whereHas('purchaseOrderItem', fn ($q) => $q->where('item_id', $itemId))
             ->whereHas('delivery', fn ($q) => $q->whereIn('receipt_status', ['VERIFIED', 'PARTIALLY_RECEIVED']))
-            ->when($excludeDeliveryId !== null, fn ($q) => $q->where('delivery_id', '!=', $excludeDeliveryId))
+            ->when(! empty($excludeIds), fn ($q) => $q->whereNotIn('delivery_id', $excludeIds))
             ->with(['delivery.distributionRecords.items'])
             ->get()
             ->sum(function (\App\Models\DeliveryItem $di) use ($itemId): float {
@@ -463,8 +467,8 @@ class DistributionRecordService
 
             $remaining = max($requested - $released, 0.0);
             $inv = $item->item?->inventory;
-            $undistributed = $this->undistributedDeliveryStock($itemId, $record->delivery_id);
-            $available = max((float) ($inv?->available_stock ?? 0) + (float) ($inv?->reserved_quantity ?? 0) - $undistributed, 0.0);
+            $undistributed = $this->undistributedDeliveryStock($itemId, $record->delivery_id ? (int) $record->delivery_id : null);
+            $available = max((float) ($inv?->available_stock ?? 0) + ($isProcurementBacked ? (float) ($inv?->reserved_quantity ?? 0) : 0.0) - $undistributed, 0.0);
             $shortageTotal += max($remaining - $available, 0.0);
             $hasRemainingQuantity = $hasRemainingQuantity || $remaining > 0.0001;
 
@@ -602,8 +606,9 @@ class DistributionRecordService
                 $maxReleasable = min($maxReleasable, $deliveryRemaining + $releasableInventory);
             }
         } else {
+            $isProcurementBacked = $record->supplyRequest->purchaseRequests()->exists();
             $inv = Inventory::query()->where('item_id', $itemId)->first();
-            $availableWarehouseStock = max((float) ($inv?->available_stock ?? 0) + (float) ($inv?->reserved_quantity ?? 0) - $undistributed, 0.0);
+            $availableWarehouseStock = max((float) ($inv?->available_stock ?? 0) + ($isProcurementBacked ? (float) ($inv?->reserved_quantity ?? 0) : 0.0) - $undistributed, 0.0);
             $maxReleasable = min($maxReleasable, $availableWarehouseStock);
         }
 
@@ -704,6 +709,9 @@ class DistributionRecordService
 
                     $availableWarehouseStock = max((float) $releasableStock - $undistributed, 0.0);
                     $quantity = min($requestRemaining, min($remainingInventoryPortion, $availableWarehouseStock));
+                } elseif ($record->delivery_id === null) {
+                    $availableWarehouseStock = max((float) $availableStock - $undistributed, 0.0);
+                    $quantity = min($requestRemaining, $availableWarehouseStock);
                 }
 
                 if ($quantity <= 0.0001) {

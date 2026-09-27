@@ -29,6 +29,7 @@ class PurchaseRequestService
         private readonly NotificationService $notificationService,
         private readonly AnomalyService $anomalyService,
         private readonly \App\Services\Inventory\InventoryMovementService $inventoryMovementService,
+        private readonly \App\Services\Inventory\InventoryService $inventoryService,
     ) {
     }
 
@@ -132,7 +133,7 @@ class PurchaseRequestService
         $shortageTotal = 0.0;
         foreach ($supplyRequest->items as $supplyRequestItem) {
             $requested = (float) $supplyRequestItem->quantity_requested;
-            $available = (float) ($supplyRequestItem->item?->inventory?->available_stock ?? 0);
+            $available = $this->inventoryService->getAvailableStockForSupplyRequest((int) $supplyRequestItem->item_id, $supplyRequest);
             $shortageTotal += max($requested - $available, 0);
         }
 
@@ -216,7 +217,7 @@ class PurchaseRequestService
 
             /** @var Inventory|null $inventory */
             $inventory = Inventory::query()->where('item_id', $itemId)->lockForUpdate()->first();
-            $available = (float) ($inventory?->available_stock ?? 0);
+            $available = $this->inventoryService->getAvailableStockForSupplyRequest($itemId, $supplyRequest);
 
             $shortage = max($requested - $available, 0.0);
             $reserveAmount = min($requested, $available);
@@ -1262,7 +1263,7 @@ class PurchaseRequestService
 
                 /** @var Inventory|null $inventory */
                 $inventory = Inventory::query()->where('item_id', $itemId)->lockForUpdate()->first();
-                $available = (float) ($inventory?->available_stock ?? 0);
+                $available = $this->inventoryService->getAvailableStockForSupplyRequest($itemId, $primarySupplyRequest);
 
                 $shortage = max($totalRequested - $available, 0.0);
                 $reserveAmount = min($totalRequested, $available);
