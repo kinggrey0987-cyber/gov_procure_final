@@ -84,7 +84,13 @@ class DistributionRecordController
         $focusSupplyRequestId = (int) $request->query('supply_request_id', 0);
 
         $procurementBackedRows = $this->procurementBackedReleaseRows();
-        $inventoryBackedRows = $this->inventoryBackedReleaseRows();
+        $coveredSupplyRequestIds = $procurementBackedRows
+            ->pluck('supply_request_id')
+            ->filter()
+            ->unique()
+            ->all();
+
+        $inventoryBackedRows = $this->inventoryBackedReleaseRows($coveredSupplyRequestIds);
 
         /** @var Collection<int, array<string, mixed>> $eligibleRows */
         $eligibleRows = $inventoryBackedRows
@@ -182,15 +188,17 @@ class DistributionRecordController
     }
 
     /**
+     * @param  array<int, int>  $excludeSupplyRequestIds
      * @return Collection<int, array<string, mixed>>
      */
-    private function inventoryBackedReleaseRows(): Collection
+    private function inventoryBackedReleaseRows(array $excludeSupplyRequestIds = []): Collection
     {
         return SupplyRequest::query()
             ->whereIn('status', ['SUBMITTED', 'APPROVED', 'PARTIALLY_RECEIVED', 'FOR_PROCUREMENT'])
             ->whereHas('office', fn ($officeQuery) => $officeQuery->where('code', '!=', 'GSO'))
             ->whereDoesntHave('distributionRecords', fn ($query) => $query->where('status', 'DRAFT'))
-            ->with(['office', 'items.item.inventory', 'distributionRecords.items'])
+            ->when(! empty($excludeSupplyRequestIds), fn ($query) => $query->whereNotIn('supply_request_id', $excludeSupplyRequestIds))
+            ->with(['office', 'items.item.inventory', 'distributionRecords.items', 'purchaseRequests', 'purchaseOrders.items'])
             ->latest('supply_request_id')
             ->get()
             ->map(fn (SupplyRequest $request): ?array => $this->releaseRowFromAvailableInventory($request))
@@ -206,8 +214,22 @@ class DistributionRecordController
 
         $hasReleasableStock = false;
         $releasedPool = $this->releasedQuantityByItemId($request);
-        $isProcurementBacked = $request->purchaseRequests()->exists();
+        $isProcurementBacked = $request->purchaseRequests->isNotEmpty();
         $request->loadMissing('purchaseOrders.items');
+
+        $hasPendingDeliveries = false;
+        if ($isProcurementBacked) {
+            $hasPendingDeliveries = Delivery::query()
+                ->whereHas('purchaseOrder', function ($q) use ($request) {
+                    $lineageIds = $this->followUpService->resolveLineageSupplyRequestIds($request);
+                    $q->whereIn('supply_request_id', $lineageIds);
+                })
+                ->where(function ($q) {
+                    $q->whereNotIn('receipt_status', ['VERIFIED', 'PARTIALLY_RECEIVED'])
+                        ->orWhereDoesntHave('distributionRecords', fn ($drQ) => $drQ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED']));
+                })
+                ->exists();
+        }
 
         foreach ($request->items as $item) {
             $itemId = (int) $item->item_id;
@@ -220,6 +242,18 @@ class DistributionRecordController
             $available = $this->inventoryService->getAvailableStockForSupplyRequest($itemId, $request);
 
             $releasableStock = min($remaining, $available);
+
+            if ($isProcurementBacked) {
+                $totalOrdered = (float) $request->purchaseOrders
+                    ->flatMap(fn ($po) => $po->items)
+                    ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
+                    ->sum('quantity_ordered');
+                $inventoryPortion = max($requested - $totalOrdered, 0.0);
+                $alreadyReleasedInventory = $this->calculateAlreadyReleasedInventory($request, $itemId);
+                $remainingInventoryPortion = max($inventoryPortion - $alreadyReleasedInventory, 0.0);
+
+                $releasableStock = min(max($remainingInventoryPortion, 0.0), $available);
+            }
 
             if ($remaining > 0.0001 && $releasableStock > 0.0001) {
                 $hasReleasableStock = true;
@@ -396,6 +430,21 @@ class DistributionRecordController
         $shortageTotal = 0.0;
         $hasAvailableStock = false;
         $releasedPool = $this->releasedQuantityByItemId($request);
+
+        $hasPendingDeliveries = false;
+        if ($hasPurchaseRequest) {
+            $hasPendingDeliveries = Delivery::query()
+                ->whereHas('purchaseOrder', function ($q) use ($request) {
+                    $lineageIds = $this->followUpService->resolveLineageSupplyRequestIds($request);
+                    $q->whereIn('supply_request_id', $lineageIds);
+                })
+                ->where(function ($q) {
+                    $q->whereNotIn('receipt_status', ['VERIFIED', 'PARTIALLY_RECEIVED'])
+                        ->orWhereDoesntHave('distributionRecords', fn ($drQ) => $drQ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED']));
+                })
+                ->exists();
+        }
+
         foreach ($request->items as $item) {
             $itemId = (int) $item->item_id;
             $requested = (float) $item->quantity_requested;
@@ -409,6 +458,18 @@ class DistributionRecordController
 
             $releasableStock = min($remaining, $available);
 
+            if ($hasPurchaseRequest) {
+                $totalOrdered = (float) $request->purchaseOrders
+                    ->flatMap(fn ($po) => $po->items)
+                    ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
+                    ->sum('quantity_ordered');
+                $inventoryPortion = max($requested - $totalOrdered, 0.0);
+                $alreadyReleasedInventory = $this->calculateAlreadyReleasedInventory($request, $itemId);
+                $remainingInventoryPortion = max($inventoryPortion - $alreadyReleasedInventory, 0.0);
+
+                $releasableStock = min(max($remainingInventoryPortion, 0.0), $available);
+            }
+
             if ($remaining > 0.0001 && $releasableStock > 0.0001) {
                 $hasAvailableStock = true;
             }
@@ -418,13 +479,14 @@ class DistributionRecordController
             return null;
         }
 
-        if ($hasPurchaseRequest && $shortageTotal > 0) {
+        if ($hasPurchaseRequest) {
             $hasVerifiedDelivery = Delivery::query()
-                ->verified()
+                ->whereIn('receipt_status', ['VERIFIED', 'PARTIALLY_RECEIVED'])
                 ->whereHas('purchaseOrder', function ($query) use ($request): void {
-                    $query->where('supply_request_id', (int) $request->supply_request_id);
+                    $lineageIds = $this->followUpService->resolveLineageSupplyRequestIds($request);
+                    $query->whereIn('supply_request_id', $lineageIds);
                 })
-                ->whereDoesntHave('distributionRecords')
+                ->whereDoesntHave('distributionRecords', fn ($q) => $q->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED']))
                 ->with(['items'])
                 ->get()
                 ->contains(function (Delivery $del): bool {

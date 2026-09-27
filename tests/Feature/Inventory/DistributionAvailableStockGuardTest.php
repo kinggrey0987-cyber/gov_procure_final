@@ -1789,16 +1789,241 @@ class DistributionAvailableStockGuardTest extends TestCase
         $distCreateResponse->assertOk();
         $eligible = $distCreateResponse->viewData('page')['props']['eligibleRows']['data'];
 
-        // Both Delivery 1 (partially received delivery) and Parent SR (available inventory) must appear as releasable!
+        // Parent SR has Delivery 1 awaiting release; it must appear under VERIFIED_DELIVERY and NOT duplicated under AVAILABLE_INVENTORY
         $this->assertNotEmpty($eligible, 'Releasable requests should not be empty.');
 
         $deliveryRow = collect($eligible)->firstWhere('release_basis', 'VERIFIED_DELIVERY');
         $this->assertNotNull($deliveryRow, 'Delivery 1 (PARTIALLY_RECEIVED) must be visible in releasable requests.');
         $this->assertEquals((int) $del1->delivery_id, (int) $deliveryRow['delivery_id']);
+        $this->assertEquals((int) $sr->supply_request_id, (int) $deliveryRow['supply_request_id']);
 
-        $inventoryRow = collect($eligible)->firstWhere('release_basis', 'AVAILABLE_INVENTORY');
-        $this->assertNotNull($inventoryRow, 'Parent SR with available warehouse inventory must be visible in releasable requests.');
-        $this->assertEquals((int) $sr->supply_request_id, (int) $inventoryRow['supply_request_id']);
+        $srRows = collect($eligible)->filter(fn ($row) => (int) $row['supply_request_id'] === (int) $sr->supply_request_id);
+        $this->assertCount(1, $srRows, 'Parent SR must only appear once in releasable requests without duplicate available inventory copy.');
+
+        // Releasing Delivery 1 bundles both the delivery stock (5) and initial warehouse stock (5)
+        $dist1 = $distService->createRecordWithAutomaticRelease($gsoUser, [
+            'supply_request_id' => $sr->supply_request_id,
+            'delivery_id' => $del1->delivery_id,
+            'office_id' => $office->id,
+            'release_date' => now()->toDateString(),
+        ]);
+
+        $this->assertEquals(10.0, (float) $dist1->items->sum('quantity_released'));
+
+        // Once released, SR has reached its full 15 requested units and must no longer appear in releasable requests
+        $distCreateResponseAfter = $this->actingAs($gsoUser)->get(route('inventory.distribution-records.create'));
+        $distCreateResponseAfter->assertOk();
+        $eligibleAfter = $distCreateResponseAfter->viewData('page')['props']['eligibleRows']['data'];
+        $srRowsAfter = collect($eligibleAfter)->filter(fn ($row) => (int) $row['supply_request_id'] === (int) $sr->supply_request_id);
+        $this->assertCount(0, $srRowsAfter, 'Parent SR must not remain as a phantom available inventory row after full release.');
+    }
+
+    public function test_multiple_verified_delivery_requests_do_not_produce_duplicate_inventory_rows_or_phantom_error(): void
+    {
+        $gsoRole = Role::query()->firstOrCreate(['code' => UserRole::GSO_OFFICER->value], ['name' => 'GSO Officer']);
+        $gsoUser = User::factory()->create(['role_id' => $gsoRole->id]);
+
+        $office = Office::factory()->create(['code' => 'MPDO', 'name' => 'Planning Office']);
+        $officeRole = Role::query()->firstOrCreate(['code' => UserRole::OFFICE_USER->value], ['name' => 'Office User']);
+        $officeUser = User::factory()->create(['role_id' => $officeRole->id, 'office_id' => $office->id]);
+
+        $category = ItemCategory::query()->firstOrCreate(
+            ['category_name' => 'Office Supplies'],
+            ['description' => 'Supplies']
+        );
+        $item = Item::query()->create([
+            'item_category_id' => $category->item_category_id,
+            'item_name' => 'Ballpen Black',
+            'default_unit' => 'piece',
+            'status' => 'ACTIVE',
+        ]);
+
+        // Warehouse has 50 units available from general stock
+        Inventory::query()->create([
+            'item_id' => $item->item_id,
+            'stock_on_hand' => 50,
+            'available_stock' => 50,
+            'reserved_quantity' => 0,
+        ]);
+
+        $supplier = Supplier::query()->create([
+            'supplier_name' => 'Office Mart',
+            'contact_person' => 'Contact',
+            'email' => 'officemart@test.local',
+            'phone' => '09123456789',
+            'address' => 'Supplier Address',
+            'status' => 'ACTIVE',
+        ]);
+
+        // Request 1: 10 requested, PO for 10, Delivery 1 for 5 units (partially received)
+        $sr1 = SupplyRequest::query()->create([
+            'request_code' => 'SR-MPDO-2026-09-0003',
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(7)->toDateString(),
+            'request_category' => 'GENERAL',
+            'priority_level' => 'NORMAL',
+            'status' => 'FOR_PROCUREMENT',
+            'purpose' => 'Test 1',
+        ]);
+
+        $sri1 = SupplyRequestItem::query()->create([
+            'supply_request_id' => $sr1->supply_request_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Ballpen Black',
+            'quantity_requested' => 10,
+        ]);
+
+        $pr1 = PurchaseRequest::query()->create([
+            'pr_number' => 'PR-2026-09-0010',
+            'supply_request_id' => $sr1->supply_request_id,
+            'office_id' => $office->id,
+            'requested_by' => $gsoUser->id,
+            'status' => 'APPROVED',
+        ]);
+
+        $po1 = PurchaseOrder::query()->create([
+            'po_number' => 'PO-2026-09-0010',
+            'purchase_request_id' => $pr1->purchase_request_id,
+            'supply_request_id' => $sr1->supply_request_id,
+            'supplier_id' => $supplier->supplier_id,
+            'created_by' => $gsoUser->id,
+            'procurement_method' => 'SHOPPING',
+            'status' => 'APPROVED',
+            'total_amount' => 500,
+        ]);
+
+        $poi1 = PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $po1->purchase_order_id,
+            'supply_request_item_id' => $sri1->supply_request_item_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Ballpen Black',
+            'quantity_ordered' => 10,
+            'unit' => 'piece',
+            'unit_price' => 50,
+            'total_price' => 500,
+        ]);
+
+        $del1 = Delivery::query()->create([
+            'delivery_code' => 'DEL-2026-09-0001',
+            'purchase_order_id' => $po1->purchase_order_id,
+            'supplier_id' => $supplier->supplier_id,
+            'received_by' => $gsoUser->id,
+            'actual_delivery_date' => now()->toDateString(),
+            'status' => 'VERIFIED',
+            'receipt_status' => 'PARTIALLY_RECEIVED',
+        ]);
+
+        DeliveryItem::query()->create([
+            'delivery_id' => $del1->delivery_id,
+            'purchase_order_item_id' => $poi1->purchase_order_item_id,
+            'expected_quantity' => 10,
+            'received_quantity' => 5,
+            'damaged_quantity' => 0,
+            'missing_quantity' => 5,
+            'item_status' => 'PARTIALLY_RECEIVED',
+        ]);
+
+        // Request 2: 10 requested, PO for 10, Delivery 2 for 10 units (verified)
+        $sr2 = SupplyRequest::query()->create([
+            'request_code' => 'SR-MPDO-2026-09-0004',
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(7)->toDateString(),
+            'request_category' => 'GENERAL',
+            'priority_level' => 'NORMAL',
+            'status' => 'FOR_PROCUREMENT',
+            'purpose' => 'Test 2',
+        ]);
+
+        $sri2 = SupplyRequestItem::query()->create([
+            'supply_request_id' => $sr2->supply_request_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Ballpen Black',
+            'quantity_requested' => 10,
+        ]);
+
+        $pr2 = PurchaseRequest::query()->create([
+            'pr_number' => 'PR-2026-09-0011',
+            'supply_request_id' => $sr2->supply_request_id,
+            'office_id' => $office->id,
+            'requested_by' => $gsoUser->id,
+            'status' => 'APPROVED',
+        ]);
+
+        $po2 = PurchaseOrder::query()->create([
+            'po_number' => 'PO-2026-09-0011',
+            'purchase_request_id' => $pr2->purchase_request_id,
+            'supply_request_id' => $sr2->supply_request_id,
+            'supplier_id' => $supplier->supplier_id,
+            'created_by' => $gsoUser->id,
+            'procurement_method' => 'SHOPPING',
+            'status' => 'APPROVED',
+            'total_amount' => 500,
+        ]);
+
+        $poi2 = PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $po2->purchase_order_id,
+            'supply_request_item_id' => $sri2->supply_request_item_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Ballpen Black',
+            'quantity_ordered' => 10,
+            'unit' => 'piece',
+            'unit_price' => 50,
+            'total_price' => 500,
+        ]);
+
+        $del2 = Delivery::query()->create([
+            'delivery_code' => 'DEL-2026-09-0002',
+            'purchase_order_id' => $po2->purchase_order_id,
+            'supplier_id' => $supplier->supplier_id,
+            'received_by' => $gsoUser->id,
+            'actual_delivery_date' => now()->toDateString(),
+            'status' => 'VERIFIED',
+            'receipt_status' => 'VERIFIED',
+        ]);
+
+        DeliveryItem::query()->create([
+            'delivery_id' => $del2->delivery_id,
+            'purchase_order_item_id' => $poi2->purchase_order_item_id,
+            'expected_quantity' => 10,
+            'received_quantity' => 10,
+            'damaged_quantity' => 0,
+            'missing_quantity' => 0,
+            'item_status' => 'VERIFIED',
+        ]);
+
+        // When viewing Supply Distribution:
+        $distCreateResponse = $this->actingAs($gsoUser)->get(route('inventory.distribution-records.create'));
+        $distCreateResponse->assertOk();
+        $eligible = $distCreateResponse->viewData('page')['props']['eligibleRows']['data'];
+
+        // Each request MUST appear exactly once (under VERIFIED_DELIVERY), zero duplicate "From Available Inventory" copies!
+        $this->assertCount(2, $eligible, 'There must be exactly 2 rows for the 2 requests, no duplicates.');
+        $this->assertTrue(collect($eligible)->every(fn ($row) => $row['release_basis'] === 'VERIFIED_DELIVERY'));
+
+        // Process release for SR-1's Delivery 1
+        $distService = app(DistributionRecordService::class);
+        $dist1 = $distService->createRecordWithAutomaticRelease($gsoUser, [
+            'supply_request_id' => $sr1->supply_request_id,
+            'delivery_id' => $del1->delivery_id,
+            'office_id' => $office->id,
+            'release_date' => now()->toDateString(),
+        ]);
+        $this->assertEquals(5.0, (float) $dist1->items->sum('quantity_released'));
+
+        // Viewing create page again: SR-1 must NOT leave behind a phantom "From Available Inventory" copy!
+        $distCreateResponse2 = $this->actingAs($gsoUser)->get(route('inventory.distribution-records.create'));
+        $distCreateResponse2->assertOk();
+        $eligible2 = $distCreateResponse2->viewData('page')['props']['eligibleRows']['data'];
+
+        $sr1Rows = collect($eligible2)->filter(fn ($row) => (int) $row['supply_request_id'] === (int) $sr1->supply_request_id);
+        $this->assertCount(0, $sr1Rows, 'SR-1 must not have a phantom available inventory row while awaiting next delivery.');
+
+        $sr2Rows = collect($eligible2)->filter(fn ($row) => (int) $row['supply_request_id'] === (int) $sr2->supply_request_id);
+        $this->assertCount(1, $sr2Rows, 'SR-2 remains visible with its verified delivery.');
     }
 }
 

@@ -505,11 +505,7 @@ class DistributionRecordService
                 $alreadyReleasedInventory = $this->calculateAlreadyReleasedInventory($record->supplyRequest, $itemId);
                 $remainingInventoryPortion = max($inventoryPortion - $alreadyReleasedInventory, 0.0);
 
-                if (! $hasPendingDeliveries) {
-                    $releasableStock = min($remaining, $available);
-                } else {
-                    $releasableStock = min(max($remainingInventoryPortion, 0.0), $available);
-                }
+                $releasableStock = min(max($remainingInventoryPortion, 0.0), $available);
             }
 
             if ($remaining > 0.0001 && $releasableStock > 0.0001) {
