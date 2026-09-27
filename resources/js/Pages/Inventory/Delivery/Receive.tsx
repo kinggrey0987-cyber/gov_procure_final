@@ -137,11 +137,17 @@ export default function DeliveryReceive({ delivery }: Props) {
     const handleDrFilesAdd = (e: ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files || e.target.files.length === 0) return;
         const newFiles = Array.from(e.target.files);
+        const oversized = newFiles.filter((f) => f.size > 10 * 1024 * 1024);
+        const valid = newFiles.filter((f) => f.size <= 10 * 1024 * 1024);
+        if (oversized.length > 0) {
+            setFileError(`Some Delivery Receipt file(s) exceed the 10 MB limit and were skipped.`);
+        } else {
+            setFileError(null);
+        }
         setDrFiles((prev) => {
             const existing = new Set(prev.map((f) => `${f.name}_${f.size}`));
-            return [...prev, ...newFiles.filter((f) => !existing.has(`${f.name}_${f.size}`))];
+            return [...prev, ...valid.filter((f) => !existing.has(`${f.name}_${f.size}`))];
         });
-        setFileError(null);
         e.target.value = '';
     };
 
@@ -152,11 +158,17 @@ export default function DeliveryReceive({ delivery }: Props) {
     const handleSiFilesAdd = (e: ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files || e.target.files.length === 0) return;
         const newFiles = Array.from(e.target.files);
+        const oversized = newFiles.filter((f) => f.size > 10 * 1024 * 1024);
+        const valid = newFiles.filter((f) => f.size <= 10 * 1024 * 1024);
+        if (oversized.length > 0) {
+            setFileError(`Some Sales Invoice file(s) exceed the 10 MB limit and were skipped.`);
+        } else {
+            setFileError(null);
+        }
         setSiFiles((prev) => {
             const existing = new Set(prev.map((f) => `${f.name}_${f.size}`));
-            return [...prev, ...newFiles.filter((f) => !existing.has(`${f.name}_${f.size}`))];
+            return [...prev, ...valid.filter((f) => !existing.has(`${f.name}_${f.size}`))];
         });
-        setFileError(null);
         e.target.value = '';
     };
 
@@ -167,9 +179,16 @@ export default function DeliveryReceive({ delivery }: Props) {
     const handleSupportingFilesAdd = (e: ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files || e.target.files.length === 0) return;
         const newFiles = Array.from(e.target.files);
+        const oversized = newFiles.filter((f) => f.size > 10 * 1024 * 1024);
+        const valid = newFiles.filter((f) => f.size <= 10 * 1024 * 1024);
+        if (oversized.length > 0) {
+            setFileError(`Some supporting file(s) exceed the 10 MB limit and were skipped.`);
+        } else {
+            setFileError(null);
+        }
         setSupportingFiles((prev) => {
             const existing = new Set(prev.map((f) => `${f.name}_${f.size}`));
-            return [...prev, ...newFiles.filter((f) => !existing.has(`${f.name}_${f.size}`))];
+            return [...prev, ...valid.filter((f) => !existing.has(`${f.name}_${f.size}`))];
         });
         e.target.value = '';
     };

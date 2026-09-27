@@ -981,10 +981,24 @@ export default function SupplyRequestShow({
                                 <label className="mb-1 block text-sm font-medium text-slate-700">Attachment (Optional)</label>
                                 <input
                                     type="file"
-                                    onChange={(event) => issueForm.setData('attachment_file', event.target.files?.[0] ?? null)}
+                                    onChange={(event) => {
+                                        const file = event.target.files?.[0] ?? null;
+                                        if (file && file.size > 10 * 1024 * 1024) {
+                                            issueForm.setError('attachment_file', `The selected file exceeds the 10 MB limit (${(file.size / (1024 * 1024)).toFixed(1)} MB).`);
+                                            event.target.value = '';
+                                            issueForm.setData('attachment_file', null);
+                                            return;
+                                        }
+                                        issueForm.clearErrors('attachment_file');
+                                        issueForm.setData('attachment_file', file);
+                                    }}
                                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                                     accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
                                 />
+                                <p className="mt-1 text-xs text-slate-500">Max 10 MB. PDF, Word, or Image.</p>
+                                {issueForm.errors.attachment_file && (
+                                    <p className="mt-1 text-xs text-rose-600">{issueForm.errors.attachment_file}</p>
+                                )}
                             </div>
 
                             <div className="flex justify-end gap-2">

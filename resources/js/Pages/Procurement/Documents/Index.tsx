@@ -117,11 +117,41 @@ export default function ProcurementDocumentsIndex({
         router.get(route('procurement.documents.index'));
     };
 
+    const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB
+
     const handleFilesSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
         const fileList = event.target.files;
         if (!fileList || fileList.length === 0) return;
 
-        const newStaged: StagedFile[] = Array.from(fileList).map((f) => {
+        const oversizedFiles: File[] = [];
+        const validFiles: File[] = [];
+
+        Array.from(fileList).forEach((f) => {
+            if (f.size > MAX_FILE_SIZE_BYTES) {
+                oversizedFiles.push(f);
+            } else {
+                validFiles.push(f);
+            }
+        });
+
+        if (oversizedFiles.length > 0) {
+            const list = oversizedFiles
+                .map((f) => `"${f.name}" (${(f.size / (1024 * 1024)).toFixed(1)} MB)`)
+                .join(', ');
+            setFormErrors((prev) => ({
+                ...prev,
+                files: `The following file(s) exceed the maximum allowed size of 15 MB and were not staged: ${list}.`,
+            }));
+        } else {
+            setFormErrors({});
+        }
+
+        if (validFiles.length === 0) {
+            event.target.value = '';
+            return;
+        }
+
+        const newStaged: StagedFile[] = validFiles.map((f) => {
             const isImg = f.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp)$/i.test(f.name);
             const baseName = f.name.replace(/\.[^/.]+$/, '');
             return {
@@ -134,7 +164,6 @@ export default function ProcurementDocumentsIndex({
         });
 
         setStagedFiles((prev) => [...prev, ...newStaged]);
-        setFormErrors({});
         event.target.value = '';
     };
 
@@ -163,6 +192,14 @@ export default function ProcurementDocumentsIndex({
 
         if (stagedFiles.length === 0) {
             setFormErrors({ files: 'Please attach at least one document file to upload.' });
+            return;
+        }
+
+        const oversized = stagedFiles.filter((item) => item.file.size > MAX_FILE_SIZE_BYTES);
+        if (oversized.length > 0) {
+            setFormErrors({
+                files: `Cannot upload. The following file(s) exceed the 15 MB limit: ${oversized.map((o) => `"${o.file.name}" (${(o.file.size / (1024 * 1024)).toFixed(1)} MB)`).join(', ')}. Please remove them.`,
+            });
             return;
         }
 
@@ -425,6 +462,11 @@ export default function ProcurementDocumentsIndex({
                                                                 ) : (
                                                                     <span className="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-800">
                                                                         Document
+                                                                    </span>
+                                                                )}
+                                                                {item.file.size > MAX_FILE_SIZE_BYTES && (
+                                                                    <span className="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-800">
+                                                                        Exceeds 15 MB Limit
                                                                     </span>
                                                                 )}
                                                             </div>

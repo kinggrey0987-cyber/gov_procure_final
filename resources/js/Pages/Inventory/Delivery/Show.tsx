@@ -627,10 +627,21 @@ export default function DeliveryShow({ delivery }: Props) {
                                         type="file"
                                         accept="image/*,application/pdf"
                                         capture="environment"
-                                        onChange={(e) => uploadForm.setData('file', e.target.files?.[0] ?? null)}
+                                        onChange={(e) => {
+                                            const selected = e.target.files?.[0] ?? null;
+                                            if (selected && selected.size > 15 * 1024 * 1024) {
+                                                uploadForm.setError('file', `Selected file exceeds the 15 MB limit (${(selected.size / (1024 * 1024)).toFixed(1)} MB).`);
+                                                e.target.value = '';
+                                                uploadForm.setData('file', null);
+                                                return;
+                                            }
+                                            uploadForm.clearErrors('file');
+                                            uploadForm.setData('file', selected);
+                                        }}
                                         className="w-full rounded-lg border border-slate-300 p-2 text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-indigo-600 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-indigo-700 cursor-pointer"
                                         required
                                     />
+                                    <p className="mt-1 text-xs text-slate-500">Accepted formats: JPG, PNG, PDF (max 15 MB).</p>
                                     {uploadForm.errors.file && <p className="mt-1 text-xs text-rose-600">{uploadForm.errors.file}</p>}
                                 </div>
 

@@ -172,12 +172,29 @@ export default function DisclosureCreate({ eligibleSources, procurementDocuments
 
     const onMainFileChange = (event: ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0] ?? null;
+        if (file && file.size > 10 * 1024 * 1024) {
+            form.setError('main_file', `Selected file exceeds the 10 MB limit (${(file.size / (1024 * 1024)).toFixed(1)} MB).`);
+            event.target.value = '';
+            form.setData('main_file', null);
+            return;
+        }
+        form.clearErrors('main_file');
         form.setData('main_file', file);
     };
 
     const onSupportingFilesChange = (event: ChangeEvent<HTMLInputElement>) => {
         const selectedFiles = Array.from(event.target.files ?? []);
-        const merged = [...form.data.supporting_files, ...selectedFiles];
+        const oversized = selectedFiles.filter((f) => f.size > 10 * 1024 * 1024);
+        const valid = selectedFiles.filter((f) => f.size <= 10 * 1024 * 1024);
+
+        if (oversized.length > 0) {
+            const names = oversized.map((f) => `"${f.name}" (${(f.size / (1024 * 1024)).toFixed(1)} MB)`).join(', ');
+            form.setError('supporting_files', `File(s) exceed 10 MB limit and were skipped: ${names}`);
+        } else {
+            form.clearErrors('supporting_files');
+        }
+
+        const merged = [...form.data.supporting_files, ...valid];
         form.setData('supporting_files', merged);
         event.target.value = '';
     };

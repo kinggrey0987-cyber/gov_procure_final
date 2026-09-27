@@ -77,10 +77,20 @@ export default function AttachmentsPanel({
                         <input
                             type="file"
                             accept=".pdf,.doc,.docx,.csv,.png,.jpg,.jpeg,.webp,image/*,application/pdf"
-                            onChange={(event) => form.setData('file', event.target.files?.[0] ?? null)}
+                            onChange={(event) => {
+                                const file = event.target.files?.[0] ?? null;
+                                if (file && file.size > 15 * 1024 * 1024) {
+                                    form.setError('file', `The selected file exceeds the 15 MB limit (${(file.size / (1024 * 1024)).toFixed(1)} MB).`);
+                                    event.target.value = '';
+                                    form.setData('file', null);
+                                    return;
+                                }
+                                form.clearErrors('file');
+                                form.setData('file', file);
+                            }}
                             className="w-full rounded border-slate-300 text-sm"
                         />
-                        <p className="mt-1 text-xs text-slate-500">PDF, Word, CSV, or Image (PNG/JPG auto-converted to PDF).</p>
+                        <p className="mt-1 text-xs text-slate-500">PDF, Word, CSV, or Image (PNG/JPG auto-converted to PDF). Max 15 MB.</p>
                         {form.errors.file && <p className="mt-1 text-xs text-rose-700">{form.errors.file}</p>}
                     </div>
                     <div className="sm:col-span-2">
