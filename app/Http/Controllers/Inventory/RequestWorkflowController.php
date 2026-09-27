@@ -28,6 +28,7 @@ class RequestWorkflowController
         private readonly DistributionRecordService $distributionService,
         private readonly \App\Services\Inventory\SupplyRequestFollowUpService $followUpService,
         private readonly \App\Services\Inventory\InventoryService $inventoryService,
+        private readonly \App\Services\Procurement\ProcurementStatusSyncService $procurementStatusSyncService,
     ) {
     }
 
@@ -572,6 +573,8 @@ class RequestWorkflowController
      */
     private function activeLowStockQueueByInventoryId(): array
     {
+        $this->procurementStatusSyncService->syncCompletedProactiveAndRestockRequests();
+
         return PurchaseRequest::query()
             ->where(function ($query): void {
                 $query->where('status', 'OPEN')

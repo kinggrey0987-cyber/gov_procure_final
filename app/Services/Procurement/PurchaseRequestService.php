@@ -285,6 +285,8 @@ class PurchaseRequestService
         $signalMarker = sprintf('LOW_STOCK_SIGNAL:inventory:%d', (int) $inventory->inventory_id);
         $governanceLabel = 'Proactive GSO Demand Forecast Signal - statistical stock-demand planning context only; not an office-approved PPMP and not a procurement approval.';
 
+        app(ProcurementStatusSyncService::class)->syncCompletedProactiveAndRestockRequests($actor);
+
         $alreadyQueued = PurchaseRequest::query()
             ->whereIn('status', ['OPEN', 'PROCESSING'])
             ->where('remarks', 'like', '%'.$signalMarker.'%')

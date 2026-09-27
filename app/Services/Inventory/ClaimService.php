@@ -188,8 +188,8 @@ class ClaimService
             'OPEN' => ['REJECTED', 'RESOLVED', 'PENDING_REPLACEMENT', 'REPLACEMENT_RELEASED'],
             'IN_REVIEW' => ['REJECTED', 'RESOLVED', 'PENDING_REPLACEMENT', 'REPLACEMENT_RELEASED'],
             'PENDING_REPLACEMENT' => ['REJECTED', 'RESOLVED', 'REPLACEMENT_RELEASED'],
-            'REPLACEMENT_RELEASED' => ['REJECTED', 'RESOLVED', 'PENDING_REPLACEMENT'],
-            'PARTIALLY_RESOLVED' => ['REJECTED', 'RESOLVED', 'PENDING_REPLACEMENT', 'REPLACEMENT_RELEASED', 'PARTIALLY_RESOLVED'],
+            'REPLACEMENT_RELEASED' => ['RESOLVED'],
+            'PARTIALLY_RESOLVED' => ['RESOLVED', 'PENDING_REPLACEMENT', 'REPLACEMENT_RELEASED'],
             'REJECTED' => [],
             'RESOLVED' => [],
         ];
@@ -198,6 +198,26 @@ class ClaimService
             throw ValidationException::withMessages([
                 'status' => sprintf('Invalid claim status transition from %s to %s.', $currentStatus, $newStatus),
             ]);
+        }
+
+        if ($newStatus === 'REJECTED') {
+            if ((float) $claim->replacement_quantity > 0 || $currentStatus === 'REPLACEMENT_RELEASED') {
+                throw ValidationException::withMessages([
+                    'status' => 'Cannot reject a claim after replacement stock has already been released.',
+                ]);
+            }
+
+            $hasActiveFollowUpPr = \App\Models\PurchaseRequest::query()
+                ->where('source_claim_id', (int) $claim->claims_id)
+                ->where('source_type', 'CLAIM_REPLACEMENT_FOLLOW_UP')
+                ->whereNotIn('status', ['CANCELLED', 'REJECTED'])
+                ->exists();
+
+            if ($hasActiveFollowUpPr) {
+                throw ValidationException::withMessages([
+                    'status' => 'Cannot reject a claim while a follow-up purchase request is active in procurement.',
+                ]);
+            }
         }
 
         return DB::transaction(function () use ($claim, $actor, $payload, $currentStatus, $newStatus): Claim {

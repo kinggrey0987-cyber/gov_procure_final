@@ -143,7 +143,13 @@ export default function ClaimShow({ claim, parentClaim, followUpClaims = [], fol
         followUpPurchaseRequest: routes?.followUpPurchaseRequest ?? 'inventory.claims.follow-up-purchase-request.store',
     };
     const remainingReplacementQuantity = Math.max((claim.quantity_disputed ?? 0) - (claim.replacement_quantity ?? 0), 0);
-    const nextStatusOptions = getNextStatusOptions(claim.status, claim.replacement_available_stock, remainingReplacementQuantity);
+    const nextStatusOptions = getNextStatusOptions(
+        claim.status,
+        claim.replacement_available_stock,
+        remainingReplacementQuantity,
+        Boolean(followUpPurchaseRequest),
+        claim.replacement_quantity ?? 0
+    );
     const canUpdate = (permissions?.update ?? false) && nextStatusOptions.length > 0;
     const statusForm = useForm({
         status: nextStatusOptions[0]?.value ?? '',
@@ -437,7 +443,13 @@ export default function ClaimShow({ claim, parentClaim, followUpClaims = [], fol
                                     ) : null}
                                 </form>
                             ) : (
-                                <p className="mt-2 text-sm text-slate-600">This claim has already been closed and can only be viewed.</p>
+                                <p className="mt-2 text-sm text-slate-600">
+                                    {claim.status === 'REPLACEMENT_RELEASED'
+                                        ? 'Replacement items have been released. Awaiting verification and acceptance by the requesting office.'
+                                        : claim.status === 'PENDING_REPLACEMENT' && followUpPurchaseRequest
+                                        ? 'Follow-up purchase request has been forwarded to Procurement. Awaiting fulfillment and stock arrival.'
+                                        : 'This claim has already been closed and can only be viewed.'}
+                                </p>
                             )}
                         </div>
                     ) : null}
@@ -683,7 +695,9 @@ function formatQuantity(value: number): string {
 function getNextStatusOptions(
     status: string,
     availableStock?: number | null,
-    remainingDisputed?: number
+    remainingDisputed?: number,
+    hasFollowUpPr: boolean = false,
+    replacementQuantity: number = 0
 ): Array<{ value: string; label: string }> {
     const hasSufficientStock = availableStock !== null && availableStock !== undefined && (remainingDisputed ?? 0) <= availableStock;
     const hasInsufficientStock = availableStock !== null && availableStock !== undefined && (remainingDisputed ?? 0) > availableStock;
@@ -699,12 +713,14 @@ function getNextStatusOptions(
         }
     } else if (status === 'PENDING_REPLACEMENT') {
         if (hasSufficientStock) {
-            allowed = ['REPLACEMENT_RELEASED', 'REJECTED'];
-        } else {
+            allowed = ['REPLACEMENT_RELEASED'];
+        } else if (!hasFollowUpPr && replacementQuantity <= 0) {
             allowed = ['REJECTED'];
+        } else {
+            allowed = [];
         }
     } else if (status === 'REPLACEMENT_RELEASED') {
-        allowed = ['REJECTED'];
+        allowed = [];
     }
 
     return allowed.map((value) => ({

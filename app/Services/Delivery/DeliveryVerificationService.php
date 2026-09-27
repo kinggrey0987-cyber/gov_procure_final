@@ -4,7 +4,10 @@ namespace App\Services\Delivery;
 
 use App\Models\Delivery;
 use App\Models\DeliveryVerification;
+use App\Models\PurchaseOrder;
+use App\Models\PurchaseRequest;
 use App\Models\StatusHistory;
+use App\Models\SupplyRequest;
 use App\Models\User;
 use App\Services\AuditLogService;
 use App\Services\Inventory\InventoryService;
@@ -106,6 +109,7 @@ class DeliveryVerificationService
 
             if ($newStatus === 'VERIFIED') {
                 $this->resolveSourcePartialDeliveryIfFollowUpCompleted($verifiedDelivery, $actor);
+                $this->completeOrderAndProcurementIfFullyDelivered($verifiedDelivery, $actor);
             }
 
             return $verification;
@@ -236,5 +240,83 @@ class DeliveryVerificationService
                 ?? $delivery->purchaseOrder?->purchaseRequest?->supplyRequest?->office_id
                 ?? null,
         );
+    }
+
+    private function completeOrderAndProcurementIfFullyDelivered(Delivery $delivery, User $actor): void
+    {
+        $delivery->loadMissing([
+            'purchaseOrder.items',
+            'purchaseOrder.deliveries.items',
+            'purchaseOrder.purchaseRequest.supplyRequest',
+            'purchaseOrder.purchaseRequest.purchaseOrders',
+        ]);
+
+        $po = $delivery->purchaseOrder;
+        if (! $po instanceof PurchaseOrder) {
+            return;
+        }
+
+        $hasPendingDeliveries = $po->deliveries()
+            ->whereNotIn('receipt_status', ['VERIFIED', 'COMPLETED', 'CANCELLED'])
+            ->exists();
+
+        if ($hasPendingDeliveries || $po->deliveries->isEmpty()) {
+            return;
+        }
+
+        $verifiedDeliveries = $po->deliveries->where('receipt_status', 'VERIFIED');
+        foreach ($po->items as $poItem) {
+            $orderedQty = (float) $poItem->quantity_ordered;
+            if ($orderedQty <= 0) {
+                continue;
+            }
+
+            $receivedQty = (float) $verifiedDeliveries
+                ->flatMap(fn (Delivery $del) => $del->items)
+                ->where('purchase_order_item_id', (int) $poItem->purchase_order_item_id)
+                ->sum('received_quantity');
+
+            if ($receivedQty < $orderedQty) {
+                return;
+            }
+        }
+
+        if (! in_array((string) $po->status, ['COMPLETED', 'CLOSED'], true)) {
+            $poOld = (string) $po->status;
+            $po->forceFill(['status' => 'COMPLETED'])->save();
+            $this->recordStatus($delivery, $poOld, 'COMPLETED', $actor, 'Purchase order deliveries fully verified and accepted into inventory.');
+        }
+
+        $pr = $po->purchaseRequest;
+        if ($pr instanceof PurchaseRequest && ! in_array((string) $pr->status, ['COMPLETED', 'CLOSED'], true)) {
+            $isLowStockSignal = str_contains((string) ($pr->remarks ?? ''), 'LOW_STOCK_SIGNAL:inventory:');
+            $isClaimFollowUp = (string) ($pr->source_type ?? '') === 'CLAIM_REPLACEMENT_FOLLOW_UP' || (int) ($pr->source_claim_id ?? 0) > 0;
+
+            $hasUnfinishedPo = $pr->purchaseOrders()
+                ->whereNotIn('status', ['COMPLETED', 'CLOSED', 'CANCELLED'])
+                ->exists();
+
+            if (! $hasUnfinishedPo && ($isLowStockSignal || $isClaimFollowUp)) {
+                $prOld = (string) $pr->status;
+                $pr->forceFill(['status' => 'COMPLETED'])->save();
+
+                StatusHistory::query()->create([
+                    'reference_type' => PurchaseRequest::class,
+                    'reference_id' => (int) $pr->purchase_request_id,
+                    'old_status' => $prOld,
+                    'new_status' => 'COMPLETED',
+                    'changed_by' => (int) $actor->id,
+                    'remarks' => $isLowStockSignal
+                        ? 'Proactive stock replenishment received and verified in warehouse.'
+                        : 'Claim replacement goods delivered and verified into warehouse inventory.',
+                    'changed_at' => now(),
+                ]);
+
+                $sr = $pr->supplyRequest;
+                if ($sr instanceof SupplyRequest && ! in_array((string) $sr->status, ['RECEIVED', 'COMPLETED'], true)) {
+                    $sr->forceFill(['status' => 'RECEIVED'])->save();
+                }
+            }
+        }
     }
 }

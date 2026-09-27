@@ -3,6 +3,7 @@
 namespace App\Services\Procurement;
 
 use App\Models\ApprovalHistory;
+use App\Models\Delivery;
 use App\Models\DistributionRecord;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequest;
@@ -87,6 +88,80 @@ class ProcurementStatusSyncService
                     $synced++;
                 }
             }, 'supply_request_id', 'supply_request_id');
+
+        return $synced;
+    }
+
+    public function syncCompletedProactiveAndRestockRequests(?User $actor = null): int
+    {
+        $synced = 0;
+
+        $prs = PurchaseRequest::query()
+            ->with(['purchaseOrders.items', 'purchaseOrders.deliveries.items', 'supplyRequest'])
+            ->whereIn('status', ['OPEN', 'PROCESSING'])
+            ->where(function ($q): void {
+                $q->where('remarks', 'like', '%LOW_STOCK_SIGNAL:inventory:%')
+                    ->orWhere('source_type', 'CLAIM_REPLACEMENT_FOLLOW_UP');
+            })
+            ->get();
+
+        foreach ($prs as $pr) {
+            if ($pr->purchaseOrders->isEmpty()) {
+                continue;
+            }
+
+            $allPosCompleted = true;
+
+            foreach ($pr->purchaseOrders as $po) {
+                $hasPendingDeliveries = $po->deliveries()
+                    ->whereNotIn('receipt_status', ['VERIFIED', 'COMPLETED', 'CANCELLED'])
+                    ->exists();
+
+                if ($hasPendingDeliveries || $po->deliveries->isEmpty()) {
+                    $allPosCompleted = false;
+                    break;
+                }
+
+                $verifiedDeliveries = $po->deliveries->where('receipt_status', 'VERIFIED');
+                foreach ($po->items as $poItem) {
+                    $orderedQty = (float) $poItem->quantity_ordered;
+                    $receivedQty = (float) $verifiedDeliveries
+                        ->flatMap(fn (Delivery $del) => $del->items)
+                        ->where('purchase_order_item_id', (int) $poItem->purchase_order_item_id)
+                        ->sum('received_quantity');
+
+                    if ($receivedQty < $orderedQty) {
+                        $allPosCompleted = false;
+                        break 2;
+                    }
+                }
+
+                if (! in_array((string) $po->status, ['COMPLETED', 'CLOSED'], true)) {
+                    $po->forceFill(['status' => 'COMPLETED'])->save();
+                }
+            }
+
+            if ($allPosCompleted) {
+                $oldStatus = (string) $pr->status;
+                $pr->forceFill(['status' => 'COMPLETED'])->save();
+
+                StatusHistory::query()->create([
+                    'reference_type' => PurchaseRequest::class,
+                    'reference_id' => (int) $pr->purchase_request_id,
+                    'old_status' => $oldStatus,
+                    'new_status' => 'COMPLETED',
+                    'changed_by' => $actor?->id,
+                    'remarks' => 'Proactive replenishment completed upon verified delivery of all items.',
+                    'changed_at' => now(),
+                ]);
+
+                if ($pr->supplyRequest && ! in_array((string) $pr->supplyRequest->status, ['RECEIVED', 'COMPLETED'], true)) {
+                    $pr->supplyRequest->forceFill(['status' => 'RECEIVED'])->save();
+                }
+
+                $synced++;
+            }
+        }
 
         return $synced;
     }

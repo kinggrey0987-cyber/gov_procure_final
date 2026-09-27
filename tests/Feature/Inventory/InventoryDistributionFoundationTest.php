@@ -1257,6 +1257,223 @@ class InventoryDistributionFoundationTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_claim_cannot_be_rejected_after_replacement_stock_is_released(): void
+    {
+        $record = $this->createReleasedDistributionRecordForOffice($this->officeA, 90301);
+        $record->forceFill(['status' => 'RECEIVED'])->save();
+        $distributionItem = $record->items()->firstOrFail();
+        $distributionItem->forceFill([
+            'quantity_released' => 5,
+            'quantity_received' => 3,
+            'quantity_missing' => 2,
+            'receipt_condition' => 'DISCREPANCY',
+        ])->save();
+
+        $this->actingAs($this->officeUserA)
+            ->post(route('office.claims.store'), [
+                'distribution_record_id' => $record->distribution_record_id,
+                'distribution_item_id' => $distributionItem->distribution_item_id,
+                'office_id' => $this->officeA->id,
+                'claim_type' => 'MISSING_ITEM',
+                'attachment_file' => \Illuminate\Http\UploadedFile::fake()->image('evidence.png'),
+                'claim_date' => now()->toDateString(),
+                'claim_location' => 'Office A Storage',
+                'quantity_disputed' => 2,
+                'remarks' => 'Two units missing.',
+            ])
+            ->assertRedirect();
+
+        $claim = Claim::query()->where('distribution_item_id', $distributionItem->distribution_item_id)->firstOrFail();
+
+        Inventory::query()
+            ->where('item_id', (int) $distributionItem->item_id)
+            ->update([
+                'available_stock' => 10,
+                'stock_on_hand' => 10,
+                'released_quantity' => 0,
+            ]);
+
+        // GSO releases replacement stock
+        $this->actingAs($this->gsoOfficer)
+            ->put(route('inventory.claims.update-status', $claim->claims_id), [
+                'status' => 'REPLACEMENT_RELEASED',
+                'resolution_type' => 'REPLACEMENT_RELEASED',
+                'replacement_quantity' => 2,
+                'remarks' => 'Replacement items released by GSO.',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $claim->refresh();
+        $this->assertSame('REPLACEMENT_RELEASED', (string) $claim->status);
+
+        // Attempting to update claim to REJECTED must fail and be disallowed
+        $this->actingAs($this->gsoOfficer)
+            ->put(route('inventory.claims.update-status', $claim->claims_id), [
+                'status' => 'REJECTED',
+                'remarks' => 'Attempting to reject after releasing stock.',
+            ])
+            ->assertSessionHasErrors('status');
+
+        $claim->refresh();
+        $this->assertSame('REPLACEMENT_RELEASED', (string) $claim->status);
+    }
+
+    public function test_claim_cannot_be_rejected_while_follow_up_purchase_request_is_active(): void
+    {
+        $record = $this->createReleasedDistributionRecordForOffice($this->officeA, 90302);
+        $record->forceFill(['status' => 'RECEIVED'])->save();
+        $distributionItem = $record->items()->firstOrFail();
+        $distributionItem->forceFill([
+            'quantity_released' => 5,
+            'quantity_received' => 3,
+            'quantity_missing' => 2,
+            'receipt_condition' => 'DISCREPANCY',
+        ])->save();
+
+        $this->actingAs($this->officeUserA)
+            ->post(route('office.claims.store'), [
+                'distribution_record_id' => $record->distribution_record_id,
+                'distribution_item_id' => $distributionItem->distribution_item_id,
+                'office_id' => $this->officeA->id,
+                'claim_type' => 'MISSING_ITEM',
+                'attachment_file' => \Illuminate\Http\UploadedFile::fake()->image('evidence.png'),
+                'claim_date' => now()->toDateString(),
+                'claim_location' => 'Office A Storage',
+                'quantity_disputed' => 2,
+                'remarks' => 'Two units missing.',
+            ])
+            ->assertRedirect();
+
+        $claim = Claim::query()->where('distribution_item_id', $distributionItem->distribution_item_id)->firstOrFail();
+
+        Inventory::query()
+            ->where('item_id', (int) $distributionItem->item_id)
+            ->update([
+                'available_stock' => 0,
+                'stock_on_hand' => 0,
+                'released_quantity' => 0,
+            ]);
+
+        // GSO forwards follow-up PR
+        $this->actingAs($this->gsoOfficer)
+            ->post(route('inventory.claims.follow-up-purchase-request.store', $claim->claims_id))
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $claim->refresh();
+        $this->assertSame('PENDING_REPLACEMENT', (string) $claim->status);
+
+        // Attempting to reject the claim while follow-up PR is active in procurement must fail
+        $this->actingAs($this->gsoOfficer)
+            ->put(route('inventory.claims.update-status', $claim->claims_id), [
+                'status' => 'REJECTED',
+                'remarks' => 'Attempting to reject while PR is in procurement.',
+            ])
+            ->assertSessionHasErrors('status');
+
+        $claim->refresh();
+        $this->assertSame('PENDING_REPLACEMENT', (string) $claim->status);
+    }
+
+    public function test_proactive_replenishment_pr_is_completed_when_all_deliveries_are_verified(): void
+    {
+        $category = \App\Models\ItemCategory::query()->create([
+            'category_name' => 'Proactive Cat '.uniqid(),
+            'standard_delivery_days' => 7,
+            'status' => 'ACTIVE',
+        ]);
+        $item = \App\Models\Item::query()->create([
+            'item_id' => 90303,
+            'item_name' => 'Test Proactive Item 90303',
+            'item_category_id' => $category->item_category_id,
+            'default_unit' => 'box',
+            'status' => 'ACTIVE',
+        ]);
+        $inventory = Inventory::query()->firstOrCreate(
+            ['item_id' => $item->item_id],
+            [
+                'available_stock' => 2,
+                'stock_on_hand' => 2,
+                'low_stock_threshold' => 10,
+                'released_quantity' => 0,
+                'reserved_quantity' => 0,
+            ]
+        );
+
+        // Create proactive PR from low stock signal
+        $prService = app(\App\Services\Procurement\PurchaseRequestService::class);
+        $pr = $prService->createFromLowStockSignal($this->gsoOfficer, $inventory, 8);
+        $this->assertSame('OPEN', (string) $pr->status);
+
+        $supplier = \App\Models\Supplier::query()->create([
+            'supplier_name' => 'Supplier '.uniqid(),
+            'status' => 'ACTIVE',
+        ]);
+
+        // Create PO for this PR
+        $po = PurchaseOrder::query()->create([
+            'purchase_request_id' => $pr->purchase_request_id,
+            'supply_request_id' => $pr->supply_request_id,
+            'supplier_id' => $supplier->supplier_id,
+            'created_by' => $this->procurementOfficer->id,
+            'po_number' => 'PO-TEST-PROACTIVE-01',
+            'procurement_method' => 'PUBLIC_BIDDING',
+            'status' => 'PLACED',
+            'total_amount' => 1000,
+        ]);
+        $poItem = PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $po->purchase_order_id,
+            'supply_request_item_id' => $pr->supplyRequest->items()->first()->supply_request_item_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => $item->item_name,
+            'quantity_ordered' => 8,
+            'unit' => 'box',
+            'unit_price' => 125,
+            'total_price' => 1000,
+        ]);
+
+        $pr->forceFill(['status' => 'PROCESSING'])->save();
+
+        // Create delivery and verify it
+        $delivery = Delivery::query()->create([
+            'purchase_order_id' => $po->purchase_order_id,
+            'supplier_id' => $supplier->supplier_id,
+            'received_by' => $this->gsoOfficer->id,
+            'delivery_code' => 'DEL-PROACTIVE-01',
+            'receipt_status' => 'RECEIVED',
+            'actual_delivery_date' => now()->toDateString(),
+        ]);
+        $delItem = DeliveryItem::query()->create([
+            'delivery_id' => $delivery->delivery_id,
+            'purchase_order_item_id' => $poItem->purchase_order_item_id,
+            'expected_quantity' => 8,
+            'received_quantity' => 8,
+            'damaged_quantity' => 0,
+            'missing_quantity' => 0,
+            'item_condition' => 'GOOD',
+        ]);
+
+        $verificationService = app(\App\Services\Delivery\DeliveryVerificationService::class);
+        $verificationService->create($delivery, $this->gsoOfficer, [
+            'verification_status' => 'APPROVED',
+            'verification_date' => now()->toDateString(),
+        ]);
+
+        $po->refresh();
+        $pr->refresh();
+        $inventory->refresh();
+
+        $this->assertSame('COMPLETED', (string) $po->status);
+        $this->assertSame('COMPLETED', (string) $pr->status);
+        $this->assertSame('10.00', (string) $inventory->available_stock);
+
+        // Since PR is completed, it should not appear in activeLowStockQueueByInventoryId
+        $response = $this->actingAs($this->gsoOfficer)
+            ->get(route('inventory.procurement-requests.index'));
+        $response->assertOk();
+    }
+
     public function test_delivery_can_be_received_when_all_delivered_items_are_damaged(): void
     {
         $context = $this->createVerifiedDeliveryContext($this->officeA, $this->officeUserA, $this->procurementOfficer, $this->gsoOfficer, 9089);
