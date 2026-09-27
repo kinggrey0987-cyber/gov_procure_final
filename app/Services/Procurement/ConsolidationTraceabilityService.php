@@ -327,6 +327,7 @@ class ConsolidationTraceabilityService
 
         // Approver / Placer attribution
         $approverData = null;
+        $executiveApprover = null;
         if ($purchaseOrder->approver instanceof User) {
             $roleCode = (string) ($purchaseOrder->approver->role?->code ?? '');
             $isExec = $roleCode === 'EXEC_OFFICER';
@@ -335,13 +336,28 @@ class ConsolidationTraceabilityService
                 'role' => $isExec ? 'Executive Officer / Municipal Mayor' : 'Procurement Unit / Authorized Placer',
                 'approved_at' => optional($purchaseOrder->date_approved ?? $purchaseOrder->updated_at)->format('M d, Y'),
             ];
+
+            if ($isExec) {
+                $executiveApprover = $approverData;
+            }
+        }
+
+        if ($executiveApprover === null) {
+            $mayor = User::query()
+                ->whereHas('role', fn ($q) => $q->where('code', 'EXEC_OFFICER'))
+                ->first();
+            $executiveApprover = [
+                'name' => (string) ($mayor?->name ?? 'Mayor Jeron'),
+                'role' => 'Executive Officer / Municipal Mayor',
+                'approved_at' => optional($purchaseOrder->date_approved ?? $purchaseOrder->updated_at)->format('M d, Y'),
+            ];
         }
 
         return [
             'is_consolidated' => $prTraceability['is_consolidated'] ?? false,
             'gso_forwarder' => $prTraceability['gso_forwarder'] ?? null,
             'procurement_officer' => $procurementOfficer,
-            'executive_approver' => $approverData,
+            'executive_approver' => $executiveApprover,
             'procurement_approver' => $approverData,
             'source_supply_requests' => $prTraceability['source_supply_requests'] ?? [],
             'requisitioning_signatories' => $prTraceability['requisitioning_signatories'] ?? [],

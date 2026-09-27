@@ -48,9 +48,17 @@ type PurchaseOrder = {
     } | null;
     creator?: {
         name?: string | null;
+        role?: {
+            code?: string | null;
+            name?: string | null;
+        } | null;
     } | null;
     approver?: {
         name?: string | null;
+        role?: {
+            code?: string | null;
+            name?: string | null;
+        } | null;
     } | null;
     date_approved?: string | null;
     items?: Array<{
@@ -238,10 +246,12 @@ type Props = {
     deliveries?: DeliveryRecord[];
     sourceDiscrepancyDelivery?: SourceDiscrepancyDelivery | null;
     attachments?: PoAttachment[];
+    mayorName?: string | null;
 };
 
 export default function PurchaseOrdersShow({
     purchaseOrder,
+    mayorName,
     isExecutive = false,
     isZeroCostReplacement: propsIsZeroCostReplacement,
     traceability,
@@ -1349,7 +1359,7 @@ export default function PurchaseOrdersShow({
                                                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Very truly yours,</p>
                                                     <div>
                                                         <p className="text-xs font-extrabold text-slate-950 uppercase">
-                                                            {purchaseOrder.approver?.name || 'Hon. Municipal Mayor'}
+                                                            {mayorName || (purchaseOrder.approver?.role?.code === 'EXEC_OFFICER' ? purchaseOrder.approver?.name : null) || traceability?.executive_approver?.name || 'Mayor Jeron'}
                                                         </p>
                                                         <p className="text-[11px] font-bold text-slate-800">Municipal Mayor / Head of the Procuring Entity</p>
                                                         <p className="text-[10px] text-slate-500">Municipality of Enrique B. Magalona</p>
@@ -1362,7 +1372,7 @@ export default function PurchaseOrdersShow({
                                                 <div className="p-2.5">
                                                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Prepared & Issued By:</p>
                                                     <p className="mt-1 text-xs font-bold text-slate-900">
-                                                        {purchaseOrder.creator?.name || traceability?.procurement_officer?.name || 'BAC Procurement Officer'}
+                                                        {purchaseOrder.creator?.name || traceability?.procurement_officer?.name || (purchaseOrder.approver?.role?.code !== 'EXEC_OFFICER' ? purchaseOrder.approver?.name : null) || 'BAC Procurement Officer'}
                                                     </p>
                                                     <p className="text-[10px] text-slate-600">BAC Procurement Unit / Secretariat</p>
                                                     <p className="text-[9px] text-slate-500 mt-0.5">Date Issued: {formatDate(purchaseOrder.created_at)}</p>

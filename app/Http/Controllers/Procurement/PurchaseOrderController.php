@@ -9,6 +9,7 @@ use App\Http\Requests\Procurement\UpdatePurchaseOrderRequest;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequest;
 use App\Models\Supplier;
+use App\Models\User;
 use App\Services\Documents\DocumentService;
 use App\Services\History\HistoryTimelineService;
 use App\Services\Procurement\PurchaseOrderService;
@@ -317,16 +318,27 @@ class PurchaseOrderController extends Controller
             }
         }
 
+        $mayor = null;
+        if ($purchaseOrder->approver instanceof User && ($purchaseOrder->approver->role?->code ?? '') === 'EXEC_OFFICER') {
+            $mayor = $purchaseOrder->approver;
+        } else {
+            $mayor = User::query()
+                ->whereHas('role', fn ($q) => $q->where('code', 'EXEC_OFFICER'))
+                ->first();
+        }
+        $mayorName = (string) ($mayor?->name ?? 'Mayor Jeron');
+
         return Inertia::render('Procurement/PurchaseOrders/Show', [
             'purchaseOrder' => $purchaseOrder->load([
                 'items.item.category',
                 'supplier',
-                'creator',
-                'approver',
+                'creator.role',
+                'approver.role',
                 'purchaseRequest.office',
                 'purchaseRequest.sourceDelivery.purchaseOrder',
                 'supplyRequest.requester',
             ]),
+            'mayorName' => $mayorName,
             'isExecutive' => $isExecutive,
             'isZeroCostReplacement' => (bool) $purchaseOrder->is_zero_cost_replacement,
             'traceability' => $this->traceabilityService->resolveForPurchaseOrder($purchaseOrder),
