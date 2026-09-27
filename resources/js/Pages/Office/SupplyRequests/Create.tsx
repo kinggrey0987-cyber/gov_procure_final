@@ -117,6 +117,9 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
 
     const totalRequestedItems = useMemo(() => {
         return form.data.items.reduce((sum, item) => {
+            if (!item.ppmp_item_id || item.ppmp_item_id.trim() === '') {
+                return sum;
+            }
             return sum + (Number(item.quantity_requested) || 0);
         }, 0);
     }, [form.data.items]);
@@ -578,17 +581,24 @@ export default function SupplyRequestCreate({ ppmpOptions, selectedPpmpId, ppmpI
                                                     min="1"
                                                     value={item.quantity_requested}
                                                     onChange={(event) => updateItem(index, { quantity_requested: event.target.value })}
-                                                    className="w-full rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium"
+                                                    disabled={!item.ppmp_item_id}
+                                                    className="w-full rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                                                     required
                                                 />
-                                                <div className="mt-0.5 text-[10px] text-slate-600">
-                                                    Requested: <strong className="text-slate-800">{reqQty} {option?.default_unit || 'units'}</strong>
-                                                    {piecesPerBox > 1 ? (
-                                                        <span className="text-indigo-600 font-semibold ml-1">
-                                                            = {reqPieces.toLocaleString()} total {subUnit}s
-                                                        </span>
-                                                    ) : null}
-                                                </div>
+                                                {item.ppmp_item_id ? (
+                                                    <div className="mt-0.5 text-[10px] text-slate-600">
+                                                        Requested: <strong className="text-slate-800">{reqQty} {option?.default_unit || 'units'}</strong>
+                                                        {piecesPerBox > 1 ? (
+                                                            <span className="text-indigo-600 font-semibold ml-1">
+                                                                = {reqPieces.toLocaleString()} total {subUnit}s
+                                                            </span>
+                                                        ) : null}
+                                                    </div>
+                                                ) : (
+                                                    <div className="mt-0.5 text-[10px] text-slate-400 italic">
+                                                        Select a PPMP item first to set quantity
+                                                    </div>
+                                                )}
                                                 {form.errors[`items.${index}.quantity_requested`] ? <p className="mt-0.5 text-[10px] text-rose-600">{form.errors[`items.${index}.quantity_requested`]}</p> : null}
                                             </label>
 
