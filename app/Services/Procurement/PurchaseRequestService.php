@@ -1138,7 +1138,7 @@ class PurchaseRequestService
         }
 
         $supplyRequests = SupplyRequest::query()
-            ->with(['items.item.inventory'])
+            ->with(['category', 'items.item.inventory', 'items.item.category', 'items.ppmpItem.itemCategory'])
             ->where('office_id', $officeId)
             ->whereIn('supply_request_id', $supplyRequestIds)
             ->get();
@@ -1167,6 +1167,32 @@ class PurchaseRequestService
         if ($eligible->count() < 2) {
             throw ValidationException::withMessages([
                 'supply_request_ids' => 'Consolidation requires at least 2 eligible supply requests to merge. For a single request, initiate a direct purchase request instead.',
+            ]);
+        }
+
+        // Enforce that all eligible requests belong to the same commodity category
+        $categoriesByRequest = $eligible->mapWithKeys(function (SupplyRequest $sr): array {
+            $catId = (int) ($sr->item_category_id
+                ?: ($sr->items->first()?->item?->item_category_id
+                    ?? $sr->items->first()?->ppmpItem?->item_category_id
+                    ?? 0));
+            $catName = (string) (
+                $sr->category?->category_name
+                ?? $sr->items->first()?->item?->category?->category_name
+                ?? $sr->items->first()?->ppmpItem?->itemCategory?->category_name
+                ?? 'General / Uncategorized'
+            );
+            return [(int) $sr->supply_request_id => ['id' => $catId, 'name' => $catName]];
+        });
+
+        $uniqueCatIds = $categoriesByRequest->pluck('id')->unique()->values();
+        if ($uniqueCatIds->count() > 1) {
+            $distinctNames = $categoriesByRequest->pluck('name')->unique()->implode(', ');
+            throw ValidationException::withMessages([
+                'supply_request_ids' => sprintf(
+                    'Consolidation requires all selected supply requests to belong to the same commodity category. Selected requests span multiple categories: %s.',
+                    $distinctNames
+                ),
             ]);
         }
 
@@ -1206,6 +1232,12 @@ class PurchaseRequestService
 
         return DB::transaction(function () use ($actor, $office, $eligible, $mergedItems, $primarySupplyRequest): PurchaseRequest {
             $sourceRequestCodes = $eligible->pluck('request_code')->implode(', ');
+            $categoryName = (string) (
+                $primarySupplyRequest->category?->category_name
+                ?? $primarySupplyRequest->items->first()?->item?->category?->category_name
+                ?? $primarySupplyRequest->items->first()?->ppmpItem?->itemCategory?->category_name
+                ?? 'General Supplies'
+            );
 
             $purchaseRequest = PurchaseRequest::query()->create([
                 'pr_number' => $this->generateNextPrNumber(),
@@ -1214,8 +1246,9 @@ class PurchaseRequestService
                 'requested_by' => (int) $actor->id,
                 'status' => 'OPEN',
                 'remarks' => sprintf(
-                    'Consolidated PR for %s from %d supply request(s): %s.',
+                    'Consolidated PR for %s [%s] from %d supply request(s): %s.',
                     (string) $office->name,
+                    $categoryName,
                     $eligible->count(),
                     $sourceRequestCodes,
                 ),

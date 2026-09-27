@@ -42,19 +42,26 @@ class RequestWorkflowController
             ? $this->officeSupplyRequestRows('', 0)
             : $allRows;
 
-        // Compute global shortage groups across all offices so the Consolidation Hub is always fully informed
-        // Only show offices with at least 2 pending shortages eligible for consolidation
+        // Compute global shortage groups across all offices and categories so the Consolidation Hub is always fully informed
+        // Only show groups with at least 2 pending shortages in the same category eligible for consolidation
         $officeShortageGroups = $shortageSourceRows
             ->where('stock_assessment', 'SHORTAGE_REQUIRES_PROCUREMENT')
             ->where('status', 'SUBMITTED')
             ->where('has_purchase_request', false)
-            ->groupBy(fn ($r) => (int) ($r['office']['id'] ?? 0))
-            ->filter(fn ($group, $id) => $id > 0 && $group->count() >= 2)
-            ->map(function ($group) {
+            ->groupBy(fn ($r) => ((int) ($r['office']['id'] ?? 0)) . '_' . ((int) ($r['item_category_id'] ?? 0)))
+            ->filter(function ($group, $key) {
+                [$officeId] = explode('_', (string) $key);
+                return (int) $officeId > 0 && $group->count() >= 2;
+            })
+            ->map(function ($group, $key) {
                 $first = $group->first();
                 return [
+                    'group_key' => (string) $key,
                     'id' => (int) $first['office']['id'],
+                    'office_id' => (int) $first['office']['id'],
                     'name' => (string) $first['office']['name'],
+                    'item_category_id' => $first['item_category_id'] ? (int) $first['item_category_id'] : null,
+                    'category_name' => (string) ($first['category_name'] ?? 'General Supplies'),
                     'count' => $group->count(),
                     'requests' => $group->values()->all(),
                 ];
@@ -136,8 +143,10 @@ class RequestWorkflowController
         $query = SupplyRequest::query()
             ->with([
                 'office',
+                'category',
                 'requester',
                 'items.item.inventory',
+                'items.item.category',
                 'purchaseRequests.sourceDelivery.purchaseOrder.supplyRequest',
                 'purchaseRequests.sourceClaim.supplyRequest',
                 'distributionRecords.items',
@@ -238,12 +247,21 @@ class RequestWorkflowController
         $isSubmitted = (string) $request->status === 'SUBMITTED';
         $canCreateInventoryDistribution = $isSubmitted && ($stockAssessment === 'STOCK_READY' || $hasAvailableStock) && ! $hasPurchaseRequest && $hasRemainingQuantity && ! $hasDraftDistribution;
 
+        $categoryId = (int) ($request->item_category_id ?: ($request->items->first()?->item?->item_category_id ?? 0));
+        $categoryName = (string) (
+            $request->category?->category_name
+            ?? $request->items->first()?->item?->category?->category_name
+            ?? 'General Supplies'
+        );
+
         return [
             'supply_request_id' => (int) $request->supply_request_id,
             'request_code' => (string) $request->request_code,
             'status' => (string) $request->status,
             'priority_level' => (string) $request->priority_level,
             'needed_by_date' => optional($request->needed_by_date)?->toDateString(),
+            'item_category_id' => $categoryId > 0 ? $categoryId : null,
+            'category_name' => $categoryName,
             'office' => $request->office ? [
                 'id' => (int) $request->office->id,
                 'name' => (string) $request->office->name,

@@ -17,6 +17,8 @@ type RequestRow = {
     supply_request_id: number;
     request_code: string;
     status: string;
+    item_category_id?: number | null;
+    category_name?: string | null;
     priority_level: string;
     needed_by_date?: string | null;
     office?: { id?: number; name?: string | null } | null;
@@ -57,8 +59,12 @@ type Props = {
         page?: number | null;
     };
     officeShortageGroups?: Array<{
+        group_key?: string;
         id: number;
+        office_id?: number;
         name: string;
+        item_category_id?: number | null;
+        category_name?: string | null;
         count: number;
         requests?: RequestRow[];
     }>;
@@ -139,21 +145,31 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
         });
     };
 
-    const [selectedConsolidationOfficeId, setSelectedConsolidationOfficeId] = useState<number | null>(null);
+    const [selectedConsolidationGroupKey, setSelectedConsolidationGroupKey] = useState<string | null>(null);
 
-    // Offices with pending shortages eligible for consolidation (global from server or derived from rows)
-    // Only includes offices with at least 2 pending shortage requests
+    // Offices with pending shortages eligible for consolidation (grouped by Office AND Commodity Category)
+    // Only includes groups with at least 2 pending shortage requests in the same category
     const officeShortageGroups = useMemo(() => {
         if (initialShortageGroups && initialShortageGroups.length > 0) {
             return initialShortageGroups.filter((g) => g.count >= 2);
         }
-        const map = new Map<number, { id: number; name: string; count: number; requests: RequestRow[] }>();
+        const map = new Map<string, { group_key: string; id: number; office_id: number; name: string; item_category_id: number | null; category_name: string; count: number; requests: RequestRow[] }>();
         requests.data.forEach((r) => {
             if (r.stock_assessment === 'SHORTAGE_REQUIRES_PROCUREMENT' && r.status === 'SUBMITTED' && !r.has_purchase_request && r.office?.id) {
-                const existing = map.get(r.office.id) ?? { id: r.office.id, name: r.office.name ?? 'Office', count: 0, requests: [] };
+                const key = `${r.office.id}_${r.item_category_id ?? 0}`;
+                const existing = map.get(key) ?? {
+                    group_key: key,
+                    id: r.office.id,
+                    office_id: r.office.id,
+                    name: r.office.name ?? 'Office',
+                    item_category_id: r.item_category_id ?? null,
+                    category_name: r.category_name ?? 'General Supplies',
+                    count: 0,
+                    requests: [],
+                };
                 existing.count++;
                 existing.requests.push(r);
-                map.set(r.office.id, existing);
+                map.set(key, existing);
             }
         });
         return Array.from(map.values())
@@ -161,20 +177,21 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
             .sort((a, b) => b.count - a.count);
     }, [initialShortageGroups, requests.data]);
 
-    // Active office for consolidation
+    // Active group for consolidation
     const activeConsolidationOffice = useMemo(() => {
         if (officeShortageGroups.length === 0) return null;
-        if (selectedConsolidationOfficeId) {
-            const found = officeShortageGroups.find((g) => g.id === selectedConsolidationOfficeId);
+        if (selectedConsolidationGroupKey) {
+            const found = officeShortageGroups.find((g) => (g.group_key ?? `${g.id}_${g.item_category_id ?? 0}`) === selectedConsolidationGroupKey);
             if (found) return found;
         }
         return officeShortageGroups[0];
-    }, [officeShortageGroups, selectedConsolidationOfficeId]);
+    }, [officeShortageGroups, selectedConsolidationGroupKey]);
 
-    const activeOfficeId = activeConsolidationOffice?.id ?? null;
+    const activeOfficeId = activeConsolidationOffice?.office_id ?? activeConsolidationOffice?.id ?? null;
     const targetOfficeName = activeConsolidationOffice?.name ?? null;
+    const targetCategoryName = activeConsolidationOffice?.category_name ?? 'General Supplies';
 
-    // Eligible requests for the active office
+    // Eligible requests for the active office and category
     const consolidatableRequests = useMemo(() => {
         if (!activeConsolidationOffice) return [];
         if (activeConsolidationOffice.requests && activeConsolidationOffice.requests.length > 0) {
@@ -185,10 +202,11 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
                 r.stock_assessment === 'SHORTAGE_REQUIRES_PROCUREMENT' &&
                 r.status === 'SUBMITTED' &&
                 !r.has_purchase_request &&
-                r.office?.id === activeConsolidationOffice.id
+                r.office?.id === activeOfficeId &&
+                (r.item_category_id ?? null) === (activeConsolidationOffice.item_category_id ?? null)
             );
         });
-    }, [activeConsolidationOffice, requests.data]);
+    }, [activeConsolidationOffice, activeOfficeId, requests.data]);
 
     // Automatically pre-select all eligible requests for the active office
     useEffect(() => {
@@ -197,13 +215,19 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
         } else {
             setSelectedRequestIds(new Set());
         }
-    }, [activeConsolidationOffice?.id, consolidatableRequests.length]);
+    }, [activeConsolidationOffice?.group_key, activeConsolidationOffice?.id, consolidatableRequests.length]);
 
     const selectedRequests = useMemo(() => {
         return consolidatableRequests.filter((r) => selectedRequestIds.has(r.supply_request_id));
     }, [consolidatableRequests, selectedRequestIds]);
 
-    const canConsolidate = activeOfficeId !== null && selectedRequestIds.size >= 2;
+    const allSameCategory = useMemo(() => {
+        if (selectedRequests.length < 2) return true;
+        const firstCatId = selectedRequests[0]?.item_category_id ?? null;
+        return selectedRequests.every((r) => (r.item_category_id ?? null) === firstCatId);
+    }, [selectedRequests]);
+
+    const canConsolidate = activeOfficeId !== null && selectedRequestIds.size >= 2 && allSameCategory;
 
     const toggleSelect = (id: number) => {
         setSelectedRequestIds((prev) => {
@@ -380,12 +404,13 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
                                 <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-200/90 bg-slate-100/90 p-1.5 shadow-2xs">
                                     <span className="px-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">Department:</span>
                                     {officeShortageGroups.map((g) => {
-                                        const isSelected = g.id === activeOfficeId;
+                                        const groupKey = g.group_key ?? `${g.id}_${g.item_category_id ?? 0}`;
+                                        const isSelected = (activeConsolidationOffice?.group_key ?? `${activeConsolidationOffice?.id}_${activeConsolidationOffice?.item_category_id ?? 0}`) === groupKey;
                                         return (
                                             <button
-                                                key={g.id}
+                                                key={groupKey}
                                                 type="button"
-                                                onClick={() => setSelectedConsolidationOfficeId(g.id)}
+                                                onClick={() => setSelectedConsolidationGroupKey(groupKey)}
                                                 className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                                                     isSelected
                                                         ? 'border border-slate-300/80 bg-white font-bold text-slate-900 shadow-2xs'
@@ -393,8 +418,13 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
                                                 }`}
                                             >
                                                 <span>{g.name}</span>
+                                                <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
+                                                    isSelected ? 'bg-red-50 text-red-700 border border-red-200/60' : 'bg-slate-200/80 text-slate-700'
+                                                }`}>
+                                                    {g.category_name || 'General'}
+                                                </span>
                                                 <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
-                                                    isSelected ? 'bg-red-100 text-red-700' : 'bg-slate-200 text-slate-600'
+                                                    isSelected ? 'bg-red-600 text-white' : 'bg-slate-300 text-slate-700'
                                                 }`}>
                                                     {g.count}
                                                 </span>
@@ -415,6 +445,9 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
                                     <div className="flex flex-wrap items-center gap-2">
                                         <span className="text-xs font-medium text-slate-500">Target Office:</span>
                                         <span className="text-sm font-bold text-slate-900">{targetOfficeName}</span>
+                                        <span className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-700">
+                                            🏷️ {targetCategoryName}
+                                        </span>
                                         <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
                                             {consolidatableRequests.length} pending requests
                                         </span>
@@ -454,6 +487,20 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
                             </div>
                         </div>
 
+                        {!allSameCategory && (
+                            <div className="mt-3 flex items-center gap-2.5 rounded-xl border border-amber-300 bg-amber-50 p-3.5 text-xs text-amber-900 shadow-2xs">
+                                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-200 text-amber-800 font-bold">
+                                    ⚠️
+                                </span>
+                                <div>
+                                    <p className="font-bold">Commodity Category Mismatch</p>
+                                    <p className="mt-0.5 text-amber-800">
+                                        Selected requests belong to different commodity categories. In accordance with government procurement regulations, consolidated purchase requests must only merge requests within the same category.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Interactive Request Cards */}
                         <div className="mt-4 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
                             {consolidatableRequests.map((request) => {
@@ -482,6 +529,11 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
                                                     <span className="font-mono text-xs font-bold text-slate-800">
                                                         {request.request_code}
                                                     </span>
+                                                    {request.category_name && (
+                                                        <span className="inline-flex rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+                                                            {request.category_name}
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 <div className="flex items-center gap-1.5 flex-wrap justify-end">
                                                     {request.priority_level?.toUpperCase() === 'URGENT' && (
@@ -783,7 +835,7 @@ export default function OfficeSupplyRequestsIndex({ requests, offices, filters, 
                                     Forward Consolidated PR to BAC
                                 </h3>
                                 <p className="text-xs text-slate-500">
-                                    Consolidating for {targetOfficeName} • {selectedRequestIds.size} Supply Request(s)
+                                    Consolidating for {targetOfficeName} • Commodity: <strong className="text-slate-800">{targetCategoryName}</strong> • {selectedRequestIds.size} Supply Request(s)
                                 </p>
                             </div>
                         </div>
