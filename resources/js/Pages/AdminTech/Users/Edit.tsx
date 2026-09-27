@@ -52,7 +52,7 @@ export default function EditUser({ userRecord, roles, offices }: Props) {
     const mayorOffice = offices.find((o) => o.code === 'MAYOR_OFFICE');
     const bacOffice = offices.find((o) => o.code === 'BAC');
     const gsoOffice = offices.find((o) => o.code === 'GSO');
-    const lineOffices = offices.filter((o) => !['MAYOR_OFFICE', 'BAC', 'TECH_ADMIN'].includes(o.code));
+    const lineOffices = offices.filter((o) => !['MAYOR_OFFICE', 'BAC', 'TECH_ADMIN', 'GSO'].includes(o.code));
 
     useEffect(() => {
         if (isAdminRole) {
@@ -88,7 +88,7 @@ export default function EditUser({ userRecord, roles, offices }: Props) {
         }
 
         // For line office users, ensure office_id is not one of the institutional offices
-        const isNonRequesting = [mayorOffice?.id, bacOffice?.id].filter(Boolean).map(String).includes(form.data.office_id);
+        const isNonRequesting = [mayorOffice?.id, bacOffice?.id, gsoOffice?.id].filter(Boolean).map(String).includes(form.data.office_id);
         if (!form.data.office_id || isNonRequesting) {
             const firstLine = lineOffices[0] || offices[0];
             if (firstLine) {

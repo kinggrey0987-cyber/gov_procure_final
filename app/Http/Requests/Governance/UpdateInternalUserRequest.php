@@ -81,6 +81,15 @@ class UpdateInternalUserRequest extends FormRequest
 
             if ($officeCode === self::TECHNICAL_OFFICE_CODE) {
                 $validator->errors()->add('office_id', 'Technical Administration is reserved for Admin accounts.');
+
+                return;
+            }
+
+            if ($roleCode === UserRole::OFFICE_USER->value && $officeCode === 'GSO') {
+                $validator->errors()->add(
+                    'office_id',
+                    'General Services Office is reserved for GSO inventory officers and cannot be assigned to office requisition users.',
+                );
             }
         });
     }

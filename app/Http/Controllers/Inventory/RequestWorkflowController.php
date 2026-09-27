@@ -345,6 +345,7 @@ class RequestWorkflowController
     private function officeOptions(): Collection
     {
         return Office::query()
+            ->where('code', '!=', 'GSO')
             ->orderBy('name', 'asc')
             ->get(['id', 'name'])
             ->map(fn (Office $office): array => [

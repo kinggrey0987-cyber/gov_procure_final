@@ -311,6 +311,41 @@ class AdminManagementCrudTest extends TestCase
             ->assertSessionHasErrors('office_id');
     }
 
+    public function test_office_user_cannot_be_assigned_to_gso_office(): void
+    {
+        $roleOfficeUser = $this->roleByCode(UserRole::OFFICE_USER->value);
+        $gsoOffice = Office::query()->firstOrCreate(
+            ['code' => 'GSO'],
+            ['name' => 'General Services Office', 'description' => 'GSO office', 'is_active' => true]
+        );
+
+        // Attempting to create an OFFICE_USER assigned to GSO must fail
+        $this->actingAs($this->admin)
+            ->post(route('admin-tech.users.store'), [
+                'name' => 'GSO Office User Attempt',
+                'email' => 'gso.office.user@gsc.local',
+                'emp_id' => 'EMP-GSO-USER-01',
+                'password' => 'TempPass#12345',
+                'password_confirmation' => 'TempPass#12345',
+                'role_id' => $roleOfficeUser->id,
+                'office_id' => $gsoOffice->id,
+            ])
+            ->assertSessionHasErrors(['office_id' => 'General Services Office is reserved for GSO inventory officers and cannot be assigned to office requisition users.']);
+
+        $staff = $this->createUser(UserRole::OFFICE_USER, $this->office, 'staff.update@gsc.local');
+
+        // Attempting to update an existing OFFICE_USER to GSO office must fail
+        $this->actingAs($this->admin)
+            ->put(route('admin-tech.users.update', $staff->id), [
+                'name' => 'Staff GSO Attempt',
+                'email' => 'staff.update@gsc.local',
+                'emp_id' => 'EMP-STAFF-001',
+                'role_id' => $roleOfficeUser->id,
+                'office_id' => $gsoOffice->id,
+            ])
+            ->assertSessionHasErrors(['office_id' => 'General Services Office is reserved for GSO inventory officers and cannot be assigned to office requisition users.']);
+    }
+
     public function test_edit_flow_enforces_admin_and_non_admin_office_rules(): void
     {
         $roleOfficeUser = $this->roleByCode(UserRole::OFFICE_USER->value);
