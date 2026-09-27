@@ -132,13 +132,13 @@ class DistributionAvailableStockGuardTest extends TestCase
             'delivery_id' => $delivery->delivery_id,
             'purchase_order_item_id' => $poi->purchase_order_item_id,
             'expected_quantity' => 16,
-            'received_quantity' => 15,
-            'damaged_quantity' => 2,
-            'missing_quantity' => 1,
+            'received_quantity' => 16,
+            'damaged_quantity' => 0,
+            'missing_quantity' => 0,
             'item_status' => 'VERIFIED',
         ]);
 
-        // Distribution 1: released 16 items (all 12 accepted delivery items + 4 or so)
+        // Distribution 1: released 16 items (all 16 accepted delivery items)
         $dist1 = DistributionRecord::query()->create([
             'distribution_code' => 'DIST-2026-09-0001',
             'supply_request_id' => $sr->supply_request_id,
@@ -748,4 +748,385 @@ class DistributionAvailableStockGuardTest extends TestCase
         $trackingResponse = $this->actingAs($officeUser)->get(route('office.supply-requests.index'));
         $trackingResponse->assertOk();
     }
+
+    public function test_exact_three_delivery_three_distribution_scenario_prevents_drain_and_succeeds(): void
+    {
+        $gsoRole = Role::query()->firstOrCreate(['code' => UserRole::GSO_OFFICER->value], ['name' => 'GSO Officer']);
+        $gsoUser = User::factory()->create(['role_id' => $gsoRole->id]);
+
+        $office = Office::factory()->create(['code' => 'MPDO', 'name' => 'Municipal Planning and Development Office']);
+        $officeRole = Role::query()->firstOrCreate(['code' => UserRole::OFFICE_USER->value], ['name' => 'Office User']);
+        $officeUser = User::factory()->create(['role_id' => $officeRole->id, 'office_id' => $office->id]);
+
+        $category = ItemCategory::query()->create([
+            'category_name' => 'Office Supplies',
+            'status' => 'ACTIVE',
+        ]);
+
+        $item = Item::query()->create([
+            'item_code' => 'ITEM-BOND-A4-EXACT',
+            'item_name' => 'Bond Paper, A4 (80 GSM)',
+            'item_category_id' => $category->item_category_id,
+            'default_unit' => 'box',
+            'status' => 'ACTIVE',
+        ]);
+
+        // Initially 4 boxes in stock
+        $inventory = Inventory::query()->create([
+            'item_id' => $item->item_id,
+            'stock_on_hand' => 4,
+            'available_stock' => 4,
+            'reserved_quantity' => 0,
+            'released_quantity' => 0,
+            'low_stock_threshold' => 5,
+        ]);
+
+        // Root request: 50 boxes requested
+        $rootSr = SupplyRequest::query()->create([
+            'request_code' => 'SR-MPDO-2026-09-0003',
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(7)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Annual Office Supplies',
+            'priority_level' => 'NORMAL',
+            'status' => 'APPROVED',
+        ]);
+
+        $rootSri = SupplyRequestItem::query()->create([
+            'supply_request_id' => $rootSr->supply_request_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Bond Paper, A4 (80 GSM)',
+            'quantity_requested' => 50,
+        ]);
+
+        // 46 sent for procurement
+        $pr1 = PurchaseRequest::query()->create([
+            'pr_number' => 'PR-2026-09-0001',
+            'supply_request_id' => $rootSr->supply_request_id,
+            'office_id' => $office->id,
+            'requested_by' => $gsoUser->id,
+            'status' => 'APPROVED',
+        ]);
+
+        $supplier = Supplier::query()->create([
+            'supplier_name' => 'Supplier Agent Inc',
+            'contact_person' => 'Supplier Agent',
+            'email' => 'supplier@agent.local',
+            'phone' => '09123456789',
+            'address' => 'Supplier Address',
+            'status' => 'ACTIVE',
+        ]);
+
+        $po1 = PurchaseOrder::query()->create([
+            'po_number' => 'PO-2026-09-0001',
+            'purchase_request_id' => $pr1->purchase_request_id,
+            'supply_request_id' => $rootSr->supply_request_id,
+            'supplier_id' => $supplier->supplier_id,
+            'created_by' => $gsoUser->id,
+            'procurement_method' => 'PUBLIC_BIDDING',
+            'status' => 'APPROVED',
+            'total_amount' => 4600,
+        ]);
+
+        $poi1 = PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $po1->purchase_order_id,
+            'supply_request_item_id' => $rootSri->supply_request_item_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Bond Paper, A4 (80 GSM)',
+            'quantity_ordered' => 46,
+            'unit' => 'box',
+            'unit_price' => 100,
+            'total_price' => 4600,
+        ]);
+
+        // Delivery 1 arrives: 36 received, 5 damaged, 5 missing -> 36 accepted (or 36 received, 0 damaged/missing)
+        // User scenario: 1st delivery 36 accepted, 5 damaged, 5 missing (total received = 46)
+        $delivery1 = Delivery::query()->create([
+            'delivery_code' => 'DEL-2026-09-0001',
+            'purchase_order_id' => $po1->purchase_order_id,
+            'supplier_id' => $supplier->supplier_id,
+            'received_by' => $gsoUser->id,
+            'actual_delivery_date' => now()->toDateString(),
+            'status' => 'VERIFIED',
+            'receipt_status' => 'PARTIALLY_RECEIVED',
+        ]);
+
+        DeliveryItem::query()->create([
+            'delivery_id' => $delivery1->delivery_id,
+            'purchase_order_item_id' => $poi1->purchase_order_item_id,
+            'expected_quantity' => 46,
+            'received_quantity' => 46,
+            'damaged_quantity' => 5,
+            'missing_quantity' => 5,
+            'item_status' => 'PARTIALLY_RECEIVED',
+        ]);
+
+        // Inventory is updated with 36 accepted units (4 initial + 36 = 40)
+        $inventory->forceFill([
+            'stock_on_hand' => 40,
+            'available_stock' => 40,
+        ])->save();
+
+        // Follow-up SR 2 created for 10 discrepancy units
+        $childSr1 = SupplyRequest::query()->create([
+            'request_code' => 'SR-MPDO-2026-09-0004',
+            'office_id' => $office->id,
+            'requested_by' => $gsoUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(7)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Discrepancy replacement for DEL-2026-09-0001',
+            'priority_level' => 'HIGH',
+            'status' => 'SUBMITTED',
+        ]);
+
+        $childSri1 = SupplyRequestItem::query()->create([
+            'supply_request_id' => $childSr1->supply_request_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Bond Paper, A4 (80 GSM)',
+            'quantity_requested' => 10,
+        ]);
+
+        $pr2 = PurchaseRequest::query()->create([
+            'pr_number' => 'PR-2026-09-0002',
+            'supply_request_id' => $childSr1->supply_request_id,
+            'source_delivery_id' => $delivery1->delivery_id,
+            'source_type' => 'PARTIAL_DELIVERY_FOLLOW_UP',
+            'office_id' => $office->id,
+            'requested_by' => $gsoUser->id,
+            'status' => 'APPROVED',
+        ]);
+
+        $po2 = PurchaseOrder::query()->create([
+            'po_number' => 'PO-2026-09-0002',
+            'purchase_request_id' => $pr2->purchase_request_id,
+            'supply_request_id' => $childSr1->supply_request_id,
+            'supplier_id' => $supplier->supplier_id,
+            'created_by' => $gsoUser->id,
+            'procurement_method' => 'SHOPPING',
+            'status' => 'APPROVED',
+            'total_amount' => 1000,
+        ]);
+
+        $poi2 = PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $po2->purchase_order_id,
+            'supply_request_item_id' => $childSri1->supply_request_item_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Bond Paper, A4 (80 GSM)',
+            'quantity_ordered' => 10,
+            'unit' => 'box',
+            'unit_price' => 100,
+            'total_price' => 1000,
+        ]);
+
+        // Delivery 2 arrives: 10 received, 9 accepted, 1 damaged
+        $delivery2 = Delivery::query()->create([
+            'delivery_code' => 'DEL-2026-09-0002',
+            'purchase_order_id' => $po2->purchase_order_id,
+            'supplier_id' => $supplier->supplier_id,
+            'received_by' => $gsoUser->id,
+            'actual_delivery_date' => now()->toDateString(),
+            'status' => 'VERIFIED',
+            'receipt_status' => 'PARTIALLY_RECEIVED',
+        ]);
+
+        DeliveryItem::query()->create([
+            'delivery_id' => $delivery2->delivery_id,
+            'purchase_order_item_id' => $poi2->purchase_order_item_id,
+            'expected_quantity' => 10,
+            'received_quantity' => 10,
+            'damaged_quantity' => 1,
+            'missing_quantity' => 0,
+            'item_status' => 'PARTIALLY_RECEIVED',
+        ]);
+
+        // Inventory is updated with 9 accepted units from Delivery 2
+        // Warehouse has 40 + 9 = 49 units
+        $inventory->forceFill([
+            'stock_on_hand' => 49,
+            'available_stock' => 49,
+        ])->save();
+
+        // Follow-up SR 3 created for 1 discrepancy unit
+        $childSr2 = SupplyRequest::query()->create([
+            'request_code' => 'SR-MPDO-2026-09-0005',
+            'office_id' => $office->id,
+            'requested_by' => $gsoUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(7)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Discrepancy replacement for DEL-2026-09-0002',
+            'priority_level' => 'HIGH',
+            'status' => 'SUBMITTED',
+        ]);
+
+        $childSri2 = SupplyRequestItem::query()->create([
+            'supply_request_id' => $childSr2->supply_request_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Bond Paper, A4 (80 GSM)',
+            'quantity_requested' => 1,
+        ]);
+
+        $pr3 = PurchaseRequest::query()->create([
+            'pr_number' => 'PR-2026-09-0003',
+            'supply_request_id' => $childSr2->supply_request_id,
+            'source_delivery_id' => $delivery2->delivery_id,
+            'source_type' => 'PARTIAL_DELIVERY_FOLLOW_UP',
+            'office_id' => $office->id,
+            'requested_by' => $gsoUser->id,
+            'status' => 'APPROVED',
+        ]);
+
+        $po3 = PurchaseOrder::query()->create([
+            'po_number' => 'PO-2026-09-0003',
+            'purchase_request_id' => $pr3->purchase_request_id,
+            'supply_request_id' => $childSr2->supply_request_id,
+            'supplier_id' => $supplier->supplier_id,
+            'created_by' => $gsoUser->id,
+            'procurement_method' => 'DIRECT_CONTRACTING',
+            'status' => 'APPROVED',
+            'total_amount' => 100,
+        ]);
+
+        $poi3 = PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $po3->purchase_order_id,
+            'supply_request_item_id' => $childSri2->supply_request_item_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Bond Paper, A4 (80 GSM)',
+            'quantity_ordered' => 1,
+            'unit' => 'box',
+            'unit_price' => 100,
+            'total_price' => 100,
+        ]);
+
+        // Delivery 3 arrives: 1 received, 1 accepted
+        $delivery3 = Delivery::query()->create([
+            'delivery_code' => 'DEL-2026-09-0003',
+            'purchase_order_id' => $po3->purchase_order_id,
+            'supplier_id' => $supplier->supplier_id,
+            'received_by' => $gsoUser->id,
+            'actual_delivery_date' => now()->toDateString(),
+            'status' => 'VERIFIED',
+            'receipt_status' => 'VERIFIED',
+        ]);
+
+        DeliveryItem::query()->create([
+            'delivery_id' => $delivery3->delivery_id,
+            'purchase_order_item_id' => $poi3->purchase_order_item_id,
+            'expected_quantity' => 1,
+            'received_quantity' => 1,
+            'damaged_quantity' => 0,
+            'missing_quantity' => 0,
+            'item_status' => 'VERIFIED',
+        ]);
+
+        // Warehouse total: 49 + 1 = 50 units (4 warehouse + 36 del1 + 9 del2 + 1 del3)
+        $inventory->forceFill([
+            'stock_on_hand' => 50,
+            'available_stock' => 50,
+        ])->save();
+
+        // NOW: Suppose Distribution 1 is created for Delivery 1 releasing only the 36 delivery portion
+        $dist1 = DistributionRecord::query()->create([
+            'distribution_code' => 'DIST-2026-09-0001',
+            'supply_request_id' => $rootSr->supply_request_id,
+            'delivery_id' => $delivery1->delivery_id,
+            'office_id' => $office->id,
+            'prepared_by' => $gsoUser->id,
+            'status' => 'RELEASED',
+        ]);
+
+        // Release the 36 delivery portion
+        $distService = app(\App\Services\Inventory\DistributionRecordService::class);
+        $distService->addDistributionItem($dist1, $gsoUser, [
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Bond Paper, A4 (80 GSM)',
+            'quantity_released' => 36,
+            'unit' => 'box',
+            'remarks' => 'Automatically released against Delivery 1',
+        ]);
+
+        // Warehouse available_stock deducted 36: now 14 units left (4 initial + 9 del2 + 1 del3)
+        $inventory->refresh();
+        $this->assertEquals(14.0, (float) $inventory->available_stock);
+
+        // When viewing Distribution 1 show page:
+        // Free warehouse stock should be 4 (not 14! Delivery 2's 9 units and Delivery 3's 1 unit must NOT be shown as free stock)
+        $showResponse1 = $this->actingAs($gsoUser)->get(route('inventory.distribution-records.show', $dist1->distribution_record_id));
+        $showResponse1->assertOk();
+        $unreleased = $showResponse1->viewData('page')['props']['unreleased_stock_items'];
+        $this->assertNotEmpty($unreleased);
+        $this->assertEquals(4.0, (float) $unreleased[0]['releasable_quantity'], 'Only the 4 initial warehouse units should be eligible for release on Distribution 1.');
+
+        // User releases the 4 warehouse units into Distribution 1
+        $this->actingAs($gsoUser)->post(route('inventory.distribution-records.release-available-stock', $dist1->distribution_record_id));
+        $this->assertEquals(40.0, (float) $dist1->fresh()->items->sum('quantity_released'));
+
+        // After releasing the 4 warehouse units:
+        // 1) Warehouse available stock should now be 10 (9 from Del 2 + 1 from Del 3)
+        $inventory->refresh();
+        $this->assertEquals(10.0, (float) $inventory->available_stock);
+
+        // 2) Viewing Distribution 1: unreleased_stock_items MUST BE EMPTY!
+        $showResponse2 = $this->actingAs($gsoUser)->get(route('inventory.distribution-records.show', $dist1->distribution_record_id));
+        $showResponse2->assertOk();
+        $unreleasedAfter = $showResponse2->viewData('page')['props']['unreleased_stock_items'];
+        $this->assertEmpty($unreleasedAfter, 'No more warehouse stock prompts should appear for Distribution 1.');
+
+        // 3) Items table in Distribution 1 show page: max_releasable must be 0
+        $itemsProp = $showResponse2->viewData('page')['props']['record']['supply_request']['items'];
+        $this->assertEquals(0.0, (float) $itemsProp[0]['max_releasable']);
+
+        // 4) Calling releaseAvailableStock again must NOT release any more units
+        $this->actingAs($gsoUser)->post(route('inventory.distribution-records.release-available-stock', $dist1->distribution_record_id));
+        $this->assertEquals(40.0, (float) $dist1->fresh()->items->sum('quantity_released'));
+
+        // 5) Trying to manually add any item to Distribution 1 MUST fail validation
+        $threwValidation = false;
+        try {
+            $distService->addDistributionItem($dist1, $gsoUser, [
+                'item_id' => $item->item_id,
+                'item_name_snapshot' => 'Bond Paper, A4 (80 GSM)',
+                'quantity_released' => 4,
+                'unit' => 'box',
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $threwValidation = true;
+        }
+        $this->assertTrue($threwValidation, 'Adding more items to Distribution 1 must be rejected by validation.');
+
+        // 6) Now user releases Distribution 2 for Delivery 2 (SR-MPDO-2026-09-0004)
+        // Must NOT fail with "Released quantity cannot exceed available stock."!
+        $dist2 = $distService->createRecordWithAutomaticRelease($gsoUser, [
+            'supply_request_id' => $childSr1->supply_request_id,
+            'delivery_id' => $delivery2->delivery_id,
+            'office_id' => $office->id,
+        ]);
+        $this->assertEquals(9.0, (float) $dist2->items->sum('quantity_released'));
+
+        // Warehouse available stock should now be 1 (for Delivery 3)
+        $inventory->refresh();
+        $this->assertEquals(1.0, (float) $inventory->available_stock);
+
+        // 7) Now user releases Distribution 3 for Delivery 3 (SR-MPDO-2026-09-0005)
+        $dist3 = $distService->createRecordWithAutomaticRelease($gsoUser, [
+            'supply_request_id' => $childSr2->supply_request_id,
+            'delivery_id' => $delivery3->delivery_id,
+            'office_id' => $office->id,
+        ]);
+        $this->assertEquals(1.0, (float) $dist3->items->sum('quantity_released'));
+
+        // Warehouse available stock is now 0 (all 50 units fully released)
+        $inventory->refresh();
+        $this->assertEquals(0.0, (float) $inventory->available_stock);
+
+        // Total distributed across all 3 distributions: 40 + 9 + 1 = 50!
+        $totalReleased = (float) $dist1->fresh()->items->sum('quantity_released')
+            + (float) $dist2->fresh()->items->sum('quantity_released')
+            + (float) $dist3->fresh()->items->sum('quantity_released');
+        $this->assertEquals(50.0, $totalReleased);
+    }
 }
+
