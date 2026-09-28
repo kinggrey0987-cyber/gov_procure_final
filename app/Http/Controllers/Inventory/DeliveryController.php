@@ -108,29 +108,35 @@ class DeliveryController
 
         $delivery->load(['purchaseOrder', 'supplier', 'receiver', 'items.purchaseOrderItem.item', 'verifications.verifier']);
 
-        $deliveryMovementMap = InventoryMovement::query()
+        $deliveryMovementsByItemId = InventoryMovement::query()
+            ->with('inventory:inventory_id,item_id')
             ->where('movement_type', 'DELIVERY_RECEIPT')
             ->where('reference_type', Delivery::class)
             ->where('reference_id', (int) $delivery->delivery_id)
             ->get()
-            ->keyBy('inventory_id');
+            ->keyBy(fn (InventoryMovement $movement): int => (int) ($movement->inventory?->item_id ?? 0));
 
         $items = collect();
         if ($delivery->relationLoaded('items') && $delivery->items instanceof \Illuminate\Database\Eloquent\Collection) {
-            $items = $delivery->items->map(fn ($item): array => [
-                'accepted_quantity' => max((float) $item->received_quantity - (float) $item->damaged_quantity, 0),
-                'delivery_item_id' => (int) $item->delivery_item_id,
-                'expected_quantity' => (float) $item->expected_quantity,
-                'received_quantity' => (float) $item->received_quantity,
-                'damaged_quantity' => (float) $item->damaged_quantity,
-                'missing_quantity' => (float) $item->missing_quantity,
-                'item_condition' => $item->item_condition,
-                'inventory_synced_quantity' => (float) ($deliveryMovementMap->first()?->quantity ?? 0),
-                'item' => ($item->relationLoaded('purchaseOrderItem') && $item->purchaseOrderItem && $item->purchaseOrderItem->relationLoaded('item') && $item->purchaseOrderItem->item) ? [
-                    'item_id' => (int) $item->purchaseOrderItem->item->item_id,
-                    'item_name' => (string) $item->purchaseOrderItem->item->item_name,
-                ] : null,
-            ])->values();
+            $items = $delivery->items->map(function ($item) use ($deliveryMovementsByItemId): array {
+                $itemId = (int) ($item->purchaseOrderItem?->item_id ?? $item->item?->item_id ?? 0);
+                $matchedMovement = $itemId > 0 ? $deliveryMovementsByItemId->get($itemId) : null;
+
+                return [
+                    'accepted_quantity' => max((float) $item->received_quantity - (float) $item->damaged_quantity, 0),
+                    'delivery_item_id' => (int) $item->delivery_item_id,
+                    'expected_quantity' => (float) $item->expected_quantity,
+                    'received_quantity' => (float) $item->received_quantity,
+                    'damaged_quantity' => (float) $item->damaged_quantity,
+                    'missing_quantity' => (float) $item->missing_quantity,
+                    'item_condition' => $item->item_condition,
+                    'inventory_synced_quantity' => (float) ($matchedMovement?->quantity ?? 0),
+                    'item' => ($item->relationLoaded('purchaseOrderItem') && $item->purchaseOrderItem && $item->purchaseOrderItem->relationLoaded('item') && $item->purchaseOrderItem->item) ? [
+                        'item_id' => (int) $item->purchaseOrderItem->item->item_id,
+                        'item_name' => (string) $item->purchaseOrderItem->item->item_name,
+                    ] : null,
+                ];
+            })->values();
         }
 
         $verifications = collect();

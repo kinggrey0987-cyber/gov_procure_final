@@ -791,7 +791,7 @@ function SummaryCard({
 function formatInventorySyncValue(receiptStatus: string, quantity: number | string | undefined): string | number {
     const numericQuantity = Number(quantity ?? 0);
 
-    if (receiptStatus === 'PARTIALLY_RECEIVED' && numericQuantity <= 0) {
+    if (receiptStatus === 'PENDING') {
         return 'Pending';
     }
 
