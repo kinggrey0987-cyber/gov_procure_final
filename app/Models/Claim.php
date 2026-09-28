@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Claim extends Model
@@ -54,6 +55,18 @@ class Claim extends Model
         'quantity_missing' => 'decimal:2',
         'replacement_quantity' => 'decimal:2',
     ];
+
+    public function supplyRequest(): HasOneThrough
+    {
+        return $this->hasOneThrough(
+            SupplyRequest::class,
+            DistributionRecord::class,
+            'distribution_record_id',
+            'supply_request_id',
+            'distribution_record_id',
+            'supply_request_id'
+        );
+    }
 
     public function distributionRecord(): BelongsTo
     {

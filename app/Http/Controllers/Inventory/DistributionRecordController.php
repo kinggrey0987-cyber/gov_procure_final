@@ -692,13 +692,19 @@ class DistributionRecordController
             }
         }
 
+        $receivedTimestamp = $distribution_record->updated_at ?? $distribution_record->created_at;
+        $receivedCarbon = $receivedTimestamp ? \Illuminate\Support\Carbon::parse($receivedTimestamp) : null;
+        $isClaimExpired = $distribution_record->status === 'RECEIVED'
+            && $receivedCarbon !== null
+            && ($receivedCarbon->copy()->addHours(48)->isPast() || abs(now()->diffInHours($receivedCarbon)) > 48);
+
         return Inertia::render('Inventory/Distribution/Show', [
             'unreleased_stock_items' => $unreleasedStockItems,
             'record' => [
                 'distribution_record_id' => (int) $distribution_record->distribution_record_id,
                 'distribution_code' => (string) $distribution_record->distribution_code,
                 'status' => (string) $distribution_record->status,
-                'is_claim_expired' => $distribution_record->status === 'RECEIVED' && ($distribution_record->updated_at ?? $distribution_record->created_at) && (($distribution_record->updated_at ?? $distribution_record->created_at)->copy()->addHours(48)->isPast() || abs(now()->diffInHours($distribution_record->updated_at ?? $distribution_record->created_at)) > 48),
+                'is_claim_expired' => $isClaimExpired,
                 'release_date' => optional($distribution_record->release_date)?->toDateString(),
                 'storage_location' => $distribution_record->storage_location,
                 'notes' => $distribution_record->notes,

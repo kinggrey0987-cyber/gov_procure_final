@@ -196,6 +196,10 @@ class ClaimReplacementNormalProcurementTest extends TestCase
         $po->refresh();
         $this->assertSame('2250.00', (string) $po->total_amount);
         $this->assertFalse((bool) $po->is_zero_cost_replacement);
+
+        // 5. Test viewing the distribution record when status is RECEIVED
+        $gsoResponse = $this->actingAs($gsoUser)->get(route('inventory.distribution-records.show', $dist->distribution_record_id));
+        $gsoResponse->assertOk();
     }
 
     public function test_migration_fixes_existing_zero_cost_claim_replacement_purchase_orders(): void

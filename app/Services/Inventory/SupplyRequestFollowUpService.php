@@ -214,21 +214,16 @@ class SupplyRequestFollowUpService
         // 2. Through claims
         $claimPrs = PurchaseRequest::query()
             ->where('source_type', 'CLAIM_REPLACEMENT_FOLLOW_UP')
-            ->where(function ($query) use ($parentIds) {
-                $query->whereHas('sourceClaim', fn ($q) => $q->whereIn('supply_request_id', $parentIds))
-                    ->orWhereHas('sourceClaim.distributionRecord', fn ($q) => $q->whereIn('supply_request_id', $parentIds));
-            })
+            ->whereHas('sourceClaim.distributionRecord', fn ($q) => $q->whereIn('supply_request_id', $parentIds))
             ->with([
                 'supplyRequest:supply_request_id,request_code,status',
-                'sourceClaim:claims_id,distribution_record_id,supply_request_id',
+                'sourceClaim:claims_id,distribution_record_id',
                 'sourceClaim.distributionRecord:distribution_record_id,supply_request_id',
             ])
             ->get();
 
         foreach ($claimPrs as $pr) {
-            $pId = (int) ($pr->sourceClaim?->supply_request_id
-                ?? $pr->sourceClaim?->distributionRecord?->supply_request_id
-                ?? 0);
+            $pId = (int) ($pr->sourceClaim?->distributionRecord?->supply_request_id ?? 0);
             if ($pId > 0 && $pr->supplyRequest) {
                 $results[$pId][] = [
                     'supply_request_id' => (int) $pr->supplyRequest->supply_request_id,
