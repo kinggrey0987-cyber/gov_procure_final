@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use App\Services\Procurement\ConsolidationTraceabilityService;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -28,6 +29,7 @@ class SupplyRequestController extends Controller
         private readonly HistoryTimelineService $historyTimelineService,
         private readonly \App\Services\Inventory\SupplyRequestFollowUpService $followUpService,
         private readonly \App\Services\Inventory\InventoryService $inventoryService,
+        private readonly ConsolidationTraceabilityService $traceabilityService,
     ) {
     }
 
@@ -136,21 +138,30 @@ class SupplyRequestController extends Controller
                 ->whereDoesntHave('purchaseOrders', fn (Builder $purchaseOrderQuery) => $purchaseOrderQuery->where('status', 'PLACED'))
                 ->whereHas('purchaseOrders', fn (Builder $purchaseOrderQuery) => $purchaseOrderQuery->where('status', 'DRAFT')),
             'REJECTED' => $query
-                ->where('status', 'REJECTED')
+                ->where(function (Builder $q) {
+                    $q->where('status', 'REJECTED')
+                        ->orWhereHas('purchaseRequests', fn (Builder $purchaseRequestQuery) => $purchaseRequestQuery->where('status', 'REJECTED'))
+                        ->orWhereHas('statusHistories', fn (Builder $shQuery) => $shQuery->where('remarks', 'like', '%rejected by procurement%'));
+                })
                 ->whereDoesntHave('distributionRecords', fn (Builder $distributionQuery) => $distributionQuery->whereIn('status', ['RELEASED', 'RECEIVED']))
-                ->whereDoesntHave('purchaseOrders', fn (Builder $purchaseOrderQuery) => $purchaseOrderQuery->whereIn('status', ['PLACED', 'DRAFT']))
-                ->whereHas('purchaseRequests', fn (Builder $purchaseRequestQuery) => $purchaseRequestQuery->where('status', 'REJECTED')),
+                ->whereDoesntHave('purchaseOrders', fn (Builder $purchaseOrderQuery) => $purchaseOrderQuery->whereIn('status', ['PLACED', 'DRAFT'])),
             'RETURNED_FOR_REVISION' => $query
                 ->where('status', 'DRAFT')
                 ->whereDoesntHave('distributionRecords', fn (Builder $distributionQuery) => $distributionQuery->whereIn('status', ['RELEASED', 'RECEIVED']))
                 ->whereDoesntHave('purchaseOrders', fn (Builder $purchaseOrderQuery) => $purchaseOrderQuery->whereIn('status', ['PLACED', 'DRAFT']))
                 ->whereDoesntHave('purchaseRequests', fn (Builder $purchaseRequestQuery) => $purchaseRequestQuery->where('status', 'REJECTED'))
-                ->whereHas('purchaseRequests', fn (Builder $purchaseRequestQuery) => $purchaseRequestQuery->where('status', 'RETURNED_FOR_REVISION')),
+                ->where(function (Builder $q) {
+                    $q->whereHas('purchaseRequests', fn (Builder $purchaseRequestQuery) => $purchaseRequestQuery->where('status', 'RETURNED_FOR_REVISION'))
+                        ->orWhereHas('statusHistories', fn (Builder $shQuery) => $shQuery->where('remarks', 'like', '%returned for revision%'));
+                }),
             'PROCESSING' => $query
                 ->whereDoesntHave('distributionRecords', fn (Builder $distributionQuery) => $distributionQuery->whereIn('status', ['RELEASED', 'RECEIVED']))
                 ->whereDoesntHave('purchaseOrders', fn (Builder $purchaseOrderQuery) => $purchaseOrderQuery->whereIn('status', ['PLACED', 'DRAFT']))
                 ->whereDoesntHave('purchaseRequests', fn (Builder $purchaseRequestQuery) => $purchaseRequestQuery->whereIn('status', ['REJECTED', 'RETURNED_FOR_REVISION']))
-                ->whereHas('purchaseRequests', fn (Builder $purchaseRequestQuery) => $purchaseRequestQuery->where('status', 'PROCESSING')),
+                ->where(function (Builder $q) {
+                    $q->whereHas('purchaseRequests', fn (Builder $purchaseRequestQuery) => $purchaseRequestQuery->where('status', 'PROCESSING'))
+                        ->orWhereHas('statusHistories', fn (Builder $shQuery) => $shQuery->where('remarks', 'like', '%procurement processing%'));
+                }),
             'IN_REVIEW' => $query->where(function (Builder $trackingQuery): void {
                 $trackingQuery
                     ->where(function (Builder $directStockQuery): void {
@@ -316,10 +327,11 @@ class SupplyRequestController extends Controller
             'priority_level' => (string) $supplyRequest->priority_level,
             'review_notes' => $supplyRequest->review_notes,
             'follow_up_context' => $this->followUpService->resolveContext($supplyRequest),
-            'purchase_requests' => $supplyRequest->purchaseRequests
+            'purchase_requests' => $this->traceabilityService->getPurchaseRequestsForSupplyRequest($supplyRequest)
                 ->sortByDesc('purchase_request_id')
                 ->map(fn ($purchaseRequest): array => [
                     'purchase_request_id' => (int) $purchaseRequest->purchase_request_id,
+                    'pr_number' => (string) ($purchaseRequest->pr_number ?? 'PR'),
                     'status' => (string) $purchaseRequest->status,
                     'remarks' => $purchaseRequest->remarks,
                     'created_at' => optional($purchaseRequest->created_at)?->toIso8601String(),
@@ -420,7 +432,8 @@ class SupplyRequestController extends Controller
 
     private function requiresProcurement(SupplyRequest $supplyRequest): bool
     {
-        if ($supplyRequest->purchaseRequests->isNotEmpty() || $supplyRequest->purchaseOrders->isNotEmpty()) {
+        $linkedPrs = $this->traceabilityService->getPurchaseRequestsForSupplyRequest($supplyRequest);
+        if ($linkedPrs->isNotEmpty() || $supplyRequest->purchaseOrders->isNotEmpty()) {
             return true;
         }
 
@@ -474,7 +487,8 @@ class SupplyRequestController extends Controller
             return 'CANCELLED';
         }
 
-        $purchaseRequestStatuses = $supplyRequest->purchaseRequests
+        $linkedPrs = $this->traceabilityService->getPurchaseRequestsForSupplyRequest($supplyRequest);
+        $purchaseRequestStatuses = $linkedPrs
             ->pluck('status')
             ->map(fn ($status): string => strtoupper((string) $status));
 
@@ -482,7 +496,7 @@ class SupplyRequestController extends Controller
             return 'REJECTED';
         }
 
-        if ($baseStatus === 'DRAFT' && $purchaseRequestStatuses->contains('RETURNED_FOR_REVISION')) {
+        if ($baseStatus === 'DRAFT' && ($purchaseRequestStatuses->contains('RETURNED_FOR_REVISION') || $supplyRequest->statusHistories()->where('remarks', 'like', '%returned for revision%')->exists())) {
             return 'RETURNED_FOR_REVISION';
         }
 

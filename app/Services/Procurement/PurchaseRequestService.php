@@ -30,6 +30,7 @@ class PurchaseRequestService
         private readonly AnomalyService $anomalyService,
         private readonly \App\Services\Inventory\InventoryMovementService $inventoryMovementService,
         private readonly \App\Services\Inventory\InventoryService $inventoryService,
+        private readonly ConsolidationTraceabilityService $traceabilityService,
     ) {
     }
 
@@ -846,12 +847,16 @@ class PurchaseRequestService
             $this->recordStatus($purchaseRequest, $oldStatus, 'PROCESSING', $actor, 'Purchase request is now in procurement processing.');
             $this->recordAudit($actor, 'PROCESS', $purchaseRequest);
 
-            $supplyRequest = $purchaseRequest->supplyRequest()->first();
-            if ($supplyRequest instanceof SupplyRequest) {
+            $supplyRequests = $this->traceabilityService->getSourceSupplyRequests($purchaseRequest);
+            if ($supplyRequests->isEmpty() && $purchaseRequest->supplyRequest) {
+                $supplyRequests = collect([$purchaseRequest->supplyRequest]);
+            }
+
+            foreach ($supplyRequests as $sr) {
                 $this->notificationService->notifySupplyRequestOfficeRequester(
-                    supplyRequest: $supplyRequest,
+                    supplyRequest: $sr,
                     title: 'Supply Request Processing Started',
-                    message: sprintf('Procurement started processing your supply request %s.', (string) $supplyRequest->request_code),
+                    message: sprintf('Procurement started processing your supply request %s.', (string) $sr->request_code),
                     notificationType: 'OFFICE_SUPPLY_REQUEST_PROCUREMENT_PROCESSING',
                 );
             }
@@ -1122,26 +1127,28 @@ class PurchaseRequestService
         string $newStatus,
         string $remarks
     ): void {
-        $supplyRequest = $purchaseRequest->supplyRequest()->first();
-        if (! $supplyRequest instanceof SupplyRequest) {
-            return;
+        $supplyRequests = $this->traceabilityService->getSourceSupplyRequests($purchaseRequest);
+        if ($supplyRequests->isEmpty() && $purchaseRequest->supplyRequest) {
+            $supplyRequests = collect([$purchaseRequest->supplyRequest]);
         }
 
-        $this->syncSingleSupplyRequestStatus($supplyRequest, $actor, $newStatus, $remarks);
+        foreach ($supplyRequests as $supplyRequest) {
+            $this->syncSingleSupplyRequestStatus($supplyRequest, $actor, $newStatus, $remarks);
 
-        $message = match ($newStatus) {
-            'DRAFT' => 'Your supply request was returned for revision by Procurement. Please review the remarks and resubmit it after updating.',
-            'REJECTED' => 'Your supply request was rejected by Procurement. Please review the remarks for the reason.',
-            'FOR_PROCUREMENT' => 'Your supply request is now being processed by Procurement.',
-            default => 'Your supply request status was updated by Procurement.',
-        };
+            $message = match ($newStatus) {
+                'DRAFT' => 'Your supply request was returned for revision by Procurement. Please review the remarks and resubmit it after updating.',
+                'REJECTED' => 'Your supply request was rejected by Procurement. Please review the remarks for the reason.',
+                'FOR_PROCUREMENT' => 'Your supply request is now being processed by Procurement.',
+                default => 'Your supply request status was updated by Procurement.',
+            };
 
-        $this->notificationService->notifySupplyRequestOfficeRequester(
-            supplyRequest: $supplyRequest,
-            title: 'Supply Request Status Updated',
-            message: $message,
-            notificationType: 'OFFICE_SUPPLY_REQUEST_STATUS_UPDATED',
-        );
+            $this->notificationService->notifySupplyRequestOfficeRequester(
+                supplyRequest: $supplyRequest,
+                title: 'Supply Request Status Updated',
+                message: $message,
+                notificationType: 'OFFICE_SUPPLY_REQUEST_STATUS_UPDATED',
+            );
+        }
     }
 
     private function recordAudit(User $actor, string $actionType, PurchaseRequest $purchaseRequest): void

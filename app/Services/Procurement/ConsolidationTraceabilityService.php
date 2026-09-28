@@ -404,4 +404,77 @@ class ConsolidationTraceabilityService
 
         return array_values($itemsMap);
     }
+
+    /**
+     * Get all Purchase Requests associated with a Supply Request (direct + consolidated).
+     *
+     * @return \Illuminate\Support\Collection<int, PurchaseRequest>
+     */
+    public function getPurchaseRequestsForSupplyRequest(SupplyRequest $supplyRequest): \Illuminate\Support\Collection
+    {
+        $prs = collect();
+
+        // 1. Direct relationship
+        $supplyRequest->loadMissing([
+            'purchaseRequests.requester.role',
+            'purchaseRequests.purchaseOrders.supplier',
+            'purchaseRequests.purchaseOrders.creator.role',
+            'purchaseRequests.purchaseOrders.approver.role',
+        ]);
+
+        if ($supplyRequest->purchaseRequests->isNotEmpty()) {
+            $prs = $prs->merge($supplyRequest->purchaseRequests);
+        }
+
+        // 2. PRs where this supply request code is explicitly listed in consolidated remarks
+        $requestCode = trim((string) $supplyRequest->request_code);
+        if ($requestCode !== '') {
+            $matchingPrs = PurchaseRequest::query()
+                ->where('remarks', 'like', "%{$requestCode}%")
+                ->with([
+                    'requester.role',
+                    'purchaseOrders.supplier',
+                    'purchaseOrders.creator.role',
+                    'purchaseOrders.approver.role',
+                ])
+                ->get();
+            $prs = $prs->merge($matchingPrs);
+        }
+
+        // 3. Status history references linking this supply request to a PR
+        $historyRemarks = StatusHistory::query()
+            ->where('reference_type', SupplyRequest::class)
+            ->where('reference_id', (int) $supplyRequest->supply_request_id)
+            ->where(function ($q) {
+                $q->where('remarks', 'like', '%PR-%')
+                    ->orWhere('remarks', 'like', '%consolidated%');
+            })
+            ->pluck('remarks')
+            ->toArray();
+
+        $prNumbers = [];
+        foreach ($historyRemarks as $histRemark) {
+            preg_match_all('/PR-[A-Z0-9-]+/', (string) $histRemark, $matches);
+            if (! empty($matches[0])) {
+                foreach ($matches[0] as $m) {
+                    $prNumbers[] = $m;
+                }
+            }
+        }
+
+        if (! empty($prNumbers)) {
+            $historyPrs = PurchaseRequest::query()
+                ->whereIn('pr_number', array_values(array_unique($prNumbers)))
+                ->with([
+                    'requester.role',
+                    'purchaseOrders.supplier',
+                    'purchaseOrders.creator.role',
+                    'purchaseOrders.approver.role',
+                ])
+                ->get();
+            $prs = $prs->merge($historyPrs);
+        }
+
+        return $prs->unique('purchase_request_id')->values();
+    }
 }
