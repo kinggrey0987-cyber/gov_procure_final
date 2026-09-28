@@ -289,58 +289,93 @@ export default function PurchaseOrdersCreate({
                     </div>
                 </section>
 
-                <section className="rounded-2xl border border-red-100 bg-red-50/40 p-6 shadow-sm">
-                    <div className="flex items-center justify-between">
-                        <p className="text-xs font-semibold uppercase tracking-[0.15em] text-red-700">Derived Request Context</p>
-                        {selectedPurchaseRequest?.is_consolidated && (
-                            <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800 border border-red-200">
+                <section className="rounded-2xl border border-red-100 bg-red-50/40 p-5 sm:p-6 shadow-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.15em] text-red-700">Derived Request Context</p>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                                {selectedPurchaseRequest?.is_consolidated
+                                    ? 'Aggregated requisition context across all consolidated office supply requests.'
+                                    : 'Originating requisition and office information for this purchase request.'}
+                            </p>
+                        </div>
+                        {selectedPurchaseRequest?.is_consolidated ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-800 border border-red-200">
+                                <span className="h-2 w-2 rounded-full bg-red-600" />
                                 Consolidated Batch ({selectedPurchaseRequest.source_count} Requests)
                             </span>
-                        )}
+                        ) : null}
                     </div>
-                    <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                        <ContextField
-                            label="Requesting Office"
-                            value={
-                                selectedPurchaseRequest?.is_consolidated
-                                    ? `Consolidated (${selectedPurchaseRequest.source_offices?.join(', ') || 'Multiple Offices'})`
-                                    : (selectedPurchaseRequest?.office ? `${selectedPurchaseRequest.office.code} - ${selectedPurchaseRequest.office.name}` : 'N/A')
-                            }
-                        />
-                        <ContextField label="Commodity Category" value={selectedPurchaseRequest?.category_name || 'General / Uncategorized'} />
-                        <ContextField
-                            label="Request Reference"
-                            value={
-                                selectedPurchaseRequest?.is_consolidated
-                                    ? `Consolidated Batch (${selectedPurchaseRequest.source_count} Requests)`
-                                    : (selectedPurchaseRequest?.supply_request?.request_code || (selectedPurchaseRequest?.supply_request?.supply_request_id ? `SR #${selectedPurchaseRequest.supply_request.supply_request_id}` : 'N/A'))
-                            }
-                        />
-                        <ContextField
-                            label="Originating Requester"
-                            value={
-                                selectedPurchaseRequest?.is_consolidated
-                                    ? `Multiple Requisitioners (${selectedPurchaseRequest.source_count} Requests)`
-                                    : (selectedPurchaseRequest?.origin_requester?.name || 'N/A')
-                            }
-                        />
-                        <ContextField
-                            label="Linked Supply Request"
-                            value={
-                                selectedPurchaseRequest?.is_consolidated
-                                    ? (selectedPurchaseRequest.source_codes && selectedPurchaseRequest.source_codes.length > 0 ? selectedPurchaseRequest.source_codes.join(', ') : `Consolidated (${selectedPurchaseRequest.source_count})`)
-                                    : (selectedPurchaseRequest?.supply_request?.supply_request_id ? `#${selectedPurchaseRequest.supply_request.supply_request_id}` : 'N/A')
-                            }
-                        />
-                    </div>
-                    {selectedPurchaseRequest?.is_consolidated && selectedPurchaseRequest.source_codes && selectedPurchaseRequest.source_codes.length > 0 && (
-                        <div className="mt-3 flex flex-wrap items-center gap-1.5 pt-2 border-t border-red-200/60">
-                            <span className="text-xs font-semibold text-red-800">Source Requests:</span>
-                            {selectedPurchaseRequest.source_codes.map((code) => (
-                                <span key={code} className="inline-flex items-center rounded-md bg-white px-2 py-0.5 text-xs font-medium text-slate-700 border border-red-200 shadow-2xs">
-                                    {code}
-                                </span>
-                            ))}
+
+                    {selectedPurchaseRequest?.is_consolidated ? (
+                        <>
+                            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                                <ContextField
+                                    label="Requesting Offices"
+                                    value={selectedPurchaseRequest.source_offices?.length ? selectedPurchaseRequest.source_offices.join(', ') : (selectedPurchaseRequest.office?.name || 'Multiple Offices')}
+                                    subtext="Participating Offices"
+                                />
+                                <ContextField
+                                    label="Commodity Category"
+                                    value={selectedPurchaseRequest.category_name || 'General / Uncategorized'}
+                                    subtext="Requisition Category"
+                                />
+                                <ContextField
+                                    label="Consolidation Scope"
+                                    value={`${selectedPurchaseRequest.source_count} Merged Requests`}
+                                    subtext="Single PO Award"
+                                />
+                                <ContextField
+                                    label="Aggregated Scope"
+                                    value={`${selectedItems.length} Line${selectedItems.length === 1 ? '' : 's'} • ${selectedTotalQty.toFixed(2)} Total Units`}
+                                    subtext="All Requests Combined"
+                                />
+                            </div>
+
+                            {selectedPurchaseRequest.source_codes && selectedPurchaseRequest.source_codes.length > 0 && (
+                                <div className="mt-4 rounded-xl border border-red-200/60 bg-white/95 p-4 shadow-2xs">
+                                    <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
+                                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-700">
+                                            Linked Source Supply Requests <span className="text-red-700">({selectedPurchaseRequest.source_count})</span>
+                                        </p>
+                                        <span className="text-xs text-slate-500">All included in this single purchase order</span>
+                                    </div>
+                                    <div className="mt-2.5 flex flex-wrap gap-2">
+                                        {selectedPurchaseRequest.source_codes.map((code) => (
+                                            <span
+                                                key={code}
+                                                className="inline-flex items-center gap-1.5 rounded-lg border border-red-200/80 bg-red-50/70 px-2.5 py-1 text-xs font-medium text-slate-800 shadow-2xs"
+                                            >
+                                                <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                                                {code}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                            <ContextField
+                                label="Requesting Office"
+                                value={selectedPurchaseRequest?.office ? `${selectedPurchaseRequest.office.code} - ${selectedPurchaseRequest.office.name}` : 'N/A'}
+                            />
+                            <ContextField
+                                label="Commodity Category"
+                                value={selectedPurchaseRequest?.category_name || 'General / Uncategorized'}
+                            />
+                            <ContextField
+                                label="Request Reference"
+                                value={selectedPurchaseRequest?.supply_request?.request_code || (selectedPurchaseRequest?.supply_request?.supply_request_id ? `SR #${selectedPurchaseRequest.supply_request.supply_request_id}` : 'N/A')}
+                            />
+                            <ContextField
+                                label="Originating Requester"
+                                value={selectedPurchaseRequest?.origin_requester?.name || 'N/A'}
+                            />
+                            <ContextField
+                                label="Linked Supply Request"
+                                value={selectedPurchaseRequest?.supply_request?.supply_request_id ? `#${selectedPurchaseRequest.supply_request.supply_request_id}` : 'N/A'}
+                            />
                         </div>
                     )}
                 </section>
@@ -465,11 +500,12 @@ export default function PurchaseOrdersCreate({
     );
 }
 
-function ContextField({ label, value }: { label: string; value: string }) {
+function ContextField({ label, value, subtext }: { label: string; value: string; subtext?: string }) {
     return (
-        <div className="rounded-lg border border-red-100 bg-white px-3 py-2">
+        <div className="rounded-lg border border-red-100 bg-white px-3.5 py-2.5 shadow-2xs">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-            <p className="mt-1 text-sm font-medium text-slate-800">{value}</p>
+            <p className="mt-1 text-sm font-semibold text-slate-800 break-words">{value}</p>
+            {subtext ? <p className="mt-0.5 text-2xs text-slate-500">{subtext}</p> : null}
         </div>
     );
 }
