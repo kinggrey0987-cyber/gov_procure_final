@@ -103,13 +103,19 @@ class PurchaseOrderController extends Controller
                 'sourceDelivery.purchaseOrder.supplier:supplier_id,supplier_name',
             ])
             ->latest('purchase_request_id')
-            ->get(['purchase_request_id', 'pr_number', 'supply_request_id', 'office_id', 'status', 'requested_by', 'created_at', 'source_type', 'source_delivery_id'])
+            ->get(['purchase_request_id', 'pr_number', 'supply_request_id', 'office_id', 'status', 'requested_by', 'created_at', 'source_type', 'source_delivery_id', 'remarks'])
             ->map(function (PurchaseRequest $purchaseRequest): array {
                 $isDiscrepancyFollowUp = (string) $purchaseRequest->source_type === 'PARTIAL_DELIVERY_FOLLOW_UP'
                     || (int) ($purchaseRequest->source_delivery_id ?? 0) > 0;
                 $sourceDelivery = $purchaseRequest->sourceDelivery;
                 $parentPo = $sourceDelivery?->purchaseOrder;
                 $parentSupplier = $sourceDelivery?->supplier ?? $parentPo?->supplier;
+
+                $sourceRequests = $this->traceabilityService->getSourceSupplyRequests($purchaseRequest);
+                $sourceCount = $sourceRequests->count();
+                $isConsolidated = $sourceCount >= 2;
+                $sourceCodes = $sourceRequests->pluck('request_code')->filter()->values()->all();
+                $sourceOffices = $sourceRequests->map(fn ($sr) => (string) ($sr->office?->code ?? $sr->office?->name ?? 'OFFICE'))->unique()->values()->all();
 
                 $prCategoryId = $purchaseRequest->supplyRequest?->item_category_id
                     ?: ($purchaseRequest->items->first()?->item?->item_category_id ?? null);
@@ -129,6 +135,10 @@ class PurchaseOrderController extends Controller
                     'source_type' => (string) ($purchaseRequest->source_type ?? ''),
                     'source_delivery_id' => $purchaseRequest->source_delivery_id ? (int) $purchaseRequest->source_delivery_id : null,
                     'is_discrepancy_follow_up' => $isDiscrepancyFollowUp,
+                    'is_consolidated' => $isConsolidated,
+                    'source_count' => $sourceCount,
+                    'source_codes' => $sourceCodes,
+                    'source_offices' => $sourceOffices,
                     'suggested_supplier_id' => $parentSupplier ? (int) $parentSupplier->supplier_id : null,
                     'suggested_supplier_name' => (string) ($parentSupplier?->supplier_name ?? ''),
                     'parent_delivery_code' => (string) ($sourceDelivery?->delivery_code ?? ''),

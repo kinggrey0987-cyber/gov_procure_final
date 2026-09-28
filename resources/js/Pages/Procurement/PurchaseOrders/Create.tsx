@@ -11,6 +11,10 @@ type PurchaseRequestOption = {
     source_type?: string | null;
     source_delivery_id?: number | null;
     is_discrepancy_follow_up?: boolean;
+    is_consolidated?: boolean;
+    source_count?: number;
+    source_codes?: string[];
+    source_offices?: string[];
     suggested_supplier_id?: number | null;
     suggested_supplier_name?: string | null;
     parent_delivery_code?: string | null;
@@ -212,7 +216,8 @@ export default function PurchaseOrdersCreate({
                                 eligiblePurchaseRequests.map((row) => (
                                     <option key={row.purchase_request_id} value={row.purchase_request_id}>
                                         {row.is_discrepancy_follow_up ? '[WARRANTY REPLACEMENT] ' : ''}
-                                        PR #{row.purchase_request_id} | {row.supply_request?.request_code || `SR #${row.supply_request?.supply_request_id ?? '-'}`} | {row.office?.code || row.office?.name || 'Unknown Office'}
+                                        {row.is_consolidated ? `[CONSOLIDATED - ${row.source_count} REQUESTS] ` : ''}
+                                        PR #{row.purchase_request_id} | {row.is_consolidated ? `Consolidated (${row.source_count} Requests)` : (row.supply_request?.request_code || `SR #${row.supply_request?.supply_request_id ?? '-'}`)} | {row.is_consolidated && row.source_offices?.length ? row.source_offices.join(', ') : (row.office?.code || row.office?.name || 'Unknown Office')}
                                     </option>
                                 ))
                             ) : null}
@@ -285,20 +290,59 @@ export default function PurchaseOrdersCreate({
                 </section>
 
                 <section className="rounded-2xl border border-red-100 bg-red-50/40 p-6 shadow-sm">
-                    <p className="text-xs font-semibold uppercase tracking-[0.15em] text-red-700">Derived Request Context</p>
+                    <div className="flex items-center justify-between">
+                        <p className="text-xs font-semibold uppercase tracking-[0.15em] text-red-700">Derived Request Context</p>
+                        {selectedPurchaseRequest?.is_consolidated && (
+                            <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800 border border-red-200">
+                                Consolidated Batch ({selectedPurchaseRequest.source_count} Requests)
+                            </span>
+                        )}
+                    </div>
                     <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                        <ContextField label="Requesting Office" value={selectedPurchaseRequest?.office ? `${selectedPurchaseRequest.office.code} - ${selectedPurchaseRequest.office.name}` : 'N/A'} />
+                        <ContextField
+                            label="Requesting Office"
+                            value={
+                                selectedPurchaseRequest?.is_consolidated
+                                    ? `Consolidated (${selectedPurchaseRequest.source_offices?.join(', ') || 'Multiple Offices'})`
+                                    : (selectedPurchaseRequest?.office ? `${selectedPurchaseRequest.office.code} - ${selectedPurchaseRequest.office.name}` : 'N/A')
+                            }
+                        />
                         <ContextField label="Commodity Category" value={selectedPurchaseRequest?.category_name || 'General / Uncategorized'} />
                         <ContextField
                             label="Request Reference"
-                            value={selectedPurchaseRequest?.supply_request?.request_code || (selectedPurchaseRequest?.supply_request?.supply_request_id ? `SR #${selectedPurchaseRequest.supply_request.supply_request_id}` : 'N/A')}
+                            value={
+                                selectedPurchaseRequest?.is_consolidated
+                                    ? `Consolidated Batch (${selectedPurchaseRequest.source_count} Requests)`
+                                    : (selectedPurchaseRequest?.supply_request?.request_code || (selectedPurchaseRequest?.supply_request?.supply_request_id ? `SR #${selectedPurchaseRequest.supply_request.supply_request_id}` : 'N/A'))
+                            }
                         />
-                        <ContextField label="Originating Requester" value={selectedPurchaseRequest?.origin_requester?.name || 'N/A'} />
+                        <ContextField
+                            label="Originating Requester"
+                            value={
+                                selectedPurchaseRequest?.is_consolidated
+                                    ? `Multiple Requisitioners (${selectedPurchaseRequest.source_count} Requests)`
+                                    : (selectedPurchaseRequest?.origin_requester?.name || 'N/A')
+                            }
+                        />
                         <ContextField
                             label="Linked Supply Request"
-                            value={selectedPurchaseRequest?.supply_request?.supply_request_id ? `#${selectedPurchaseRequest.supply_request.supply_request_id}` : 'N/A'}
+                            value={
+                                selectedPurchaseRequest?.is_consolidated
+                                    ? (selectedPurchaseRequest.source_codes && selectedPurchaseRequest.source_codes.length > 0 ? selectedPurchaseRequest.source_codes.join(', ') : `Consolidated (${selectedPurchaseRequest.source_count})`)
+                                    : (selectedPurchaseRequest?.supply_request?.supply_request_id ? `#${selectedPurchaseRequest.supply_request.supply_request_id}` : 'N/A')
+                            }
                         />
                     </div>
+                    {selectedPurchaseRequest?.is_consolidated && selectedPurchaseRequest.source_codes && selectedPurchaseRequest.source_codes.length > 0 && (
+                        <div className="mt-3 flex flex-wrap items-center gap-1.5 pt-2 border-t border-red-200/60">
+                            <span className="text-xs font-semibold text-red-800">Source Requests:</span>
+                            {selectedPurchaseRequest.source_codes.map((code) => (
+                                <span key={code} className="inline-flex items-center rounded-md bg-white px-2 py-0.5 text-xs font-medium text-slate-700 border border-red-200 shadow-2xs">
+                                    {code}
+                                </span>
+                            ))}
+                        </div>
+                    )}
                 </section>
 
                 <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
