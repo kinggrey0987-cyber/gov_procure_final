@@ -593,7 +593,6 @@ class ExecutiveMonitoringService
             'recent' => [
                 'anomalies' => (clone $anomalyBase)
                     ->latest('detected_at')
-                    ->limit(10)
                     ->get([
                         'anomaly_id',
                         'anomaly_type',
@@ -611,7 +610,6 @@ class ExecutiveMonitoringService
                     ]),
                 'alerts' => (clone $alertBase)
                     ->latest('detected_at')
-                    ->limit(10)
                     ->get([
                         'alerts_id',
                         'alert_type',

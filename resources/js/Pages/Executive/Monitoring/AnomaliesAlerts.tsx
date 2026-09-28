@@ -522,7 +522,7 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2.5">
                             <div>
                                 <h3 className="text-sm font-bold text-slate-900">Recent Anomalies</h3>
-                                <p className="text-[11px] text-slate-500">Top 5 records &bull; Select record to view full anomaly breakdown</p>
+                                <p className="text-[11px] text-slate-500">5 per page &bull; Select record to view full anomaly breakdown</p>
                             </div>
                         </div>
                         {recent.anomalies.length === 0 ? (
@@ -575,7 +575,7 @@ export default function ExecutiveAnomaliesAlertsMonitoring({
                         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2.5">
                             <div>
                                 <h3 className="text-sm font-bold text-slate-900">Recent Alerts</h3>
-                                <p className="text-[11px] text-slate-500">Top 5 records &bull; Select record to view full alert breakdown</p>
+                                <p className="text-[11px] text-slate-500">5 per page &bull; Select record to view full alert breakdown</p>
                             </div>
                         </div>
                         {recent.alerts.length === 0 ? (
