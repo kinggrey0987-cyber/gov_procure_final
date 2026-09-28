@@ -176,7 +176,7 @@ export default function ConfirmationModal({
             <div className="p-6">
                 <div className="sm:flex sm:items-start">
                     {renderIcon()}
-                    <div className="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left">
+                    <div className="mt-3 w-full flex-1 min-w-0 text-center sm:ml-4 sm:mt-0 sm:text-left">
                         <h3 className="text-lg font-semibold leading-6 text-slate-900" id="modal-title">
                             {title}
                         </h3>

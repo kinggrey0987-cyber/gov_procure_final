@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import ConfirmationModal from '@/Components/ConfirmationModal';
 import InputError from '@/Components/InputError';
 import useSmartRefresh from '@/hooks/useSmartRefresh';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
@@ -61,6 +62,7 @@ const CURRENT_YEAR = new Date().getFullYear();
 export default function PpmpEdit({ ppmp, itemOptions }: Props) {
     const { flash, errors: pageErrors } = usePage().props as unknown as PageFlash;
     const [processingRowId, setProcessingRowId] = useState<number | null>(null);
+    const [itemPendingRemoval, setItemPendingRemoval] = useState<ExistingItem | null>(null);
     const { isRefreshing, refreshNow } = useSmartRefresh({
         only: ['itemOptions'],
         refreshOnFocus: false,
@@ -133,16 +135,22 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
         });
     };
 
-    const removeItem = (itemId: number) => {
-        if (!window.confirm('Remove this PPMP item line?')) {
+    const confirmRemoveItem = () => {
+        if (!itemPendingRemoval) {
             return;
         }
 
+        const itemId = itemPendingRemoval.ppmp_item_id;
         setProcessingRowId(itemId);
         router.delete(route('office.ppmp.items.destroy', [ppmp.ppmp_id, itemId]), {
             preserveScroll: true,
             preserveState: false,
-            onFinish: () => setProcessingRowId(null),
+            onSuccess: () => {
+                setItemPendingRemoval(null);
+            },
+            onFinish: () => {
+                setProcessingRowId(null);
+            },
         });
     };
 
@@ -478,7 +486,7 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={() => removeItem(item.ppmp_item_id)}
+                                                onClick={() => setItemPendingRemoval(row)}
                                                 disabled={processingRowId === item.ppmp_item_id}
                                                 className="rounded-lg border border-rose-300 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
                                             >
@@ -609,7 +617,7 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                                             onChange={(event) => chooseNewVariant(event.target.value)}
                                             required
                                         >
-                                            <option value="">Select standard specification (A4, Letter, Legal...)</option>
+                                            <option value="">Select standard specification</option>
                                             {selectedNewGroup.variants.map((v) => (
                                                 <option key={v.item_id} value={v.item_id}>
                                                     {v.specification}
@@ -658,6 +666,61 @@ export default function PpmpEdit({ ppmp, itemOptions }: Props) {
                     ) : null}
                 </section>
             </div>
+
+            <ConfirmationModal
+                show={Boolean(itemPendingRemoval)}
+                onClose={() => {
+                    if (processingRowId === null) {
+                        setItemPendingRemoval(null);
+                    }
+                }}
+                processing={processingRowId === itemPendingRemoval?.ppmp_item_id}
+                variant="danger"
+                title="Remove PPMP Item Line"
+                confirmText={processingRowId === itemPendingRemoval?.ppmp_item_id ? 'Removing...' : 'Remove Line'}
+                cancelText="Cancel"
+                message={
+                    itemPendingRemoval ? (
+                        <div className="space-y-3">
+                            <p className="text-sm text-slate-600">
+                                Are you sure you want to remove this item line from this PPMP?
+                            </p>
+                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 text-xs text-slate-700 space-y-2">
+                                <div className="flex items-center justify-between gap-2">
+                                    <span className="font-semibold text-slate-900 text-sm">
+                                        {itemPendingRemoval.item?.item_name || itemOptionById.get(String(itemPendingRemoval.item_id))?.item_name || `Item #${itemPendingRemoval.item_id}`}
+                                    </span>
+                                    <span className="rounded bg-rose-50 px-2 py-0.5 font-medium text-rose-700 border border-rose-200 shrink-0">
+                                        Line #{itemPendingRemoval.ppmp_item_id}
+                                    </span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-slate-200 text-slate-600">
+                                    <div>
+                                        <span className="font-medium text-slate-500">Schedule: </span>
+                                        <span className="font-semibold text-slate-800">{itemPendingRemoval.procurement_schedule}</span>
+                                    </div>
+                                    <div>
+                                        <span className="font-medium text-slate-500">Quantity: </span>
+                                        <span className="font-semibold text-slate-800">
+                                            {itemPendingRemoval.quantity} {itemPendingRemoval.item?.default_unit || itemOptionById.get(String(itemPendingRemoval.item_id))?.default_unit || 'box'}
+                                        </span>
+                                    </div>
+                                    {itemPendingRemoval.remarks ? (
+                                        <div className="col-span-2">
+                                            <span className="font-medium text-slate-500">Specification: </span>
+                                            <span className="text-slate-800">{itemPendingRemoval.remarks}</span>
+                                        </div>
+                                    ) : null}
+                                </div>
+                            </div>
+                            <p className="text-xs text-rose-600 font-medium">
+                                This action will permanently remove this item line from this PPMP and recalculate total estimates.
+                            </p>
+                        </div>
+                    ) : null
+                }
+                onConfirm={confirmRemoveItem}
+            />
         </AuthenticatedLayout>
     );
 }

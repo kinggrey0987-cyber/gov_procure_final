@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import ConfirmationModal from '@/Components/ConfirmationModal';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { FormEvent, ReactNode, useMemo, useState } from 'react';
 import { dateInputValue } from '@/lib/dateInput';
@@ -65,6 +66,8 @@ type Props = {
 
 export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selectedPpmpId, ppmpItemOptions: initialOptions, categories = [] }: Props) {
     const [itemOptions, setItemOptions] = useState<Option[]>(initialOptions);
+    const [itemPendingRemoval, setItemPendingRemoval] = useState<ExistingItem | null>(null);
+    const [isRemoving, setIsRemoving] = useState(false);
 
     const form = useForm({
         ppmp_id: selectedPpmpId ? String(selectedPpmpId) : '',
@@ -142,13 +145,20 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
         });
     };
 
-    const removeItem = (itemId: number) => {
-        if (confirm('Are you sure you want to remove this item from the supply request?')) {
-            router.delete(route('office.supply-requests.items.destroy', [supplyRequest.supply_request_id, itemId]), {
-                preserveScroll: true,
-                preserveState: false,
-            });
-        }
+    const confirmRemoveItem = () => {
+        if (!itemPendingRemoval) return;
+
+        setIsRemoving(true);
+        router.delete(route('office.supply-requests.items.destroy', [supplyRequest.supply_request_id, itemPendingRemoval.supply_request_item_id]), {
+            preserveScroll: true,
+            preserveState: false,
+            onSuccess: () => {
+                setItemPendingRemoval(null);
+            },
+            onFinish: () => {
+                setIsRemoving(false);
+            },
+        });
     };
 
     const onNewItemOptionChange = (value: string) => {
@@ -493,13 +503,14 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    onClick={() => removeItem(item.supply_request_item_id)}
-                                                    className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 px-3 py-1.5 text-xs font-semibold shadow-2xs transition"
+                                                    onClick={() => setItemPendingRemoval(row)}
+                                                    disabled={isRemoving && itemPendingRemoval?.supply_request_item_id === item.supply_request_item_id}
+                                                    className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 px-3 py-1.5 text-xs font-semibold shadow-2xs transition disabled:opacity-50"
                                                 >
                                                     <svg className="w-3.5 h-3.5 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                                         <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                                     </svg>
-                                                    <span>Remove</span>
+                                                    <span>{isRemoving && itemPendingRemoval?.supply_request_item_id === item.supply_request_item_id ? 'Removing...' : 'Remove'}</span>
                                                 </button>
                                             </div>
                                         </div>
@@ -660,6 +671,46 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                     )}
                 </section>
             </div>
+
+            <ConfirmationModal
+                show={Boolean(itemPendingRemoval)}
+                onClose={() => !isRemoving && setItemPendingRemoval(null)}
+                processing={isRemoving}
+                variant="danger"
+                title="Remove Item from Supply Request"
+                confirmText={isRemoving ? 'Removing...' : 'Remove Item'}
+                cancelText="Cancel"
+                message={
+                    itemPendingRemoval ? (
+                        <div className="space-y-3">
+                            <p className="text-sm text-slate-600">
+                                Are you sure you want to remove this item from the supply request?
+                            </p>
+                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 text-xs text-slate-700 space-y-2">
+                                <div className="font-semibold text-slate-900 text-sm">
+                                    {itemPendingRemoval.item_name_snapshot}
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-slate-200 text-slate-600">
+                                    <div>
+                                        <span className="font-medium text-slate-500">Requested Qty: </span>
+                                        <span className="font-semibold text-slate-800">{itemPendingRemoval.quantity_requested}</span>
+                                    </div>
+                                    {itemPendingRemoval.item_specification ? (
+                                        <div className="col-span-2">
+                                            <span className="font-medium text-slate-500">Specification: </span>
+                                            <span className="text-slate-800">{itemPendingRemoval.item_specification}</span>
+                                        </div>
+                                    ) : null}
+                                </div>
+                            </div>
+                            <p className="text-xs text-rose-600 font-medium">
+                                The allocated quantity will be released back to the PPMP balance.
+                            </p>
+                        </div>
+                    ) : null
+                }
+                onConfirm={confirmRemoveItem}
+            />
         </AuthenticatedLayout>
     );
 }
