@@ -73,7 +73,13 @@ class PurchaseOrderItemController extends Controller
                     continue;
                 }
 
-                $matchedSrItemIds[] = (int) $srItem->supply_request_item_id;
+                $srItem->loadMissing(['ppmpItem', 'item']);
+                $suggestedPrice = (float) (
+                    $srItem->ppmpItem?->unit_cost
+                    ?? \App\Models\PpmpItem::query()->where('item_id', $prItem->item_id)->value('unit_cost')
+                    ?? \App\Models\PurchaseOrderItem::query()->where('item_id', $prItem->item_id)->where('unit_price', '>', 0)->latest('purchase_order_item_id')->value('unit_price')
+                    ?? 0
+                );
 
                 $sourceItems->push([
                     'supply_request_item_id' => (int) $srItem->supply_request_item_id,
@@ -85,12 +91,20 @@ class PurchaseOrderItemController extends Controller
                     'item_specification' => (string) ($prItem->remarks ?? ''),
                     'default_unit' => (string) ($prItem->item?->default_unit ?? 'piece'),
                     'quantity_requested' => (float) $prItem->quantity_requested,
+                    'suggested_unit_price' => $suggestedPrice > 0 ? $suggestedPrice : null,
                 ]);
             }
         } else {
             foreach ($sourceSupplyRequests as $sr) {
                 $sr->loadMissing(['items.item', 'items.ppmpItem', 'office']);
                 foreach ($sr->items ?? [] as $row) {
+                    $suggestedPrice = (float) (
+                        $row->ppmpItem?->unit_cost
+                        ?? \App\Models\PpmpItem::query()->where('item_id', $row->item_id)->value('unit_cost')
+                        ?? \App\Models\PurchaseOrderItem::query()->where('item_id', $row->item_id)->where('unit_price', '>', 0)->latest('purchase_order_item_id')->value('unit_price')
+                        ?? 0
+                    );
+
                     $sourceItems->push([
                         'supply_request_item_id' => (int) $row->supply_request_item_id,
                         'supply_request_id' => (int) $row->supply_request_id,
@@ -101,6 +115,7 @@ class PurchaseOrderItemController extends Controller
                         'item_specification' => (string) ($row->ppmpItem?->remarks ?? ''),
                         'default_unit' => (string) ($row->item?->default_unit ?? 'piece'),
                         'quantity_requested' => (float) ($row->quantity_requested ?? 0),
+                        'suggested_unit_price' => $suggestedPrice > 0 ? $suggestedPrice : null,
                     ]);
                 }
             }

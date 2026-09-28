@@ -79,9 +79,7 @@ export default function PurchaseOrdersEdit({ purchaseOrder, suppliers, isZeroCos
         purchaseOrder.is_zero_cost_replacement ||
         propIsZeroCostReplacement ||
         purchaseOrder.purchase_request?.source_type === 'PARTIAL_DELIVERY_FOLLOW_UP' ||
-        purchaseOrder.purchase_request?.source_type === 'CLAIM_REPLACEMENT_FOLLOW_UP' ||
-        Boolean(purchaseOrder.purchase_request?.source_delivery_id) ||
-        Boolean(purchaseOrder.purchase_request?.source_claim_id)
+        Boolean(purchaseOrder.purchase_request?.source_delivery_id)
     );
 
     useEffect(() => {

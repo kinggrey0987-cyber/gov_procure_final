@@ -390,7 +390,12 @@ class PurchaseRequestService
     {
         $this->assertGsoActor($actor);
 
-        $claim->loadMissing(['distributionItem.item', 'office']);
+        $claim->loadMissing([
+            'distributionItem.item',
+            'distributionItem.distributionRecord.supplyRequest.items.ppmpItem',
+            'distributionRecord.supplyRequest.items.ppmpItem',
+            'office',
+        ]);
 
         if ($claim->distributionItem === null) {
             throw ValidationException::withMessages([
@@ -441,11 +446,46 @@ class PurchaseRequestService
             ?? 1
         );
 
+        $distRecord = $claim->distributionRecord ?? $claim->distributionItem?->distributionRecord;
+        $origSr = $distRecord?->supplyRequest;
+        $origSrItem = $origSr?->items?->firstWhere('item_id', $itemId);
+
+        $ppmpId = $origSr?->ppmp_id;
+        $ppmpItemId = $origSrItem?->ppmp_item_id;
+        $specification = $origSrItem?->item_specification
+            ?? $origSrItem?->ppmpItem?->remarks
+            ?? $distributionItem->remarks
+            ?? $item?->specification
+            ?? null;
+
+        if (! $ppmpItemId) {
+            $ppmpItem = \App\Models\PpmpItem::query()
+                ->whereHas('ppmp', function ($q) use ($officeId) {
+                    $q->where('office_id', $officeId)
+                        ->whereIn('status', ['APPROVED', 'COMPLETED', 'ACTIVE']);
+                })
+                ->where('item_id', $itemId)
+                ->first();
+
+            if (! $ppmpItem) {
+                $ppmpItem = \App\Models\PpmpItem::query()
+                    ->where('item_id', $itemId)
+                    ->latest('ppmp_item_id')
+                    ->first();
+            }
+
+            if ($ppmpItem) {
+                $ppmpItemId = (int) $ppmpItem->ppmp_item_id;
+                $ppmpId = $ppmpId ?: (int) $ppmpItem->ppmp_id;
+                $specification = $specification ?: $ppmpItem->remarks;
+            }
+        }
+
         $baseRemarks = trim((string) $remarks) !== ''
             ? trim((string) $remarks)
             : 'Generated from claim pending replacement due to insufficient GSO stock.';
 
-        return DB::transaction(function () use ($actor, $claim, $itemId, $itemName, $officeId, $quantityToProcure, $baseRemarks): PurchaseRequest {
+        return DB::transaction(function () use ($actor, $claim, $itemId, $itemName, $officeId, $quantityToProcure, $baseRemarks, $ppmpId, $ppmpItemId, $specification): PurchaseRequest {
             if ((string) $claim->status !== 'PENDING_REPLACEMENT') {
                 $oldClaimStatus = (string) $claim->status;
                 $claim->forceFill([
@@ -468,7 +508,7 @@ class PurchaseRequestService
                 'request_code' => $this->buildRequestCode($officeId),
                 'office_id' => $officeId,
                 'requested_by' => (int) $actor->id,
-                'ppmp_id' => null,
+                'ppmp_id' => $ppmpId,
                 'request_date' => now()->toDateString(),
                 'needed_by_date' => now()->addDays(7)->toDateString(),
                 'request_category' => 'GENERAL',
@@ -491,8 +531,9 @@ class PurchaseRequestService
             SupplyRequestItem::query()->create([
                 'supply_request_id' => (int) $supplyRequest->supply_request_id,
                 'item_id' => $itemId,
-                'ppmp_item_id' => null,
+                'ppmp_item_id' => $ppmpItemId,
                 'item_name_snapshot' => $itemName,
+                'item_specification' => $specification,
                 'quantity_requested' => $quantityToProcure,
             ]);
 
@@ -515,7 +556,7 @@ class PurchaseRequestService
                 'purchase_request_id' => (int) $purchaseRequest->purchase_request_id,
                 'item_id' => $itemId,
                 'quantity_requested' => $quantityToProcure,
-                'remarks' => sprintf(
+                'remarks' => $specification ?: sprintf(
                     'Claim replacement quantity for claim %s; remaining unavailable quantity %.2f.',
                     (string) $claim->claim_code,
                     $quantityToProcure

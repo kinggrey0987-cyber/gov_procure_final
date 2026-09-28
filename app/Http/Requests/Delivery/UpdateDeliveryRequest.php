@@ -26,7 +26,7 @@ class UpdateDeliveryRequest extends FormRequest
             && (
                 (bool) ($delivery->purchaseOrder?->is_zero_cost_replacement ?? false)
                 || (int) ($delivery->purchaseOrder?->purchaseRequest?->source_delivery_id ?? 0) > 0
-                || in_array((string) ($delivery->purchaseOrder?->purchaseRequest?->source_type ?? ''), ['PARTIAL_DELIVERY_FOLLOW_UP', 'CLAIM_REPLACEMENT_FOLLOW_UP'], true)
+                || (string) ($delivery->purchaseOrder?->purchaseRequest?->source_type ?? '') === 'PARTIAL_DELIVERY_FOLLOW_UP'
             );
 
         if ($isZeroCost) {
@@ -60,7 +60,7 @@ class UpdateDeliveryRequest extends FormRequest
             && (
                 (bool) ($delivery->purchaseOrder?->is_zero_cost_replacement ?? false)
                 || (int) ($delivery->purchaseOrder?->purchaseRequest?->source_delivery_id ?? 0) > 0
-                || in_array((string) ($delivery->purchaseOrder?->purchaseRequest?->source_type ?? ''), ['PARTIAL_DELIVERY_FOLLOW_UP', 'CLAIM_REPLACEMENT_FOLLOW_UP'], true)
+                || (string) ($delivery->purchaseOrder?->purchaseRequest?->source_type ?? '') === 'PARTIAL_DELIVERY_FOLLOW_UP'
             );
 
         $hasExistingDr = $delivery instanceof \App\Models\Delivery

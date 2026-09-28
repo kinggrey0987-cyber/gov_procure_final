@@ -36,6 +36,7 @@ type SourceItem = {
     quantity_requested: number;
     request_code?: string;
     office_code?: string;
+    suggested_unit_price?: number | null;
 };
 
 type Props = {
@@ -85,21 +86,29 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
     const applySourceItem = (supplyRequestItemId: number) => {
         const row = sourceItems.find((item) => item.supply_request_item_id === supplyRequestItemId);
         if (!row) {
-            form.setData('supply_request_item_id', 0);
-            form.setData('item_id', 0);
-            form.setData('item_name_snapshot', '');
-            form.setData('specification', '');
-            form.setData('quantity_ordered', '');
-            form.setData('unit', '');
+            form.setData({
+                ...form.data,
+                supply_request_item_id: 0,
+                item_id: 0,
+                item_name_snapshot: '',
+                specification: '',
+                quantity_ordered: '',
+                unit: '',
+                unit_price: '',
+            });
             return;
         }
 
-        form.setData('supply_request_item_id', row.supply_request_item_id);
-        form.setData('item_id', row.item_id);
-        form.setData('item_name_snapshot', row.item_name_snapshot);
-        form.setData('specification', row.item_specification || '');
-        form.setData('unit', row.default_unit || '');
-        form.setData('quantity_ordered', String(toWholeQuantity(row.quantity_requested ?? 0)));
+        form.setData({
+            ...form.data,
+            supply_request_item_id: row.supply_request_item_id,
+            item_id: row.item_id,
+            item_name_snapshot: row.item_name_snapshot,
+            specification: row.item_specification || '',
+            unit: row.default_unit || '',
+            quantity_ordered: String(toWholeQuantity(row.quantity_requested ?? 0)),
+            unit_price: row.suggested_unit_price && Number(row.suggested_unit_price) > 0 ? String(row.suggested_unit_price) : form.data.unit_price,
+        });
     };
 
     const submit = (event: FormEvent) => {
@@ -284,8 +293,13 @@ export default function PurchaseOrderItemsIndex({ purchaseOrder, items, sourceIt
                         <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end pt-2">
                             <div className="sm:col-span-6 lg:col-span-5">
                                 <label className="block">
-                                    <span className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-700">
-                                        Unit Price from Supplier Quote <span className="text-red-600">*</span>
+                                    <span className="mb-1 flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-slate-700">
+                                        <span>Unit Price from Supplier Quote <span className="text-red-600">*</span></span>
+                                        {selectedSource?.suggested_unit_price && Number(selectedSource.suggested_unit_price) > 0 ? (
+                                            <span className="text-[11px] font-normal lowercase tracking-normal text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                                PPMP: ₱{Number(selectedSource.suggested_unit_price).toFixed(2)}
+                                            </span>
+                                        ) : null}
                                     </span>
                                     <div className="relative rounded-lg shadow-2xs">
                                         <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500 font-semibold text-sm select-none">
