@@ -1019,9 +1019,11 @@ class DistributionRecordService
 
             $origDist = $claim->distributionRecord;
             if ($origDist instanceof DistributionRecord) {
-                $origDist->loadMissing('items');
+                $origDist->load('items');
                 $allFullyReceived = $origDist->items->every(fn ($item): bool =>
                     (float) $item->quantity_received >= (float) $item->quantity_released
+                    && (float) ($item->quantity_missing ?? 0) <= 0.0001
+                    && (float) ($item->quantity_damaged ?? 0) <= 0.0001
                 );
                 if ($allFullyReceived && (string) $origDist->status !== 'RECEIVED') {
                     $origOldStatus = (string) $origDist->status;
@@ -1044,7 +1046,9 @@ class DistributionRecordService
 
             $totalReplacementQty = max((float) $claim->replacement_quantity, $receivedQtyInThisRecord);
             $disputedQty = (float) $claim->quantity_disputed;
-            $isFullyResolved = $totalReplacementQty >= $disputedQty || ($distributionItem && (float) $distributionItem->quantity_received >= (float) $distributionItem->quantity_released);
+            $isFullyResolved = ($disputedQty > 0.0001)
+                ? ($totalReplacementQty >= ($disputedQty - 0.0001))
+                : true;
 
             $oldClaimStatus = (string) $claim->status;
             $newClaimStatus = $isFullyResolved ? 'RESOLVED' : 'PARTIALLY_RESOLVED';

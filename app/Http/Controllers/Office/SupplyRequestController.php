@@ -1136,6 +1136,7 @@ class SupplyRequestController extends Controller
                 'items',
                 'supplyRequest.purchaseRequests.sourceClaim',
                 'delivery.purchaseOrder.purchaseRequest.sourceClaim',
+                'delivery.purchaseOrder.supplyRequest.purchaseRequests.sourceClaim',
             ])
             ->forOffice($officeId)
             ->whereIn('status', ['RELEASED', 'RECEIVED'])
@@ -1143,6 +1144,7 @@ class SupplyRequestController extends Controller
             ->get()
             ->map(function (DistributionRecord $record): array {
                 $sourceClaim = $record->delivery?->purchaseOrder?->purchaseRequest?->sourceClaim
+                    ?? $record->delivery?->purchaseOrder?->supplyRequest?->purchaseRequests?->firstWhere('source_claim_id')?->sourceClaim
                     ?? $record->supplyRequest?->purchaseRequests?->firstWhere('source_claim_id')?->sourceClaim;
 
                 if (! $sourceClaim && ($record->supplyRequest?->purpose || $record->notes)) {
@@ -1184,10 +1186,30 @@ class SupplyRequestController extends Controller
                 ];
             });
 
+        $coveredClaimIds = $distributionRecords
+            ->pluck('claim_id')
+            ->filter()
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $followUpClaimIds = \App\Models\PurchaseRequest::query()
+            ->whereNotNull('source_claim_id')
+            ->pluck('source_claim_id')
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $excludedClaimIds = array_unique(array_merge($coveredClaimIds, $followUpClaimIds));
+
         $claimReplacements = \App\Models\Claim::query()
             ->with(['distributionItem.item', 'distributionRecord.supplyRequest'])
             ->where('office_id', $officeId)
-            ->whereIn('status', ['REPLACEMENT_RELEASED', 'RESOLVED'])
+            ->whereIn('status', ['REPLACEMENT_RELEASED', 'RESOLVED', 'PARTIALLY_RESOLVED'])
+            ->where('replacement_quantity', '>', 0)
+            ->whereNotIn('claims_id', $excludedClaimIds)
             ->latest('claims_id')
             ->get()
             ->map(function (\App\Models\Claim $claim): array {

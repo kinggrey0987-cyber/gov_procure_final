@@ -330,4 +330,322 @@ class ClaimReplacementFlowTest extends TestCase
         $this->assertEquals(0.0, (float) $distItem->quantity_missing);
         $this->assertSame('GOOD', (string) $distItem->receipt_condition);
     }
+
+    public function test_damaged_item_claim_partial_replacement_prevents_duplicate_and_premature_resolution(): void
+    {
+        $roleOffice = Role::query()->firstOrCreate(['code' => UserRole::OFFICE_USER->value], ['name' => 'Office User']);
+        $roleGso = Role::query()->firstOrCreate(['code' => UserRole::GSO_OFFICER->value], ['name' => 'GSO Officer']);
+
+        $office = Office::query()->create(['name' => 'MPDO Office', 'code' => 'MPDO', 'status' => 'ACTIVE']);
+        $officeUser = User::factory()->create(['role_id' => $roleOffice->id, 'office_id' => $office->id, 'name' => 'Office Requester']);
+        $gsoUser = User::factory()->create(['role_id' => $roleGso->id, 'office_id' => $office->id, 'name' => 'GSO Officer']);
+
+        $category = ItemCategory::query()->create(['category_name' => 'Office Supplies 2', 'status' => 'active']);
+        $item = Item::query()->create([
+            'item_category_id' => $category->item_category_id,
+            'item_name' => 'Bond Paper, A4 (80 GSM)',
+            'default_unit' => 'box',
+            'status' => 'active',
+        ]);
+
+        $inventory = Inventory::query()->create([
+            'item_id' => $item->item_id,
+            'stock_on_hand' => 0,
+            'available_stock' => 0,
+            'low_stock_threshold' => 5,
+        ]);
+
+        $ppmp = Ppmp::query()->create([
+            'office_id' => $office->id,
+            'fiscal_year' => 2026,
+            'status' => 'APPROVED',
+            'prepared_by' => $officeUser->id,
+            'date_prepared' => now()->toDateString(),
+            'total_estimated_budget' => 50000.00,
+        ]);
+
+        $ppmpItem = PpmpItem::query()->create([
+            'ppmp_id' => $ppmp->ppmp_id,
+            'item_id' => $item->item_id,
+            'item_category_id' => $category->item_category_id,
+            'quantity' => 200,
+            'unit_cost' => 250.00,
+            'estimated_budget' => 50000.00,
+            'procurement_schedule' => 'Q1',
+            'fund_source' => 'General Fund',
+        ]);
+
+        $sr = SupplyRequest::query()->create([
+            'request_code' => 'SR-MPDO-2026-09-0003',
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'status' => 'RELEASED',
+            'priority_level' => 'NORMAL',
+            'request_category' => 'SUPPLIES',
+            'purpose' => 'Office bond paper supplies A4',
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(5)->toDateString(),
+            'ppmp_id' => $ppmp->ppmp_id,
+        ]);
+
+        SupplyRequestItem::query()->create([
+            'supply_request_id' => $sr->supply_request_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => $item->item_name,
+            'ppmp_item_id' => $ppmpItem->ppmp_item_id,
+            'quantity_requested' => 200,
+        ]);
+
+        // Original distribution record of 200 boxes
+        $origDist = DistributionRecord::query()->create([
+            'distribution_code' => 'DIST-2026-09-0001',
+            'office_id' => $office->id,
+            'supply_request_id' => $sr->supply_request_id,
+            'prepared_by' => $gsoUser->id,
+            'release_date' => now()->toDateString(),
+            'storage_location' => 'GSO Storage',
+            'status' => 'RELEASED',
+        ]);
+
+        // Office received 200 boxes, but 100 were damaged
+        $origDistItem = DistributionItem::query()->create([
+            'distribution_record_id' => $origDist->distribution_record_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => $item->item_name,
+            'unit' => 'box',
+            'quantity_released' => 200,
+            'quantity_received' => 200,
+            'quantity_missing' => 0,
+            'quantity_damaged' => 100,
+            'receipt_condition' => 'DISCREPANCY',
+            'remarks' => '100 boxes damaged during handling',
+        ]);
+
+        // Office files a claim for 100 damaged items
+        $claim = Claim::query()->create([
+            'claim_code' => 'CLM-2026-00007',
+            'distribution_record_id' => $origDist->distribution_record_id,
+            'distribution_item_id' => $origDistItem->distribution_item_id,
+            'claimed_by' => $officeUser->id,
+            'office_id' => $office->id,
+            'claim_type' => 'DAMAGED_ITEM',
+            'claim_date' => now()->toDateString(),
+            'claim_location' => 'Office Storage',
+            'quantity_disputed' => 100,
+            'quantity_damaged' => 100,
+            'quantity_missing' => 0,
+            'remarks' => '100 boxes damaged',
+            'status' => 'PENDING_REPLACEMENT',
+            'replacement_quantity' => 0,
+        ]);
+
+        // Follow-up PR is created
+        $followUpPr = PurchaseRequest::query()->create([
+            'pr_number' => 'PR-2026-09-0002',
+            'supply_request_id' => $sr->supply_request_id,
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'source_claim_id' => $claim->claims_id,
+            'source_type' => 'CLAIM_REPLACEMENT_FOLLOW_UP',
+            'status' => 'APPROVED',
+            'remarks' => 'Follow-up PR for claim CLM-2026-00007',
+        ]);
+
+        PurchaseRequestItem::query()->create([
+            'purchase_request_id' => $followUpPr->purchase_request_id,
+            'item_id' => $item->item_id,
+            'quantity_requested' => 100,
+            'estimated_unit_cost' => 0.00,
+            'estimated_total_cost' => 0.00,
+        ]);
+
+        $supplier = Supplier::query()->create([
+            'supplier_name' => 'Paper Supplier Corp',
+            'status' => 'ACTIVE',
+        ]);
+
+        $po = PurchaseOrder::query()->create([
+            'po_number' => 'PO-2026-09-0002',
+            'purchase_request_id' => $followUpPr->purchase_request_id,
+            'supply_request_id' => $sr->supply_request_id,
+            'office_id' => $office->id,
+            'supplier_id' => $supplier->supplier_id,
+            'procurement_method' => 'SHOPPING',
+            'total_amount' => 0.00,
+            'status' => 'APPROVED',
+            'order_date' => now()->toDateString(),
+            'po_date' => now()->toDateString(),
+            'created_by' => $gsoUser->id,
+        ]);
+
+        $poItem = PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $po->purchase_order_id,
+            'supply_request_item_id' => $sr->items->first()->supply_request_item_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => $item->item_name,
+            'quantity_ordered' => 100,
+            'unit' => 'box',
+            'unit_price' => 0.00,
+            'total_price' => 0.00,
+        ]);
+
+        // Supplier delivers only 50 items first
+        $delivery = Delivery::query()->create([
+            'delivery_code' => 'DEL-2026-09-0003',
+            'purchase_order_id' => $po->purchase_order_id,
+            'supplier_id' => $supplier->supplier_id,
+            'receipt_status' => 'VERIFIED',
+            'delivery_date' => now()->toDateString(),
+            'status' => 'VERIFIED',
+            'created_by' => $gsoUser->id,
+        ]);
+
+        DeliveryItem::query()->create([
+            'delivery_id' => $delivery->delivery_id,
+            'purchase_order_item_id' => $poItem->purchase_order_item_id,
+            'item_id' => $item->item_id,
+            'expected_quantity' => 100,
+            'received_quantity' => 50,
+            'missing_quantity' => 50,
+            'item_condition' => 'MISSING',
+            'remarks' => 'Partial delivery: 50 delivered, 50 remaining',
+        ]);
+
+        $inventory->forceFill([
+            'stock_on_hand' => 50,
+            'available_stock' => 50,
+        ])->save();
+
+        // GSO creates follow-up distribution record of 50 items
+        $distService = app(DistributionRecordService::class);
+        $followUpDist = $distService->createRecordWithAutomaticRelease($gsoUser, [
+            'office_id' => $office->id,
+            'supply_request_id' => $sr->supply_request_id,
+            'delivery_id' => $delivery->delivery_id,
+            'storage_location' => 'GSO Storage',
+            'notes' => 'Claim replacement for CLM-2026-00007',
+            'items' => [
+                [
+                    'item_id' => $item->item_id,
+                    'quantity_released' => 50,
+                ],
+            ],
+        ]);
+
+        $claim->refresh();
+        $this->assertSame('REPLACEMENT_RELEASED', (string) $claim->status);
+        $this->assertEquals(50.0, (float) $claim->replacement_quantity);
+
+        // Office views supplies ready for claim
+        // Crucial: There should be NO duplicate synthetic row, only the physical follow-up distribution record
+        $response = $this->actingAs($officeUser)->get(route('office.supplies-ready.index'));
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('Office/SuppliesReadyForClaim/Index')
+            ->has('records.data')
+            ->where('records.data', function ($records) use ($followUpDist) {
+                $collection = collect($records);
+                // Must contain the follow-up distribution record
+                $hasFollowUp = $collection->contains('distribution_record_id', (int) $followUpDist->distribution_record_id);
+                // Must NOT contain any synthetic record (distribution_record_id = 0) for this claim
+                $hasSynthetic = $collection->contains(fn ($r) => ((int) ($r['distribution_record_id'] ?? 0)) === 0 && ($r['claim_code'] ?? '') === 'CLM-2026-00007');
+
+                return $hasFollowUp && ! $hasSynthetic;
+            })
+        );
+
+        // Office confirms receipt of the 50 items
+        $confirmResponse = $this->actingAs($officeUser)->post(
+            route('office.distribution-records.receive', $followUpDist->distribution_record_id),
+            ['remarks' => 'Confirmed receipt of 50 boxes']
+        );
+        $confirmResponse->assertRedirect();
+
+        // Claim MUST be PARTIALLY_RESOLVED because 50 < 100 disputed
+        $claim->refresh();
+        $this->assertSame('PARTIALLY_RESOLVED', (string) $claim->status);
+        $this->assertSame('PARTIAL_REPLACEMENT', (string) $claim->resolution_type);
+        $this->assertEquals(50.0, (float) $claim->replacement_quantity);
+
+        // Original distribution item should still reflect 50 damaged items remaining
+        $origDistItem->refresh();
+        $this->assertEquals(50.0, (float) $origDistItem->quantity_damaged);
+        $this->assertSame('DISCREPANCY', (string) $origDistItem->receipt_condition);
+
+        // Original distribution record must NOT be marked RECEIVED yet
+        $origDist->refresh();
+        $this->assertNotSame('RECEIVED', (string) $origDist->status);
+
+        // Second delivery of remaining 50 items
+        $secondDelivery = Delivery::query()->create([
+            'delivery_code' => 'DEL-2026-09-0004',
+            'purchase_order_id' => $po->purchase_order_id,
+            'supplier_id' => $supplier->supplier_id,
+            'receipt_status' => 'VERIFIED',
+            'delivery_date' => now()->toDateString(),
+            'status' => 'VERIFIED',
+            'created_by' => $gsoUser->id,
+        ]);
+
+        DeliveryItem::query()->create([
+            'delivery_id' => $secondDelivery->delivery_id,
+            'purchase_order_item_id' => $poItem->purchase_order_item_id,
+            'item_id' => $item->item_id,
+            'expected_quantity' => 50,
+            'received_quantity' => 50,
+            'missing_quantity' => 0,
+            'item_condition' => 'GOOD',
+            'remarks' => 'Remaining 50 boxes delivered',
+        ]);
+
+        Inventory::query()->where('item_id', $item->item_id)->update([
+            'stock_on_hand' => 50,
+            'available_stock' => 50,
+        ]);
+        $sr->refresh();
+        $sr->unsetRelations();
+        $item->refresh();
+        $item->unsetRelations();
+
+        // GSO releases the second 50 items
+        $secondDist = $distService->createRecordWithAutomaticRelease($gsoUser, [
+            'office_id' => $office->id,
+            'supply_request_id' => $sr->supply_request_id,
+            'delivery_id' => $secondDelivery->delivery_id,
+            'storage_location' => 'GSO Storage',
+            'notes' => 'Remaining claim replacement for CLM-2026-00007',
+            'items' => [
+                [
+                    'item_id' => $item->item_id,
+                    'quantity_released' => 50,
+                ],
+            ],
+        ]);
+
+        $claim->refresh();
+        $this->assertSame('REPLACEMENT_RELEASED', (string) $claim->status);
+        $this->assertEquals(100.0, (float) $claim->replacement_quantity);
+
+        // Office confirms receipt of second 50 items
+        $finalConfirmResponse = $this->actingAs($officeUser)->post(
+            route('office.distribution-records.receive', $secondDist->distribution_record_id),
+            ['remarks' => 'Confirmed receipt of remaining 50 boxes']
+        );
+        $finalConfirmResponse->assertRedirect();
+
+        // NOW the claim is fully RESOLVED
+        $claim->refresh();
+        $this->assertSame('RESOLVED', (string) $claim->status);
+        $this->assertSame('REPLACEMENT_RELEASED', (string) $claim->resolution_type);
+        $this->assertEquals(100.0, (float) $claim->replacement_quantity);
+
+        // Original distribution item discrepancy is fully cleared
+        $origDistItem->refresh();
+        $this->assertEquals(0.0, (float) $origDistItem->quantity_damaged);
+        $this->assertSame('GOOD', (string) $origDistItem->receipt_condition);
+
+        // Original distribution record is now marked RECEIVED
+        $origDist->refresh();
+        $this->assertSame('RECEIVED', (string) $origDist->status);
+    }
 }

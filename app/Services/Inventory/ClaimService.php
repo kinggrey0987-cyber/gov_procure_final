@@ -363,9 +363,11 @@ class ClaimService
 
             $distributionRecord = $claim->distributionRecord;
             if ($distributionRecord instanceof DistributionRecord) {
-                $distributionRecord->loadMissing('items');
+                $distributionRecord->load('items');
                 $allFullyReceived = $distributionRecord->items->every(fn ($item): bool =>
                     (float) $item->quantity_received >= (float) $item->quantity_released
+                    && (float) ($item->quantity_missing ?? 0) <= 0.0001
+                    && (float) ($item->quantity_damaged ?? 0) <= 0.0001
                 );
                 if ($allFullyReceived && (string) $distributionRecord->status !== 'RECEIVED') {
                     $oldDistStatus = (string) $distributionRecord->status;
