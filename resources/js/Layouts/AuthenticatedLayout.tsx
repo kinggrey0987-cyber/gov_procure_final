@@ -160,9 +160,9 @@ export default function Authenticated({
             .replace(/\b\w/g, (char) => char.toUpperCase());
 
         return (
-            <div className="min-h-screen bg-slate-100 md:flex md:h-screen md:overflow-hidden">
-                <aside className="hidden h-screen w-64 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white md:flex">
-                    <div className="border-b border-slate-200 px-5 py-4">
+            <div className="app-shell-locked min-h-screen bg-slate-100 md:flex md:h-screen md:max-h-screen md:min-h-0 md:overflow-hidden">
+                <aside className="hidden md:flex md:sticky md:top-0 h-screen w-64 shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white z-20">
+                    <div className="shrink-0 border-b border-slate-200 px-5 py-4">
                         <Link href={route('dashboard')} className="flex items-center gap-3 transition hover:opacity-85 group">
                             <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover group-hover:ring-2 group-hover:ring-red-500/30 transition" />
                             <div>
@@ -172,7 +172,7 @@ export default function Authenticated({
                         </Link>
                     </div>
 
-                    <nav className="space-y-2 px-3 py-4">
+                    <nav className="sidebar-scroll min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-4">
                         {adminLinks.map((item) => (
                             <Link
                                 key={item.label}
@@ -189,7 +189,7 @@ export default function Authenticated({
                         ))}
                     </nav>
 
-                    <div className="mt-auto border-t border-slate-200 px-4 py-4">
+                    <div className="shrink-0 border-t border-slate-200 px-4 py-4">
                         <div className="flex items-center gap-2 text-sm text-slate-600">
                             <img src="/logo.jpg" alt="GovSupply Connect" className="h-8 w-8 rounded-full border border-slate-300 bg-white object-cover" />
                             <div>
@@ -200,8 +200,8 @@ export default function Authenticated({
                     </div>
                 </aside>
 
-                <div className="flex min-h-screen flex-1 flex-col md:min-h-0">
-                    <header className="shrink-0 border-b border-slate-200 bg-white">
+                <div className="flex min-h-screen flex-1 flex-col md:min-h-0 md:h-screen md:max-h-screen md:overflow-hidden">
+                    <header className="shrink-0 border-b border-slate-200 bg-white md:sticky md:top-0 z-10">
                         <div className="mx-auto flex min-h-16 w-full max-w-[1300px] items-center justify-between gap-3 px-4 py-3 sm:min-h-20 sm:px-6">
                             <Link href={route('dashboard')} className="flex items-center gap-3 transition hover:opacity-85 md:hidden">
                                 <img src="/logo.jpg" alt="GovSupply Connect" className="h-9 w-9 rounded-full border border-slate-300 bg-white object-cover sm:h-10 sm:w-10" />
@@ -269,7 +269,7 @@ export default function Authenticated({
                         </div>
                     </nav>
 
-                    <div className="mx-auto w-full max-w-[1300px] flex-1 overflow-y-auto px-3 py-3 sm:px-6 sm:py-4 md:h-0">
+                    <div className="mx-auto w-full max-w-[1300px] flex-1 min-h-0 overflow-y-auto px-3 py-3 sm:px-6 sm:py-4">
                         {header && (
                             <header className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
                                 <div>
@@ -339,9 +339,9 @@ export default function Authenticated({
                 .replace(/\b\w/g, (char) => char.toUpperCase());
 
         return (
-            <div className="min-h-screen bg-slate-100 md:flex md:h-screen md:overflow-hidden">
-                <aside className="hidden h-screen w-72 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white md:flex">
-                    <div className="border-b border-slate-200 px-5 py-4">
+            <div className="app-shell-locked min-h-screen bg-slate-100 md:flex md:h-screen md:max-h-screen md:min-h-0 md:overflow-hidden">
+                <aside className="hidden md:flex md:sticky md:top-0 h-screen w-72 shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white z-20">
+                    <div className="shrink-0 border-b border-slate-200 px-5 py-4">
                         <Link href={route('dashboard')} className="flex items-center gap-3 transition hover:opacity-85 group">
                             <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover group-hover:ring-2 group-hover:ring-red-500/30 transition" />
                             <div>
@@ -351,7 +351,7 @@ export default function Authenticated({
                         </Link>
                     </div>
 
-                    <nav className="space-y-2 px-3 py-4">
+                    <nav className="sidebar-scroll min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-4">
                         {procurementLinks.map((item) => (
                             <Link
                                 key={item.label}
@@ -367,7 +367,7 @@ export default function Authenticated({
                         ))}
                     </nav>
 
-                    <div className="mt-auto border-t border-slate-200 px-4 py-4">
+                    <div className="shrink-0 border-t border-slate-200 px-4 py-4">
                         <div className="flex items-center gap-2 text-sm text-slate-600">
                             <img src="/logo.jpg" alt="GovSupply Connect" className="h-8 w-8 rounded-full border border-slate-300 bg-white object-cover" />
                             <div>
@@ -378,8 +378,8 @@ export default function Authenticated({
                     </div>
                 </aside>
 
-                <div className="flex min-h-screen flex-1 flex-col md:min-h-0">
-                    <header className="shrink-0 border-b border-slate-200 bg-white">
+                <div className="flex min-h-screen flex-1 flex-col md:min-h-0 md:h-screen md:max-h-screen md:overflow-hidden">
+                    <header className="shrink-0 border-b border-slate-200 bg-white md:sticky md:top-0 z-10">
                         <div className="mx-auto flex min-h-16 w-full max-w-[1400px] items-center justify-between gap-3 px-4 py-3 sm:min-h-20 sm:px-6">
                             <Link href={route('dashboard')} className="flex items-center gap-3 transition hover:opacity-85 md:hidden">
                                 <img src="/logo.jpg" alt="GovSupply Connect" className="h-9 w-9 rounded-full border border-slate-300 bg-white object-cover sm:h-11 sm:w-11" />
@@ -449,7 +449,7 @@ export default function Authenticated({
                         </div>
                     </nav>
 
-                    <div className="mx-auto w-full max-w-[1400px] flex-1 overflow-y-auto px-3 py-3 sm:px-6 sm:py-4 md:h-0">
+                    <div className="mx-auto w-full max-w-[1400px] flex-1 min-h-0 overflow-y-auto px-3 py-3 sm:px-6 sm:py-4">
                         {header && (
                             <header className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
                                 <div>
@@ -520,9 +520,9 @@ export default function Authenticated({
             : 'Municipal Department';
 
         return (
-            <div className="min-h-screen bg-slate-100 md:flex md:h-screen md:overflow-hidden">
-                <aside className="hidden h-screen w-72 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white md:flex">
-                    <div className="border-b border-slate-200 px-5 py-4">
+            <div className="app-shell-locked min-h-screen bg-slate-100 md:flex md:h-screen md:max-h-screen md:min-h-0 md:overflow-hidden">
+                <aside className="hidden md:flex md:sticky md:top-0 h-screen w-72 shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white z-20">
+                    <div className="shrink-0 border-b border-slate-200 px-5 py-4">
                         <Link href={route('dashboard')} className="flex items-center gap-3 transition hover:opacity-85 group">
                             <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover group-hover:ring-2 group-hover:ring-red-500/30 transition" />
                             <div>
@@ -532,7 +532,7 @@ export default function Authenticated({
                         </Link>
                     </div>
 
-                    <nav className="space-y-2 px-3 py-4">
+                    <nav className="sidebar-scroll min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-4">
                         {officeLinks.map((item) => (
                             <Link
                                 key={item.label}
@@ -548,7 +548,7 @@ export default function Authenticated({
                         ))}
                     </nav>
 
-                    <div className="mt-auto border-t border-slate-200 px-4 py-4">
+                    <div className="shrink-0 border-t border-slate-200 px-4 py-4">
                         <div className="flex items-center gap-2 text-sm text-slate-600">
                             <img src="/logo.jpg" alt="GovSupply Connect" className="h-8 w-8 rounded-full border border-slate-300 bg-white object-cover" />
                             <div>
@@ -559,8 +559,8 @@ export default function Authenticated({
                     </div>
                 </aside>
 
-                <div className="flex min-h-screen flex-1 flex-col md:min-h-0">
-                    <header className="shrink-0 border-b border-slate-200 bg-white">
+                <div className="flex min-h-screen flex-1 flex-col md:min-h-0 md:h-screen md:max-h-screen md:overflow-hidden">
+                    <header className="shrink-0 border-b border-slate-200 bg-white md:sticky md:top-0 z-10">
                         <div className="mx-auto flex min-h-16 w-full max-w-[1400px] items-center justify-between gap-3 px-4 py-3 sm:min-h-20 sm:px-6">
                             <Link href={route('dashboard')} className="flex items-center gap-3 transition hover:opacity-85 md:hidden">
                                 <img src="/logo.jpg" alt="GovSupply Connect" className="h-9 w-9 rounded-full border border-slate-300 bg-white object-cover sm:h-11 sm:w-11" />
@@ -630,7 +630,7 @@ export default function Authenticated({
                         </div>
                     </nav>
 
-                    <div className="mx-auto w-full max-w-[1400px] flex-1 overflow-y-auto px-3 py-3 sm:px-6 sm:py-4 md:h-0">
+                    <div className="mx-auto w-full max-w-[1400px] flex-1 min-h-0 overflow-y-auto px-3 py-3 sm:px-6 sm:py-4">
                         {header && (
                             <header className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
                                 <div>
@@ -707,9 +707,9 @@ export default function Authenticated({
             .replace(/\b\w/g, (char) => char.toUpperCase());
 
         return (
-            <div className="min-h-screen bg-slate-100 md:flex md:h-screen md:overflow-hidden">
-                <aside className="hidden h-screen w-72 shrink-0 flex-col overflow-y-auto border-r border-red-200 bg-white md:flex">
-                    <div className="border-b border-slate-200 px-5 py-4">
+            <div className="app-shell-locked min-h-screen bg-slate-100 md:flex md:h-screen md:max-h-screen md:min-h-0 md:overflow-hidden">
+                <aside className="hidden md:flex md:sticky md:top-0 h-screen w-72 shrink-0 flex-col overflow-hidden border-r border-red-200 bg-white z-20">
+                    <div className="shrink-0 border-b border-slate-200 px-5 py-4">
                         <Link href={route('dashboard')} className="flex items-center gap-3 transition hover:opacity-85 group">
                             <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover group-hover:ring-2 group-hover:ring-red-500/30 transition" />
                             <div>
@@ -719,7 +719,7 @@ export default function Authenticated({
                         </Link>
                     </div>
 
-                    <nav className="space-y-2 px-3 py-4">
+                    <nav className="sidebar-scroll min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-4">
                         {executiveLinks.map((item) => (
                             <Link
                                 key={item.label}
@@ -735,7 +735,7 @@ export default function Authenticated({
                         ))}
                     </nav>
 
-                    <div className="mt-auto border-t border-slate-200 px-4 py-4">
+                    <div className="shrink-0 border-t border-slate-200 px-4 py-4">
                         <div className="flex items-center gap-2 text-sm text-slate-600">
                             <img src="/logo.jpg" alt="GovSupply Connect" className="h-8 w-8 rounded-full border border-slate-300 bg-white object-cover" />
                             <div>
@@ -746,8 +746,8 @@ export default function Authenticated({
                     </div>
                 </aside>
 
-                <div className="flex min-h-screen flex-1 flex-col md:min-h-0">
-                    <header className="shrink-0 border-b border-slate-200 bg-white">
+                <div className="flex min-h-screen flex-1 flex-col md:min-h-0 md:h-screen md:max-h-screen md:overflow-hidden">
+                    <header className="shrink-0 border-b border-slate-200 bg-white md:sticky md:top-0 z-10">
                         <div className="mx-auto flex min-h-16 w-full max-w-[1400px] items-center justify-between gap-3 px-4 py-3 sm:min-h-20 sm:px-6">
                             <Link href={route('dashboard')} className="flex items-center gap-3 transition hover:opacity-85 md:hidden">
                                 <img src="/logo.jpg" alt="GovSupply Connect" className="h-9 w-9 rounded-full border border-slate-300 bg-white object-cover sm:h-11 sm:w-11" />
@@ -817,7 +817,7 @@ export default function Authenticated({
                         </div>
                     </nav>
 
-                    <div className="mx-auto w-full max-w-[1400px] flex-1 overflow-y-auto px-3 py-3 sm:px-6 sm:py-4 md:h-0">
+                    <div className="mx-auto w-full max-w-[1400px] flex-1 min-h-0 overflow-y-auto px-3 py-3 sm:px-6 sm:py-4">
                         {header && (
                             <header className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
                                 <div>
@@ -921,8 +921,8 @@ export default function Authenticated({
             .replace(/\b\w/g, (char) => char.toUpperCase());
 
         return (
-            <div className="min-h-screen bg-slate-100 md:flex md:h-screen md:overflow-hidden">
-                <aside className="hidden h-screen w-72 shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white md:flex">
+            <div className="app-shell-locked min-h-screen bg-slate-100 md:flex md:h-screen md:max-h-screen md:min-h-0 md:overflow-hidden">
+                <aside className="hidden md:flex md:sticky md:top-0 h-screen w-72 shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white z-20">
                     <div className="shrink-0 border-b border-slate-200 px-5 py-4">
                         <Link href={route('dashboard')} className="flex items-center gap-3 transition hover:opacity-85 group">
                             <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover group-hover:ring-2 group-hover:ring-red-500/30 transition" />
@@ -960,8 +960,8 @@ export default function Authenticated({
                     </div>
                 </aside>
 
-                <div className="flex min-h-screen flex-1 flex-col md:min-h-0">
-                    <header className="shrink-0 border-b border-slate-200 bg-white">
+                <div className="flex min-h-screen flex-1 flex-col md:min-h-0 md:h-screen md:max-h-screen md:overflow-hidden">
+                    <header className="shrink-0 border-b border-slate-200 bg-white md:sticky md:top-0 z-10">
                         <div className="mx-auto flex min-h-16 w-full max-w-[1400px] items-center justify-between gap-3 px-4 py-3 sm:min-h-20 sm:px-6">
                             <Link href={route('dashboard')} className="flex items-center gap-3 transition hover:opacity-85 md:hidden">
                                 <img src="/logo.jpg" alt="GovSupply Connect" className="h-9 w-9 rounded-full border border-slate-300 bg-white object-cover sm:h-11 sm:w-11" />
@@ -1031,7 +1031,7 @@ export default function Authenticated({
                         </div>
                     </nav>
 
-                    <div className="mx-auto w-full max-w-[1400px] flex-1 overflow-y-auto px-3 py-3 sm:px-6 sm:py-4 md:h-0">
+                    <div className="mx-auto w-full max-w-[1400px] flex-1 min-h-0 overflow-y-auto px-3 py-3 sm:px-6 sm:py-4">
                         {header && (
                             <header className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
                                 <div>
