@@ -538,11 +538,17 @@ class PurchaseRequestService
                 'quantity_requested' => $quantityToProcure,
             ]);
 
+            $claim->loadMissing('distributionRecord');
+            $sourceDeliveryId = $claim->distributionRecord?->delivery_id;
+            $sourceSupplyRequestId = $claim->distributionRecord?->supply_request_id;
+
             $purchaseRequest = PurchaseRequest::query()->create([
                 'pr_number' => $this->generateNextPrNumber(),
                 'supply_request_id' => (int) $supplyRequest->supply_request_id,
                 'office_id' => $officeId,
                 'requested_by' => (int) $actor->id,
+                'source_delivery_id' => $sourceDeliveryId ? (int) $sourceDeliveryId : null,
+                'source_supply_request_id' => $sourceSupplyRequestId ? (int) $sourceSupplyRequestId : null,
                 'source_claim_id' => (int) $claim->claims_id,
                 'source_type' => 'CLAIM_REPLACEMENT_FOLLOW_UP',
                 'status' => 'OPEN',

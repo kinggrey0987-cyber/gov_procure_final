@@ -86,6 +86,10 @@ class PurchaseOrder extends Model
     {
         $pr = $this->relationLoaded('purchaseRequest') ? $this->purchaseRequest : ($this->purchase_request_id ? $this->purchaseRequest()->first() : null);
 
+        if ($pr?->is_claim_replacement) {
+            return false;
+        }
+
         return (string) ($pr?->source_type ?? '') === 'PARTIAL_DELIVERY_FOLLOW_UP'
             || (int) ($pr?->source_delivery_id ?? 0) > 0;
     }

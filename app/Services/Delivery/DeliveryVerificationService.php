@@ -116,24 +116,40 @@ class DeliveryVerificationService
         });
     }
 
-    private function resolveSourcePartialDeliveryIfFollowUpCompleted(Delivery $delivery, User $actor): void
+    public function resolveSourcePartialDeliveryIfFollowUpCompleted(Delivery $delivery, ?User $actor = null): void
     {
+        $actor = $actor ?? $delivery->receiver ?? User::query()->whereHas('role', fn ($q) => $q->where('code', 'GSO_OFFICER'))->first() ?? User::query()->first();
+        if (! $actor instanceof User) {
+            return;
+        }
+
         $resolvedByDelivery = $delivery;
         $visitedDeliveryIds = [];
 
         while (true) {
-            $resolvedByDelivery->loadMissing('purchaseOrder.purchaseRequest.sourceDelivery');
+            $resolvedByDelivery->loadMissing([
+                'purchaseOrder.purchaseRequest.sourceDelivery',
+                'purchaseOrder.purchaseRequest.sourceClaim.distributionRecord.delivery',
+            ]);
 
             $purchaseRequest = $resolvedByDelivery->purchaseOrder?->purchaseRequest;
-            if (
-                ! $purchaseRequest
-                || (string) $purchaseRequest->source_type !== 'PARTIAL_DELIVERY_FOLLOW_UP'
-                || (int) ($purchaseRequest->source_delivery_id ?? 0) <= 0
-            ) {
+            if (! $purchaseRequest) {
+                return;
+            }
+
+            $isFollowUp = in_array((string) $purchaseRequest->source_type, ['PARTIAL_DELIVERY_FOLLOW_UP', 'CLAIM_REPLACEMENT_FOLLOW_UP'], true)
+                || (int) ($purchaseRequest->source_delivery_id ?? 0) > 0
+                || (int) ($purchaseRequest->source_claim_id ?? 0) > 0;
+
+            if (! $isFollowUp) {
                 return;
             }
 
             $sourceDelivery = $purchaseRequest->sourceDelivery;
+            if (! $sourceDelivery instanceof Delivery && $purchaseRequest->sourceClaim) {
+                $sourceDelivery = $purchaseRequest->sourceClaim->distributionRecord?->delivery;
+            }
+
             if (! $sourceDelivery instanceof Delivery) {
                 return;
             }
@@ -145,28 +161,26 @@ class DeliveryVerificationService
 
             $visitedDeliveryIds[$sourceDeliveryId] = true;
 
-            if ((string) $sourceDelivery->receipt_status !== 'PARTIALLY_RECEIVED') {
-                return;
+            if ((string) $sourceDelivery->receipt_status === 'PARTIALLY_RECEIVED') {
+                $oldStatus = (string) $sourceDelivery->receipt_status;
+
+                $sourceDelivery->forceFill([
+                    'receipt_status' => 'VERIFIED',
+                ])->save();
+
+                $this->recordStatus(
+                    $sourceDelivery,
+                    $oldStatus,
+                    'VERIFIED',
+                    $actor,
+                    sprintf(
+                        'Partial delivery discrepancy resolved by accepted follow-up delivery %s.',
+                        (string) $delivery->delivery_code
+                    )
+                );
+
+                $this->recordAudit($actor, 'RESOLVE_PARTIAL_DELIVERY_FROM_FOLLOW_UP', $sourceDelivery);
             }
-
-            $oldStatus = (string) $sourceDelivery->receipt_status;
-
-            $sourceDelivery->forceFill([
-                'receipt_status' => 'VERIFIED',
-            ])->save();
-
-            $this->recordStatus(
-                $sourceDelivery,
-                $oldStatus,
-                'VERIFIED',
-                $actor,
-                sprintf(
-                    'Partial delivery discrepancy resolved by accepted follow-up delivery %s.',
-                    (string) $delivery->delivery_code
-                )
-            );
-
-            $this->recordAudit($actor, 'RESOLVE_PARTIAL_DELIVERY_FROM_FOLLOW_UP', $sourceDelivery);
 
             // Cascading completion:
             // 1. Mark follow-up replacement PO as COMPLETED

@@ -379,6 +379,187 @@ class ClaimAndConsolidatedLifecycleTest extends TestCase
         });
     }
 
+    public function test_claim_follow_up_delivery_verification_resolves_parent_partial_delivery_to_verified(): void
+    {
+        $prService = app(PurchaseRequestService::class);
+        $verificationService = app(\App\Services\Delivery\DeliveryVerificationService::class);
+
+        // 1. Initial supply request and PO for 200 items
+        $sr = SupplyRequest::query()->create([
+            'request_code' => 'SR-MPDO-2026-09-0017',
+            'office_id' => $this->office->id,
+            'requested_by' => $this->officeUser->id,
+            'status' => 'APPROVED',
+            'priority_level' => 'NORMAL',
+            'request_category' => 'GENERAL',
+            'purpose' => 'Office supplies batch 17',
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(7)->toDateString(),
+        ]);
+        $sri = SupplyRequestItem::query()->create([
+            'supply_request_id' => $sr->supply_request_id,
+            'item_id' => $this->item->item_id,
+            'item_name_snapshot' => $this->item->item_name,
+            'quantity_requested' => 200,
+        ]);
+
+        $parentPr = PurchaseRequest::query()->create([
+            'pr_number' => 'PR-2026-09-0017',
+            'supply_request_id' => $sr->supply_request_id,
+            'office_id' => $this->office->id,
+            'requested_by' => $this->officeUser->id,
+            'status' => 'APPROVED',
+        ]);
+        $parentPrItem = PurchaseRequestItem::query()->create([
+            'purchase_request_id' => $parentPr->purchase_request_id,
+            'item_id' => $this->item->item_id,
+            'quantity_requested' => 200,
+        ]);
+
+        $parentPo = PurchaseOrder::query()->create([
+            'po_number' => 'PO-2026-09-0018',
+            'purchase_request_id' => $parentPr->purchase_request_id,
+            'supply_request_id' => $sr->supply_request_id,
+            'created_by' => $this->gsoUser->id,
+            'supplier_id' => $this->supplier->supplier_id,
+            'procurement_method' => 'SHOPPING',
+            'status' => 'PLACED',
+            'total_amount' => 20000,
+        ]);
+        $parentPoi = PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $parentPo->purchase_order_id,
+            'supply_request_item_id' => $sri->supply_request_item_id,
+            'item_id' => $this->item->item_id,
+            'item_name_snapshot' => $this->item->item_name,
+            'quantity_ordered' => 200,
+            'unit' => 'box',
+            'unit_price' => 100,
+            'total_price' => 20000,
+        ]);
+
+        // 2. Delivery 17 arrives with only 150 items (PARTIALLY_RECEIVED)
+        $del17 = Delivery::query()->create([
+            'delivery_code' => 'DEL-2026-09-0017',
+            'purchase_order_id' => $parentPo->purchase_order_id,
+            'supplier_id' => $this->supplier->supplier_id,
+            'received_by' => $this->gsoUser->id,
+            'actual_delivery_date' => now()->toDateString(),
+            'receipt_status' => 'PARTIALLY_RECEIVED',
+        ]);
+        DeliveryItem::query()->create([
+            'delivery_id' => $del17->delivery_id,
+            'purchase_order_item_id' => $parentPoi->purchase_order_item_id,
+            'expected_quantity' => 200,
+            'received_quantity' => 150,
+            'damaged_quantity' => 0,
+            'missing_quantity' => 50,
+            'item_status' => 'PARTIALLY_RECEIVED',
+        ]);
+
+        // 3. Distribution of 150 items to office, with 50 missing reported in claim
+        $dist = DistributionRecord::query()->create([
+            'distribution_code' => 'DIST-2026-09-0017',
+            'supply_request_id' => $sr->supply_request_id,
+            'delivery_id' => $del17->delivery_id,
+            'office_id' => $this->office->id,
+            'prepared_by' => $this->gsoUser->id,
+            'released_by' => $this->gsoUser->id,
+            'status' => 'RECEIVED',
+            'release_date' => now()->toDateString(),
+        ]);
+        $distItem = DistributionItem::query()->create([
+            'distribution_record_id' => $dist->distribution_record_id,
+            'item_id' => $this->item->item_id,
+            'item_name_snapshot' => $this->item->item_name,
+            'quantity_released' => 150,
+            'quantity_received' => 150,
+            'quantity_missing' => 50,
+            'unit' => 'box',
+        ]);
+
+        $claim = Claim::query()->create([
+            'claim_code' => 'CLM-2026-09-0017',
+            'distribution_record_id' => $dist->distribution_record_id,
+            'distribution_item_id' => $distItem->distribution_item_id,
+            'claimed_by' => $this->officeUser->id,
+            'office_id' => $this->office->id,
+            'claim_date' => now()->toDateString(),
+            'claim_type' => 'REPLACEMENT',
+            'claim_location' => 'Office receiving desk',
+            'issue_type' => 'MISSING_ITEMS',
+            'quantity_disputed' => 50,
+            'quantity_missing' => 50,
+            'status' => 'PENDING_REPLACEMENT',
+        ]);
+
+        // 4. Follow-up PR is generated from Claim -> check source_delivery_id is set
+        $replacementPr = $prService->createFromPendingClaimReplacement($claim, $this->gsoUser, 'Procure 50 replacement');
+        $this->assertEquals((int) $del17->delivery_id, (int) $replacementPr->source_delivery_id);
+        $this->assertEquals('CLAIM_REPLACEMENT_FOLLOW_UP', (string) $replacementPr->source_type);
+
+        // 5. Follow-up PO is created for 50 items
+        $followUpPo = PurchaseOrder::query()->create([
+            'po_number' => 'PO-2026-09-0019',
+            'purchase_request_id' => $replacementPr->purchase_request_id,
+            'supply_request_id' => $replacementPr->supply_request_id,
+            'created_by' => $this->gsoUser->id,
+            'supplier_id' => $this->supplier->supplier_id,
+            'procurement_method' => 'SHOPPING',
+            'status' => 'PLACED',
+            'total_amount' => 5000,
+        ]);
+        $followUpPoi = PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $followUpPo->purchase_order_id,
+            'supply_request_item_id' => $replacementPr->supplyRequest->items->first()->supply_request_item_id,
+            'item_id' => $this->item->item_id,
+            'item_name_snapshot' => $this->item->item_name,
+            'quantity_ordered' => 50,
+            'unit' => 'box',
+            'unit_price' => 100,
+            'total_price' => 5000,
+        ]);
+
+        // 6. Delivery 18 arrives with 50 replacement items
+        $del18 = Delivery::query()->create([
+            'delivery_code' => 'DEL-2026-09-0018',
+            'purchase_order_id' => $followUpPo->purchase_order_id,
+            'supplier_id' => $this->supplier->supplier_id,
+            'received_by' => $this->gsoUser->id,
+            'actual_delivery_date' => now()->toDateString(),
+            'receipt_status' => 'RECEIVED',
+        ]);
+        DeliveryItem::query()->create([
+            'delivery_id' => $del18->delivery_id,
+            'purchase_order_item_id' => $followUpPoi->purchase_order_item_id,
+            'expected_quantity' => 50,
+            'received_quantity' => 50,
+            'damaged_quantity' => 0,
+            'missing_quantity' => 0,
+            'item_status' => 'ACCEPTED',
+        ]);
+
+        // 7. Verify Delivery 18 with APPROVED status
+        $this->actingAs($this->gsoUser)->post(
+            route('inventory.delivery-verifications.store', $del18->delivery_id),
+            [
+                'verification_status' => 'APPROVED',
+                'verification_date' => now()->toDateString(),
+                'remarks' => 'All 50 replacement units verified and accepted.',
+            ]
+        );
+
+        // 8. Assertions:
+        // - Delivery 18 is VERIFIED
+        $this->assertSame('VERIFIED', (string) $del18->fresh()->receipt_status);
+        // - Delivery 17 (Parent) is automatically updated from PARTIALLY_RECEIVED to VERIFIED!
+        $this->assertSame('VERIFIED', (string) $del17->fresh()->receipt_status);
+
+        // - Parent PO is marked COMPLETED
+        $this->assertSame('COMPLETED', (string) $parentPo->fresh()->status);
+        // - Follow-up PO is marked COMPLETED
+        $this->assertSame('COMPLETED', (string) $followUpPo->fresh()->status);
+    }
+
     public function test_consolidated_pr_fulfillment_order_and_dynamic_rebinding(): void
     {
         $distService = app(DistributionRecordService::class);
