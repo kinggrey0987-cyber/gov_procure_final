@@ -877,31 +877,25 @@ class ExecutiveMonitoringService
                 'total' => $group->count(),
             ]);
 
-        if ($byMonth->isEmpty()) {
-            return collect();
-        }
-
-        $allMonths = $byMonth->keys()->sort()->values();
-        $startMonth = Carbon::parse($allMonths->first() . '-01');
-        $endMonth = Carbon::parse($allMonths->last() . '-01');
-
         if ($filteredYear && preg_match('/^\d{4}$/', $filteredYear)) {
             $startMonth = Carbon::parse("{$filteredYear}-01-01");
             $endMonth = Carbon::parse("{$filteredYear}-12-01");
+
+            $result = collect();
+            $curr = $startMonth->copy();
+            while ($curr->lessThanOrEqualTo($endMonth)) {
+                $key = $curr->format('Y-m');
+                $result->push([
+                    'month' => $key,
+                    'total' => $byMonth->get($key)['total'] ?? 0,
+                ]);
+                $curr->addMonth();
+            }
+
+            return $result;
         }
 
-        $result = collect();
-        $curr = $startMonth->copy();
-        while ($curr->lessThanOrEqualTo($endMonth)) {
-            $key = $curr->format('Y-m');
-            $result->push([
-                'month' => $key,
-                'total' => $byMonth->get($key)['total'] ?? 0,
-            ]);
-            $curr->addMonth();
-        }
-
-        return $result;
+        return $byMonth->sortBy('month')->values();
     }
 
     /**
@@ -918,32 +912,26 @@ class ExecutiveMonitoringService
                 'order_count' => $group->count(),
             ]);
 
-        if ($byMonth->isEmpty()) {
-            return collect();
-        }
-
-        $allMonths = $byMonth->keys()->sort()->values();
-        $startMonth = Carbon::parse($allMonths->first() . '-01');
-        $endMonth = Carbon::parse($allMonths->last() . '-01');
-
         if ($filteredYear && preg_match('/^\d{4}$/', $filteredYear)) {
             $startMonth = Carbon::parse("{$filteredYear}-01-01");
             $endMonth = Carbon::parse("{$filteredYear}-12-01");
+
+            $result = collect();
+            $curr = $startMonth->copy();
+            while ($curr->lessThanOrEqualTo($endMonth)) {
+                $key = $curr->format('Y-m');
+                $result->push([
+                    'month' => $key,
+                    'total' => (float) ($byMonth->get($key)['total'] ?? 0.0),
+                    'order_count' => (int) ($byMonth->get($key)['order_count'] ?? 0),
+                ]);
+                $curr->addMonth();
+            }
+
+            return $result;
         }
 
-        $result = collect();
-        $curr = $startMonth->copy();
-        while ($curr->lessThanOrEqualTo($endMonth)) {
-            $key = $curr->format('Y-m');
-            $result->push([
-                'month' => $key,
-                'total' => (float) ($byMonth->get($key)['total'] ?? 0.0),
-                'order_count' => (int) ($byMonth->get($key)['order_count'] ?? 0),
-            ]);
-            $curr->addMonth();
-        }
-
-        return $result;
+        return $byMonth->sortBy('month')->values();
     }
 
     /**
