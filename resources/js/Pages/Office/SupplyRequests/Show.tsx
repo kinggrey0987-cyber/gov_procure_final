@@ -1093,7 +1093,7 @@ function formatNumber(value?: number | null): string {
 function StatusBadge({ status }: { status: string }) {
     const normalized = status.toUpperCase();
     const style =
-        normalized === 'APPROVED' || normalized === 'COMPLETED'
+        normalized === 'APPROVED' || normalized === 'COMPLETED' || normalized === 'READY_FOR_RELEASE'
             ? 'bg-emerald-100 text-emerald-700'
             : normalized === 'IN_REVIEW' || normalized === 'PROCESSING' || normalized === 'RELEASED' || normalized === 'PARTIALLY_RELEASED' || normalized === 'PROCUREMENT_PO_DRAFT' || normalized === 'PROCUREMENT_PLACED'
                 ? 'bg-blue-100 text-blue-700'

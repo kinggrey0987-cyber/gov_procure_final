@@ -373,9 +373,9 @@ function formatDateTime(value?: string | null): string {
 function StatusBadge({ status }: { status: string }) {
     const normalized = status.toUpperCase();
     const style =
-        normalized === 'APPROVED' || normalized === 'COMPLETED'
+        normalized === 'APPROVED' || normalized === 'COMPLETED' || normalized === 'READY_FOR_RELEASE'
             ? 'bg-emerald-100 text-emerald-700'
-            : normalized === 'IN_REVIEW' || normalized === 'PROCESSING'
+            : normalized === 'IN_REVIEW' || normalized === 'PROCESSING' || normalized === 'RELEASED' || normalized === 'PARTIALLY_RELEASED' || normalized === 'PROCUREMENT_PO_DRAFT' || normalized === 'PROCUREMENT_PLACED'
                 ? 'bg-blue-100 text-blue-700'
                 : normalized === 'REJECTED'
                     ? 'bg-rose-100 text-rose-700'
@@ -391,6 +391,7 @@ function displayOfficeRequestStatus(status: string): string {
         SUBMITTED: 'Submitted',
         PROCESSING: 'In Processing',
         APPROVED: 'Approved',
+        READY_FOR_RELEASE: 'Ready for Release',
         COMPLETED: 'Completed',
         REJECTED: 'Rejected',
     };

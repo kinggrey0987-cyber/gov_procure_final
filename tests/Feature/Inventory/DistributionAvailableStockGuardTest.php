@@ -19,6 +19,8 @@ use App\Models\SupplyRequest;
 use App\Models\SupplyRequestItem;
 use App\Models\User;
 use App\Services\Inventory\DistributionRecordService;
+use App\Services\Inventory\SupplyRequestFollowUpService;
+use App\Services\Procurement\PurchaseRequestService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -2383,6 +2385,241 @@ class DistributionAvailableStockGuardTest extends TestCase
         $response3 = $this->actingAs($gsoUser)->get(route('inventory.distribution-records.create'));
         $response3->assertOk();
         $this->assertCount(0, $response3->viewData('page')['props']['eligibleRows']['data']);
+    }
+
+    public function test_consolidated_pr_delivery_discrepancy_follow_up_links_to_deficit_sr_and_resolves_cleanly(): void
+    {
+        $gsoRole = Role::query()->firstOrCreate(['code' => UserRole::GSO_OFFICER->value], ['name' => 'GSO Officer']);
+        $officeRole = Role::query()->firstOrCreate(['code' => UserRole::OFFICE_USER->value], ['name' => 'Office User']);
+
+        $office = Office::factory()->create(['code' => 'MPDO', 'name' => 'Municipal Planning and Development Office']);
+        $gsoUser = User::factory()->create(['role_id' => $gsoRole->id]);
+        $officeUser = User::factory()->create(['role_id' => $officeRole->id, 'office_id' => $office->id]);
+
+        $category = ItemCategory::query()->firstOrCreate(
+            ['category_name' => 'Office Supplies'],
+            ['description' => 'Supplies']
+        );
+        $item = Item::query()->create([
+            'item_category_id' => $category->item_category_id,
+            'item_name' => 'Flash Drive 32GB',
+            'default_unit' => 'box',
+            'status' => 'active',
+        ]);
+
+        Inventory::query()->create([
+            'item_id' => $item->item_id,
+            'stock_on_hand' => 0,
+            'available_stock' => 0,
+            'reserved_quantity' => 0,
+        ]);
+
+        // SR 1: 200 boxes requested
+        $sr1 = SupplyRequest::query()->create([
+            'request_code' => 'SR-MPDO-2026-09-0003',
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(7)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Office Drive Storage 1',
+            'priority_level' => 'NORMAL',
+            'status' => 'FOR_PROCUREMENT',
+        ]);
+        $sri1 = SupplyRequestItem::query()->create([
+            'supply_request_id' => $sr1->supply_request_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Flash Drive 32GB',
+            'quantity_requested' => 200,
+        ]);
+
+        // SR 2: 100 boxes requested
+        $sr2 = SupplyRequest::query()->create([
+            'request_code' => 'SR-MPDO-2026-09-0004',
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(7)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Office Drive Storage 2',
+            'priority_level' => 'NORMAL',
+            'status' => 'FOR_PROCUREMENT',
+        ]);
+        $sri2 = SupplyRequestItem::query()->create([
+            'supply_request_id' => $sr2->supply_request_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Flash Drive 32GB',
+            'quantity_requested' => 100,
+        ]);
+
+        // Consolidated PR for both SRs (total 300)
+        $pr = PurchaseRequest::query()->create([
+            'pr_number' => 'PR-2026-09-0020',
+            'supply_request_id' => $sr1->supply_request_id,
+            'office_id' => $office->id,
+            'requested_by' => $gsoUser->id,
+            'status' => 'APPROVED',
+            'remarks' => 'Consolidated PR from 2 supply request(s): SR-MPDO-2026-09-0003, SR-MPDO-2026-09-0004.',
+        ]);
+
+        $supplier = Supplier::query()->create([
+            'supplier_name' => 'Storage Supplier',
+            'contact_person' => 'Supplier',
+            'email' => 'storage@test.local',
+            'phone' => '09123456789',
+            'address' => 'Storage Address',
+            'status' => 'ACTIVE',
+        ]);
+
+        $po = PurchaseOrder::query()->create([
+            'po_number' => 'PO-2026-09-0020',
+            'purchase_request_id' => $pr->purchase_request_id,
+            'supply_request_id' => $sr1->supply_request_id,
+            'supplier_id' => $supplier->supplier_id,
+            'created_by' => $gsoUser->id,
+            'procurement_method' => 'SHOPPING',
+            'status' => 'APPROVED',
+            'total_amount' => 75000,
+        ]);
+
+        $poi = PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $po->purchase_order_id,
+            'supply_request_item_id' => $sri1->supply_request_item_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Flash Drive 32GB',
+            'quantity_ordered' => 300,
+            'unit' => 'box',
+            'unit_price' => 250,
+            'total_price' => 75000,
+        ]);
+
+        // Partial delivery: only 210 received out of 300 (missing 90)
+        $delivery1 = Delivery::query()->create([
+            'delivery_code' => 'DEL-2026-09-0010',
+            'purchase_order_id' => $po->purchase_order_id,
+            'supplier_id' => $supplier->supplier_id,
+            'received_by' => $gsoUser->id,
+            'delivery_date' => now()->toDateString(),
+            'receipt_status' => 'PARTIALLY_RECEIVED',
+        ]);
+
+        $di1 = DeliveryItem::query()->create([
+            'delivery_id' => $delivery1->delivery_id,
+            'purchase_order_item_id' => $poi->purchase_order_item_id,
+            'expected_quantity' => 300,
+            'received_quantity' => 210,
+            'missing_quantity' => 90,
+            'damaged_quantity' => 0,
+        ]);
+
+        Inventory::query()->where('item_id', $item->item_id)->update(['available_stock' => 210]);
+
+        $distService = app(DistributionRecordService::class);
+        $followUpService = app(SupplyRequestFollowUpService::class);
+        $prService = app(PurchaseRequestService::class);
+
+        // 1. Release to SR1 first: gets 200 (100% full receipt)
+        $dist1 = $distService->createRecordWithAutomaticRelease($gsoUser, [
+            'supply_request_id' => $sr1->supply_request_id,
+            'delivery_id' => $delivery1->delivery_id,
+            'office_id' => $office->id,
+            'release_date' => now()->toDateString(),
+        ]);
+        $distService->markReceivedByOffice($dist1, $officeUser);
+
+        // 2. Release remaining 10 to SR2: gets 10 (short 90 -> PARTIALLY_RECEIVED)
+        $dist2 = $distService->createRecordWithAutomaticRelease($gsoUser, [
+            'supply_request_id' => $sr2->supply_request_id,
+            'delivery_id' => $delivery1->delivery_id,
+            'office_id' => $office->id,
+            'release_date' => now()->toDateString(),
+        ]);
+        $distService->markReceivedByOffice($dist2, $officeUser);
+        $sr2->forceFill(['status' => 'PARTIALLY_RECEIVED'])->save();
+
+        // 3. Create follow-up PR from delivery discrepancy
+        $followUpPr = $prService->createFromPartialDelivery(
+            $delivery1,
+            $gsoUser,
+            'Follow up for shortage on consolidated delivery'
+        );
+
+        // Assert: Parent must be SR2 (the one that took the shortage), NOT SR1!
+        $this->assertEquals((int) $sr2->supply_request_id, (int) $followUpPr->source_supply_request_id, 'Follow-up PR must attribute to SR2 which has the deficit.');
+        $followUpSr = $followUpPr->supplyRequest;
+        $this->assertNotNull($followUpSr);
+
+        $context = $followUpService->resolveContext($followUpSr);
+        $this->assertTrue($context['is_follow_up']);
+        $this->assertEquals((int) $sr2->supply_request_id, (int) $context['parent']['supply_request_id']);
+
+        $sr1Context = $followUpService->resolveContext($sr1);
+        $this->assertEmpty($sr1Context['children'], 'SR1 is complete and should have no follow-up batches.');
+
+        $sr2Context = $followUpService->resolveContext($sr2);
+        $this->assertCount(1, $sr2Context['children'], 'SR2 has the deficit and must be linked to the follow-up batch.');
+
+        // 4. Follow-up PO created and replacement delivery of 90 boxes arrives
+        $followUpPo = PurchaseOrder::query()->create([
+            'po_number' => 'PO-2026-09-0021',
+            'purchase_request_id' => $followUpPr->purchase_request_id,
+            'supply_request_id' => $followUpSr->supply_request_id,
+            'supplier_id' => $supplier->supplier_id,
+            'created_by' => $gsoUser->id,
+            'procurement_method' => 'SHOPPING',
+            'status' => 'APPROVED',
+            'total_amount' => 22500,
+        ]);
+
+        $poiFollowUp = PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $followUpPo->purchase_order_id,
+            'supply_request_item_id' => $followUpSr->items()->first()->supply_request_item_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Flash Drive 32GB',
+            'quantity_ordered' => 90,
+            'unit' => 'box',
+            'unit_price' => 250,
+            'total_price' => 22500,
+        ]);
+
+        $delivery2 = Delivery::query()->create([
+            'delivery_code' => 'DEL-2026-09-0011',
+            'purchase_order_id' => $followUpPo->purchase_order_id,
+            'supplier_id' => $supplier->supplier_id,
+            'received_by' => $gsoUser->id,
+            'delivery_date' => now()->toDateString(),
+            'receipt_status' => 'VERIFIED',
+        ]);
+
+        DeliveryItem::query()->create([
+            'delivery_id' => $delivery2->delivery_id,
+            'purchase_order_item_id' => $poiFollowUp->purchase_order_item_id,
+            'expected_quantity' => 90,
+            'received_quantity' => 90,
+            'damaged_quantity' => 0,
+        ]);
+
+        Inventory::query()->where('item_id', $item->item_id)->update(['available_stock' => 90]);
+
+        // Office view for followUpSr: must reflect READY_FOR_RELEASE
+        $responseShow = $this->actingAs($officeUser)->get(route('office.supply-requests.show', $followUpSr->supply_request_id));
+        $responseShow->assertOk();
+        $this->assertEquals('READY_FOR_RELEASE', $responseShow->viewData('page')['props']['supplyRequest']['status']);
+
+        // 5. GSO releases replacement distribution
+        $dist3 = $distService->createRecordWithAutomaticRelease($gsoUser, [
+            'supply_request_id' => $followUpSr->supply_request_id,
+            'delivery_id' => $delivery2->delivery_id,
+            'office_id' => $office->id,
+            'release_date' => now()->toDateString(),
+        ]);
+        $this->assertEquals(90.0, (float) $dist3->items->sum('quantity_released'));
+
+        // Complete release and office receipt
+        $distService->markReceivedByOffice($dist3, $officeUser);
+
+        // Assert: Parent SR2 should now be 100% fulfilled and transitioned to RECEIVED!
+        $this->assertEquals('RECEIVED', (string) $sr2->fresh()->status, 'Parent SR2 should automatically transition to RECEIVED once follow-up batch fulfills remaining 90 items.');
     }
 }
 

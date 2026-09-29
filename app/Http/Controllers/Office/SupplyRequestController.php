@@ -467,11 +467,26 @@ class SupplyRequestController extends Controller
                 : 'PARTIALLY_RELEASED';
         }
 
-        $purchaseOrderStatuses = $supplyRequest->purchaseOrders
+        $deliveryIds = $this->followUpService->resolveDeliveryIdsForSupplyRequest($supplyRequest);
+        $hasVerifiedDelivery = ! empty($deliveryIds) && \App\Models\Delivery::query()
+            ->whereIn('delivery_id', $deliveryIds)
+            ->whereIn('receipt_status', ['VERIFIED', 'PARTIALLY_RECEIVED'])
+            ->exists();
+
+        if ($hasVerifiedDelivery) {
+            return 'READY_FOR_RELEASE';
+        }
+
+        $linkedPrs = $this->traceabilityService->getPurchaseRequestsForSupplyRequest($supplyRequest);
+        $allPurchaseOrders = $supplyRequest->purchaseOrders
+            ->concat($linkedPrs->flatMap->purchaseOrders)
+            ->unique('purchase_order_id');
+
+        $purchaseOrderStatuses = $allPurchaseOrders
             ->pluck('status')
             ->map(fn ($status): string => strtoupper((string) $status));
 
-        if ($purchaseOrderStatuses->contains('PLACED')) {
+        if ($purchaseOrderStatuses->contains('PLACED') || $purchaseOrderStatuses->contains('APPROVED') || $purchaseOrderStatuses->contains('COMPLETED')) {
             return 'PROCUREMENT_PLACED';
         }
 
@@ -487,7 +502,6 @@ class SupplyRequestController extends Controller
             return 'CANCELLED';
         }
 
-        $linkedPrs = $this->traceabilityService->getPurchaseRequestsForSupplyRequest($supplyRequest);
         $purchaseRequestStatuses = $linkedPrs
             ->pluck('status')
             ->map(fn ($status): string => strtoupper((string) $status));
@@ -583,9 +597,13 @@ class SupplyRequestController extends Controller
                 'IN_REVIEW' => 3,
                 'OPEN' => 3,
                 'RETURNED_FOR_REVISION' => 3,
+                'FOR_PROCUREMENT' => 3,
+                'APPROVED' => 3,
                 'PROCESSING' => 4,
                 'PROCUREMENT_PO_DRAFT' => 4,
                 'PROCUREMENT_PLACED' => 4,
+                'READY_FOR_RELEASE' => 4,
+                'FOR_DISTRIBUTION' => 4,
                 'PARTIALLY_RELEASED' => 5,
                 'PARTIALLY_RECEIVED' => 5,
                 'RELEASED' => 5,
@@ -598,7 +616,11 @@ class SupplyRequestController extends Controller
                 'SUBMITTED' => 2,
                 'IN_REVIEW' => 3,
                 'RETURNED_FOR_REVISION' => 3,
+                'FOR_PROCUREMENT' => 3,
+                'APPROVED' => 3,
                 'REJECTED' => 3,
+                'READY_FOR_RELEASE' => 3,
+                'FOR_DISTRIBUTION' => 3,
                 'PARTIALLY_RELEASED' => 4,
                 'PARTIALLY_RECEIVED' => 4,
                 'RELEASED' => 4,

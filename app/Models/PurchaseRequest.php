@@ -26,6 +26,7 @@ class PurchaseRequest extends Model
          'office_id',
          'requested_by',
          'source_delivery_id',
+         'source_supply_request_id',
          'source_claim_id',
          'source_type',
          'status',
@@ -37,6 +38,7 @@ class PurchaseRequest extends Model
          'office_id' => 'integer',
          'requested_by' => 'integer',
          'source_delivery_id' => 'integer',
+         'source_supply_request_id' => 'integer',
          'source_claim_id' => 'integer',
      ];
 
@@ -117,6 +119,11 @@ class PurchaseRequest extends Model
      public function sourceClaim(): BelongsTo
      {
          return $this->belongsTo(Claim::class, 'source_claim_id', 'claims_id');
+     }
+
+     public function sourceSupplyRequest(): BelongsTo
+     {
+         return $this->belongsTo(SupplyRequest::class, 'source_supply_request_id', 'supply_request_id');
      }
 
     public function items(): HasMany

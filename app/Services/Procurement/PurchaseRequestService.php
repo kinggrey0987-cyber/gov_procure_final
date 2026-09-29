@@ -613,8 +613,33 @@ class PurchaseRequestService
             ]);
         }
 
-        $sourceSupplyRequest = $delivery->purchaseOrder?->supplyRequest
-            ?? $delivery->purchaseOrder?->purchaseRequest?->supplyRequest;
+        $candidateRequests = $delivery->purchaseOrder
+            ? $this->traceabilityService->getSourceSupplyRequests($delivery->purchaseOrder)
+            : collect();
+
+        if ($candidateRequests->isEmpty() && $delivery->purchaseOrder?->purchaseRequest) {
+            $candidateRequests = $this->traceabilityService->getSourceSupplyRequests($delivery->purchaseOrder->purchaseRequest);
+        }
+
+        $sourceSupplyRequest = null;
+        if ($candidateRequests->count() > 1) {
+            $sourceSupplyRequest = $candidateRequests->first(function (SupplyRequest $sr): bool {
+                $sr->loadMissing('items', 'distributionRecords.items');
+                $requested = (float) $sr->items->sum('quantity_requested');
+                $released = (float) $sr->distributionRecords
+                    ->whereIn('status', ['RELEASED', 'RECEIVED'])
+                    ->flatMap->items
+                    ->sum('quantity_released');
+
+                return $requested > ($released + 0.0001);
+            });
+        }
+
+        if (! $sourceSupplyRequest instanceof SupplyRequest) {
+            $sourceSupplyRequest = $candidateRequests->first()
+                ?? $delivery->purchaseOrder?->supplyRequest
+                ?? $delivery->purchaseOrder?->purchaseRequest?->supplyRequest;
+        }
 
         $discrepancyItems = $delivery->items
             ->filter(function ($item): bool {
@@ -657,15 +682,17 @@ class PurchaseRequestService
                 'needed_by_date' => now()->addDays(7)->toDateString(),
                 'request_category' => (string) ($sourceSupplyRequest?->request_category ?? 'GENERAL'),
                 'purpose' => sprintf(
-                    'Follow-up procurement for partially received delivery %s linked to PO %s.',
+                    'Follow-up procurement for partially received delivery %s linked to PO %s for parent requisition %s.',
                     (string) $delivery->delivery_code,
-                    (string) ($delivery->purchaseOrder?->po_number ?? 'N/A')
+                    (string) ($delivery->purchaseOrder?->po_number ?? 'N/A'),
+                    (string) ($sourceSupplyRequest?->request_code ?? 'parent request')
                 ),
                 'priority_level' => (string) ($sourceSupplyRequest?->priority_level ?? 'HIGH'),
                 'status' => 'SUBMITTED',
                 'review_notes' => sprintf(
-                    'Generated from discrepancy follow-up of delivery %s. %s',
+                    'Generated from discrepancy follow-up of delivery %s replenishing parent requisition %s. %s',
                     (string) $delivery->delivery_code,
+                    (string) ($sourceSupplyRequest?->request_code ?? 'parent request'),
                     $baseRemarks
                 ),
                 'approved_by' => null,
@@ -678,11 +705,13 @@ class PurchaseRequestService
                 'office_id' => $officeId,
                 'requested_by' => (int) $actor->id,
                 'source_delivery_id' => (int) $delivery->delivery_id,
+                'source_supply_request_id' => $sourceSupplyRequest ? (int) $sourceSupplyRequest->supply_request_id : null,
                 'source_type' => 'PARTIAL_DELIVERY_FOLLOW_UP',
                 'status' => 'OPEN',
                 'remarks' => sprintf(
-                    'Follow-up procurement generated from delivery %s. %s',
+                    'Follow-up procurement generated from delivery %s for %s. %s',
                     (string) $delivery->delivery_code,
+                    (string) ($sourceSupplyRequest?->request_code ?? 'parent request'),
                     $baseRemarks
                 ),
             ]);
