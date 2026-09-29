@@ -288,7 +288,10 @@ class ClaimService
             ]);
         }
 
-        $hasFollowUpReleased = \App\Models\DistributionRecord::query()
+        $distService = app(\App\Services\Inventory\DistributionRecordService::class);
+        $cumulativeReplacementQty = $distService->calculateCumulativeReplacementQuantity($claim);
+
+        $hasFollowUpReleased = $cumulativeReplacementQty > 0 || \App\Models\DistributionRecord::query()
             ->where(function ($q) use ($claim) {
                 $q->whereHas('delivery.purchaseOrder.purchaseRequest', function ($prQ) use ($claim) {
                     $prQ->where('source_claim_id', (int) $claim->claims_id)
@@ -306,13 +309,15 @@ class ClaimService
             ]);
         }
 
-        return DB::transaction(function () use ($claim, $actor, $payload): Claim {
+        return DB::transaction(function () use ($claim, $actor, $payload, $distService): Claim {
             $currentStatus = (string) $claim->status;
             $remarks = trim((string) ($payload['remarks'] ?? '')) !== ''
                 ? (string) $payload['remarks']
                 : 'Replacement items verified and accepted by requesting office.';
 
-            $effectiveReplacementQty = (float) $claim->replacement_quantity;
+            $cumulativeReplacementQty = $distService->calculateCumulativeReplacementQuantity($claim);
+            $effectiveReplacementQty = max((float) $claim->replacement_quantity, $cumulativeReplacementQty);
+
             if ($effectiveReplacementQty <= 0) {
                 $followUpItemsQty = (float) \App\Models\DistributionItem::query()
                     ->whereHas('distributionRecord', function ($q) use ($claim) {
@@ -326,18 +331,18 @@ class ClaimService
 
                 if ($followUpItemsQty > 0) {
                     $effectiveReplacementQty = $followUpItemsQty;
-                    $claim->replacement_quantity = $effectiveReplacementQty;
                 }
             }
 
             $disputedQty = (float) $claim->quantity_disputed;
-            $isFullyResolved = ($disputedQty > 0) ? ($effectiveReplacementQty >= $disputedQty) : true;
+            $isFullyResolved = ($disputedQty > 0.0001) ? ($effectiveReplacementQty >= ($disputedQty - 0.0001)) : true;
             $newStatus = $isFullyResolved ? 'RESOLVED' : 'PARTIALLY_RESOLVED';
             $resolutionType = $isFullyResolved ? ($claim->resolution_type ?: 'REPLACEMENT_RELEASED') : 'PARTIAL_REPLACEMENT';
 
             $claim->forceFill([
                 'status' => $newStatus,
                 'resolution_type' => $resolutionType,
+                'replacement_quantity' => $effectiveReplacementQty,
                 'remarks' => $remarks,
             ])->save();
 

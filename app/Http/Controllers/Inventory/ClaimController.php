@@ -11,6 +11,7 @@ use App\Services\History\HistoryTimelineService;
 use App\Services\Inventory\ClaimService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redirect;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -183,6 +184,88 @@ class ClaimController
         $distributionRecord = DistributionRecord::query()
             ->where('distribution_record_id', (int) $validated['distribution_record_id'])
             ->firstOrFail();
+
+        $itemsPayload = $validated['items'] ?? null;
+        if (is_array($itemsPayload) && count($itemsPayload) > 0) {
+            $groupedByItem = [];
+            foreach ($itemsPayload as $entry) {
+                $distItemId = (int) ($entry['distribution_item_id'] ?? 0);
+                if ($distItemId <= 0) continue;
+
+                if (! isset($groupedByItem[$distItemId])) {
+                    $groupedByItem[$distItemId] = [
+                        'distribution_item_id' => $distItemId,
+                        'quantity_damaged' => 0.0,
+                        'quantity_missing' => 0.0,
+                    ];
+                }
+                $groupedByItem[$distItemId]['quantity_damaged'] += max(0.0, (float) ($entry['quantity_damaged'] ?? 0));
+                $groupedByItem[$distItemId]['quantity_missing'] += max(0.0, (float) ($entry['quantity_missing'] ?? 0));
+            }
+
+            $groupedByItem = array_filter($groupedByItem, fn ($g) => ($g['quantity_damaged'] + $g['quantity_missing']) > 0);
+
+            if (count($groupedByItem) > 1) {
+                $createdClaims = [];
+                DB::transaction(function () use (&$createdClaims, $groupedByItem, $validated, $distributionRecord, $request) {
+                    foreach ($groupedByItem as $itemGroup) {
+                        $damaged = $itemGroup['quantity_damaged'];
+                        $missing = $itemGroup['quantity_missing'];
+                        $disputed = $damaged + $missing;
+                        $claimType = ($damaged > 0 && $missing > 0)
+                            ? 'MISSING_AND_DAMAGED'
+                            : ($damaged > 0 ? 'DAMAGED_ITEM' : 'MISSING_ITEM');
+
+                        $claimPayload = array_merge($validated, [
+                            'distribution_record' => $distributionRecord,
+                            'distribution_item_id' => $itemGroup['distribution_item_id'],
+                            'claim_type' => $claimType,
+                            'quantity_disputed' => $disputed,
+                            'quantity_damaged' => $damaged,
+                            'quantity_missing' => $missing,
+                            'claim_code' => null,
+                        ]);
+
+                        $createdClaim = $this->claimService->createClaim(request()->user(), $claimPayload);
+                        $createdClaims[] = $createdClaim;
+
+                        if ($request->hasFile('attachment_file')) {
+                            $this->documentService->upload(
+                                request()->user(),
+                                'claims',
+                                (int) $createdClaim->claims_id,
+                                [
+                                    'title' => (string) ($validated['attachment_title'] ?? ($claimType.' Evidence')),
+                                    'file' => $request->file('attachment_file'),
+                                ],
+                            );
+                        }
+
+                        if ($request->hasFile('attachments')) {
+                            foreach ($request->file('attachments') as $idx => $file) {
+                                if ($file && $file->isValid()) {
+                                    $this->documentService->upload(
+                                        request()->user(),
+                                        'claims',
+                                        (int) $createdClaim->claims_id,
+                                        [
+                                            'title' => sprintf('%s Evidence #%d', $claimType, $idx + 1),
+                                            'file' => $file,
+                                        ],
+                                    );
+                                }
+                            }
+                        }
+                    }
+                });
+
+                $firstClaim = $createdClaims[0] ?? null;
+                $showRoute = request()->user()->isOfficeUser() ? 'office.claims.show' : 'inventory.claims.show';
+
+                return Redirect::route($showRoute, $firstClaim?->claims_id)
+                    ->with('success', sprintf('%d claims filed successfully.', count($createdClaims)));
+            }
+        }
 
         $claim = $this->claimService->createClaim(request()->user(), array_merge($validated, [
             'distribution_record' => $distributionRecord,

@@ -672,7 +672,33 @@ class PurchaseRequestService
                 ? trim($verificationNotes)
                 : 'Generated from partially received delivery discrepancy.');
 
-        return DB::transaction(function () use ($actor, $delivery, $sourceSupplyRequest, $discrepancyItems, $officeId, $ppmpId, $baseRemarks): PurchaseRequest {
+        $parentPr = $delivery->purchaseOrder?->purchaseRequest;
+        $sourceClaimId = $parentPr?->source_claim_id
+            ?? $delivery->purchaseOrder?->supplyRequest?->purchaseRequests?->firstWhere('source_claim_id')?->source_claim_id
+            ?? $sourceSupplyRequest?->purchaseRequests?->firstWhere('source_claim_id')?->source_claim_id;
+
+        if (! $sourceClaimId && $parentPr?->sourceDelivery) {
+            $sourceClaimId = $parentPr->sourceDelivery->purchaseOrder?->purchaseRequest?->source_claim_id;
+        }
+
+        $sourceClaim = $sourceClaimId ? \App\Models\Claim::find($sourceClaimId) : null;
+
+        return DB::transaction(function () use ($actor, $delivery, $sourceSupplyRequest, $discrepancyItems, $officeId, $ppmpId, $baseRemarks, $sourceClaimId, $sourceClaim): PurchaseRequest {
+            $requestCategory = $sourceClaim !== null ? 'REPLACEMENT' : (string) ($sourceSupplyRequest?->request_category ?? 'GENERAL');
+            $purpose = $sourceClaim !== null
+                ? sprintf(
+                    'Follow-up replacement procurement for claim %s replenishment from delivery %s linked to parent requisition %s.',
+                    (string) $sourceClaim->claim_code,
+                    (string) $delivery->delivery_code,
+                    (string) ($sourceSupplyRequest?->request_code ?? 'parent request')
+                )
+                : sprintf(
+                    'Follow-up procurement for partially received delivery %s linked to PO %s for parent requisition %s.',
+                    (string) $delivery->delivery_code,
+                    (string) ($delivery->purchaseOrder?->po_number ?? 'N/A'),
+                    (string) ($sourceSupplyRequest?->request_code ?? 'parent request')
+                );
+
             $supplyRequest = SupplyRequest::query()->create([
                 'request_code' => $this->buildRequestCode($officeId),
                 'office_id' => $officeId,
@@ -680,13 +706,8 @@ class PurchaseRequestService
                 'ppmp_id' => $ppmpId > 0 ? $ppmpId : null,
                 'request_date' => now()->toDateString(),
                 'needed_by_date' => now()->addDays(7)->toDateString(),
-                'request_category' => (string) ($sourceSupplyRequest?->request_category ?? 'GENERAL'),
-                'purpose' => sprintf(
-                    'Follow-up procurement for partially received delivery %s linked to PO %s for parent requisition %s.',
-                    (string) $delivery->delivery_code,
-                    (string) ($delivery->purchaseOrder?->po_number ?? 'N/A'),
-                    (string) ($sourceSupplyRequest?->request_code ?? 'parent request')
-                ),
+                'request_category' => $requestCategory,
+                'purpose' => $purpose,
                 'priority_level' => (string) ($sourceSupplyRequest?->priority_level ?? 'HIGH'),
                 'status' => 'SUBMITTED',
                 'review_notes' => sprintf(
@@ -706,7 +727,8 @@ class PurchaseRequestService
                 'requested_by' => (int) $actor->id,
                 'source_delivery_id' => (int) $delivery->delivery_id,
                 'source_supply_request_id' => $sourceSupplyRequest ? (int) $sourceSupplyRequest->supply_request_id : null,
-                'source_type' => 'PARTIAL_DELIVERY_FOLLOW_UP',
+                'source_claim_id' => $sourceClaimId ? (int) $sourceClaimId : null,
+                'source_type' => $sourceClaimId ? 'CLAIM_REPLACEMENT_FOLLOW_UP' : 'PARTIAL_DELIVERY_FOLLOW_UP',
                 'status' => 'OPEN',
                 'remarks' => sprintf(
                     'Follow-up procurement generated from delivery %s for %s. %s',

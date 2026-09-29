@@ -30,6 +30,7 @@ class SupplyRequestController extends Controller
         private readonly \App\Services\Inventory\SupplyRequestFollowUpService $followUpService,
         private readonly \App\Services\Inventory\InventoryService $inventoryService,
         private readonly ConsolidationTraceabilityService $traceabilityService,
+        private readonly \App\Services\Inventory\DistributionRecordService $distributionRecordService,
     ) {
     }
 
@@ -1157,7 +1158,10 @@ class SupplyRequestController extends Controller
             ->with([
                 'items',
                 'supplyRequest.purchaseRequests.sourceClaim',
+                'supplyRequest.purchaseRequests.sourceDelivery.purchaseOrder.purchaseRequest.sourceClaim',
+                'supplyRequest.purchaseRequests.sourceSupplyRequest.purchaseRequests.sourceClaim',
                 'delivery.purchaseOrder.purchaseRequest.sourceClaim',
+                'delivery.purchaseOrder.purchaseRequest.sourceDelivery.purchaseOrder.purchaseRequest.sourceClaim',
                 'delivery.purchaseOrder.supplyRequest.purchaseRequests.sourceClaim',
             ])
             ->forOffice($officeId)
@@ -1165,15 +1169,7 @@ class SupplyRequestController extends Controller
             ->latest('distribution_record_id')
             ->get()
             ->map(function (DistributionRecord $record): array {
-                $sourceClaim = $record->delivery?->purchaseOrder?->purchaseRequest?->sourceClaim
-                    ?? $record->delivery?->purchaseOrder?->supplyRequest?->purchaseRequests?->firstWhere('source_claim_id')?->sourceClaim
-                    ?? $record->supplyRequest?->purchaseRequests?->firstWhere('source_claim_id')?->sourceClaim;
-
-                if (! $sourceClaim && ($record->supplyRequest?->purpose || $record->notes)) {
-                    if (preg_match('/(CLM-\d{4}-\d{5})/', ($record->supplyRequest?->purpose ?? '') . ' ' . ($record->notes ?? ''), $matches)) {
-                        $sourceClaim = \App\Models\Claim::query()->where('claim_code', $matches[1])->first();
-                    }
-                }
+                $sourceClaim = $this->distributionRecordService->resolveLinkedSourceClaim($record);
 
                 $isClaimReplacement = $sourceClaim !== null
                     || (string) ($record->supplyRequest?->request_category ?? '') === 'REPLACEMENT'

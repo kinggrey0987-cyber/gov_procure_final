@@ -81,23 +81,20 @@ export default function SuppliesReadyForClaimIndex({ records }: Props) {
                                         <tr key={record.distribution_record_id || record.claim_id} className="hover:bg-slate-50/60 transition-colors">
                                             <td className="px-3.5 py-2 font-semibold text-red-700">
                                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                                    {record.claim_code ? (
-                                                        <Link
-                                                            href={record.claim_id ? route('office.claims.show', record.claim_id) : '#'}
-                                                            className="font-bold text-red-700 hover:text-red-900 underline decoration-red-300"
-                                                        >
-                                                            {record.claim_code}
-                                                        </Link>
-                                                    ) : (
-                                                        <span>{record.request_id}</span>
-                                                    )}
+                                                    <span>{record.request_id}</span>
                                                     {record.is_claim_replacement && (
                                                         <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 border border-amber-300 px-2 py-0.5 text-[10px] font-black text-amber-800 shadow-2xs uppercase">
                                                             🛡️ Claim Replacement
                                                         </span>
                                                     )}
-                                                    {record.claim_code && record.request_id && record.request_id !== 'N/A' && (
-                                                        <span className="text-[10px] text-slate-400 font-normal">({record.request_id})</span>
+                                                    {record.claim_code && (
+                                                        <Link
+                                                            href={record.claim_id ? route('office.claims.show', record.claim_id) : '#'}
+                                                            className="text-xs font-bold text-red-700 hover:text-red-900 underline decoration-red-300"
+                                                            title={`View claim ${record.claim_code}`}
+                                                        >
+                                                            ({record.claim_code})
+                                                        </Link>
                                                     )}
                                                 </div>
                                             </td>

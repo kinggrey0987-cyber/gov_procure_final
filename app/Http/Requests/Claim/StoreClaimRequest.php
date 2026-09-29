@@ -36,6 +36,12 @@ class StoreClaimRequest extends FormRequest
             'quantity_disputed' => ['nullable', 'integer', 'min:0'],
             'quantity_damaged' => ['nullable', 'integer', 'min:0'],
             'quantity_missing' => ['nullable', 'integer', 'min:0'],
+            'items' => ['nullable', 'array'],
+            'items.*.distribution_item_id' => ['required_with:items', 'integer', 'exists:distribution_items,distribution_item_id'],
+            'items.*.claim_type' => ['nullable', 'string', Rule::in(['MISSING_ITEM', 'DAMAGED_ITEM', 'MISSING_AND_DAMAGED'])],
+            'items.*.quantity_disputed' => ['nullable', 'numeric', 'min:0'],
+            'items.*.quantity_damaged' => ['nullable', 'numeric', 'min:0'],
+            'items.*.quantity_missing' => ['nullable', 'numeric', 'min:0'],
             'remarks' => ['nullable', 'string'],
             'attachment_title' => ['nullable', 'string', 'max:200'],
             'attachment_file' => [

@@ -180,6 +180,10 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
         return totals;
     }, [issueLines]);
 
+    const distinctItemIds = useMemo(() => {
+        return Array.from(new Set(issueLines.map((l) => l.distribution_item_id).filter(Boolean)));
+    }, [issueLines]);
+
     const hasOverclaimedItems = useMemo(() => {
         for (const item of selectedRecordItems) {
             const total = itemClaimedTotals[String(item.distribution_item_id)] ?? 0;
@@ -246,13 +250,35 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
 
                             const primaryItemId = issueLines.find((l) => toWholeQuantity(l.quantity) > 0)?.distribution_item_id || issueLines[0]?.distribution_item_id || form.data.distribution_item_id;
 
+                            const itemsPayload = issueLines
+                                .filter((l) => Boolean(l.distribution_item_id) && toWholeQuantity(l.quantity) > 0)
+                                .map((l) => ({
+                                    distribution_item_id: Number(l.distribution_item_id),
+                                    claim_type: l.claim_type,
+                                    quantity_disputed: toWholeQuantity(l.quantity),
+                                    quantity_damaged: l.claim_type === 'DAMAGED_ITEM' ? toWholeQuantity(l.quantity) : 0,
+                                    quantity_missing: l.claim_type === 'MISSING_ITEM' ? toWholeQuantity(l.quantity) : 0,
+                                }));
+
+                            const primaryItemLines = issueLines.filter((l) => String(l.distribution_item_id) === String(primaryItemId));
+                            const primaryDamaged = primaryItemLines
+                                .filter((l) => l.claim_type === 'DAMAGED_ITEM')
+                                .reduce((sum, l) => sum + toWholeQuantity(l.quantity), 0);
+                            const primaryMissing = primaryItemLines
+                                .filter((l) => l.claim_type === 'MISSING_ITEM')
+                                .reduce((sum, l) => sum + toWholeQuantity(l.quantity), 0);
+                            const primaryTotal = primaryDamaged + primaryMissing;
+
+                            const distinctItemCount = new Set(itemsPayload.map((i) => i.distribution_item_id)).size;
+
                             form.transform((data) => ({
                                 ...data,
                                 distribution_item_id: primaryItemId,
                                 claim_type: derivedClaimType,
-                                quantity_disputed: String(totalIssueQuantity),
-                                quantity_damaged: String(damagedQuantity),
-                                quantity_missing: String(missingQuantity),
+                                quantity_disputed: String(distinctItemCount > 1 ? primaryTotal : totalIssueQuantity),
+                                quantity_damaged: String(distinctItemCount > 1 ? primaryDamaged : damagedQuantity),
+                                quantity_missing: String(distinctItemCount > 1 ? primaryMissing : missingQuantity),
+                                items: itemsPayload,
                             }));
                             form.post(route(isOfficeUser ? 'office.claims.store' : 'inventory.claims.store'), { forceFormData: true });
                         }}
@@ -480,12 +506,16 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
 
                             <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-amber-200/80 pt-3">
                                 <p className="text-xs font-semibold text-amber-900">
-                                    Total claimed quantity: {formatQuantity(totalIssueQuantity)} {selectedItem?.unit ?? ''}
+                                    Total claimed quantity: {formatQuantity(totalIssueQuantity)}{distinctItemIds.length <= 1 && selectedItem ? ` ${selectedItem.unit}` : ' total'}
                                     {derivedClaimType ? ` - Claim type: ${displayClaimType(derivedClaimType)}` : ''}
                                 </p>
-                                {selectedItem ? (
+                                {distinctItemIds.length <= 1 && selectedItem ? (
                                     <span className="text-[11px] text-amber-800">
                                         Released quantity for {selectedItem.item_name}: {formatQuantity(selectedItemReleasedQuantity)} {selectedItem.unit}
+                                    </span>
+                                ) : distinctItemIds.length > 1 ? (
+                                    <span className="text-[11px] font-medium text-amber-800">
+                                        Filing claims for {distinctItemIds.length} items
                                     </span>
                                 ) : null}
                             </div>

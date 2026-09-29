@@ -945,21 +945,80 @@ class DistributionRecordService
     {
         $record->loadMissing([
             'supplyRequest.purchaseRequests.sourceClaim',
+            'supplyRequest.purchaseRequests.sourceDelivery.purchaseOrder.purchaseRequest.sourceClaim',
+            'supplyRequest.purchaseRequests.sourceSupplyRequest.purchaseRequests.sourceClaim',
             'delivery.purchaseOrder.purchaseRequest.sourceClaim',
+            'delivery.purchaseOrder.purchaseRequest.sourceDelivery.purchaseOrder.purchaseRequest.sourceClaim',
             'delivery.purchaseOrder.supplyRequest.purchaseRequests.sourceClaim',
         ]);
 
-        $sourceClaim = $record->delivery?->purchaseOrder?->purchaseRequest?->sourceClaim
-            ?? $record->delivery?->purchaseOrder?->supplyRequest?->purchaseRequests?->firstWhere('source_claim_id')?->sourceClaim
-            ?? $record->supplyRequest?->purchaseRequests?->firstWhere('source_claim_id')?->sourceClaim;
+        $pr = $record->delivery?->purchaseOrder?->purchaseRequest;
+        $sourceClaim = $pr?->sourceClaim
+            ?? $pr?->sourceDelivery?->purchaseOrder?->purchaseRequest?->sourceClaim
+            ?? $record->delivery?->purchaseOrder?->supplyRequest?->purchaseRequests?->firstWhere('source_claim_id')?->sourceClaim;
 
-        if (! $sourceClaim && ($record->supplyRequest?->purpose || $record->notes)) {
-            if (preg_match('/(CLM-\d{4}-\d{5})/', ($record->supplyRequest?->purpose ?? '').' '.($record->notes ?? ''), $matches)) {
-                $sourceClaim = Claim::query()->where('claim_code', $matches[1])->first();
+        if ($sourceClaim instanceof Claim) {
+            return $sourceClaim;
+        }
+
+        if ($record->supplyRequest) {
+            foreach ($record->supplyRequest->purchaseRequests as $srPr) {
+                if ($srPr->sourceClaim instanceof Claim) {
+                    return $srPr->sourceClaim;
+                }
+                if ($srPr->sourceDelivery?->purchaseOrder?->purchaseRequest?->sourceClaim instanceof Claim) {
+                    return $srPr->sourceDelivery->purchaseOrder->purchaseRequest->sourceClaim;
+                }
+                if ($srPr->sourceSupplyRequest) {
+                    $parentClaim = $srPr->sourceSupplyRequest->purchaseRequests->firstWhere('source_claim_id')?->sourceClaim;
+                    if ($parentClaim instanceof Claim) {
+                        return $parentClaim;
+                    }
+                }
             }
         }
 
-        return $sourceClaim;
+        $combinedText = ($record->supplyRequest?->purpose ?? '').' '.($record->notes ?? '');
+        if ($record->delivery?->purchaseOrder?->purchaseRequest) {
+            $combinedText .= ' '.($record->delivery->purchaseOrder->purchaseRequest->remarks ?? '');
+        }
+        if (preg_match('/(CLM-\d{4}-\d{5})/', $combinedText, $matches)) {
+            $sourceClaim = Claim::query()->where('claim_code', $matches[1])->first();
+            if ($sourceClaim instanceof Claim) {
+                return $sourceClaim;
+            }
+        }
+
+        return null;
+    }
+
+    public function calculateCumulativeReplacementQuantity(Claim $claim): float
+    {
+        $claim->loadMissing('distributionItem');
+        $claimedItemId = (int) ($claim->distributionItem?->item_id ?? 0);
+
+        $candidateRecords = DistributionRecord::query()
+            ->where('distribution_record_id', '!=', (int) $claim->distribution_record_id)
+            ->where('office_id', (int) $claim->office_id)
+            ->whereIn('status', ['RELEASED', 'RECEIVED'])
+            ->with(['items', 'supplyRequest.purchaseRequests', 'delivery.purchaseOrder.purchaseRequest'])
+            ->get();
+
+        $total = 0.0;
+        foreach ($candidateRecords as $candidateRecord) {
+            if ($this->resolveLinkedSourceClaim($candidateRecord)?->claims_id === (int) $claim->claims_id) {
+                $qty = (float) $candidateRecord->items
+                    ->when($claimedItemId > 0, fn ($coll) => $coll->where('item_id', $claimedItemId))
+                    ->sum('quantity_released');
+
+                if ($qty <= 0) {
+                    $qty = (float) $candidateRecord->items->sum('quantity_released');
+                }
+                $total += $qty;
+            }
+        }
+
+        return $total;
     }
 
     private function syncClaimOnRelease(DistributionRecord $record, User $actor): void
@@ -971,21 +1030,10 @@ class DistributionRecordService
 
         if (in_array((string) $claim->status, ['PENDING_REPLACEMENT', 'OPEN', 'IN_REVIEW', 'PARTIALLY_RESOLVED'], true)) {
             $oldStatus = (string) $claim->status;
-            $claim->loadMissing('distributionItem');
-            $claimedItemId = (int) ($claim->distributionItem?->item_id ?? 0);
-
-            $releasedQty = (float) $record->items()
-                ->when($claimedItemId > 0, fn ($q) => $q->where('item_id', $claimedItemId))
-                ->sum('quantity_released');
-
-            if ($releasedQty <= 0) {
-                $releasedQty = (float) $record->items()->sum('quantity_released');
-            }
-
-            $currentReplacementQty = (float) $claim->replacement_quantity;
-            $newReplacementQty = $currentReplacementQty + $releasedQty;
+            $cumulativeReplacementQty = $this->calculateCumulativeReplacementQuantity($claim);
+            $newReplacementQty = max((float) $claim->replacement_quantity, $cumulativeReplacementQty);
             $disputedQty = (float) $claim->quantity_disputed;
-            $resolutionType = ($newReplacementQty >= $disputedQty) ? 'REPLACEMENT_RELEASED' : 'PARTIAL_REPLACEMENT';
+            $resolutionType = ($newReplacementQty >= ($disputedQty - 0.0001)) ? 'REPLACEMENT_RELEASED' : 'PARTIAL_REPLACEMENT';
 
             $claim->forceFill([
                 'status' => 'REPLACEMENT_RELEASED',
@@ -1071,7 +1119,8 @@ class DistributionRecordService
                 }
             }
 
-            $totalReplacementQty = max((float) $claim->replacement_quantity, $receivedQtyInThisRecord);
+            $cumulativeReplacementQty = $this->calculateCumulativeReplacementQuantity($claim);
+            $totalReplacementQty = max((float) $claim->replacement_quantity, $cumulativeReplacementQty, $receivedQtyInThisRecord);
             $disputedQty = (float) $claim->quantity_disputed;
             $isFullyResolved = ($disputedQty > 0.0001)
                 ? ($totalReplacementQty >= ($disputedQty - 0.0001))
