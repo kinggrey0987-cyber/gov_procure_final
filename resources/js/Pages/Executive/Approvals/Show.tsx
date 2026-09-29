@@ -133,7 +133,7 @@ export default function ExecutiveApprovalShow({
                     <div className="mt-4 grid gap-3 text-sm text-slate-700 md:grid-cols-2 lg:grid-cols-3">
                         <p><span className="font-semibold">Office:</span> {ppmp.office?.name ?? '-'}</p>
                         <p><span className="font-semibold">Prepared By:</span> {ppmp.preparer?.name ?? '-'}</p>
-                        {ppmp.status === 'APPROVED' ? (
+                        {ppmp.status === 'APPROVED' || ppmp.status === 'CLOSED' ? (
                             <>
                                 <p><span className="font-semibold">Approved By:</span> {ppmp.approver?.name ?? '-'}</p>
                                 <p><span className="font-semibold">Approval Date:</span> {formatDate(ppmp.date_approved)}</p>
@@ -295,6 +295,7 @@ function statusBadgeClass(status: string): string {
     if (status === 'APPROVED') return `${base} bg-emerald-100 text-emerald-800`;
     if (status === 'RETURNED_FOR_REVISION') return `${base} bg-blue-100 text-blue-800`;
     if (status === 'REJECTED') return `${base} bg-rose-100 text-rose-800`;
+    if (status === 'CLOSED') return `${base} bg-slate-200 text-slate-700 font-medium`;
     return `${base} bg-slate-100 text-slate-800`;
 }
 
@@ -304,6 +305,7 @@ function displayPpmpStatus(status: string): string {
         APPROVED: 'Approved',
         RETURNED_FOR_REVISION: 'Returned for Revision',
         REJECTED: 'Rejected',
+        CLOSED: 'Closed',
     };
 
     return map[status] ?? status.replaceAll('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase());

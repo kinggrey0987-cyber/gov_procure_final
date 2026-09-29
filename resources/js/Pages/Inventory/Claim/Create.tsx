@@ -101,7 +101,23 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
         return null;
     }, [isFollowUpClaim, parentClaim]);
 
-    const form = useForm({
+    const form = useForm<{
+        distribution_record_id: number | string;
+        distribution_item_id: number | string;
+        parent_claim_id: number | string;
+        source_type: string;
+        office_id: number;
+        claim_type: string;
+        claim_date: string;
+        claim_location: string;
+        quantity_disputed: string;
+        quantity_damaged: string;
+        quantity_missing: string;
+        remarks: string;
+        attachment_title: string;
+        attachment_file: File | null;
+        attachments: File[];
+    }>({
         distribution_record_id: first?.distribution_record_id ?? '',
         distribution_item_id: initialItem?.distribution_item_id ?? '',
         parent_claim_id: parentClaim?.claims_id ?? '',
@@ -121,6 +137,10 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
     const [issueLines, setIssueLines] = useState<IssueLine[]>(() => buildInitialIssueLines(initialItem, isFollowUpClaim));
     const [validationError, setValidationError] = useState<string | null>(null);
     const [fileWarning, setFileWarning] = useState<string | null>(null);
+
+    const [selectedRequestCode, setSelectedRequestCode] = useState<string>(() => {
+        return first?.request_code ?? '';
+    });
 
     const groupedDistributionRecords = useMemo(() => {
         const groups: {
@@ -148,6 +168,54 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
 
         return groups;
     }, [distributionRecords]);
+
+    const availableBatches = useMemo(() => {
+        if (!selectedRequestCode) return [];
+        return distributionRecords.filter((record) => record.request_code === selectedRequestCode);
+    }, [distributionRecords, selectedRequestCode]);
+
+    const handleBatchSelect = (recordId: number) => {
+        setValidationError(null);
+        const selected = distributionRecords.find((record) => record.distribution_record_id === recordId);
+        if (!selected) {
+            form.setData('distribution_record_id', '');
+            form.setData('distribution_item_id', '');
+            setIssueLines([]);
+            return;
+        }
+        if (selected.has_ongoing_claim) {
+            setValidationError(`This supply request already has an ongoing claim (${selected.ongoing_claim_code}) that is not yet completed. You cannot file another claim until it is resolved or rejected.`);
+            return;
+        }
+        const firstItem = selected.items?.[0] ?? null;
+        form.setData('distribution_record_id', selected.distribution_record_id);
+        form.setData('distribution_item_id', firstItem?.distribution_item_id ?? '');
+        form.setData('office_id', selected.office_id ?? 0);
+        form.setData('claim_date', todayDate());
+        form.setData('quantity_disputed', String(Math.trunc((firstItem?.quantity_missing ?? 0) + (firstItem?.quantity_damaged ?? 0))));
+        form.setData('quantity_damaged', String(Math.trunc(firstItem?.quantity_damaged ?? 0)));
+        form.setData('quantity_missing', String(Math.trunc(firstItem?.quantity_missing ?? 0)));
+        setIssueLines(buildInitialIssueLines(firstItem));
+    };
+
+    const handleRequestCodeChange = (requestCode: string) => {
+        setSelectedRequestCode(requestCode);
+        setValidationError(null);
+        if (!requestCode) {
+            form.setData('distribution_record_id', '');
+            form.setData('distribution_item_id', '');
+            setIssueLines([]);
+            return;
+        }
+        const matchingRecords = distributionRecords.filter((r) => r.request_code === requestCode);
+        if (matchingRecords.length === 1 && !matchingRecords[0].has_ongoing_claim) {
+            handleBatchSelect(matchingRecords[0].distribution_record_id);
+        } else {
+            form.setData('distribution_record_id', '');
+            form.setData('distribution_item_id', '');
+            setIssueLines([]);
+        }
+    };
 
     const selectedRecord = useMemo(
         () => distributionRecords.find((record) => record.distribution_record_id === Number(form.data.distribution_record_id)),
@@ -355,41 +423,56 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                             form.post(route(isOfficeUser ? 'office.claims.store' : 'inventory.claims.store'), { forceFormData: true });
                         }}
                     >
-                        <div>
-                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                Select Received Supply Request & Delivery Batch
-                            </label>
-                            <select
-                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                                value={form.data.distribution_record_id}
-                                disabled={isFollowUpClaim}
-                                onChange={(e) => {
-                                    setValidationError(null);
-                                    const selectedRecordId = Number(e.target.value);
-                                    const selected = distributionRecords.find((record) => record.distribution_record_id === selectedRecordId);
-                                    if (selected?.has_ongoing_claim) {
-                                        setValidationError(`This supply request already has an ongoing claim (${selected.ongoing_claim_code}) that is not yet completed. You cannot file another claim until it is resolved or rejected.`);
-                                        return;
-                                    }
-                                    const firstItem = selected?.items?.[0] ?? null;
-                                    form.setData('distribution_record_id', selectedRecordId);
-                                    form.setData('distribution_item_id', firstItem?.distribution_item_id ?? '');
-                                    form.setData('office_id', selected?.office_id ?? 0);
-                                    form.setData('claim_date', todayDate());
-                                    form.setData('quantity_disputed', String(Math.trunc((firstItem?.quantity_missing ?? 0) + (firstItem?.quantity_damaged ?? 0))));
-                                    form.setData('quantity_damaged', String(Math.trunc(firstItem?.quantity_damaged ?? 0)));
-                                    form.setData('quantity_missing', String(Math.trunc(firstItem?.quantity_missing ?? 0)));
-                                    setIssueLines(buildInitialIssueLines(firstItem));
-                                }}
-                            >
-                                <option value="">Select Received Supply Request / Delivery Batch</option>
-                                {groupedDistributionRecords.map((group) => (
-                                    <optgroup
-                                        key={group.requestCode}
-                                        label={`${group.requestCode} — ${group.officeName}`}
+                        <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 shadow-2xs">
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                {/* Step 1: Supply Request Dropdown */}
+                                <div>
+                                    <label className="mb-1.5 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-700">
+                                        <span>1. Received Supply Request <span className="text-rose-600 font-bold">*</span></span>
+                                        <span className="rounded bg-slate-200/80 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">Step 1</span>
+                                    </label>
+                                    <select
+                                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-2xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 disabled:bg-slate-100 disabled:text-slate-400"
+                                        value={selectedRequestCode}
+                                        disabled={isFollowUpClaim}
+                                        onChange={(e) => handleRequestCodeChange(e.target.value)}
                                     >
-                                        {group.records.map((record, index) => {
-                                            const batchPrefix = group.records.length > 1 ? `Batch ${index + 1}: ` : '';
+                                        <option value="">Select Supply Request...</option>
+                                        {groupedDistributionRecords.map((group) => {
+                                            const batchCount = group.records.length;
+                                            return (
+                                                <option key={group.requestCode} value={group.requestCode}>
+                                                    {group.requestCode} ({batchCount} {batchCount === 1 ? 'batch' : 'batches'} delivered)
+                                                </option>
+                                            );
+                                        })}
+                                    </select>
+                                    <p className="mt-1 text-[11px] text-slate-500">
+                                        Select the received supply request that has damaged or missing items.
+                                    </p>
+                                </div>
+
+                                {/* Step 2: Delivery Batch Dropdown */}
+                                <div>
+                                    <label className="mb-1.5 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-700">
+                                        <span>2. Delivery Batch / Voucher <span className="text-rose-600 font-bold">*</span></span>
+                                        <span className="rounded bg-slate-200/80 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">Step 2</span>
+                                    </label>
+                                    <select
+                                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-2xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 disabled:bg-slate-100 disabled:text-slate-400"
+                                        value={form.data.distribution_record_id}
+                                        disabled={isFollowUpClaim || !selectedRequestCode}
+                                        onChange={(e) => handleBatchSelect(Number(e.target.value))}
+                                    >
+                                        <option value="">
+                                            {!selectedRequestCode
+                                                ? '← Select Supply Request first'
+                                                : availableBatches.length > 1
+                                                ? 'Choose Delivery Batch...'
+                                                : 'Select Delivery Batch'}
+                                        </option>
+                                        {availableBatches.map((record, index) => {
+                                            const batchPrefix = availableBatches.length > 1 ? `Batch ${index + 1}: ` : '';
                                             const itemsSummary = record.items && record.items.length > 0
                                                 ? record.items.slice(0, 2).map((i) => `${Math.trunc(i.quantity_released)} ${i.unit || 'unit'} ${i.item_name}`).join(', ') + (record.items.length > 2 ? ` +${record.items.length - 2} more` : '')
                                                 : 'No items recorded';
@@ -401,16 +484,21 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                                     disabled={record.has_ongoing_claim}
                                                 >
                                                     {batchPrefix}{record.distribution_code} ({formatDate(record.release_date)}) — {itemsSummary}
-                                                    {record.has_ongoing_claim ? ` (Has Ongoing Claim: ${record.ongoing_claim_code} - Pending)` : ''}
+                                                    {record.has_ongoing_claim ? ` [Ongoing Claim: ${record.ongoing_claim_code}]` : ''}
                                                 </option>
                                             );
                                         })}
-                                    </optgroup>
-                                ))}
-                            </select>
-                            {form.errors.distribution_record_id ? <p className="mt-1 text-xs text-rose-600">{form.errors.distribution_record_id}</p> : null}
-                            {form.errors.parent_claim_id ? <p className="mt-1 text-xs text-rose-600">{form.errors.parent_claim_id}</p> : null}
-                            {form.errors.source_type ? <p className="mt-1 text-xs text-rose-600">{form.errors.source_type}</p> : null}
+                                    </select>
+                                    <p className="mt-1 text-[11px] text-slate-500">
+                                        {availableBatches.length > 1
+                                            ? `This request had ${availableBatches.length} deliveries. Choose which batch was affected.`
+                                            : 'Select the specific distribution voucher.'}
+                                    </p>
+                                </div>
+                            </div>
+                            {form.errors.distribution_record_id ? <p className="mt-2 text-xs font-semibold text-rose-600">{form.errors.distribution_record_id}</p> : null}
+                            {form.errors.parent_claim_id ? <p className="mt-2 text-xs font-semibold text-rose-600">{form.errors.parent_claim_id}</p> : null}
+                            {form.errors.source_type ? <p className="mt-2 text-xs font-semibold text-rose-600">{form.errors.source_type}</p> : null}
                         </div>
 
                         {selectedRecord ? (
@@ -726,27 +814,29 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                             {form.data.attachments.length > 0 && (
                                 <div className="space-y-1.5 pt-2">
                                     <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Selected Files ({form.data.attachments.length}):</p>
-                                    <div className="grid gap-1.5 sm:grid-cols-2">
-                                        {form.data.attachments.map((file, idx) => (
-                                            <div key={idx} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs shadow-2xs">
-                                                <div className="truncate pr-2">
-                                                    <p className="truncate font-medium text-slate-800">{file.name}</p>
-                                                    <p className="text-[10px] text-slate-400">{(file.size / 1024).toFixed(0)} KB</p>
+                                    <div className="max-h-36 overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin]">
+                                        <div className="grid gap-1.5 sm:grid-cols-2">
+                                            {form.data.attachments.map((file, idx) => (
+                                                <div key={idx} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs shadow-2xs">
+                                                    <div className="truncate pr-2">
+                                                        <p className="truncate font-medium text-slate-800">{file.name}</p>
+                                                        <p className="text-[10px] text-slate-400">{(file.size / 1024).toFixed(0)} KB</p>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const updated = form.data.attachments.filter((_, i) => i !== idx);
+                                                            form.setData('attachments', updated);
+                                                            form.setData('attachment_file', updated[0] ?? null);
+                                                        }}
+                                                        className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
+                                                        title="Remove attachment"
+                                                    >
+                                                        ✕
+                                                    </button>
                                                 </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const updated = form.data.attachments.filter((_, i) => i !== idx);
-                                                        form.setData('attachments', updated);
-                                                        form.setData('attachment_file', updated[0] ?? null);
-                                                    }}
-                                                    className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
-                                                    title="Remove attachment"
-                                                >
-                                                    ✕
-                                                </button>
-                                            </div>
-                                        ))}
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
                             )}

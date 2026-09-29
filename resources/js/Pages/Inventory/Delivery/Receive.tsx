@@ -450,7 +450,7 @@ export default function DeliveryReceive({ delivery }: Props) {
                                             </div>
 
                                             {drFiles.length > 0 && (
-                                                <div className="mt-3 space-y-2">
+                                                <div className="mt-2.5 max-h-36 overflow-y-auto overscroll-contain space-y-1.5 pr-1 [scrollbar-width:thin]">
                                                     {drFiles.map((file, idx) => (
                                                         <AttachmentCard
                                                             key={`dr_${file.name}_${file.size}_${idx}`}
@@ -490,7 +490,7 @@ export default function DeliveryReceive({ delivery }: Props) {
                                                     <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                                                         <span>Scanned Sales Invoice (SI)</span>
                                                         {siFiles.length > 0 ? (
-                                                            <span className="rounded bg-emerald-100 border border-emerald-300 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">
+                                                             <span className="rounded bg-emerald-100 border border-emerald-300 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">
                                                                 ✓ {siFiles.length} {siFiles.length === 1 ? 'file' : 'files'} attached
                                                             </span>
                                                         ) : delivery.has_existing_si ? (
@@ -509,7 +509,7 @@ export default function DeliveryReceive({ delivery }: Props) {
                                             </div>
 
                                             {siFiles.length > 0 && (
-                                                <div className="mt-3 space-y-2">
+                                                <div className="mt-2.5 max-h-36 overflow-y-auto overscroll-contain space-y-1.5 pr-1 [scrollbar-width:thin]">
                                                     {siFiles.map((file, idx) => (
                                                         <AttachmentCard
                                                             key={`si_${file.name}_${file.size}_${idx}`}
@@ -561,14 +561,16 @@ export default function DeliveryReceive({ delivery }: Props) {
                                             </div>
 
                                             {supportingFiles.length > 0 && (
-                                                <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                                                    {supportingFiles.map((file, idx) => (
-                                                        <AttachmentCard
-                                                            key={`supp_${file.name}_${file.size}_${idx}`}
-                                                            file={file}
-                                                            onRemove={() => removeSupportingFile(idx)}
-                                                        />
-                                                    ))}
+                                                <div className="mt-2.5 max-h-36 overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin]">
+                                                    <div className="grid gap-1.5 sm:grid-cols-2">
+                                                        {supportingFiles.map((file, idx) => (
+                                                            <AttachmentCard
+                                                                key={`supp_${file.name}_${file.size}_${idx}`}
+                                                                file={file}
+                                                                onRemove={() => removeSupportingFile(idx)}
+                                                            />
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             )}
 
@@ -877,16 +879,16 @@ function AttachmentCard({
     };
 
     return (
-        <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-2.5 shadow-2xs transition hover:border-slate-300">
-            <div className="flex items-center gap-3 overflow-hidden">
+        <div className="flex items-center justify-between rounded-md border border-slate-200 bg-white px-2.5 py-1.5 shadow-2xs transition hover:border-slate-300">
+            <div className="flex items-center gap-2 overflow-hidden min-w-0">
                 {isImage && previewUrl ? (
                     <img
                         src={previewUrl}
                         alt={file.name}
-                        className="h-10 w-10 shrink-0 rounded border border-slate-200 object-cover bg-slate-50"
+                        className="h-7 w-7 shrink-0 rounded border border-slate-200 object-cover bg-slate-50"
                     />
                 ) : (
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-slate-200 bg-slate-100 text-[10px] font-black text-slate-600 uppercase">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded border border-slate-200 bg-slate-100 text-[9px] font-black text-slate-600 uppercase">
                         {file.type === 'application/pdf' ? (
                             <span className="text-rose-600 font-bold">PDF</span>
                         ) : (
@@ -894,23 +896,23 @@ function AttachmentCard({
                         )}
                     </div>
                 )}
-                <div className="min-w-0">
-                    <p className="truncate text-xs font-semibold text-slate-800" title={file.name}>
+                <div className="min-w-0 flex items-center gap-1.5">
+                    <p className="truncate text-xs font-semibold text-slate-800 max-w-[130px] sm:max-w-[200px]" title={file.name}>
                         {file.name}
                     </p>
-                    <p className="text-[11px] text-slate-400">
-                        {formatSize(file.size)}
-                    </p>
+                    <span className="shrink-0 text-[10px] text-slate-400">
+                        ({formatSize(file.size)})
+                    </span>
                 </div>
             </div>
             <button
                 type="button"
                 onClick={onRemove}
-                className="ml-2 inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-50 hover:text-rose-700 transition"
+                className="ml-2 shrink-0 inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[11px] font-semibold text-rose-600 hover:bg-rose-50 hover:text-rose-700 transition"
                 title="Remove attachment"
             >
-                <span className="text-sm font-bold leading-none">✕</span>
-                <span>Remove</span>
+                <span className="text-xs font-bold leading-none">✕</span>
+                <span className="hidden sm:inline">Remove</span>
             </button>
         </div>
     );

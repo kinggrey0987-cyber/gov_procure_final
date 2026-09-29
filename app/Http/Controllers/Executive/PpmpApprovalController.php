@@ -43,7 +43,7 @@ class PpmpApprovalController extends Controller
             ->withMax([
                 'statusHistory as submitted_at' => static fn ($historyQuery) => $historyQuery->where('new_status', 'SUBMITTED'),
             ], 'changed_at')
-            ->whereIn('status', ['SUBMITTED', 'APPROVED', 'REJECTED', 'RETURNED_FOR_REVISION']);
+            ->whereIn('status', ['SUBMITTED', 'APPROVED', 'REJECTED', 'RETURNED_FOR_REVISION', 'CLOSED']);
 
         if (! empty($filters['office_id'])) {
             $query->where('office_id', (int) $filters['office_id']);
@@ -128,12 +128,7 @@ class PpmpApprovalController extends Controller
             ->select(['offices.id as office_id', 'offices.name as office_name'])
             ->withCount([
                 'ppmps as total' => function ($query): void {
-                    $query->where(function ($statusQuery): void {
-                        $statusQuery->where('status', 'SUBMITTED')
-                            ->orWhere('status', 'APPROVED')
-                            ->orWhere('status', 'REJECTED')
-                            ->orWhere('status', 'RETURNED_FOR_REVISION');
-                    });
+                    $query->whereIn('status', ['SUBMITTED', 'APPROVED', 'REJECTED', 'RETURNED_FOR_REVISION', 'CLOSED']);
                 },
             ])
             ->orderByDesc('total')
@@ -185,7 +180,7 @@ class PpmpApprovalController extends Controller
             ],
             'filter_options' => [
                 'offices' => Office::query()->requestingOffices()->select(['id', 'name'])->orderBy('name', 'asc')->get(),
-                'statuses' => ['SUBMITTED', 'APPROVED', 'REJECTED', 'RETURNED_FOR_REVISION'],
+                'statuses' => ['SUBMITTED', 'APPROVED', 'REJECTED', 'RETURNED_FOR_REVISION', 'CLOSED'],
                 'years' => Ppmp::query()
                     ->whereNotNull('fiscal_year')
                     ->pluck('fiscal_year')
@@ -293,7 +288,7 @@ class PpmpApprovalController extends Controller
             return (string) $submittedAt;
         }
 
-        if (in_array((string) $ppmp->status, ['SUBMITTED', 'APPROVED', 'REJECTED', 'RETURNED_FOR_REVISION'], true)) {
+        if (in_array((string) $ppmp->status, ['SUBMITTED', 'APPROVED', 'REJECTED', 'RETURNED_FOR_REVISION', 'CLOSED'], true)) {
             return optional($ppmp->created_at)?->toIso8601String();
         }
 
@@ -322,7 +317,7 @@ class PpmpApprovalController extends Controller
                     return false;
                 }
 
-                return in_array($newStatus, ['SUBMITTED', 'APPROVED', 'REJECTED', 'RETURNED_FOR_REVISION'], true);
+                return in_array($newStatus, ['SUBMITTED', 'APPROVED', 'REJECTED', 'RETURNED_FOR_REVISION', 'CLOSED'], true);
             })
             ->map(fn ($entry): array => [
                 'id' => (int) $entry->id,

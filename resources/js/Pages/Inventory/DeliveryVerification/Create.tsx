@@ -262,24 +262,26 @@ export default function DeliveryVerificationCreate({ delivery }: Props) {
                                     <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                                         Selected Attachments ({data.evidence_files.length}):
                                     </p>
-                                    <div className="grid gap-2 sm:grid-cols-2">
-                                        {data.evidence_files.map((file, idx) => (
-                                            <div key={idx} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs shadow-2xs">
-                                                <div className="flex items-center gap-2 min-w-0 pr-2">
-                                                    <span className="text-slate-400">📎</span>
-                                                    <span className="truncate font-medium text-slate-700" title={file.name}>{file.name}</span>
-                                                    <span className="shrink-0 text-[10px] text-slate-400">({formatFileSize(file.size)})</span>
+                                    <div className="max-h-36 overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin]">
+                                        <div className="grid gap-2 sm:grid-cols-2">
+                                            {data.evidence_files.map((file, idx) => (
+                                                <div key={idx} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs shadow-2xs">
+                                                    <div className="flex items-center gap-2 min-w-0 pr-2">
+                                                        <span className="text-slate-400">📎</span>
+                                                        <span className="truncate font-medium text-slate-700" title={file.name}>{file.name}</span>
+                                                        <span className="shrink-0 text-[10px] text-slate-400">({formatFileSize(file.size)})</span>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRemoveFile(idx)}
+                                                        className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
+                                                        title="Remove attachment"
+                                                    >
+                                                        ✕
+                                                    </button>
                                                 </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleRemoveFile(idx)}
-                                                    className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
-                                                    title="Remove attachment"
-                                                >
-                                                    ✕
-                                                </button>
-                                            </div>
-                                        ))}
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
                             )}

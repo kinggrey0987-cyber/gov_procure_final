@@ -269,6 +269,77 @@ class ExecutivePpmpApprovalTest extends TestCase
             );
     }
 
+    public function test_executive_can_view_and_filter_closed_historical_ppmps(): void
+    {
+        $closedPpmp2025 = Ppmp::query()->create([
+            'office_id' => $this->office->id,
+            'prepared_by' => $this->officeUser->id,
+            'approved_by' => $this->executive->id,
+            'fiscal_year' => 2025,
+            'status' => 'CLOSED',
+            'total_estimated_budget' => 85000.00,
+            'date_prepared' => '2025-01-10',
+            'date_approved' => '2025-01-15',
+            'remarks' => 'Completed FY2025 cycle.',
+        ]);
+
+        $approvedPpmp2026 = Ppmp::query()->create([
+            'office_id' => $this->office->id,
+            'prepared_by' => $this->officeUser->id,
+            'approved_by' => $this->executive->id,
+            'fiscal_year' => 2026,
+            'status' => 'APPROVED',
+            'total_estimated_budget' => 95000.00,
+            'date_prepared' => '2026-01-05',
+            'date_approved' => '2026-01-10',
+            'remarks' => 'Active FY2026 plan.',
+        ]);
+
+        $this->actingAs($this->executive)
+            ->get(route('executive.ppmp-approvals.index'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Executive/Approvals/Index')
+                ->where('filter_options.statuses', ['SUBMITTED', 'APPROVED', 'REJECTED', 'RETURNED_FOR_REVISION', 'CLOSED'])
+                ->where('records.data.0.ppmp_id', $approvedPpmp2026->ppmp_id)
+                ->where('records.data.0.can_signoff', false)
+                ->where('records.data.1.ppmp_id', $closedPpmp2025->ppmp_id)
+                ->where('records.data.1.status', 'CLOSED')
+                ->where('records.data.1.can_signoff', false)
+            );
+
+        // Filter by status=CLOSED
+        $this->actingAs($this->executive)
+            ->get(route('executive.ppmp-approvals.index', ['status' => 'CLOSED']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Executive/Approvals/Index')
+                ->has('records.data', 1)
+                ->where('records.data.0.ppmp_id', $closedPpmp2025->ppmp_id)
+            );
+
+        // Filter by year=2025
+        $this->actingAs($this->executive)
+            ->get(route('executive.ppmp-approvals.index', ['year' => 2025]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Executive/Approvals/Index')
+                ->has('records.data', 1)
+                ->where('records.data.0.ppmp_id', $closedPpmp2025->ppmp_id)
+            );
+
+        // Executive can view details of closed PPMP
+        $this->actingAs($this->executive)
+            ->get(route('executive.ppmp-approvals.show', $closedPpmp2025->ppmp_id))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Executive/Approvals/Show')
+                ->where('ppmp.ppmp_id', $closedPpmp2025->ppmp_id)
+                ->where('ppmp.status', 'CLOSED')
+                ->where('canSignoff', false)
+            );
+    }
+
     private function createSubmittedPpmp(): Ppmp
     {
         return Ppmp::query()->create([

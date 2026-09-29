@@ -10,14 +10,21 @@
         overflow-x: hidden;
     }
 
-    /* Lock desktop viewport completely when authenticated app shell is active */
+    /* Lock desktop viewport completely when authenticated app shell is active to prevent double-scroll */
     @media (min-width: 768px) {
         html:has(.app-shell-locked),
         body:has(.app-shell-locked),
+        html.app-shell-active,
+        body.app-shell-active {
+            overflow: hidden !important;
+            height: 100% !important;
+            height: 100vh !important;
+            max-height: 100vh !important;
+            min-height: 0 !important;
+        }
+
         html:has(.app-shell-locked) body,
         html:has(.app-shell-locked) #app,
-        html.app-shell-active,
-        body.app-shell-active,
         html.app-shell-active body,
         html.app-shell-active #app {
             overflow: hidden !important;
