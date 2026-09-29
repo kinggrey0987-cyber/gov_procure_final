@@ -135,6 +135,30 @@ class SupplyRequestService
             $this->recordStatus($supplyRequest, $oldStatus, 'SUBMITTED', $actor, 'Supply request submitted');
             $this->recordAudit($actor, 'SUBMIT', $supplyRequest);
 
+            // Reopen any linked purchase requests that were returned for revision
+            $linkedPrs = \App\Models\PurchaseRequest::query()
+                ->where('supply_request_id', (int) $supplyRequest->supply_request_id)
+                ->where('status', 'RETURNED_FOR_REVISION')
+                ->get();
+
+            foreach ($linkedPrs as $pr) {
+                $prOld = (string) $pr->status;
+                $pr->forceFill([
+                    'status' => 'OPEN',
+                    'remarks' => sprintf('Resubmitted by office following revision. %s', (string) ($reviewNotes ?? '')),
+                ])->save();
+
+                StatusHistory::query()->create([
+                    'reference_type' => \App\Models\PurchaseRequest::class,
+                    'reference_id' => (int) $pr->purchase_request_id,
+                    'old_status' => $prOld,
+                    'new_status' => 'OPEN',
+                    'changed_by' => (int) $actor->id,
+                    'remarks' => 'Resubmitted by requesting office following revision.',
+                    'changed_at' => now(),
+                ]);
+            }
+
             $this->notificationService->notifyUser(
                 user: $actor,
                 title: 'Supply Request Submitted',
@@ -172,6 +196,19 @@ class SupplyRequestService
     public function deleteDraft(SupplyRequest $supplyRequest, User $actor): void
     {
         $this->assertDraftAndOwned($supplyRequest, $actor);
+
+        $followUpService = app(\App\Services\Inventory\SupplyRequestFollowUpService::class);
+        if ($followUpService->isFollowUpSupplyRequest($supplyRequest)) {
+            throw ValidationException::withMessages([
+                'supply_request' => 'Follow-up requisitions cannot be deleted.',
+            ]);
+        }
+
+        if ($supplyRequest->purchaseRequests()->exists() || $supplyRequest->distributionRecords()->exists()) {
+            throw ValidationException::withMessages([
+                'supply_request' => 'Requisitions with linked procurement or distribution records cannot be deleted.',
+            ]);
+        }
 
         DB::transaction(function () use ($supplyRequest, $actor): void {
             $supplyRequest->loadMissing('items');

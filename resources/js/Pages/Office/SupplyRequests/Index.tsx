@@ -297,7 +297,7 @@ export default function SupplyRequestsIndex({ supplyRequests, filters, filter_op
                                                             {submittingDraftId === row.supply_request_id ? 'Submitting...' : 'Submit'}
                                                         </button>
                                                     )}
-                                                    {(row.raw_status ?? row.status) === 'DRAFT' && (
+                                                    {(row.raw_status ?? row.status) === 'DRAFT' && !row.follow_up_context?.is_follow_up && (
                                                         <button
                                                             type="button"
                                                             onClick={() => setDraftToDelete(row)}

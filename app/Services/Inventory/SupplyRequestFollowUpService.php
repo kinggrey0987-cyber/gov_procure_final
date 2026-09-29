@@ -266,6 +266,24 @@ class SupplyRequestFollowUpService
             $parent = $followUpPr->sourceSupplyRequest
                 ?? SupplyRequest::query()->find($followUpPr->source_supply_request_id);
             if ($parent instanceof SupplyRequest) {
+                // If this follow-up PR originated from a consolidated delivery, check if this stored parent is already 100% fulfilled
+                $delivery = $followUpPr->sourceDelivery;
+                if ($delivery && $delivery->purchaseOrder) {
+                    $traceability = app(\App\Services\Procurement\ConsolidationTraceabilityService::class);
+                    $candidateRequests = $traceability->getSourceSupplyRequests($delivery->purchaseOrder);
+                    if ($candidateRequests->count() > 1 && $this->isSupplyRequestFullyFulfilled($parent)) {
+                        $targetParent = $traceability->resolveCandidateSupplyRequestWithDeficit($delivery, $candidateRequests);
+                        if ($targetParent instanceof SupplyRequest && (int) $targetParent->supply_request_id !== (int) $parent->supply_request_id) {
+                            $followUpPr->forceFill(['source_supply_request_id' => (int) $targetParent->supply_request_id])->save();
+                            if ($followUpPr->supplyRequest && (int) $followUpPr->supplyRequest->office_id !== (int) $targetParent->office_id) {
+                                $followUpPr->supplyRequest->forceFill(['office_id' => (int) $targetParent->office_id])->save();
+                            }
+
+                            return $targetParent;
+                        }
+                    }
+                }
+
                 return $parent;
             }
         }
@@ -414,6 +432,48 @@ class SupplyRequestFollowUpService
             ->unique()
             ->values()
             ->all();
+    }
+
+    public function isFollowUpSupplyRequest(SupplyRequest $supplyRequest): bool
+    {
+        $context = $this->resolveContext($supplyRequest);
+
+        return (bool) ($context['is_follow_up'] ?? false);
+    }
+
+    public function isSupplyRequestFullyFulfilled(SupplyRequest $supplyRequest): bool
+    {
+        $supplyRequest->loadMissing(['items', 'distributionRecords.items']);
+        if ($supplyRequest->items->isEmpty()) {
+            return false;
+        }
+
+        $releasedRecords = \App\Models\DistributionRecord::query()
+            ->with('items')
+            ->where('supply_request_id', $supplyRequest->supply_request_id)
+            ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
+            ->get();
+
+        $releasedByItem = [];
+        foreach ($releasedRecords as $record) {
+            foreach ($record->items as $item) {
+                $itemId = (int) $item->item_id;
+                $damaged = (float) ($item->quantity_damaged ?? 0.0);
+                $effective = max((float) $item->quantity_released - $damaged, 0.0);
+                $releasedByItem[$itemId] = ($releasedByItem[$itemId] ?? 0.0) + $effective;
+            }
+        }
+
+        foreach ($supplyRequest->items as $item) {
+            $itemId = (int) $item->item_id;
+            $requested = (float) $item->quantity_requested;
+            $released = (float) ($releasedByItem[$itemId] ?? 0.0);
+            if ($released + 0.0001 < $requested) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
 

@@ -158,7 +158,20 @@ class AppServiceProvider extends ServiceProvider
             return $user->can('office.supply-request.view', $supplyRequest) && $supplyRequest->status === 'DRAFT';
         });
         Gate::define('office.supply-request.delete', function (User $user, SupplyRequest $supplyRequest): bool {
-            return $user->can('office.supply-request.view', $supplyRequest) && $supplyRequest->status === 'DRAFT';
+            if (! $user->can('office.supply-request.view', $supplyRequest) || $supplyRequest->status !== 'DRAFT') {
+                return false;
+            }
+
+            $followUpService = app(\App\Services\Inventory\SupplyRequestFollowUpService::class);
+            if ($followUpService->isFollowUpSupplyRequest($supplyRequest)) {
+                return false;
+            }
+
+            if ($supplyRequest->purchaseRequests()->exists() || $supplyRequest->distributionRecords()->exists()) {
+                return false;
+            }
+
+            return true;
         });
         Gate::define('office.supply-request.submit', function (User $user, SupplyRequest $supplyRequest): bool {
             return $user->can('office.supply-request.update', $supplyRequest);

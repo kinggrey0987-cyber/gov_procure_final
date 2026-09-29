@@ -462,25 +462,36 @@ class SupplyRequestController extends Controller
             return 'CANCELLED';
         }
 
+        $linkedPrs = $this->traceabilityService->getPurchaseRequestsForSupplyRequest($supplyRequest);
+        $purchaseRequestStatuses = $linkedPrs
+            ->pluck('status')
+            ->map(fn ($status): string => strtoupper((string) $status));
+
+        // Prioritize RETURNED_FOR_REVISION if draft and procurement requested revision
+        if ($baseStatus === 'DRAFT') {
+            if ($purchaseRequestStatuses->contains('RETURNED_FOR_REVISION') || $supplyRequest->statusHistories()->where('remarks', 'like', '%returned for revision%')->exists()) {
+                return 'RETURNED_FOR_REVISION';
+            }
+
+            return 'DRAFT';
+        }
+
+        $hasActiveClaims = $this->hasActiveDiscrepanciesOrClaims($supplyRequest);
+
         if ($baseStatus === 'RECEIVED') {
-            return 'RECEIVED';
+            return $hasActiveClaims ? 'PARTIALLY_RECEIVED' : 'RECEIVED';
         }
 
         $progress = $this->distributionProgress($supplyRequest);
 
         if ($progress['received'] > 0) {
+            if ($hasActiveClaims) {
+                return 'PARTIALLY_RECEIVED';
+            }
+
             return $progress['received'] + 0.0001 >= $progress['requested']
                 ? 'RECEIVED'
                 : 'PARTIALLY_RECEIVED';
-        }
-
-        // Check if this request is a follow-up child whose lineage/root is already fully received
-        $rootSr = $this->followUpService->resolveRootSupplyRequest($supplyRequest);
-        if ($rootSr && (int) $rootSr->supply_request_id !== (int) $supplyRequest->supply_request_id) {
-            $rootProgress = $this->distributionProgress($rootSr);
-            if ($rootSr->status === 'RECEIVED' || ($rootProgress['received'] > 0 && $rootProgress['received'] + 0.0001 >= $rootProgress['requested'])) {
-                return 'RECEIVED';
-            }
         }
 
         if ($progress['released'] > 0) {
@@ -518,7 +529,6 @@ class SupplyRequestController extends Controller
             return 'READY_FOR_RELEASE';
         }
 
-        $linkedPrs = $this->traceabilityService->getPurchaseRequestsForSupplyRequest($supplyRequest);
         $allPurchaseOrders = $supplyRequest->purchaseOrders
             ->concat($linkedPrs->flatMap->purchaseOrders)
             ->unique('purchase_order_id');
@@ -535,24 +545,8 @@ class SupplyRequestController extends Controller
             return 'PROCUREMENT_PO_DRAFT';
         }
 
-        if ($baseStatus === 'REJECTED') {
-            return 'REJECTED';
-        }
-
-        if ($baseStatus === 'CANCELLED') {
-            return 'CANCELLED';
-        }
-
-        $purchaseRequestStatuses = $linkedPrs
-            ->pluck('status')
-            ->map(fn ($status): string => strtoupper((string) $status));
-
         if ($purchaseRequestStatuses->contains('REJECTED')) {
             return 'REJECTED';
-        }
-
-        if ($baseStatus === 'DRAFT' && ($purchaseRequestStatuses->contains('RETURNED_FOR_REVISION') || $supplyRequest->statusHistories()->where('remarks', 'like', '%returned for revision%')->exists())) {
-            return 'RETURNED_FOR_REVISION';
         }
 
         if ($purchaseRequestStatuses->contains('PROCESSING')) {
@@ -568,6 +562,24 @@ class SupplyRequestController extends Controller
         }
 
         return $baseStatus;
+    }
+
+    private function hasActiveDiscrepanciesOrClaims(SupplyRequest $supplyRequest): bool
+    {
+        $distributionRecordIds = $this->fulfillmentDistributionRecords($supplyRequest)
+            ->pluck('distribution_record_id')
+            ->filter()
+            ->unique()
+            ->all();
+
+        if (empty($distributionRecordIds)) {
+            return false;
+        }
+
+        return \App\Models\Claim::query()
+            ->whereIn('distribution_record_id', $distributionRecordIds)
+            ->whereNotIn('status', ['RESOLVED', 'REJECTED'])
+            ->exists();
     }
 
     /**

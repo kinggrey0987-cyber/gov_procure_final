@@ -45,10 +45,12 @@ class ProcurementStatusSyncService
                         ->whereIn('supply_request_id', $childIds)
                         ->get();
                     foreach ($children as $child) {
-                        $childRemarks = 'Parent supply request lineage was fully received by the requesting office.';
-                        $this->transitionSupplyRequest($child, $actor, $childRemarks);
-                        $this->transitionPurchaseRequests($child->purchaseRequests, $actor, $childRemarks);
-                        $this->transitionPurchaseOrders($child->purchaseOrders, $actor, $childRemarks);
+                        if ($this->canSyncChildWhenParentFullyReceived($child, $supplyRequest)) {
+                            $childRemarks = 'Parent supply request lineage was fully received by the requesting office.';
+                            $this->transitionSupplyRequest($child, $actor, $childRemarks);
+                            $this->transitionPurchaseRequests($child->purchaseRequests, $actor, $childRemarks);
+                            $this->transitionPurchaseOrders($child->purchaseOrders, $actor, $childRemarks);
+                        }
                     }
                 }
             }
@@ -85,10 +87,12 @@ class ProcurementStatusSyncService
                             ->whereIn('supply_request_id', $siblingIds)
                             ->get();
                         foreach ($siblings as $sibling) {
-                            $siblingRemarks = 'Parent supply request lineage was fully received across follow-up deliveries.';
-                            $this->transitionSupplyRequest($sibling, $actor, $siblingRemarks);
-                            $this->transitionPurchaseRequests($sibling->purchaseRequests, $actor, $siblingRemarks);
-                            $this->transitionPurchaseOrders($sibling->purchaseOrders, $actor, $siblingRemarks);
+                            if ($this->canSyncChildWhenParentFullyReceived($sibling, $parent)) {
+                                $siblingRemarks = 'Parent supply request lineage was fully received across follow-up deliveries.';
+                                $this->transitionSupplyRequest($sibling, $actor, $siblingRemarks);
+                                $this->transitionPurchaseRequests($sibling->purchaseRequests, $actor, $siblingRemarks);
+                                $this->transitionPurchaseOrders($sibling->purchaseOrders, $actor, $siblingRemarks);
+                            }
                         }
                     }
                 }
@@ -127,10 +131,7 @@ class ProcurementStatusSyncService
         $prs = PurchaseRequest::query()
             ->with(['purchaseOrders.items', 'purchaseOrders.deliveries.items', 'supplyRequest'])
             ->whereIn('status', ['OPEN', 'PROCESSING'])
-            ->where(function ($q): void {
-                $q->where('remarks', 'like', '%LOW_STOCK_SIGNAL:inventory:%')
-                    ->orWhere('source_type', 'CLAIM_REPLACEMENT_FOLLOW_UP');
-            })
+            ->where('remarks', 'like', '%LOW_STOCK_SIGNAL:inventory:%')
             ->get();
 
         foreach ($prs as $pr) {
@@ -184,7 +185,10 @@ class ProcurementStatusSyncService
                 ]);
 
                 if ($pr->supplyRequest && ! in_array((string) $pr->supplyRequest->status, ['RECEIVED', 'COMPLETED'], true)) {
-                    $pr->supplyRequest->forceFill(['status' => 'RECEIVED'])->save();
+                    // Only mark received if genuinely fully received by office
+                    if ($this->isFullyReceived($pr->supplyRequest)) {
+                        $pr->supplyRequest->forceFill(['status' => 'RECEIVED'])->save();
+                    }
                 }
 
                 $synced++;
@@ -198,6 +202,11 @@ class ProcurementStatusSyncService
     {
         $supplyRequest->loadMissing('items');
         if ($supplyRequest->items->isEmpty()) {
+            return false;
+        }
+
+        // Active or unresolved claims prevent a supply request from being fully received
+        if ($this->hasUnresolvedClaims($supplyRequest)) {
             return false;
         }
 
@@ -220,6 +229,56 @@ class ProcurementStatusSyncService
             if ($received + 0.0001 < $requested) {
                 return false;
             }
+        }
+
+        return true;
+    }
+
+    public function hasUnresolvedClaims(SupplyRequest $supplyRequest): bool
+    {
+        $distributionRecordIds = $this->allFulfillmentDistributionRecords($supplyRequest)
+            ->pluck('distribution_record_id')
+            ->filter()
+            ->all();
+
+        if (empty($distributionRecordIds)) {
+            return false;
+        }
+
+        return \App\Models\Claim::query()
+            ->whereIn('distribution_record_id', $distributionRecordIds)
+            ->whereNotIn('status', ['RESOLVED', 'REJECTED'])
+            ->exists();
+    }
+
+    private function canSyncChildWhenParentFullyReceived(SupplyRequest $child, SupplyRequest $parent): bool
+    {
+        // 1. If the child has a linked claim or is a claim replacement, it can NEVER be marked received unless that claim is RESOLVED
+        $sourceClaimIds = $child->purchaseRequests()->pluck('source_claim_id')->filter()->all();
+        if (! empty($sourceClaimIds)) {
+            $hasUnresolvedClaim = \App\Models\Claim::query()
+                ->whereIn('claims_id', $sourceClaimIds)
+                ->whereNotIn('status', ['RESOLVED', 'REJECTED'])
+                ->exists();
+
+            if ($hasUnresolvedClaim) {
+                return false;
+            }
+        }
+
+        if ($this->hasUnresolvedClaims($child)) {
+            return false;
+        }
+
+        // 2. Child cannot be in DRAFT or RETURNED_FOR_REVISION
+        if (in_array(strtoupper((string) $child->status), ['DRAFT', 'RETURNED_FOR_REVISION', 'REJECTED', 'CANCELLED'], true)) {
+            return false;
+        }
+
+        // 3. For consolidated procurements, verify the parent is indeed the constituent that this child corresponds to
+        $resolvedParent = $this->followUpService->resolveParentSupplyRequest($child);
+        if ($resolvedParent instanceof SupplyRequest && (int) $resolvedParent->supply_request_id !== (int) $parent->supply_request_id) {
+            return false;
         }
 
         return true;
@@ -281,6 +340,14 @@ class ProcurementStatusSyncService
 
         foreach ($purchaseRequest->purchaseOrders as $po) {
             if (! $this->canTransitionPurchaseOrderToCompleted($po)) {
+                return false;
+            }
+        }
+
+        // If this PR was generated from a claim replacement follow-up, the claim MUST be fully RESOLVED!
+        if ((int) ($purchaseRequest->source_claim_id ?? 0) > 0 || (string) $purchaseRequest->source_type === 'CLAIM_REPLACEMENT_FOLLOW_UP') {
+            $claim = $purchaseRequest->sourceClaim ?? \App\Models\Claim::find($purchaseRequest->source_claim_id);
+            if ($claim instanceof \App\Models\Claim && (string) $claim->status !== 'RESOLVED') {
                 return false;
             }
         }

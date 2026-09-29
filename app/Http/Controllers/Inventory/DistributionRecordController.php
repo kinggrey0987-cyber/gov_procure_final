@@ -189,6 +189,19 @@ class DistributionRecordController
             if ($targetChildSr instanceof SupplyRequest) {
                 $sourceSupplyRequests->push($targetChildSr);
             }
+
+            // If this follow-up is for a consolidated procurement, also offer constituent requests with unmet shortage
+            $sourceDelivery = $delivery->purchaseOrder?->purchaseRequest?->sourceDelivery;
+            $parentPo = $sourceDelivery?->purchaseOrder
+                ?? $delivery->purchaseOrder?->purchaseRequest?->purchaseOrder;
+            if ($parentPo) {
+                $candidates = $this->traceabilityService->getSourceSupplyRequests($parentPo);
+                if ($candidates->count() >= 2) {
+                    foreach ($candidates as $candidate) {
+                        $sourceSupplyRequests->push($candidate);
+                    }
+                }
+            }
         } else {
             if ($delivery->purchaseOrder?->supplyRequest instanceof SupplyRequest) {
                 $sourceSupplyRequests->push($delivery->purchaseOrder->supplyRequest);
@@ -216,12 +229,13 @@ class DistributionRecordController
             }
         }
 
-        // Never offer supply requests that are already fully received, completed, or closed
+        // Never offer supply requests that are cancelled, rejected, or closed
         $sourceSupplyRequests = $sourceSupplyRequests->reject(function ($sr): bool {
             if (! $sr instanceof SupplyRequest) {
                 return true;
             }
-            return in_array(strtoupper((string) $sr->status), ['RECEIVED', 'COMPLETED', 'CLOSED', 'CANCELLED', 'REJECTED'], true);
+
+            return in_array(strtoupper((string) $sr->status), ['CLOSED', 'CANCELLED', 'REJECTED'], true);
         });
 
         $sourceSupplyRequests = $sourceSupplyRequests->unique('supply_request_id')->values();
@@ -407,7 +421,7 @@ class DistributionRecordController
 
     private function hasReleasableQuantityForDelivery(SupplyRequest $supplyRequest, Delivery $delivery): bool
     {
-        if (in_array(strtoupper((string) $supplyRequest->status), ['RECEIVED', 'COMPLETED', 'CLOSED', 'CANCELLED', 'REJECTED'], true)) {
+        if (in_array(strtoupper((string) $supplyRequest->status), ['CLOSED', 'CANCELLED', 'REJECTED'], true)) {
             return false;
         }
 

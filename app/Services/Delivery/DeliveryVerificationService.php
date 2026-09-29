@@ -290,13 +290,12 @@ class DeliveryVerificationService
         $pr = $po->purchaseRequest;
         if ($pr instanceof PurchaseRequest && ! in_array((string) $pr->status, ['COMPLETED', 'CLOSED'], true)) {
             $isLowStockSignal = str_contains((string) ($pr->remarks ?? ''), 'LOW_STOCK_SIGNAL:inventory:');
-            $isClaimFollowUp = (string) ($pr->source_type ?? '') === 'CLAIM_REPLACEMENT_FOLLOW_UP' || (int) ($pr->source_claim_id ?? 0) > 0;
 
             $hasUnfinishedPo = $pr->purchaseOrders()
                 ->whereNotIn('status', ['COMPLETED', 'CLOSED', 'CANCELLED'])
                 ->exists();
 
-            if (! $hasUnfinishedPo && ($isLowStockSignal || $isClaimFollowUp)) {
+            if (! $hasUnfinishedPo && $isLowStockSignal) {
                 $prOld = (string) $pr->status;
                 $pr->forceFill(['status' => 'COMPLETED'])->save();
 
@@ -306,9 +305,7 @@ class DeliveryVerificationService
                     'old_status' => $prOld,
                     'new_status' => 'COMPLETED',
                     'changed_by' => (int) $actor->id,
-                    'remarks' => $isLowStockSignal
-                        ? 'Proactive stock replenishment received and verified in warehouse.'
-                        : 'Claim replacement goods delivered and verified into warehouse inventory.',
+                    'remarks' => 'Proactive stock replenishment received and verified in warehouse.',
                     'changed_at' => now(),
                 ]);
 

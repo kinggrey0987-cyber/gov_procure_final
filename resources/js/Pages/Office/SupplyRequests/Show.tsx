@@ -377,7 +377,7 @@ export default function SupplyRequestShow({
                                     </Link>
                                 ) : null}
 
-                                {isDraft ? (
+                                {isDraft && !supplyRequest.follow_up_context?.is_follow_up && (supplyRequest.purchase_requests ?? []).length === 0 ? (
                                     <button
                                         type="button"
                                         onClick={() => setConfirmingDelete(true)}
