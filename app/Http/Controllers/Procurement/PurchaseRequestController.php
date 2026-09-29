@@ -191,6 +191,12 @@ class PurchaseRequestController extends Controller
             ]);
         }
 
+        if ($purchaseRequest->is_claim_replacement && $action === 'return') {
+            throw ValidationException::withMessages([
+                'action' => 'Claim replacement purchase requests cannot be returned for revision to protect claim dispute integrity. You can either process or reject the request.',
+            ]);
+        }
+
         if ($action === 'return') {
             if (! is_string($remarks)) {
                 throw ValidationException::withMessages([

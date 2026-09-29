@@ -231,6 +231,13 @@ class SupplyRequestService
     {
         $this->assertDraftAndOwned($supplyRequest, $actor);
 
+        $followUpService = app(\App\Services\Inventory\SupplyRequestFollowUpService::class);
+        if ($followUpService->isFollowUpSupplyRequest($supplyRequest)) {
+            throw ValidationException::withMessages([
+                'items' => 'Items and quantities on follow-up requisitions cannot be modified because they are bound to a verified shortage or claim dispute.',
+            ]);
+        }
+
         if (! $supplyRequest->ppmp_id) {
             throw ValidationException::withMessages([
                 'ppmp_id' => 'Select a PPMP on the supply request before adding items.',
@@ -274,6 +281,13 @@ class SupplyRequestService
     ): SupplyRequestItem {
         $this->assertDraftAndOwned($supplyRequest, $actor);
 
+        $followUpService = app(\App\Services\Inventory\SupplyRequestFollowUpService::class);
+        if ($followUpService->isFollowUpSupplyRequest($supplyRequest)) {
+            throw ValidationException::withMessages([
+                'items' => 'Items and quantities on follow-up requisitions cannot be modified because they are bound to a verified shortage or claim dispute.',
+            ]);
+        }
+
         if ((int) $item->supply_request_id !== (int) $supplyRequest->supply_request_id) {
             throw ValidationException::withMessages([
                 'supply_request_item_id' => 'Item does not belong to this supply request.',
@@ -315,6 +329,13 @@ class SupplyRequestService
     public function removeItem(SupplyRequest $supplyRequest, SupplyRequestItem $item, User $actor): void
     {
         $this->assertDraftAndOwned($supplyRequest, $actor);
+
+        $followUpService = app(\App\Services\Inventory\SupplyRequestFollowUpService::class);
+        if ($followUpService->isFollowUpSupplyRequest($supplyRequest)) {
+            throw ValidationException::withMessages([
+                'items' => 'Items and quantities on follow-up requisitions cannot be modified because they are bound to a verified shortage or claim dispute.',
+            ]);
+        }
 
         if ((int) $item->supply_request_id !== (int) $supplyRequest->supply_request_id) {
             throw ValidationException::withMessages([

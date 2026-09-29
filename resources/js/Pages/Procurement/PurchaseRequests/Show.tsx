@@ -526,12 +526,20 @@ export default function PurchaseRequestsShow({ purchaseRequest, traceability, re
                                     </p>
                                 </div>
                             )}
+                            {isClaimReplacement && (
+                                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                                    <p className="font-semibold">🛡️ Office Claim Replacement Follow-Up</p>
+                                    <p className="mt-0.5">
+                                        This follow-up request was generated from an approved office claim dispute. Quantities and specifications are fixed to match the verified inspection report and cannot be returned for revision. You may proceed by moving it to processing or reject the request (which will close and reject the claim).
+                                    </p>
+                                </div>
+                            )}
 
                             <label className="mb-1 block text-sm text-gray-700">Review Decision Remarks</label>
                             <textarea
                                 value={processForm.data.remarks}
                                 onChange={(event) => processForm.setData('remarks', event.target.value)}
-                                placeholder={isDiscrepancyReplacement ? "Provide optional remarks when moving to processing." : "Provide remarks. Required for Return for Revision and Reject."}
+                                placeholder={isDiscrepancyReplacement ? "Provide optional remarks when moving to processing." : (isClaimReplacement ? "Provide optional remarks when processing, or required remarks when rejecting." : "Provide remarks. Required for Return for Revision and Reject.")}
                                 className="w-full rounded border-gray-300 text-sm"
                                 rows={3}
                             />
@@ -549,15 +557,15 @@ export default function PurchaseRequestsShow({ purchaseRequest, traceability, re
                                         Move to Processing
                                     </button>
                                 )}
+                                {!isDiscrepancyReplacement && !isClaimReplacement && (
+                                    <button type="button" onClick={() => submitReviewAction('return')} disabled={reasonIsBlank || processForm.processing} className="rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60">
+                                        Return for Revision
+                                    </button>
+                                )}
                                 {!isDiscrepancyReplacement && (
-                                    <>
-                                        <button type="button" onClick={() => submitReviewAction('return')} disabled={reasonIsBlank || processForm.processing} className="rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60">
-                                            Return for Revision
-                                        </button>
-                                        <button type="button" onClick={() => submitReviewAction('reject')} disabled={reasonIsBlank || processForm.processing} className="rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60">
-                                            Reject Request
-                                        </button>
-                                    </>
+                                    <button type="button" onClick={() => submitReviewAction('reject')} disabled={reasonIsBlank || processForm.processing} className="rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60">
+                                        Reject Request
+                                    </button>
                                 )}
                             </div>
                         </form>

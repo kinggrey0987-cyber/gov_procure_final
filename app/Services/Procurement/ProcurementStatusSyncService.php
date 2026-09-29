@@ -38,7 +38,7 @@ class ProcurementStatusSyncService
                 $this->transitionPurchaseRequests($supplyRequest->purchaseRequests, $actor, $remarks);
                 $this->transitionPurchaseOrders($supplyRequest->purchaseOrders, $actor, $remarks);
 
-                $childIds = $this->followUpService->resolveAllFollowUpChildSupplyRequestIds($supplyRequest);
+                $childIds = $this->resolveFulfillmentChildSupplyRequestIds($supplyRequest);
                 if (! empty($childIds)) {
                     $children = SupplyRequest::query()
                         ->with(['items', 'distributionRecords.items', 'purchaseRequests', 'purchaseOrders'])
@@ -80,7 +80,7 @@ class ProcurementStatusSyncService
                     $this->transitionPurchaseRequests($parent->purchaseRequests, $actor, $remarks);
                     $this->transitionPurchaseOrders($parent->purchaseOrders, $actor, $remarks);
 
-                    $siblingIds = $this->followUpService->resolveAllFollowUpChildSupplyRequestIds($parent);
+                    $siblingIds = $this->resolveFulfillmentChildSupplyRequestIds($parent);
                     if (! empty($siblingIds)) {
                         $siblings = SupplyRequest::query()
                             ->with(['items', 'distributionRecords.items', 'purchaseRequests', 'purchaseOrders'])
@@ -275,13 +275,52 @@ class ProcurementStatusSyncService
             return false;
         }
 
-        // 3. For consolidated procurements, verify the parent is indeed the constituent that this child corresponds to
+        // 3. For consolidated procurements, verify ALL constituents of the parent consolidated procurement are fully received
+        $delivery = $child->purchaseRequests->firstWhere('source_delivery_id')?->sourceDelivery;
+        $parentPo = $delivery?->purchaseOrder;
+        if ($parentPo) {
+            $traceability = app(\App\Services\Procurement\ConsolidationTraceabilityService::class);
+            $candidates = $traceability->getSourceSupplyRequests($parentPo);
+            if ($candidates->count() > 1) {
+                foreach ($candidates as $cand) {
+                    if (! $this->isFullyReceived($cand)) {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+        }
+
+        // 4. Verify the parent is indeed the constituent that this child corresponds to
         $resolvedParent = $this->followUpService->resolveParentSupplyRequest($child);
         if ($resolvedParent instanceof SupplyRequest && (int) $resolvedParent->supply_request_id !== (int) $parent->supply_request_id) {
             return false;
         }
 
         return true;
+    }
+
+    /**
+     * @return array<int>
+     */
+    private function resolveFulfillmentChildSupplyRequestIds(SupplyRequest $supplyRequest): array
+    {
+        $childIds = $this->followUpService->resolveAllFollowUpChildSupplyRequestIds($supplyRequest);
+
+        $deliveryIds = $this->followUpService->resolveDeliveryIdsForSupplyRequest($supplyRequest);
+        if (! empty($deliveryIds)) {
+            $deliveryChildIds = PurchaseRequest::query()
+                ->whereIn('source_delivery_id', $deliveryIds)
+                ->whereNotNull('supply_request_id')
+                ->pluck('supply_request_id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            $childIds = array_values(array_unique(array_merge($childIds, $deliveryChildIds)));
+        }
+
+        return $childIds;
     }
 
     /**

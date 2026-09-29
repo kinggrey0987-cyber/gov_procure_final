@@ -33,13 +33,15 @@ class SupplyRequestFollowUpService
             $type = 'DISCREPANCY_REPLACEMENT';
             $label = 'Delivery Discrepancy Replacement';
 
-            if ((int) ($followUpPr->source_supply_request_id ?? 0) > 0) {
+            if ((int) $followUpPr->source_delivery_id > 0) {
+                $type = 'DISCREPANCY_REPLACEMENT';
+                $label = 'Delivery Discrepancy Replacement';
+                $parentSr = $this->resolveParentSupplyRequestForDeliveryFollowUp($followUpPr);
+            } elseif ((int) ($followUpPr->source_supply_request_id ?? 0) > 0) {
                 $type = 'REQUISITION_FOLLOW_UP';
                 $label = 'Follow-up Requisition Batch';
                 $parentSr = $followUpPr->sourceSupplyRequest
                     ?? SupplyRequest::query()->find($followUpPr->source_supply_request_id);
-            } elseif ((int) $followUpPr->source_delivery_id > 0) {
-                $parentSr = $this->resolveParentSupplyRequestForDeliveryFollowUp($followUpPr);
             } elseif ((int) $followUpPr->source_claim_id > 0) {
                 $type = 'CLAIM_REPLACEMENT';
                 $label = 'Warranty / Return Claim Replacement';
@@ -115,13 +117,15 @@ class SupplyRequestFollowUpService
                 $type = 'DISCREPANCY_REPLACEMENT';
                 $label = 'Delivery Discrepancy Replacement';
 
-                if ((int) ($followUpPr->source_supply_request_id ?? 0) > 0) {
+                if ((int) $followUpPr->source_delivery_id > 0) {
+                    $type = 'DISCREPANCY_REPLACEMENT';
+                    $label = 'Delivery Discrepancy Replacement';
+                    $parentSr = $this->resolveParentSupplyRequestForDeliveryFollowUp($followUpPr);
+                } elseif ((int) ($followUpPr->source_supply_request_id ?? 0) > 0) {
                     $type = 'REQUISITION_FOLLOW_UP';
                     $label = 'Follow-up Requisition Batch';
                     $parentSr = $followUpPr->sourceSupplyRequest
                         ?? SupplyRequest::query()->find($followUpPr->source_supply_request_id);
-                } elseif ((int) $followUpPr->source_delivery_id > 0) {
-                    $parentSr = $this->resolveParentSupplyRequestForDeliveryFollowUp($followUpPr);
                 } elseif ((int) $followUpPr->source_claim_id > 0) {
                     $type = 'CLAIM_REPLACEMENT';
                     $label = 'Warranty / Return Claim Replacement';
@@ -199,13 +203,9 @@ class SupplyRequestFollowUpService
             })
             ->where(function ($query) use ($parentIds) {
                 $query->whereIn('source_supply_request_id', $parentIds)
-                    ->orWhere(function ($fallbackQ) use ($parentIds) {
-                        $fallbackQ->whereNull('source_supply_request_id')
-                            ->where(function ($nested) use ($parentIds) {
-                                $nested->whereHas('sourceDelivery.purchaseOrder', fn ($q) => $q->whereIn('supply_request_id', $parentIds))
-                                    ->orWhereHas('sourceDelivery.purchaseOrder.purchaseRequest', fn ($q) => $q->whereIn('supply_request_id', $parentIds));
-                            });
-                    });
+                    ->orWhereNotNull('source_delivery_id')
+                    ->orWhereHas('sourceDelivery.purchaseOrder', fn ($q) => $q->whereIn('supply_request_id', $parentIds))
+                    ->orWhereHas('sourceDelivery.purchaseOrder.purchaseRequest', fn ($q) => $q->whereIn('supply_request_id', $parentIds));
             })
             ->with([
                 'supplyRequest:supply_request_id,request_code,status',
@@ -216,9 +216,11 @@ class SupplyRequestFollowUpService
             ->get();
 
         foreach ($deliveryPrs as $pr) {
-            $parent = ((int) ($pr->source_supply_request_id ?? 0) > 0)
-                ? ($pr->sourceSupplyRequest ?? SupplyRequest::query()->find($pr->source_supply_request_id))
-                : $this->resolveParentSupplyRequestForDeliveryFollowUp($pr);
+            $parent = ((int) ($pr->source_delivery_id ?? 0) > 0)
+                ? $this->resolveParentSupplyRequestForDeliveryFollowUp($pr)
+                : (((int) ($pr->source_supply_request_id ?? 0) > 0)
+                    ? ($pr->sourceSupplyRequest ?? SupplyRequest::query()->find($pr->source_supply_request_id))
+                    : null);
             $pId = (int) ($parent?->supply_request_id ?? 0);
             if (in_array($pId, $parentIds, true) && $pr->supplyRequest) {
                 $results[$pId][] = [
@@ -267,10 +269,13 @@ class SupplyRequestFollowUpService
                 ?? SupplyRequest::query()->find($followUpPr->source_supply_request_id);
             if ($parent instanceof SupplyRequest) {
                 // If this follow-up PR originated from a consolidated delivery, check if this stored parent is already 100% fulfilled
-                $delivery = $followUpPr->sourceDelivery;
-                if ($delivery && $delivery->purchaseOrder) {
+                $delivery = $followUpPr->sourceDelivery
+                    ?? ((int) $followUpPr->source_delivery_id > 0 ? Delivery::query()->find($followUpPr->source_delivery_id) : null);
+                $po = $delivery?->purchaseOrder
+                    ?? ($delivery?->purchase_order_id ? PurchaseOrder::query()->find($delivery->purchase_order_id) : null);
+                if ($delivery && $po) {
                     $traceability = app(\App\Services\Procurement\ConsolidationTraceabilityService::class);
-                    $candidateRequests = $traceability->getSourceSupplyRequests($delivery->purchaseOrder);
+                    $candidateRequests = $traceability->getSourceSupplyRequests($po);
                     if ($candidateRequests->count() > 1 && $this->isSupplyRequestFullyFulfilled($parent)) {
                         $targetParent = $traceability->resolveCandidateSupplyRequestWithDeficit($delivery, $candidateRequests);
                         if ($targetParent instanceof SupplyRequest && (int) $targetParent->supply_request_id !== (int) $parent->supply_request_id) {

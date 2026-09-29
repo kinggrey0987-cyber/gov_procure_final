@@ -917,6 +917,12 @@ class PurchaseRequestService
             ]);
         }
 
+        if ($purchaseRequest->is_claim_replacement) {
+            throw ValidationException::withMessages([
+                'status' => 'Claim replacement purchase requests cannot be returned for revision to protect claim dispute integrity. You can either process or reject the request.',
+            ]);
+        }
+
         if (! in_array((string) $purchaseRequest->status, ['OPEN', 'PROCESSING'], true)) {
             throw ValidationException::withMessages([
                 'status' => 'Only OPEN or PROCESSING purchase requests can be returned for revision.',
@@ -994,10 +1000,53 @@ class PurchaseRequestService
                 'Linked purchase request rejected by procurement. '.$finalRemarks
             );
 
+            // If linked to an office claim, reject and close the claim as well
+            $claim = $purchaseRequest->sourceClaim ?? ($purchaseRequest->source_claim_id ? \App\Models\Claim::find($purchaseRequest->source_claim_id) : null);
+            if ($claim instanceof \App\Models\Claim) {
+                $oldClaimStatus = (string) $claim->status;
+                $claimRemarks = 'Claim replacement rejected by Procurement: '.$finalRemarks;
+
+                $claim->forceFill([
+                    'status' => 'REJECTED',
+                    'resolution_type' => 'REJECTED',
+                    'remarks' => $claimRemarks,
+                ])->save();
+
+                \App\Models\StatusHistory::query()->create([
+                    'reference_type' => \App\Models\Claim::class,
+                    'reference_id' => (int) $claim->claims_id,
+                    'old_status' => $oldClaimStatus,
+                    'new_status' => 'REJECTED',
+                    'changed_by' => (int) $actor->id,
+                    'remarks' => $claimRemarks,
+                    'changed_at' => now(),
+                ]);
+
+                \App\Models\ApprovalHistory::query()->create([
+                    'reference_type' => \App\Models\Claim::class,
+                    'reference_id' => (int) $claim->claims_id,
+                    'approved_by' => (int) $actor->id,
+                    'status' => 'REJECTED',
+                    'remarks' => 'Claim replacement procurement rejected.',
+                    'approved_at' => now(),
+                ]);
+
+                if ($claim->claimant instanceof User) {
+                    $this->notificationService->notifyUser(
+                        user: $claim->claimant,
+                        title: 'Claim Rejected by Procurement',
+                        message: sprintf('Procurement rejected the replacement for claim %s: %s', (string) $claim->claim_code, $finalRemarks),
+                        notificationType: 'CLAIM_STATUS_UPDATED',
+                        referenceType: \App\Models\Claim::class,
+                        referenceId: (int) $claim->claims_id,
+                    );
+                }
+            }
+
             $this->recordStatus($purchaseRequest, $oldStatus, 'REJECTED', $actor, 'Purchase request rejected by procurement.');
             $this->recordAudit($actor, 'REJECT', $purchaseRequest);
 
-            return $purchaseRequest->fresh(['items', 'office', 'requester', 'supplyRequest']) ?? $purchaseRequest;
+            return $purchaseRequest->fresh(['items', 'office', 'requester', 'supplyRequest', 'sourceClaim']) ?? $purchaseRequest;
         });
     }
 
@@ -1117,6 +1166,12 @@ class PurchaseRequestService
         if (! in_array((string) $purchaseRequest->status, ['OPEN', 'PROCESSING', 'RETURNED_FOR_REVISION'], true)) {
             throw ValidationException::withMessages([
                 'status' => 'This purchase request can no longer be modified.',
+            ]);
+        }
+
+        if ($purchaseRequest->is_zero_cost_replacement || $purchaseRequest->is_claim_replacement) {
+            throw ValidationException::withMessages([
+                'purchase_request' => 'Follow-up purchase request items cannot be modified because quantities are bound to the verified discrepancy or claim dispute.',
             ]);
         }
     }
