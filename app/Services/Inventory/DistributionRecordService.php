@@ -25,6 +25,7 @@ class DistributionRecordService
         private readonly NotificationService $notificationService,
         private readonly ProcurementStatusSyncService $procurementStatusSyncService,
         private readonly SupplyRequestFollowUpService $followUpService,
+        private readonly \App\Services\Procurement\ConsolidationTraceabilityService $traceabilityService,
     ) {
     }
 
@@ -460,7 +461,8 @@ class DistributionRecordService
             ]);
         }
 
-        $isProcurementBacked = $record->supplyRequest->purchaseRequests->isNotEmpty();
+        $allPrs = $this->traceabilityService->getPurchaseRequestsForSupplyRequest($record->supplyRequest);
+        $isProcurementBacked = $record->supplyRequest->purchaseRequests->isNotEmpty() || $allPrs->isNotEmpty();
         $hasDeliveryContext = $record->delivery_id !== null;
         $shortageTotal = 0.0;
         $releasedPool = $this->allFulfillmentDistributionRecords($record->supplyRequest)
@@ -502,10 +504,14 @@ class DistributionRecordService
 
             $releasableStock = $available;
             if ($isProcurementBacked && ! $hasDeliveryContext) {
+                $deliveryIds = $this->followUpService->resolveDeliveryIdsForSupplyRequest($record->supplyRequest);
                 $hasPendingDeliveries = \App\Models\Delivery::query()
-                    ->whereHas('purchaseOrder', function ($q) use ($record) {
-                        $lineageIds = $this->followUpService->resolveLineageSupplyRequestIds($record->supplyRequest);
-                        $q->whereIn('supply_request_id', $lineageIds);
+                    ->where(function ($q) use ($record, $deliveryIds) {
+                        $q->whereIn('delivery_id', $deliveryIds)
+                            ->orWhereHas('purchaseOrder', function ($poQ) use ($record) {
+                                $lineageIds = $this->followUpService->resolveLineageSupplyRequestIds($record->supplyRequest);
+                                $poQ->whereIn('supply_request_id', $lineageIds);
+                            });
                     })
                     ->where(function ($q) {
                         $q->whereNotIn('receipt_status', ['VERIFIED', 'PARTIALLY_RECEIVED'])
@@ -513,10 +519,17 @@ class DistributionRecordService
                     })
                     ->exists();
 
-                $totalOrdered = (float) $record->supplyRequest->purchaseOrders
+                $totalOrdered = (float) $allPrs
+                    ->flatMap(fn ($pr) => $pr->purchaseOrders)
                     ->flatMap(fn ($po) => $po->items)
                     ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
                     ->sum('quantity_ordered');
+                if ($totalOrdered <= 0.0) {
+                    $totalOrdered = (float) $record->supplyRequest->purchaseOrders
+                        ->flatMap(fn ($po) => $po->items)
+                        ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
+                        ->sum('quantity_ordered');
+                }
                 $inventoryPortion = max($requested - $totalOrdered, 0.0);
                 $alreadyReleasedInventory = $this->calculateAlreadyReleasedInventory($record->supplyRequest, $itemId);
                 $remainingInventoryPortion = max($inventoryPortion - $alreadyReleasedInventory, 0.0);
@@ -551,8 +564,19 @@ class DistributionRecordService
             return;
         }
 
-        $deliverySupplyRequestId = (int) ($record->delivery?->purchaseOrder?->supply_request_id ?? 0);
-        if ($deliverySupplyRequestId !== (int) $record->supply_request_id) {
+        $delivery = $record->delivery;
+        $deliverySupplyRequestId = (int) ($delivery?->purchaseOrder?->supply_request_id ?? 0);
+        $prSupplyRequestId = (int) ($delivery?->purchaseOrder?->purchaseRequest?->supply_request_id ?? 0);
+
+        $isAllowed = false;
+        if ($deliverySupplyRequestId === (int) $record->supply_request_id || $prSupplyRequestId === (int) $record->supply_request_id) {
+            $isAllowed = true;
+        } elseif ($delivery?->purchaseOrder) {
+            $sourceSupplyRequests = $this->traceabilityService->getSourceSupplyRequests($delivery?->purchaseOrder);
+            $isAllowed = $sourceSupplyRequests->contains('supply_request_id', (int) $record->supply_request_id);
+        }
+
+        if (! $isAllowed) {
             throw ValidationException::withMessages([
                 'supply_request_id' => 'Distribution record supply request must match the delivery purchase order context.',
             ]);
@@ -641,14 +665,15 @@ class DistributionRecordService
                 $inv = Inventory::query()->where('item_id', $itemId)->first();
                 $reservedStock = (float) ($inv?->reserved_quantity ?? 0);
 
-                $record->supplyRequest->loadMissing(['purchaseRequests.items', 'purchaseOrders.items', 'purchaseOrders.purchaseRequest']);
-                $orderedFromPr = (float) $record->supplyRequest->purchaseRequests
+                $allPrs = $this->traceabilityService->getPurchaseRequestsForSupplyRequest($record->supplyRequest);
+                $orderedFromPr = (float) $allPrs
                     ->filter(fn ($pr) => empty($pr->source_type) || $pr->source_type === 'SHORTAGE')
                     ->flatMap(fn ($pr) => $pr->items)
                     ->where('item_id', $itemId)
                     ->sum('quantity_requested');
 
-                $orderedFromPo = (float) $record->supplyRequest->purchaseOrders
+                $orderedFromPo = (float) $allPrs
+                    ->flatMap(fn ($pr) => $pr->purchaseOrders)
                     ->filter(fn ($po) => $po->purchaseRequest === null || empty($po->purchaseRequest->source_type) || $po->purchaseRequest->source_type === 'SHORTAGE')
                     ->flatMap(fn ($po) => $po->items)
                     ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
@@ -668,7 +693,8 @@ class DistributionRecordService
                 $maxReleasable = min($maxReleasable, $deliveryRemaining + $releasableInventory);
             }
         } else {
-            $isProcurementBacked = $record->supplyRequest->purchaseRequests()->exists();
+            $isProcurementBacked = $record->supplyRequest->purchaseRequests()->exists()
+                || $this->traceabilityService->getPurchaseRequestsForSupplyRequest($record->supplyRequest)->isNotEmpty();
             $inv = Inventory::query()->where('item_id', $itemId)->first();
             $availableWarehouseStock = max((float) ($inv?->available_stock ?? 0) + ($isProcurementBacked ? (float) ($inv?->reserved_quantity ?? 0) : 0.0) - $undistributed, 0.0);
             $maxReleasable = min($maxReleasable, $availableWarehouseStock);
@@ -756,14 +782,15 @@ class DistributionRecordService
                         $deliveryPortion = min($requestRemaining, $deliveryRemaining);
                         $unmetRequest = max($requestRemaining - $deliveryPortion, 0.0);
 
-                        $record->supplyRequest->loadMissing(['purchaseRequests.items', 'purchaseOrders.items', 'purchaseOrders.purchaseRequest']);
-                        $orderedFromPr = (float) $record->supplyRequest->purchaseRequests
+                        $allPrs = $this->traceabilityService->getPurchaseRequestsForSupplyRequest($record->supplyRequest);
+                        $orderedFromPr = (float) $allPrs
                             ->filter(fn ($pr) => empty($pr->source_type) || $pr->source_type === 'SHORTAGE')
                             ->flatMap(fn ($pr) => $pr->items)
                             ->where('item_id', $itemId)
                             ->sum('quantity_requested');
 
-                        $orderedFromPo = (float) $record->supplyRequest->purchaseOrders
+                        $orderedFromPo = (float) $allPrs
+                            ->flatMap(fn ($pr) => $pr->purchaseOrders)
                             ->filter(fn ($po) => $po->purchaseRequest === null || empty($po->purchaseRequest->source_type) || $po->purchaseRequest->source_type === 'SHORTAGE')
                             ->flatMap(fn ($po) => $po->items)
                             ->filter(fn ($poi) => (int) $poi->item_id === $itemId)

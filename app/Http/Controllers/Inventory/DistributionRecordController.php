@@ -23,6 +23,7 @@ class DistributionRecordController
         private readonly DistributionRecordService $distributionService,
         private readonly \App\Services\Inventory\SupplyRequestFollowUpService $followUpService,
         private readonly \App\Services\Inventory\InventoryService $inventoryService,
+        private readonly \App\Services\Procurement\ConsolidationTraceabilityService $traceabilityService,
     )
     {
     }
@@ -95,7 +96,7 @@ class DistributionRecordController
         /** @var Collection<int, array<string, mixed>> $eligibleRows */
         $eligibleRows = $inventoryBackedRows
             ->concat($procurementBackedRows)
-            ->unique(fn (array $row): string => ($row['delivery_id'] ?? null) !== null ? 'del_' . $row['delivery_id'] : 'inv_' . $row['supply_request_id'])
+            ->unique(fn (array $row): string => ($row['delivery_id'] ?? null) !== null ? 'del_' . $row['delivery_id'] . '_sr_' . $row['supply_request_id'] : 'inv_' . $row['supply_request_id'])
             ->sortByDesc(fn (array $row): int => (int) $row['sort_timestamp'])
             ->values();
 
@@ -134,31 +135,35 @@ class DistributionRecordController
             ->whereHas('purchaseOrder', function ($query): void {
                 $query->where(function ($poQuery) {
                     $poQuery->whereNotNull('supply_request_id')
-                        ->orWhereHas('purchaseRequest', fn ($prQ) => $prQ->whereNotNull('supply_request_id'));
+                        ->orWhereHas('purchaseRequest', fn ($prQ) => $prQ->whereNotNull('supply_request_id'))
+                        ->orWhereHas('purchaseRequest', fn ($prQ) => $prQ->where('remarks', 'like', '%SR-%'));
                 })
                 ->where(function ($subQ) {
                     $subQ->whereHas('supplyRequest.office', fn ($officeQuery) => $officeQuery->where('code', '!=', 'GSO'))
-                        ->orWhereHas('purchaseRequest.supplyRequest.office', fn ($officeQuery) => $officeQuery->where('code', '!=', 'GSO'));
+                        ->orWhereHas('purchaseRequest.supplyRequest.office', fn ($officeQuery) => $officeQuery->where('code', '!=', 'GSO'))
+                        ->orWhereHas('purchaseRequest.office', fn ($officeQuery) => $officeQuery->where('code', '!=', 'GSO'));
                 });
             })
             ->whereDoesntHave('distributionRecords', fn ($q) => $q->where('status', 'DRAFT'))
-            ->with(['purchaseOrder.supplyRequest.office', 'purchaseOrder.purchaseRequest.supplyRequest.office', 'items.purchaseOrderItem', 'distributionRecords.items'])
+            ->with([
+                'purchaseOrder.supplyRequest.office',
+                'purchaseOrder.purchaseRequest.supplyRequest.office',
+                'purchaseOrder.purchaseRequest.office',
+                'items.purchaseOrderItem',
+                'distributionRecords.items',
+            ])
             ->latest('delivery_id')
             ->get()
-            ->map(fn (Delivery $delivery): ?array => $this->releaseRowFromVerifiedDelivery($delivery))
+            ->flatMap(fn (Delivery $delivery): Collection => $this->releaseRowsFromVerifiedDelivery($delivery))
             ->filter()
             ->values();
     }
 
-    private function releaseRowFromVerifiedDelivery(Delivery $delivery): ?array
+    /**
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function releaseRowsFromVerifiedDelivery(Delivery $delivery): Collection
     {
-        $supplyRequest = $delivery->purchaseOrder?->supplyRequest
-            ?? $delivery->purchaseOrder?->purchaseRequest?->supplyRequest;
-
-        if (! $supplyRequest instanceof SupplyRequest) {
-            return null;
-        }
-
         $acceptedTotal = (float) $delivery->items->sum(function ($item): float {
             return max((float) $item->received_quantity - (float) $item->damaged_quantity, 0);
         });
@@ -169,22 +174,65 @@ class DistributionRecordController
             ->sum('quantity_released');
 
         if ($acceptedTotal - $releasedTotal <= 0.0001) {
-            return null;
+            return collect();
         }
 
-        return [
-            'supply_request_id' => (int) $supplyRequest->supply_request_id,
-            'request_code' => (string) $supplyRequest->request_code,
-            'office_id' => (int) $supplyRequest->office_id,
-            'office_name' => (string) ($supplyRequest->office?->name ?? 'Unknown Office'),
-            'release_basis' => 'VERIFIED_DELIVERY',
-            'release_basis_label' => 'From Verified Delivery',
-            'delivery_id' => (int) $delivery->delivery_id,
-            'delivery_code' => (string) $delivery->delivery_code,
-            'receipt_status' => (string) $delivery->receipt_status,
-            'releasable_reason' => null,
-            'sort_timestamp' => (int) ($delivery->created_at?->getTimestamp() ?? $delivery->delivery_id),
-        ];
+        $sourceSupplyRequests = collect();
+        if ($delivery->purchaseOrder?->supplyRequest instanceof SupplyRequest) {
+            $sourceSupplyRequests->push($delivery->purchaseOrder->supplyRequest);
+        }
+        if ($delivery->purchaseOrder?->purchaseRequest?->supplyRequest instanceof SupplyRequest) {
+            $sourceSupplyRequests->push($delivery->purchaseOrder->purchaseRequest->supplyRequest);
+        }
+        if ($delivery->purchaseOrder) {
+            $consolidated = $this->traceabilityService->getSourceSupplyRequests($delivery->purchaseOrder);
+            $sourceSupplyRequests = $sourceSupplyRequests->merge($consolidated);
+        }
+
+        $sourceSupplyRequests = $sourceSupplyRequests->unique('supply_request_id')->values();
+
+        $deliveryItemIds = $delivery->items
+            ->map(fn ($di) => (int) ($di->purchaseOrderItem?->item_id ?? 0))
+            ->filter()
+            ->all();
+
+        $rows = collect();
+
+        foreach ($sourceSupplyRequests as $supplyRequest) {
+            if (! $supplyRequest instanceof SupplyRequest) {
+                continue;
+            }
+
+            if ((string) ($supplyRequest->office?->code ?? '') === 'GSO') {
+                continue;
+            }
+
+            if (! $this->hasRemainingQuantity($supplyRequest)) {
+                continue;
+            }
+
+            $hasMatchingItem = $supplyRequest->items
+                ->contains(fn ($sri) => in_array((int) $sri->item_id, $deliveryItemIds, true));
+            if (! $hasMatchingItem) {
+                continue;
+            }
+
+            $rows->push([
+                'supply_request_id' => (int) $supplyRequest->supply_request_id,
+                'request_code' => (string) $supplyRequest->request_code,
+                'office_id' => (int) $supplyRequest->office_id,
+                'office_name' => (string) ($supplyRequest->office?->name ?? 'Unknown Office'),
+                'release_basis' => 'VERIFIED_DELIVERY',
+                'release_basis_label' => 'From Verified Delivery',
+                'delivery_id' => (int) $delivery->delivery_id,
+                'delivery_code' => (string) $delivery->delivery_code,
+                'receipt_status' => (string) $delivery->receipt_status,
+                'releasable_reason' => null,
+                'sort_timestamp' => (int) ($delivery->created_at?->getTimestamp() ?? $delivery->delivery_id),
+            ]);
+        }
+
+        return $rows;
     }
 
     /**
@@ -214,15 +262,20 @@ class DistributionRecordController
 
         $hasReleasableStock = false;
         $releasedPool = $this->releasedQuantityByItemId($request);
-        $isProcurementBacked = $request->purchaseRequests->isNotEmpty();
+        $prs = $this->traceabilityService->getPurchaseRequestsForSupplyRequest($request);
+        $isProcurementBacked = $request->purchaseRequests->isNotEmpty() || $prs->isNotEmpty();
         $request->loadMissing('purchaseOrders.items');
 
         $hasPendingDeliveries = false;
         if ($isProcurementBacked) {
+            $deliveryIds = $this->followUpService->resolveDeliveryIdsForSupplyRequest($request);
             $hasPendingDeliveries = Delivery::query()
-                ->whereHas('purchaseOrder', function ($q) use ($request) {
-                    $lineageIds = $this->followUpService->resolveLineageSupplyRequestIds($request);
-                    $q->whereIn('supply_request_id', $lineageIds);
+                ->where(function ($q) use ($request, $deliveryIds) {
+                    $q->whereIn('delivery_id', $deliveryIds)
+                        ->orWhereHas('purchaseOrder', function ($poQ) use ($request) {
+                            $lineageIds = $this->followUpService->resolveLineageSupplyRequestIds($request);
+                            $poQ->whereIn('supply_request_id', $lineageIds);
+                        });
                 })
                 ->where(function ($q) {
                     $q->whereNotIn('receipt_status', ['VERIFIED', 'PARTIALLY_RECEIVED'])
@@ -244,10 +297,17 @@ class DistributionRecordController
             $releasableStock = min($remaining, $available);
 
             if ($isProcurementBacked) {
-                $totalOrdered = (float) $request->purchaseOrders
+                $totalOrdered = (float) $prs
+                    ->flatMap(fn ($pr) => $pr->purchaseOrders)
                     ->flatMap(fn ($po) => $po->items)
                     ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
                     ->sum('quantity_ordered');
+                if ($totalOrdered <= 0.0) {
+                    $totalOrdered = (float) $request->purchaseOrders
+                        ->flatMap(fn ($po) => $po->items)
+                        ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
+                        ->sum('quantity_ordered');
+                }
                 $inventoryPortion = max($requested - $totalOrdered, 0.0);
                 $alreadyReleasedInventory = $this->calculateAlreadyReleasedInventory($request, $itemId);
                 $remainingInventoryPortion = max($inventoryPortion - $alreadyReleasedInventory, 0.0);
@@ -425,7 +485,8 @@ class DistributionRecordController
             return 'All requested quantities have already been released for this request.';
         }
 
-        $hasPurchaseRequest = $request->purchaseRequests->isNotEmpty();
+        $prs = $this->traceabilityService->getPurchaseRequestsForSupplyRequest($request);
+        $hasPurchaseRequest = $request->purchaseRequests->isNotEmpty() || $prs->isNotEmpty();
 
         $shortageTotal = 0.0;
         $hasAvailableStock = false;
@@ -433,10 +494,14 @@ class DistributionRecordController
 
         $hasPendingDeliveries = false;
         if ($hasPurchaseRequest) {
+            $deliveryIds = $this->followUpService->resolveDeliveryIdsForSupplyRequest($request);
             $hasPendingDeliveries = Delivery::query()
-                ->whereHas('purchaseOrder', function ($q) use ($request) {
-                    $lineageIds = $this->followUpService->resolveLineageSupplyRequestIds($request);
-                    $q->whereIn('supply_request_id', $lineageIds);
+                ->where(function ($q) use ($request, $deliveryIds) {
+                    $q->whereIn('delivery_id', $deliveryIds)
+                        ->orWhereHas('purchaseOrder', function ($poQ) use ($request) {
+                            $lineageIds = $this->followUpService->resolveLineageSupplyRequestIds($request);
+                            $poQ->whereIn('supply_request_id', $lineageIds);
+                        });
                 })
                 ->where(function ($q) {
                     $q->whereNotIn('receipt_status', ['VERIFIED', 'PARTIALLY_RECEIVED'])
@@ -459,10 +524,17 @@ class DistributionRecordController
             $releasableStock = min($remaining, $available);
 
             if ($hasPurchaseRequest) {
-                $totalOrdered = (float) $request->purchaseOrders
+                $totalOrdered = (float) $prs
+                    ->flatMap(fn ($pr) => $pr->purchaseOrders)
                     ->flatMap(fn ($po) => $po->items)
                     ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
                     ->sum('quantity_ordered');
+                if ($totalOrdered <= 0.0) {
+                    $totalOrdered = (float) $request->purchaseOrders
+                        ->flatMap(fn ($po) => $po->items)
+                        ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
+                        ->sum('quantity_ordered');
+                }
                 $inventoryPortion = max($requested - $totalOrdered, 0.0);
                 $alreadyReleasedInventory = $this->calculateAlreadyReleasedInventory($request, $itemId);
                 $remainingInventoryPortion = max($inventoryPortion - $alreadyReleasedInventory, 0.0);
@@ -480,11 +552,15 @@ class DistributionRecordController
         }
 
         if ($hasPurchaseRequest) {
+            $deliveryIds = $this->followUpService->resolveDeliveryIdsForSupplyRequest($request);
             $hasVerifiedDelivery = Delivery::query()
                 ->whereIn('receipt_status', ['VERIFIED', 'PARTIALLY_RECEIVED'])
-                ->whereHas('purchaseOrder', function ($query) use ($request): void {
-                    $lineageIds = $this->followUpService->resolveLineageSupplyRequestIds($request);
-                    $query->whereIn('supply_request_id', $lineageIds);
+                ->where(function ($query) use ($request, $deliveryIds): void {
+                    $query->whereIn('delivery_id', $deliveryIds)
+                        ->orWhereHas('purchaseOrder', function ($poQ) use ($request) {
+                            $lineageIds = $this->followUpService->resolveLineageSupplyRequestIds($request);
+                            $poQ->whereIn('supply_request_id', $lineageIds);
+                        });
                 })
                 ->whereDoesntHave('distributionRecords', fn ($q) => $q->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED']))
                 ->with(['items'])

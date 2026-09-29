@@ -328,11 +328,20 @@ class SupplyRequestFollowUpService
         $srIds = $this->resolveLineageSupplyRequestIds($supplyRequest);
         $requestCode = trim((string) $supplyRequest->request_code);
 
+        $traceabilityPrIds = app(\App\Services\Procurement\ConsolidationTraceabilityService::class)
+            ->getPurchaseRequestsForSupplyRequest($supplyRequest)
+            ->pluck('purchase_request_id')
+            ->filter()
+            ->all();
+
         return Delivery::query()
-            ->whereHas('purchaseOrder', function ($query) use ($srIds, $requestCode) {
+            ->whereHas('purchaseOrder', function ($query) use ($srIds, $requestCode, $traceabilityPrIds) {
                 $query->whereIn('supply_request_id', $srIds)
-                    ->orWhereHas('purchaseRequest', function ($prQ) use ($srIds, $requestCode) {
+                    ->orWhereHas('purchaseRequest', function ($prQ) use ($srIds, $requestCode, $traceabilityPrIds) {
                         $prQ->whereIn('supply_request_id', $srIds);
+                        if (! empty($traceabilityPrIds)) {
+                            $prQ->orWhereIn('purchase_request_id', $traceabilityPrIds);
+                        }
                         if ($requestCode !== '') {
                             $prQ->orWhere('remarks', 'like', '%' . $requestCode . '%');
                         }

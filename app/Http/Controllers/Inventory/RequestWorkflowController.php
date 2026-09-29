@@ -778,11 +778,15 @@ class RequestWorkflowController
         }
 
         $lineageIds = $this->followUpService->resolveLineageSupplyRequestIds($supplyRequest);
+        $deliveryIds = $this->followUpService->resolveDeliveryIdsForSupplyRequest($supplyRequest);
         $verifiedDelivery = Delivery::query()
             ->whereIn('receipt_status', ['VERIFIED', 'PARTIALLY_RECEIVED'])
-            ->whereHas('purchaseOrder', function ($query) use ($lineageIds): void {
-                $query->whereIn('supply_request_id', $lineageIds)
-                    ->orWhereHas('purchaseRequest', fn ($prQ) => $prQ->whereIn('supply_request_id', $lineageIds));
+            ->where(function ($query) use ($lineageIds, $deliveryIds): void {
+                $query->whereIn('delivery_id', $deliveryIds)
+                    ->orWhereHas('purchaseOrder', function ($poQ) use ($lineageIds): void {
+                        $poQ->whereIn('supply_request_id', $lineageIds)
+                            ->orWhereHas('purchaseRequest', fn ($prQ) => $prQ->whereIn('supply_request_id', $lineageIds));
+                    });
             })
             ->whereDoesntHave('distributionRecords', fn ($q) => $q->where('status', 'DRAFT'))
             ->with(['items.purchaseOrderItem', 'distributionRecords.items'])
@@ -820,7 +824,11 @@ class RequestWorkflowController
         }
 
         if (! $hasAvailableStock) {
-            if ($supplyRequest->purchaseRequests->isNotEmpty()) {
+            $isProcurementBacked = $supplyRequest->purchaseRequests->isNotEmpty()
+                || ! empty($deliveryIds)
+                || app(\App\Services\Procurement\ConsolidationTraceabilityService::class)->getPurchaseRequestsForSupplyRequest($supplyRequest)->isNotEmpty();
+
+            if ($isProcurementBacked) {
                 return redirect()
                     ->route('inventory.office-supply-requests.index', $request->query())
                     ->with('error', 'This request is procurement-backed and awaits verified delivery before distribution release.');

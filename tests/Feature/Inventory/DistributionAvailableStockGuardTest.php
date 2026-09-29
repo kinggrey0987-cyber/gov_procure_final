@@ -2025,6 +2025,365 @@ class DistributionAvailableStockGuardTest extends TestCase
         $sr2Rows = collect($eligible2)->filter(fn ($row) => (int) $row['supply_request_id'] === (int) $sr2->supply_request_id);
         $this->assertCount(1, $sr2Rows, 'SR-2 remains visible with its verified delivery.');
     }
+
+    public function test_consolidated_purchase_request_delivery_shows_both_requests_and_releases_sequentially(): void
+    {
+        $gsoRole = Role::query()->firstOrCreate(['code' => UserRole::GSO_OFFICER->value], ['name' => 'GSO Officer']);
+        $gsoUser = User::factory()->create(['role_id' => $gsoRole->id]);
+
+        $office = Office::factory()->create(['code' => 'MPDO', 'name' => 'Planning Office']);
+        $officeRole = Role::query()->firstOrCreate(['code' => UserRole::OFFICE_USER->value], ['name' => 'Office User']);
+        $officeUser = User::factory()->create(['role_id' => $officeRole->id, 'office_id' => $office->id]);
+
+        $category = ItemCategory::query()->firstOrCreate(
+            ['category_name' => 'Office Supplies'],
+            ['description' => 'Supplies']
+        );
+        $item = Item::query()->create([
+            'item_category_id' => $category->item_category_id,
+            'item_name' => 'Legal Bond Paper',
+            'default_unit' => 'box',
+            'status' => 'active',
+        ]);
+
+        Inventory::query()->create([
+            'item_id' => $item->item_id,
+            'stock_on_hand' => 200,
+            'available_stock' => 200,
+            'reserved_quantity' => 0,
+        ]);
+
+        $sr1 = SupplyRequest::query()->create([
+            'request_code' => 'SR-MPDO-2026-09-0006',
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(7)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Consolidated Test 1',
+            'priority_level' => 'NORMAL',
+            'status' => 'FOR_PROCUREMENT',
+        ]);
+        $sri1 = SupplyRequestItem::query()->create([
+            'supply_request_id' => $sr1->supply_request_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Legal Bond Paper',
+            'quantity_requested' => 100,
+        ]);
+
+        $sr2 = SupplyRequest::query()->create([
+            'request_code' => 'SR-MPDO-2026-09-0008',
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(7)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Consolidated Test 2',
+            'priority_level' => 'NORMAL',
+            'status' => 'FOR_PROCUREMENT',
+        ]);
+        $sri2 = SupplyRequestItem::query()->create([
+            'supply_request_id' => $sr2->supply_request_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Legal Bond Paper',
+            'quantity_requested' => 100,
+        ]);
+
+        $pr = PurchaseRequest::query()->create([
+            'pr_number' => 'PR-2026-09-0015',
+            'supply_request_id' => $sr1->supply_request_id,
+            'office_id' => $office->id,
+            'requested_by' => $gsoUser->id,
+            'status' => 'APPROVED',
+            'remarks' => 'Consolidated PR for Planning Office [General Supplies] from 2 supply request(s): SR-MPDO-2026-09-0006, SR-MPDO-2026-09-0008.',
+        ]);
+
+        $supplier = Supplier::query()->create([
+            'supplier_name' => 'Paper Supplier',
+            'contact_person' => 'Supplier',
+            'email' => 'supplier@test.local',
+            'phone' => '09123456789',
+            'address' => 'Supplier Address',
+            'status' => 'ACTIVE',
+        ]);
+
+        $po = PurchaseOrder::query()->create([
+            'po_number' => 'PO-2026-09-0015',
+            'purchase_request_id' => $pr->purchase_request_id,
+            'supply_request_id' => $sr1->supply_request_id,
+            'supplier_id' => $supplier->supplier_id,
+            'created_by' => $gsoUser->id,
+            'procurement_method' => 'SHOPPING',
+            'status' => 'APPROVED',
+            'total_amount' => 50000,
+        ]);
+
+        $poi = PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $po->purchase_order_id,
+            'supply_request_item_id' => $sri1->supply_request_item_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Legal Bond Paper',
+            'quantity_ordered' => 200,
+            'unit' => 'box',
+            'unit_price' => 250,
+            'total_price' => 50000,
+        ]);
+
+        $delivery = Delivery::query()->create([
+            'delivery_code' => 'DEL-2026-09-0003',
+            'purchase_order_id' => $po->purchase_order_id,
+            'supplier_id' => $supplier->supplier_id,
+            'received_by' => $gsoUser->id,
+            'delivery_date' => now()->toDateString(),
+            'receipt_status' => 'VERIFIED',
+        ]);
+
+        DeliveryItem::query()->create([
+            'delivery_id' => $delivery->delivery_id,
+            'purchase_order_item_id' => $poi->purchase_order_item_id,
+            'expected_quantity' => 200,
+            'received_quantity' => 200,
+            'damaged_quantity' => 0,
+        ]);
+
+        // 1. Visit Supply Distribution Create page:
+        // BOTH SR-1 and SR-2 must be visible under VERIFIED_DELIVERY!
+        $response = $this->actingAs($gsoUser)->get(route('inventory.distribution-records.create'));
+        $response->assertOk();
+        $eligible = $response->viewData('page')['props']['eligibleRows']['data'];
+
+        $this->assertCount(2, $eligible, 'Both SR-1 and SR-2 must be listed on the distribution create page.');
+        $srIds = collect($eligible)->pluck('supply_request_id')->all();
+        $this->assertContains((int) $sr1->supply_request_id, $srIds);
+        $this->assertContains((int) $sr2->supply_request_id, $srIds);
+        $this->assertTrue(collect($eligible)->every(fn ($r) => $r['release_basis'] === 'VERIFIED_DELIVERY'));
+
+        // 2. Release SR-1:
+        $distService = app(DistributionRecordService::class);
+        $dist1 = $distService->createRecordWithAutomaticRelease($gsoUser, [
+            'supply_request_id' => $sr1->supply_request_id,
+            'delivery_id' => $delivery->delivery_id,
+            'office_id' => $office->id,
+            'release_date' => now()->toDateString(),
+        ]);
+        $this->assertEquals(100.0, (float) $dist1->items->sum('quantity_released'));
+
+        // 3. Re-visit create page:
+        // SR-1 must NOT appear as a ghost row! SR-2 must still appear with the delivery!
+        $response2 = $this->actingAs($gsoUser)->get(route('inventory.distribution-records.create'));
+        $response2->assertOk();
+        $eligible2 = $response2->viewData('page')['props']['eligibleRows']['data'];
+
+        $this->assertCount(1, $eligible2, 'Only SR-2 should remain; SR-1 must not be a ghost row.');
+        $this->assertEquals((int) $sr2->supply_request_id, (int) $eligible2[0]['supply_request_id']);
+
+        // 4. Release SR-2:
+        $dist2 = $distService->createRecordWithAutomaticRelease($gsoUser, [
+            'supply_request_id' => $sr2->supply_request_id,
+            'delivery_id' => $delivery->delivery_id,
+            'office_id' => $office->id,
+            'release_date' => now()->toDateString(),
+        ]);
+        // MUST release all remaining 100 boxes (not 2 boxes!)
+        $this->assertEquals(100.0, (float) $dist2->items->sum('quantity_released'));
+
+        // 5. Re-visit create page:
+        // Everything is fully distributed, 0 rows should remain!
+        $response3 = $this->actingAs($gsoUser)->get(route('inventory.distribution-records.create'));
+        $response3->assertOk();
+        $eligible3 = $response3->viewData('page')['props']['eligibleRows']['data'];
+        $this->assertCount(0, $eligible3, 'Both consolidated requests are fully distributed; no rows remain.');
+    }
+
+    public function test_consolidated_pr_partial_delivery_discrepancy_and_replacement_release(): void
+    {
+        $gsoRole = Role::query()->firstOrCreate(['code' => UserRole::GSO_OFFICER->value], ['name' => 'GSO Officer']);
+        $gsoUser = User::factory()->create(['role_id' => $gsoRole->id]);
+
+        $office = Office::factory()->create(['code' => 'MPDO', 'name' => 'Planning Office']);
+        $officeRole = Role::query()->firstOrCreate(['code' => UserRole::OFFICE_USER->value], ['name' => 'Office User']);
+        $officeUser = User::factory()->create(['role_id' => $officeRole->id, 'office_id' => $office->id]);
+
+        $category = ItemCategory::query()->firstOrCreate(
+            ['category_name' => 'Office Supplies'],
+            ['description' => 'Supplies']
+        );
+        $item = Item::query()->create([
+            'item_category_id' => $category->item_category_id,
+            'item_name' => 'Legal Bond Paper',
+            'default_unit' => 'box',
+            'status' => 'active',
+        ]);
+
+        Inventory::query()->create([
+            'item_id' => $item->item_id,
+            'stock_on_hand' => 50,
+            'available_stock' => 50,
+            'reserved_quantity' => 0,
+        ]);
+
+        $sr1 = SupplyRequest::query()->create([
+            'request_code' => 'SR-MPDO-2026-09-0006',
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(7)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Consolidated Test 1',
+            'priority_level' => 'NORMAL',
+            'status' => 'FOR_PROCUREMENT',
+        ]);
+        $sri1 = SupplyRequestItem::query()->create([
+            'supply_request_id' => $sr1->supply_request_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Legal Bond Paper',
+            'quantity_requested' => 100,
+        ]);
+
+        $sr2 = SupplyRequest::query()->create([
+            'request_code' => 'SR-MPDO-2026-09-0008',
+            'office_id' => $office->id,
+            'requested_by' => $officeUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(7)->toDateString(),
+            'request_category' => 'GENERAL',
+            'purpose' => 'Consolidated Test 2',
+            'priority_level' => 'NORMAL',
+            'status' => 'FOR_PROCUREMENT',
+        ]);
+        $sri2 = SupplyRequestItem::query()->create([
+            'supply_request_id' => $sr2->supply_request_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Legal Bond Paper',
+            'quantity_requested' => 100,
+        ]);
+
+        $pr = PurchaseRequest::query()->create([
+            'pr_number' => 'PR-2026-09-0015',
+            'supply_request_id' => $sr1->supply_request_id,
+            'office_id' => $office->id,
+            'requested_by' => $gsoUser->id,
+            'status' => 'APPROVED',
+            'remarks' => 'Consolidated PR for Planning Office [General Supplies] from 2 supply request(s): SR-MPDO-2026-09-0006, SR-MPDO-2026-09-0008.',
+        ]);
+
+        $supplier = Supplier::query()->create([
+            'supplier_name' => 'Paper Supplier',
+            'contact_person' => 'Supplier',
+            'email' => 'supplier@test.local',
+            'phone' => '09123456789',
+            'address' => 'Supplier Address',
+            'status' => 'ACTIVE',
+        ]);
+
+        $po = PurchaseOrder::query()->create([
+            'po_number' => 'PO-2026-09-0015',
+            'purchase_request_id' => $pr->purchase_request_id,
+            'supply_request_id' => $sr1->supply_request_id,
+            'supplier_id' => $supplier->supplier_id,
+            'created_by' => $gsoUser->id,
+            'procurement_method' => 'SHOPPING',
+            'status' => 'APPROVED',
+            'total_amount' => 50000,
+        ]);
+
+        $poi = PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $po->purchase_order_id,
+            'supply_request_item_id' => $sri1->supply_request_item_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => 'Legal Bond Paper',
+            'quantity_ordered' => 200,
+            'unit' => 'box',
+            'unit_price' => 250,
+            'total_price' => 50000,
+        ]);
+
+        // Partial delivery: only 50 received out of 200
+        $delivery1 = Delivery::query()->create([
+            'delivery_code' => 'DEL-2026-09-0003',
+            'purchase_order_id' => $po->purchase_order_id,
+            'supplier_id' => $supplier->supplier_id,
+            'received_by' => $gsoUser->id,
+            'delivery_date' => now()->toDateString(),
+            'receipt_status' => 'PARTIALLY_RECEIVED',
+        ]);
+
+        DeliveryItem::query()->create([
+            'delivery_id' => $delivery1->delivery_id,
+            'purchase_order_item_id' => $poi->purchase_order_item_id,
+            'expected_quantity' => 50,
+            'received_quantity' => 50,
+            'damaged_quantity' => 0,
+        ]);
+
+        // Release the 50 to SR-1 first
+        $distService = app(DistributionRecordService::class);
+        $dist1 = $distService->createRecordWithAutomaticRelease($gsoUser, [
+            'supply_request_id' => $sr1->supply_request_id,
+            'delivery_id' => $delivery1->delivery_id,
+            'office_id' => $office->id,
+            'release_date' => now()->toDateString(),
+        ]);
+        $this->assertEquals(50.0, (float) $dist1->items->sum('quantity_released'));
+        $dist1->forceFill(['status' => 'RELEASED'])->save();
+
+        // Since delivery1 is now exhausted (50 received, 50 released) and warehouse has 0 unallocated stock,
+        // create page MUST NOT show any releasable rows!
+        $response = $this->actingAs($gsoUser)->get(route('inventory.distribution-records.create'));
+        $response->assertOk();
+        $eligible = $response->viewData('page')['props']['eligibleRows']['data'];
+        $this->assertCount(0, $eligible, 'When delivery is exhausted and warehouse has 0 stock, no rows should appear.');
+
+        // Now supplier delivers the replacement/remaining 150 items
+        $delivery2 = Delivery::query()->create([
+            'delivery_code' => 'DEL-2026-09-0004',
+            'purchase_order_id' => $po->purchase_order_id,
+            'supplier_id' => $supplier->supplier_id,
+            'received_by' => $gsoUser->id,
+            'delivery_date' => now()->toDateString(),
+            'receipt_status' => 'VERIFIED',
+        ]);
+
+        DeliveryItem::query()->create([
+            'delivery_id' => $delivery2->delivery_id,
+            'purchase_order_item_id' => $poi->purchase_order_item_id,
+            'expected_quantity' => 150,
+            'received_quantity' => 150,
+            'damaged_quantity' => 0,
+        ]);
+
+        Inventory::query()->where('item_id', $item->item_id)->update(['available_stock' => 150]);
+
+        // Create page should now show BOTH requests under DEL-2:
+        // SR-1 (needs 50) and SR-2 (needs 100)
+        $response2 = $this->actingAs($gsoUser)->get(route('inventory.distribution-records.create'));
+        $response2->assertOk();
+        $eligible2 = $response2->viewData('page')['props']['eligibleRows']['data'];
+        $this->assertCount(2, $eligible2, 'Both SR-1 (remaining 50) and SR-2 (remaining 100) appear for DEL-2.');
+
+        // Release remaining 50 to SR-1
+        $dist2 = $distService->createRecordWithAutomaticRelease($gsoUser, [
+            'supply_request_id' => $sr1->supply_request_id,
+            'delivery_id' => $delivery2->delivery_id,
+            'office_id' => $office->id,
+            'release_date' => now()->toDateString(),
+        ]);
+        $this->assertEquals(50.0, (float) $dist2->items->sum('quantity_released'));
+
+        // Release remaining 100 to SR-2
+        $dist3 = $distService->createRecordWithAutomaticRelease($gsoUser, [
+            'supply_request_id' => $sr2->supply_request_id,
+            'delivery_id' => $delivery2->delivery_id,
+            'office_id' => $office->id,
+            'release_date' => now()->toDateString(),
+        ]);
+        $this->assertEquals(100.0, (float) $dist3->items->sum('quantity_released'));
+
+        // All fulfilled
+        $response3 = $this->actingAs($gsoUser)->get(route('inventory.distribution-records.create'));
+        $response3->assertOk();
+        $this->assertCount(0, $response3->viewData('page')['props']['eligibleRows']['data']);
+    }
 }
 
 

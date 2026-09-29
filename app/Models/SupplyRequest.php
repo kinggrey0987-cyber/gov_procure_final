@@ -103,6 +103,11 @@ class SupplyRequest extends Model
         return $this->morphMany(StatusHistory::class, 'reference', 'reference_type', 'reference_id');
     }
 
+    public function statusHistories(): MorphMany
+    {
+        return $this->statusHistory();
+    }
+
     public function approvalHistory(): MorphMany
     {
         return $this->morphMany(ApprovalHistory::class, 'reference', 'reference_type', 'reference_id');
