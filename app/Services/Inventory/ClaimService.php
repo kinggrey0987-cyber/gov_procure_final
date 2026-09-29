@@ -288,7 +288,19 @@ class ClaimService
             ]);
         }
 
-        if (! in_array((string) $claim->status, ['REPLACEMENT_RELEASED', 'PARTIALLY_RESOLVED', 'OPEN'], true)) {
+        $hasFollowUpReleased = \App\Models\DistributionRecord::query()
+            ->where(function ($q) use ($claim) {
+                $q->whereHas('delivery.purchaseOrder.purchaseRequest', function ($prQ) use ($claim) {
+                    $prQ->where('source_claim_id', (int) $claim->claims_id)
+                        ->orWhere('source_type', self::FOLLOW_UP_SOURCE_TYPE);
+                })->orWhereHas('supplyRequest.purchaseRequests', function ($prQ) use ($claim) {
+                    $prQ->where('source_claim_id', (int) $claim->claims_id);
+                })->orWhere('notes', 'like', "%{$claim->claim_code}%");
+            })
+            ->whereIn('status', ['RELEASED', 'RECEIVED'])
+            ->exists();
+
+        if (! in_array((string) $claim->status, ['REPLACEMENT_RELEASED', 'PARTIALLY_RESOLVED', 'OPEN'], true) && ! $hasFollowUpReleased) {
             throw ValidationException::withMessages([
                 'status' => 'Claim is not currently awaiting office verification of released replacement.',
             ]);
@@ -300,9 +312,32 @@ class ClaimService
                 ? (string) $payload['remarks']
                 : 'Replacement items verified and accepted by requesting office.';
 
+            $effectiveReplacementQty = (float) $claim->replacement_quantity;
+            if ($effectiveReplacementQty <= 0) {
+                $followUpItemsQty = (float) \App\Models\DistributionItem::query()
+                    ->whereHas('distributionRecord', function ($q) use ($claim) {
+                        $q->where(function ($inner) use ($claim) {
+                            $inner->whereHas('delivery.purchaseOrder.purchaseRequest', function ($prQ) use ($claim) {
+                                $prQ->where('source_claim_id', (int) $claim->claims_id);
+                            })->orWhere('notes', 'like', "%{$claim->claim_code}%");
+                        })->whereIn('status', ['RELEASED', 'RECEIVED']);
+                    })
+                    ->sum('quantity_released');
+
+                if ($followUpItemsQty > 0) {
+                    $effectiveReplacementQty = $followUpItemsQty;
+                    $claim->replacement_quantity = $effectiveReplacementQty;
+                }
+            }
+
+            $disputedQty = (float) $claim->quantity_disputed;
+            $isFullyResolved = ($disputedQty > 0) ? ($effectiveReplacementQty >= $disputedQty) : true;
+            $newStatus = $isFullyResolved ? 'RESOLVED' : 'PARTIALLY_RESOLVED';
+            $resolutionType = $isFullyResolved ? ($claim->resolution_type ?: 'REPLACEMENT_RELEASED') : 'PARTIAL_REPLACEMENT';
+
             $claim->forceFill([
-                'status' => 'RESOLVED',
-                'resolution_type' => $claim->resolution_type ?: 'REPLACEMENT_RELEASED',
+                'status' => $newStatus,
+                'resolution_type' => $resolutionType,
                 'remarks' => $remarks,
             ])->save();
 
@@ -310,7 +345,7 @@ class ClaimService
 
             $distributionItem = $claim->distributionItem;
             if ($distributionItem instanceof DistributionItem) {
-                $replacementQty = (float) $claim->replacement_quantity;
+                $replacementQty = $effectiveReplacementQty > 0 ? $effectiveReplacementQty : (float) $claim->replacement_quantity;
                 if ($replacementQty > 0) {
                     $newReceived = min((float) $distributionItem->quantity_released, (float) $distributionItem->quantity_received + $replacementQty);
                     $newMissing = max(0.0, (float) $distributionItem->quantity_missing - $replacementQty);
@@ -351,11 +386,39 @@ class ClaimService
                 }
             }
 
-            $this->recordStatus($claim, $currentStatus, 'RESOLVED', $actor, 'Replacement verified and claim resolved by office.');
-            $this->recordApproval($claim, $actor, 'RESOLVED', 'Office accepted replacement items in good condition.');
+            // Sync any follow-up distribution records linked to this claim
+            $linkedDistRecords = \App\Models\DistributionRecord::query()
+                ->where(function ($q) use ($claim) {
+                    $q->whereHas('delivery.purchaseOrder.purchaseRequest', function ($prQ) use ($claim) {
+                        $prQ->where('source_claim_id', (int) $claim->claims_id);
+                    })->orWhere('notes', 'like', "%{$claim->claim_code}%");
+                })
+                ->where('status', 'RELEASED')
+                ->get();
+
+            foreach ($linkedDistRecords as $distRec) {
+                $oldDistStatus = (string) $distRec->status;
+                $distRec->forceFill([
+                    'status' => 'RECEIVED',
+                    'received_by' => (int) $actor->id,
+                ])->save();
+
+                StatusHistory::query()->create([
+                    'reference_type' => DistributionRecord::class,
+                    'reference_id' => (int) $distRec->distribution_record_id,
+                    'old_status' => $oldDistStatus,
+                    'new_status' => 'RECEIVED',
+                    'changed_by' => (int) $actor->id,
+                    'remarks' => 'Distribution record marked as received following claim replacement acceptance.',
+                    'changed_at' => now(),
+                ]);
+            }
+
+            $this->recordStatus($claim, $currentStatus, $newStatus, $actor, 'Replacement verified and claim updated by office.');
+            $this->recordApproval($claim, $actor, $newStatus, 'Office accepted replacement items in good condition.');
             $this->recordAudit($actor, 'OFFICE_RESOLVE_CLAIM', $claim, [
                 'old_status' => $currentStatus,
-                'new_status' => 'RESOLVED',
+                'new_status' => $newStatus,
             ]);
 
             $this->resolveParentClaimFromFollowUp($claim, $actor, $remarks);

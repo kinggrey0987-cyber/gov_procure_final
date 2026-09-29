@@ -1,6 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PaginationNav from '@/Components/PaginationNav';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import type { PageProps } from '@/types';
 
 type ReadyRecord = {
     distribution_record_id: number;
@@ -33,11 +34,26 @@ type Props = {
 };
 
 export default function SuppliesReadyForClaimIndex({ records }: Props) {
+    const { flash, errors: pageErrors } = usePage<PageProps<{
+        flash?: { success?: string; error?: string };
+    }>>().props;
+
     return (
         <AuthenticatedLayout header="Supplies Ready for Claim">
             <Head title="Supplies Ready for Claim" />
 
             <div className="space-y-3">
+                {flash?.success && (
+                    <div className="rounded-lg border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-xs font-medium text-emerald-800">
+                        ✓ {flash.success}
+                    </div>
+                )}
+                {(flash?.error || (pageErrors && Object.keys(pageErrors).length > 0)) && (
+                    <div className="rounded-lg border border-rose-300 bg-rose-50 px-3.5 py-2 text-xs font-medium text-rose-800">
+                        ⚠️ {flash?.error || Object.values(pageErrors)[0]}
+                    </div>
+                )}
+
                 <section className="shrink-0 rounded-xl border border-slate-200 bg-white px-3.5 py-2 shadow-sm flex items-center justify-between">
                     <p className="text-xs text-slate-600">Confirm receipt first, then file claims from the received supply request.</p>
                     <span className="text-[11px] text-slate-500 font-medium">Showing {records.data.length} records</span>
@@ -62,7 +78,7 @@ export default function SuppliesReadyForClaimIndex({ records }: Props) {
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {records.data.map((record) => (
-                                        <tr key={record.distribution_record_id} className="hover:bg-slate-50/60 transition-colors">
+                                        <tr key={record.distribution_record_id || record.claim_id} className="hover:bg-slate-50/60 transition-colors">
                                             <td className="px-3.5 py-2 font-semibold text-red-700">
                                                 <div className="flex items-center gap-1.5 flex-wrap">
                                                     {record.claim_code ? (
@@ -101,12 +117,12 @@ export default function SuppliesReadyForClaimIndex({ records }: Props) {
                                                         <button
                                                             type="button"
                                                             onClick={() => {
-                                                                if (record.is_claim_replacement && record.claim_id) {
-                                                                    router.post(route('office.claims.verify-replacement', record.claim_id), {}, {
+                                                                if (record.distribution_record_id && record.distribution_record_id > 0) {
+                                                                    router.post(route('office.distribution-records.receive', record.distribution_record_id), {}, {
                                                                         preserveScroll: true,
                                                                     });
-                                                                } else {
-                                                                    router.post(route('office.distribution-records.receive', record.distribution_record_id), {}, {
+                                                                } else if (record.is_claim_replacement && record.claim_id) {
+                                                                    router.post(route('office.claims.verify-replacement', record.claim_id), {}, {
                                                                         preserveScroll: true,
                                                                     });
                                                                 }
@@ -116,6 +132,14 @@ export default function SuppliesReadyForClaimIndex({ records }: Props) {
                                                             Confirm Received
                                                         </button>
                                                     ) : null}
+                                                    {record.distribution_record_id && record.distribution_record_id > 0 ? (
+                                                        <Link
+                                                            href={route('office.distribution-records.show', record.distribution_record_id)}
+                                                            className="rounded border border-red-200 bg-red-50/50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 transition"
+                                                        >
+                                                            View
+                                                        </Link>
+                                                    ) : null}
                                                     {record.is_claim_replacement && record.claim_id ? (
                                                         <Link
                                                             href={route('office.claims.show', record.claim_id)}
@@ -123,20 +147,9 @@ export default function SuppliesReadyForClaimIndex({ records }: Props) {
                                                         >
                                                             View Claim
                                                         </Link>
-                                                    ) : (
-                                                        <Link
-                                                            href={route('office.distribution-records.show', record.distribution_record_id)}
-                                                            className="rounded border border-red-200 bg-red-50/50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 transition"
-                                                        >
-                                                            View
-                                                        </Link>
-                                                    )}
+                                                    ) : null}
                                                     {record.status.toUpperCase() === 'RECEIVED' ? (
-                                                        record.is_claim_replacement ? (
-                                                            <span className="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">
-                                                                Replacement Verified
-                                                            </span>
-                                                        ) : record.has_existing_claim ? (
+                                                        record.has_existing_claim ? (
                                                             <Link
                                                                 href={record.existing_claim_id ? route('office.claims.show', record.existing_claim_id) : route('office.claims.index')}
                                                                 className="rounded border border-indigo-200 bg-indigo-50/70 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition"
@@ -150,16 +163,21 @@ export default function SuppliesReadyForClaimIndex({ records }: Props) {
                                                             >
                                                                 <span>Claim Expired (2d)</span>
                                                             </span>
-                                                        ) : (
+                                                        ) : (record.distribution_record_id && record.distribution_record_id > 0) ? (
                                                             <Link
                                                                 href={route('office.claims.create', {
                                                                     supply_request_id: record.supply_request_id,
                                                                     distribution_record_id: record.distribution_record_id,
+                                                                    ...(record.is_claim_replacement && record.claim_id ? { parent_claim_id: record.claim_id } : {}),
                                                                 })}
                                                                 className="rounded border border-red-200 bg-red-50/50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 transition"
                                                             >
                                                                 File Claim
                                                             </Link>
+                                                        ) : (
+                                                            <span className="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">
+                                                                Replacement Verified
+                                                            </span>
                                                         )
                                                     ) : (
                                                         <span className="rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-400">

@@ -3,6 +3,7 @@
 namespace App\Services\Inventory;
 
 use App\Models\ApprovalHistory;
+use App\Models\Claim;
 use App\Models\DistributionItem;
 use App\Models\DistributionRecord;
 use App\Models\Inventory;
@@ -96,6 +97,8 @@ class DistributionRecordService
                 ])->save();
             }
 
+            $this->syncClaimOnRelease($record->fresh() ?? $record, $actor);
+
             return $record->fresh(['supplyRequest', 'delivery', 'office', 'items.item']) ?? $record;
         });
     }
@@ -183,6 +186,7 @@ class DistributionRecordService
             $this->recordApproval($record, $actor, 'RECEIVED', 'Office receipt reconciliation recorded.');
             $this->recordAudit($actor, 'RECONCILE_RECEIPT', $record, []);
             $this->procurementStatusSyncService->syncCompletedStatusesForReceivedSupplyRequest($record->supplyRequest()->firstOrFail(), $actor);
+            $this->syncClaimOnReceipt($record, $actor);
 
             return $record->fresh(['office', 'receiver', 'items.item']) ?? $record;
         });
@@ -238,6 +242,7 @@ class DistributionRecordService
             ]);
 
             if ($releasedNow) {
+                $this->syncClaimOnRelease($record, $actor);
                 $this->notificationService->notifyDistributionOfficeRecipient(
                     record: $record,
                     title: 'Supplies Released for Distribution',
@@ -463,6 +468,17 @@ class DistributionRecordService
             ->flatMap(fn ($distributionRecord) => $distributionRecord->items)
             ->groupBy(fn ($item) => (int) $item->item_id)
             ->map(fn ($items): float => (float) $items->sum('quantity_released'));
+
+        $linkedSourceClaim = $this->resolveLinkedSourceClaim($record);
+        if ($linkedSourceClaim !== null) {
+            $linkedSourceClaim->loadMissing('distributionItem');
+            if ($linkedSourceClaim->distributionItem) {
+                $claimedItemId = (int) $linkedSourceClaim->distributionItem->item_id;
+                $disputedQty = (float) $linkedSourceClaim->quantity_disputed;
+                $currentReleased = (float) ($releasedPool->get($claimedItemId) ?? 0.0);
+                $releasedPool->put($claimedItemId, max($currentReleased - $disputedQty, 0.0));
+            }
+        }
         $hasRemainingQuantity = false;
         $hasAvailableWarehouseStock = false;
 
@@ -585,6 +601,15 @@ class DistributionRecordService
             })
             ->sum(fn ($distributionItem): float => (float) $distributionItem->quantity_released);
 
+        $linkedSourceClaim = $this->resolveLinkedSourceClaim($record);
+        if ($linkedSourceClaim !== null) {
+            $linkedSourceClaim->loadMissing('distributionItem');
+            if ($linkedSourceClaim->distributionItem && (int) $linkedSourceClaim->distributionItem->item_id === $itemId) {
+                $disputedQty = (float) $linkedSourceClaim->quantity_disputed;
+                $releasedForRequest = max((float) $releasedForRequest - $disputedQty, 0.0);
+            }
+        }
+
         $maxReleasable = max($requestedQuantity - (float) $releasedForRequest, 0);
         $undistributed = $this->undistributedDeliveryStock($itemId, $record->delivery_id ? (int) $record->delivery_id : null);
 
@@ -678,6 +703,17 @@ class DistributionRecordService
             ->flatMap(fn ($distributionRecord) => $distributionRecord->items)
             ->groupBy(fn ($item) => (int) $item->item_id)
             ->map(fn ($items): float => (float) $items->sum('quantity_released'));
+
+        $linkedSourceClaim = $this->resolveLinkedSourceClaim($record);
+        if ($linkedSourceClaim !== null) {
+            $linkedSourceClaim->loadMissing('distributionItem');
+            if ($linkedSourceClaim->distributionItem) {
+                $claimedItemId = (int) $linkedSourceClaim->distributionItem->item_id;
+                $disputedQty = (float) $linkedSourceClaim->quantity_disputed;
+                $currReleased = (float) ($requestReleasedByItemId->get($claimedItemId) ?? 0.0);
+                $requestReleasedByItemId->put($claimedItemId, max($currReleased - $disputedQty, 0.0));
+            }
+        }
 
         $deliveryRemainingByItemId = collect();
         if ($record->delivery_id !== null && $record->delivery !== null) {
@@ -876,5 +912,178 @@ class DistributionRecordService
             logDomain: 'BUSINESS',
             officeId: $record->office_id,
         );
+    }
+
+    public function resolveLinkedSourceClaim(DistributionRecord $record): ?Claim
+    {
+        $record->loadMissing([
+            'supplyRequest.purchaseRequests.sourceClaim',
+            'delivery.purchaseOrder.purchaseRequest.sourceClaim',
+            'delivery.purchaseOrder.supplyRequest.purchaseRequests.sourceClaim',
+        ]);
+
+        $sourceClaim = $record->delivery?->purchaseOrder?->purchaseRequest?->sourceClaim
+            ?? $record->delivery?->purchaseOrder?->supplyRequest?->purchaseRequests?->firstWhere('source_claim_id')?->sourceClaim
+            ?? $record->supplyRequest?->purchaseRequests?->firstWhere('source_claim_id')?->sourceClaim;
+
+        if (! $sourceClaim && ($record->supplyRequest?->purpose || $record->notes)) {
+            if (preg_match('/(CLM-\d{4}-\d{5})/', ($record->supplyRequest?->purpose ?? '').' '.($record->notes ?? ''), $matches)) {
+                $sourceClaim = Claim::query()->where('claim_code', $matches[1])->first();
+            }
+        }
+
+        return $sourceClaim;
+    }
+
+    private function syncClaimOnRelease(DistributionRecord $record, User $actor): void
+    {
+        $claim = $this->resolveLinkedSourceClaim($record);
+        if (! $claim instanceof Claim) {
+            return;
+        }
+
+        if (in_array((string) $claim->status, ['PENDING_REPLACEMENT', 'OPEN', 'IN_REVIEW', 'PARTIALLY_RESOLVED'], true)) {
+            $oldStatus = (string) $claim->status;
+            $claim->loadMissing('distributionItem');
+            $claimedItemId = (int) ($claim->distributionItem?->item_id ?? 0);
+
+            $releasedQty = (float) $record->items()
+                ->when($claimedItemId > 0, fn ($q) => $q->where('item_id', $claimedItemId))
+                ->sum('quantity_released');
+
+            if ($releasedQty <= 0) {
+                $releasedQty = (float) $record->items()->sum('quantity_released');
+            }
+
+            $currentReplacementQty = (float) $claim->replacement_quantity;
+            $newReplacementQty = $currentReplacementQty + $releasedQty;
+            $disputedQty = (float) $claim->quantity_disputed;
+            $resolutionType = ($newReplacementQty >= $disputedQty) ? 'REPLACEMENT_RELEASED' : 'PARTIAL_REPLACEMENT';
+
+            $claim->forceFill([
+                'status' => 'REPLACEMENT_RELEASED',
+                'resolution_type' => $resolutionType,
+                'replacement_quantity' => $newReplacementQty,
+            ])->save();
+
+            $remarks = sprintf(
+                'Replacement items released by GSO under distribution record %s.',
+                (string) $record->distribution_code
+            );
+
+            StatusHistory::query()->create([
+                'reference_type' => Claim::class,
+                'reference_id' => (int) $claim->claims_id,
+                'old_status' => $oldStatus,
+                'new_status' => 'REPLACEMENT_RELEASED',
+                'changed_by' => (int) $actor->id,
+                'remarks' => $remarks,
+                'changed_at' => now(),
+            ]);
+        }
+    }
+
+    private function syncClaimOnReceipt(DistributionRecord $record, User $actor): void
+    {
+        $claim = $this->resolveLinkedSourceClaim($record);
+        if (! $claim instanceof Claim) {
+            return;
+        }
+
+        if (in_array((string) $claim->status, ['PENDING_REPLACEMENT', 'REPLACEMENT_RELEASED', 'PARTIALLY_RESOLVED', 'OPEN'], true)) {
+            $claim->loadMissing(['distributionItem', 'distributionRecord.items']);
+            $distributionItem = $claim->distributionItem;
+            $claimedItemId = (int) ($distributionItem?->item_id ?? 0);
+
+            $receivedQtyInThisRecord = (float) $record->items()
+                ->when($claimedItemId > 0, fn ($q) => $q->where('item_id', $claimedItemId))
+                ->sum('quantity_released');
+
+            if ($receivedQtyInThisRecord <= 0) {
+                $receivedQtyInThisRecord = (float) $record->items()->sum('quantity_released');
+            }
+
+            if ($receivedQtyInThisRecord > 0 && $distributionItem instanceof DistributionItem) {
+                $newReceived = min((float) $distributionItem->quantity_released, (float) $distributionItem->quantity_received + $receivedQtyInThisRecord);
+                $newMissing = max(0.0, (float) $distributionItem->quantity_missing - $receivedQtyInThisRecord);
+                $remainingReplAfterMissing = max(0.0, $receivedQtyInThisRecord - (float) $distributionItem->quantity_missing);
+                $newDamaged = max(0.0, (float) $distributionItem->quantity_damaged - $remainingReplAfterMissing);
+
+                $distributionItem->forceFill([
+                    'quantity_received' => $newReceived,
+                    'quantity_missing' => $newMissing,
+                    'quantity_damaged' => $newDamaged,
+                    'receipt_condition' => ($newMissing > 0 || $newDamaged > 0) ? 'DISCREPANCY' : 'GOOD',
+                ])->save();
+            }
+
+            $origDist = $claim->distributionRecord;
+            if ($origDist instanceof DistributionRecord) {
+                $origDist->loadMissing('items');
+                $allFullyReceived = $origDist->items->every(fn ($item): bool =>
+                    (float) $item->quantity_received >= (float) $item->quantity_released
+                );
+                if ($allFullyReceived && (string) $origDist->status !== 'RECEIVED') {
+                    $origOldStatus = (string) $origDist->status;
+                    $origDist->forceFill([
+                        'status' => 'RECEIVED',
+                        'received_by' => (int) $actor->id,
+                    ])->save();
+
+                    StatusHistory::query()->create([
+                        'reference_type' => DistributionRecord::class,
+                        'reference_id' => (int) $origDist->distribution_record_id,
+                        'old_status' => $origOldStatus,
+                        'new_status' => 'RECEIVED',
+                        'changed_by' => (int) $actor->id,
+                        'remarks' => 'Distribution record marked as fully received following claim replacement acceptance.',
+                        'changed_at' => now(),
+                    ]);
+                }
+            }
+
+            $totalReplacementQty = max((float) $claim->replacement_quantity, $receivedQtyInThisRecord);
+            $disputedQty = (float) $claim->quantity_disputed;
+            $isFullyResolved = $totalReplacementQty >= $disputedQty || ($distributionItem && (float) $distributionItem->quantity_received >= (float) $distributionItem->quantity_released);
+
+            $oldClaimStatus = (string) $claim->status;
+            $newClaimStatus = $isFullyResolved ? 'RESOLVED' : 'PARTIALLY_RESOLVED';
+            $resolutionType = $isFullyResolved ? 'REPLACEMENT_RELEASED' : 'PARTIAL_REPLACEMENT';
+            $remarks = $isFullyResolved
+                ? sprintf('Replacement items verified and accepted under distribution record %s.', (string) $record->distribution_code)
+                : sprintf('Partial replacement (%.2f of %.2f) verified and accepted under distribution record %s.', $totalReplacementQty, $disputedQty, (string) $record->distribution_code);
+
+            $claim->forceFill([
+                'status' => $newClaimStatus,
+                'resolution_type' => $resolutionType,
+                'replacement_quantity' => $totalReplacementQty,
+                'remarks' => $remarks,
+            ])->save();
+
+            StatusHistory::query()->create([
+                'reference_type' => Claim::class,
+                'reference_id' => (int) $claim->claims_id,
+                'old_status' => $oldClaimStatus,
+                'new_status' => $newClaimStatus,
+                'changed_by' => (int) $actor->id,
+                'remarks' => $remarks,
+                'changed_at' => now(),
+            ]);
+
+            $this->auditLogService->log(
+                actor: $actor,
+                moduleName: 'Claim',
+                actionType: 'OFFICE_RECEIVE_CLAIM_REPLACEMENT',
+                referenceType: Claim::class,
+                referenceId: (int) $claim->claims_id,
+                details: [
+                    'old_status' => $oldClaimStatus,
+                    'new_status' => $newClaimStatus,
+                    'distribution_record_id' => (int) $record->distribution_record_id,
+                ],
+                logDomain: 'BUSINESS',
+                officeId: $claim->office_id,
+            );
+        }
     }
 }
