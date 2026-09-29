@@ -8,6 +8,7 @@
     #app {
         min-width: 0;
         overflow-x: hidden;
+        background-color: #f1f5f9;
     }
 
     /* Lock desktop viewport completely when authenticated app shell is active to prevent double-scroll */

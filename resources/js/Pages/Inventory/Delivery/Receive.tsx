@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { useEffect, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
+import { Component, type ErrorInfo, useEffect, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
 
 type DeliveryItem = {
     delivery_item_id: number;
@@ -450,15 +450,17 @@ export default function DeliveryReceive({ delivery }: Props) {
                                             </div>
 
                                             {drFiles.length > 0 && (
-                                                <div className="mt-2.5 max-h-36 overflow-y-auto overscroll-contain space-y-1.5 pr-1 [scrollbar-width:thin]">
-                                                    {drFiles.map((file, idx) => (
-                                                        <AttachmentCard
-                                                            key={`dr_${file.name}_${file.size}_${idx}`}
-                                                            file={file}
-                                                            onRemove={() => removeDrFile(idx)}
-                                                        />
-                                                    ))}
-                                                </div>
+                                                <SafeBoundary>
+                                                    <div className="mt-2.5 max-h-36 overflow-y-auto overscroll-contain space-y-1.5 pr-1 [scrollbar-width:thin]">
+                                                        {drFiles.filter(Boolean).map((file, idx) => (
+                                                            <AttachmentCard
+                                                                key={`dr_${file?.name ?? idx}_${file?.size ?? 0}_${idx}`}
+                                                                file={file}
+                                                                onRemove={() => removeDrFile(idx)}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                </SafeBoundary>
                                             )}
 
                                             <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -509,15 +511,17 @@ export default function DeliveryReceive({ delivery }: Props) {
                                             </div>
 
                                             {siFiles.length > 0 && (
-                                                <div className="mt-2.5 max-h-36 overflow-y-auto overscroll-contain space-y-1.5 pr-1 [scrollbar-width:thin]">
-                                                    {siFiles.map((file, idx) => (
-                                                        <AttachmentCard
-                                                            key={`si_${file.name}_${file.size}_${idx}`}
-                                                            file={file}
-                                                            onRemove={() => removeSiFile(idx)}
-                                                        />
-                                                    ))}
-                                                </div>
+                                                <SafeBoundary>
+                                                    <div className="mt-2.5 max-h-36 overflow-y-auto overscroll-contain space-y-1.5 pr-1 [scrollbar-width:thin]">
+                                                        {siFiles.filter(Boolean).map((file, idx) => (
+                                                            <AttachmentCard
+                                                                key={`si_${file?.name ?? idx}_${file?.size ?? 0}_${idx}`}
+                                                                file={file}
+                                                                onRemove={() => removeSiFile(idx)}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                </SafeBoundary>
                                             )}
 
                                             <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -561,17 +565,19 @@ export default function DeliveryReceive({ delivery }: Props) {
                                             </div>
 
                                             {supportingFiles.length > 0 && (
-                                                <div className="mt-2.5 max-h-36 overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin]">
-                                                    <div className="grid gap-1.5 sm:grid-cols-2">
-                                                        {supportingFiles.map((file, idx) => (
-                                                            <AttachmentCard
-                                                                key={`supp_${file.name}_${file.size}_${idx}`}
-                                                                file={file}
-                                                                onRemove={() => removeSupportingFile(idx)}
-                                                            />
-                                                        ))}
+                                                <SafeBoundary>
+                                                    <div className="mt-2.5 max-h-36 overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin]">
+                                                        <div className="grid gap-1.5 sm:grid-cols-2">
+                                                            {supportingFiles.filter(Boolean).map((file, idx) => (
+                                                                <AttachmentCard
+                                                                    key={`supp_${file?.name ?? idx}_${file?.size ?? 0}_${idx}`}
+                                                                    file={file}
+                                                                    onRemove={() => removeSupportingFile(idx)}
+                                                                />
+                                                            ))}
+                                                        </div>
                                                     </div>
-                                                </div>
+                                                </SafeBoundary>
                                             )}
 
                                             <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -852,6 +858,43 @@ function FormField({
     );
 }
 
+interface SafeBoundaryProps {
+    children: ReactNode;
+    fallback?: ReactNode;
+}
+
+interface SafeBoundaryState {
+    hasError: boolean;
+}
+
+class SafeBoundary extends Component<SafeBoundaryProps, SafeBoundaryState> {
+    constructor(props: SafeBoundaryProps) {
+        super(props);
+        this.state = { hasError: false };
+    }
+
+    static getDerivedStateFromError(): SafeBoundaryState {
+        return { hasError: true };
+    }
+
+    componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+        console.warn('SafeBoundary caught attachment render error:', error, errorInfo);
+    }
+
+    render() {
+        if (this.state.hasError) {
+            return (
+                this.props.fallback ?? (
+                    <div className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                        Attachment preview unavailable. File will still be uploaded on submit.
+                    </div>
+                )
+            );
+        }
+        return this.props.children;
+    }
+}
+
 function AttachmentCard({
     file,
     onRemove,
@@ -859,20 +902,42 @@ function AttachmentCard({
     file: File;
     onRemove: () => void;
 }) {
-    const isImage = file.type.startsWith('image/');
+    if (!file) return null;
+
+    const fileType = typeof file.type === 'string' ? file.type : '';
+    const fileName = typeof file.name === 'string' ? file.name : 'Attached file';
+    const isImage = fileType.startsWith('image/');
+    const isPdf = fileType === 'application/pdf' || fileName.toLowerCase().endsWith('.pdf');
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
     useEffect(() => {
-        if (isImage) {
-            const url = URL.createObjectURL(file);
-            setPreviewUrl(url);
-            return () => {
-                URL.revokeObjectURL(url);
-            };
+        let active = true;
+        let url: string | null = null;
+
+        if (isImage && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+            try {
+                url = URL.createObjectURL(file);
+                if (active) {
+                    setPreviewUrl(url);
+                }
+            } catch (err) {
+                console.warn('Failed to create preview object URL:', err);
+                setPreviewUrl(null);
+            }
         }
+
+        return () => {
+            active = false;
+            if (url) {
+                try {
+                    URL.revokeObjectURL(url);
+                } catch (_) {}
+            }
+        };
     }, [file, isImage]);
 
-    const formatSize = (bytes: number) => {
+    const formatSize = (bytes?: number) => {
+        if (!bytes || typeof bytes !== 'number' || isNaN(bytes)) return '0 B';
         if (bytes < 1024) return `${bytes} B`;
         if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
         return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -884,21 +949,24 @@ function AttachmentCard({
                 {isImage && previewUrl ? (
                     <img
                         src={previewUrl}
-                        alt={file.name}
+                        alt={fileName}
+                        onError={() => setPreviewUrl(null)}
                         className="h-7 w-7 shrink-0 rounded border border-slate-200 object-cover bg-slate-50"
                     />
                 ) : (
                     <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded border border-slate-200 bg-slate-100 text-[9px] font-black text-slate-600 uppercase">
-                        {file.type === 'application/pdf' ? (
+                        {isPdf ? (
                             <span className="text-rose-600 font-bold">PDF</span>
+                        ) : isImage ? (
+                            <span className="text-indigo-600 font-bold">IMG</span>
                         ) : (
                             <span>DOC</span>
                         )}
                     </div>
                 )}
                 <div className="min-w-0 flex items-center gap-1.5">
-                    <p className="truncate text-xs font-semibold text-slate-800 max-w-[130px] sm:max-w-[200px]" title={file.name}>
-                        {file.name}
+                    <p className="truncate text-xs font-semibold text-slate-800 max-w-[130px] sm:max-w-[200px]" title={fileName}>
+                        {fileName}
                     </p>
                     <span className="shrink-0 text-[10px] text-slate-400">
                         ({formatSize(file.size)})
