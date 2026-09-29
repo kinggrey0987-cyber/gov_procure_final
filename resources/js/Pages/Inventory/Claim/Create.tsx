@@ -37,6 +37,9 @@ type Props = {
         claim_code: string;
         status: string;
         distribution_item_id?: number | null;
+        item_name?: string | null;
+        quantity_disputed?: number;
+        replacement_quantity?: number;
     } | null;
 };
 
@@ -77,14 +80,27 @@ function formatDate(value?: string | null): string {
 export default function ClaimCreate({ distributionRecords, preselectedDistributionRecordId = null, preselectedDistributionItemId = null, parentClaim = null }: Props) {
     const { auth } = usePage<PageProps>().props;
     const isOfficeUser = auth?.user?.role_code === 'OFFICE_USER';
+    const isFollowUpClaim = parentClaim !== null;
+    const targetDistributionItemId = parentClaim?.distribution_item_id ?? preselectedDistributionItemId;
     const preselectedRecord = preselectedDistributionRecordId
         ? distributionRecords.find((record) => record.distribution_record_id === preselectedDistributionRecordId)
         : null;
     const first = preselectedRecord ?? distributionRecords[0];
-    const initialItem = (preselectedDistributionItemId
-        ? first?.items?.find((item) => item.distribution_item_id === preselectedDistributionItemId)
+    const initialItem = (targetDistributionItemId
+        ? first?.items?.find((item) => item.distribution_item_id === targetDistributionItemId)
         : null) ?? first?.items?.[0] ?? null;
-    const isFollowUpClaim = parentClaim !== null;
+
+    const followUpMaxQuantity = useMemo(() => {
+        if (!isFollowUpClaim || !parentClaim) return null;
+        if (parentClaim.replacement_quantity && parentClaim.replacement_quantity > 0) {
+            return Math.trunc(parentClaim.replacement_quantity);
+        }
+        if (parentClaim.quantity_disputed && parentClaim.quantity_disputed > 0) {
+            return Math.trunc(parentClaim.quantity_disputed);
+        }
+        return null;
+    }, [isFollowUpClaim, parentClaim]);
+
     const form = useForm({
         distribution_record_id: first?.distribution_record_id ?? '',
         distribution_item_id: initialItem?.distribution_item_id ?? '',
@@ -102,7 +118,7 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
         attachment_file: null as File | null,
         attachments: [] as File[],
     });
-    const [issueLines, setIssueLines] = useState<IssueLine[]>(() => buildInitialIssueLines(initialItem));
+    const [issueLines, setIssueLines] = useState<IssueLine[]>(() => buildInitialIssueLines(initialItem, isFollowUpClaim));
     const [validationError, setValidationError] = useState<string | null>(null);
     const [fileWarning, setFileWarning] = useState<string | null>(null);
 
@@ -110,7 +126,13 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
         () => distributionRecords.find((record) => record.distribution_record_id === Number(form.data.distribution_record_id)),
         [distributionRecords, form.data.distribution_record_id],
     );
-    const selectedRecordItems = useMemo(() => selectedRecord?.items ?? [], [selectedRecord]);
+    const selectedRecordItems = useMemo(() => {
+        const allItems = selectedRecord?.items ?? [];
+        if (isFollowUpClaim && parentClaim?.distribution_item_id) {
+            return allItems.filter((i) => i.distribution_item_id === Number(parentClaim.distribution_item_id));
+        }
+        return allItems;
+    }, [selectedRecord, isFollowUpClaim, parentClaim]);
     const primaryDistributionItemId = issueLines[0]?.distribution_item_id || form.data.distribution_item_id;
     const selectedItem = useMemo(
         () => selectedRecordItems.find((item) => item.distribution_item_id === Number(primaryDistributionItemId)) ?? null,
@@ -189,12 +211,17 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
     const hasOverclaimedItems = useMemo(() => {
         for (const item of selectedRecordItems) {
             const total = itemClaimedTotals[String(item.distribution_item_id)] ?? 0;
-            if (total > Math.trunc(item.quantity_released ?? 0)) {
+            const releasedLimit = Math.trunc(item.quantity_released ?? 0);
+            const effectiveLimit = (isFollowUpClaim && followUpMaxQuantity !== null)
+                ? Math.min(releasedLimit || followUpMaxQuantity, followUpMaxQuantity)
+                : releasedLimit;
+
+            if (effectiveLimit > 0 && total > effectiveLimit) {
                 return true;
             }
         }
         return false;
-    }, [selectedRecordItems, itemClaimedTotals]);
+    }, [selectedRecordItems, itemClaimedTotals, isFollowUpClaim, followUpMaxQuantity]);
 
     return (
         <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-gray-800">File Claim</h2>}>
@@ -209,9 +236,16 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                         <p className="text-sm text-slate-600">Claims are filed against supply requests your office has already confirmed received.</p>
                         <p className="mt-2 text-xs text-slate-500">Claim types are limited to missing items and damaged items.</p>
                         {parentClaim ? (
-                            <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
-                                Follow-up claim for {parentClaim.claim_code}. Resolving this follow-up will also resolve the original claim.
-                            </p>
+                            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                                <p className="font-semibold">
+                                    Follow-up claim for {parentClaim.claim_code}{parentClaim.item_name ? ` (${parentClaim.item_name})` : ''}
+                                </p>
+                                <p className="mt-1 text-xs text-amber-800">
+                                    This follow-up claim is restricted specifically to this item line.
+                                    {followUpMaxQuantity !== null ? ` Disputed quantity is capped at ${followUpMaxQuantity} (resolved replacement quantity).` : ''}
+                                    {' '}Resolving this follow-up will also resolve the original claim.
+                                </p>
+                            </div>
                         ) : null}
                     </div>
 
@@ -242,7 +276,11 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                 return;
                             }
                             if (hasOverclaimedItems) {
-                                setValidationError('Total claimed quantity exceeds the released quantity for one or more items. Please adjust the quantities before submitting.');
+                                setValidationError(
+                                    isFollowUpClaim && followUpMaxQuantity !== null
+                                        ? `Total claimed quantity exceeds the replacement quantity limit (${followUpMaxQuantity}). Please adjust the quantity before submitting.`
+                                        : 'Total claimed quantity exceeds the released quantity for one or more items. Please adjust the quantities before submitting.'
+                                );
                                 return;
                             }
                             if (totalIssueQuantity <= 0) {
@@ -420,7 +458,10 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                     const lineItem = line.distribution_item_id
                                         ? selectedRecordItems.find((item) => item.distribution_item_id === Number(line.distribution_item_id)) ?? null
                                         : null;
-                                    const lineMaxQuantity = Math.trunc(lineItem?.quantity_released ?? 0);
+                                    const itemReleasedQty = Math.trunc(lineItem?.quantity_released ?? 0);
+                                    const lineMaxQuantity = (isFollowUpClaim && followUpMaxQuantity !== null)
+                                        ? Math.min(itemReleasedQty || followUpMaxQuantity, followUpMaxQuantity)
+                                        : itemReleasedQty;
                                     const lineIsDuplicate = Boolean(line.distribution_item_id) && isDuplicateCombo(line.distribution_item_id, line.claim_type, line.id);
                                     const itemTotal = line.distribution_item_id ? itemClaimedTotals[line.distribution_item_id] ?? 0 : 0;
                                     const itemOverclaimed = lineMaxQuantity > 0 && itemTotal > lineMaxQuantity;
@@ -435,9 +476,12 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                                             ? 'border-rose-400 bg-rose-50/50'
                                                             : lineMissingItem && validationError
                                                             ? 'border-rose-400 bg-rose-50/30'
+                                                            : isFollowUpClaim
+                                                            ? 'border-slate-200 bg-slate-100 text-slate-700 cursor-not-allowed'
                                                             : 'border-slate-300'
                                                     }`}
                                                     value={line.distribution_item_id}
+                                                    disabled={isFollowUpClaim}
                                                     onChange={(e) => {
                                                         const newDistributionItemId = e.target.value;
                                                         setValidationError(null);
@@ -715,17 +759,19 @@ function createIssueLine(claimType: string, quantity = '', distributionItemId: n
     };
 }
 
-function buildInitialIssueLines(item: DistributionItemOption | null): IssueLine[] {
+function buildInitialIssueLines(item: DistributionItemOption | null, isFollowUp = false): IssueLine[] {
     const missingQuantity = Math.trunc(item?.quantity_missing ?? 0);
     const damagedQuantity = Math.trunc(item?.quantity_damaged ?? 0);
     const lines: IssueLine[] = [];
 
-    if (missingQuantity > 0) {
-        lines.push(createIssueLine('MISSING_ITEM', String(missingQuantity), item?.distribution_item_id ?? ''));
-    }
+    if (!isFollowUp) {
+        if (missingQuantity > 0) {
+            lines.push(createIssueLine('MISSING_ITEM', String(missingQuantity), item?.distribution_item_id ?? ''));
+        }
 
-    if (damagedQuantity > 0) {
-        lines.push(createIssueLine('DAMAGED_ITEM', String(damagedQuantity), item?.distribution_item_id ?? ''));
+        if (damagedQuantity > 0) {
+            lines.push(createIssueLine('DAMAGED_ITEM', String(damagedQuantity), item?.distribution_item_id ?? ''));
+        }
     }
 
     return lines.length > 0 ? lines : [createIssueLine('MISSING_ITEM', '', item?.distribution_item_id ?? '')];

@@ -108,6 +108,7 @@ class ClaimController
                 ->whereYear('created_at', $currentYear)
                 ->whereNull('parent_claim_id')
                 ->doesntHave('followUpClaims')
+                ->with(['distributionItem.item', 'distributionRecord.office', 'distributionRecord.supplyRequest', 'distributionRecord.items.item'])
                 ->firstOrFail();
 
             $parentClaim = $candidateParentClaim;
@@ -133,6 +134,15 @@ class ClaimController
             })
             ->values();
 
+        if ($parentClaim instanceof Claim && $parentClaim->distributionRecord) {
+            $alreadyIncluded = $distributionRecords->contains(
+                fn (DistributionRecord $record): bool => (int) $record->distribution_record_id === (int) $parentClaim->distribution_record_id
+            );
+            if (! $alreadyIncluded) {
+                $distributionRecords->prepend($parentClaim->distributionRecord);
+            }
+        }
+
         $activeClaims = Claim::query()
             ->where('office_id', (int) $user->office_id)
             ->whereNull('parent_claim_id')
@@ -150,6 +160,15 @@ class ClaimController
         $requestedDistributionRecordId = (int) $request->query('distribution_record_id', 0);
         $requestedSupplyRequestId = (int) $request->query('supply_request_id', 0);
         $requestedDistributionItemId = (int) $request->query('distribution_item_id', 0);
+
+        if ($parentClaim instanceof Claim) {
+            if ($requestedDistributionRecordId <= 0 && $parentClaim->distribution_record_id) {
+                $requestedDistributionRecordId = (int) $parentClaim->distribution_record_id;
+            }
+            if ($requestedDistributionItemId <= 0 && $parentClaim->distribution_item_id) {
+                $requestedDistributionItemId = (int) $parentClaim->distribution_item_id;
+            }
+        }
 
         $preselectedCandidate = null;
         if ($requestedDistributionRecordId > 0) {
@@ -176,6 +195,11 @@ class ClaimController
                         ?? ($record->supply_request_id ? $activeClaimsBySrId->get((int) $record->supply_request_id)?->first() : null);
                 }
 
+                $items = $record->items;
+                if ($parentClaim instanceof Claim && $parentClaim->distribution_item_id && (int) $record->distribution_record_id === (int) $parentClaim->distribution_record_id) {
+                    $items = $items->filter(fn ($item) => (int) $item->distribution_item_id === (int) $parentClaim->distribution_item_id);
+                }
+
                 return [
                     'distribution_record_id' => (int) $record->distribution_record_id,
                     'distribution_code' => (string) $record->distribution_code,
@@ -186,7 +210,7 @@ class ClaimController
                     'request_code' => (string) ($record->supplyRequest?->request_code ?? '-'),
                     'has_ongoing_claim' => $ongoingClaim !== null,
                     'ongoing_claim_code' => $ongoingClaim?->claim_code,
-                    'items' => $record->items->map(fn ($item): array => [
+                    'items' => $items->map(fn ($item): array => [
                         'distribution_item_id' => (int) $item->distribution_item_id,
                         'item_id' => (int) $item->item_id,
                         'item_name' => (string) ($item->item?->item_name ?? $item->item_name_snapshot),
@@ -205,6 +229,9 @@ class ClaimController
                 'claim_code' => (string) $parentClaim->claim_code,
                 'status' => (string) $parentClaim->status,
                 'distribution_item_id' => $parentClaim->distribution_item_id ? (int) $parentClaim->distribution_item_id : null,
+                'item_name' => (string) ($parentClaim->distributionItem?->item?->item_name ?? $parentClaim->distributionItem?->item_name_snapshot ?? ''),
+                'quantity_disputed' => (float) $parentClaim->quantity_disputed,
+                'replacement_quantity' => (float) $parentClaim->replacement_quantity,
             ] : null,
         ]);
     }
@@ -237,6 +264,12 @@ class ClaimController
             }
 
             $groupedByItem = array_filter($groupedByItem, fn ($g) => ($g['quantity_damaged'] + $g['quantity_missing']) > 0);
+
+            if (! empty($validated['parent_claim_id']) && count($groupedByItem) > 1) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => 'Follow-up claims can only be filed for the single item associated with the original claim.',
+                ]);
+            }
 
             if (count($groupedByItem) > 1) {
                 $createdClaims = [];

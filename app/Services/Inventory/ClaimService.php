@@ -111,6 +111,18 @@ class ClaimService
                 ]);
             }
 
+            if ($parentClaim instanceof Claim) {
+                $maxFollowUpQty = (float) $parentClaim->replacement_quantity > 0
+                    ? (float) $parentClaim->replacement_quantity
+                    : (float) $parentClaim->quantity_disputed;
+
+                if ($maxFollowUpQty > 0 && ($disputedQuantity - $maxFollowUpQty) > 0.0001) {
+                    throw ValidationException::withMessages([
+                        'quantity_disputed' => sprintf('Follow-up claim disputed quantity (%.2f) cannot exceed the replacement quantity of %.2f.', $disputedQuantity, $maxFollowUpQty),
+                    ]);
+                }
+            }
+
             $this->ensureNoActiveDuplicateItemClaim($distributionItem->distribution_item_id, $parentClaim);
         }
 
@@ -127,7 +139,7 @@ class ClaimService
         }
 
         $receivedAt = $distributionRecord->updated_at ?? $distributionRecord->created_at;
-        if ($receivedAt && ($receivedAt->copy()->addHours(48)->isPast() || abs(now()->diffInHours($receivedAt)) > 48)) {
+        if (! ($parentClaim instanceof Claim) && $receivedAt && ($receivedAt->copy()->addHours(48)->isPast() || abs(now()->diffInHours($receivedAt)) > 48)) {
             throw ValidationException::withMessages([
                 'distribution_record_id' => 'Claims must be filed within 2 days (48 hours) of receiving the supplies.',
             ]);

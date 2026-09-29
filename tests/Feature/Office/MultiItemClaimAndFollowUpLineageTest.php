@@ -435,5 +435,219 @@ class MultiItemClaimAndFollowUpLineageTest extends TestCase
             )
         );
     }
+
+    public function test_follow_up_claim_only_shows_and_allows_parent_claim_item_line_with_quantity_capping(): void
+    {
+        $category = \App\Models\ItemCategory::query()->create(['category_name' => 'Stationery', 'status' => 'active']);
+        $itemA = Item::create([
+            'item_category_id' => $category->item_category_id,
+            'item_name' => 'Ballpen, Black',
+            'default_unit' => 'piece',
+            'status' => 'ACTIVE',
+        ]);
+        $itemB = Item::create([
+            'item_category_id' => $category->item_category_id,
+            'item_name' => 'Ballpen, Blue',
+            'default_unit' => 'piece',
+            'status' => 'ACTIVE',
+        ]);
+
+        $sr = SupplyRequest::create([
+            'request_code' => 'SR-MPDO-2026-09-0020',
+            'office_id' => $this->office->id,
+            'requested_by' => $this->officeUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(7)->toDateString(),
+            'priority_level' => 'NORMAL',
+            'request_category' => 'GENERAL',
+            'purpose' => 'Multi-item requisition',
+            'status' => 'RECEIVED',
+        ]);
+
+        $distRecord = DistributionRecord::create([
+            'distribution_code' => 'DIS-MPDO-2026-09-0020',
+            'supply_request_id' => $sr->supply_request_id,
+            'office_id' => $this->office->id,
+            'prepared_by' => $this->gsoUser->id,
+            'release_date' => now()->toDateString(),
+            'status' => 'RECEIVED',
+        ]);
+
+        $distItemA = DistributionItem::create([
+            'distribution_record_id' => $distRecord->distribution_record_id,
+            'item_id' => $itemA->item_id,
+            'item_name_snapshot' => $itemA->item_name,
+            'quantity_requested' => 10,
+            'quantity_released' => 10,
+            'quantity_received' => 10,
+            'unit' => 'piece',
+        ]);
+
+        $distItemB = DistributionItem::create([
+            'distribution_record_id' => $distRecord->distribution_record_id,
+            'item_id' => $itemB->item_id,
+            'item_name_snapshot' => $itemB->item_name,
+            'quantity_requested' => 20,
+            'quantity_released' => 20,
+            'quantity_received' => 20,
+            'unit' => 'piece',
+        ]);
+
+        // Create resolved parent claim for Item A (5 pcs disputed and replaced)
+        $parentClaimA = Claim::create([
+            'claim_code' => 'CLM-2026-00014',
+            'distribution_record_id' => $distRecord->distribution_record_id,
+            'distribution_item_id' => $distItemA->distribution_item_id,
+            'office_id' => $this->office->id,
+            'claimed_by' => $this->officeUser->id,
+            'claim_type' => 'DAMAGED_ITEM',
+            'claim_date' => now()->toDateString(),
+            'claim_location' => 'Office Storage',
+            'quantity_disputed' => 5,
+            'quantity_damaged' => 5,
+            'quantity_missing' => 0,
+            'replacement_quantity' => 5,
+            'status' => 'RESOLVED',
+            'resolution_type' => 'REPLACEMENT_RELEASED',
+        ]);
+
+        // 1. Visit the follow-up claim create page referencing parent claim A
+        $response = $this->actingAs($this->officeUser)->get(route('office.claims.create', [
+            'parent_claim_id' => $parentClaimA->claims_id,
+        ]));
+
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Inventory/Claim/Create')
+            ->where('parentClaim.claims_id', $parentClaimA->claims_id)
+            ->where('parentClaim.distribution_item_id', $distItemA->distribution_item_id)
+            ->where('parentClaim.item_name', 'Ballpen, Black')
+            ->where('parentClaim.replacement_quantity', 5)
+            ->where('preselectedDistributionItemId', $distItemA->distribution_item_id)
+            ->where('distributionRecords', function ($records) use ($distRecord, $distItemA, $distItemB) {
+                $matchedRecord = collect($records)->firstWhere('distribution_record_id', $distRecord->distribution_record_id);
+                if (! $matchedRecord) return false;
+
+                // Candidate items MUST only have Item A and must NOT have Item B
+                $itemIds = collect($matchedRecord['items'])->pluck('distribution_item_id')->all();
+                return in_array($distItemA->distribution_item_id, $itemIds)
+                    && ! in_array($distItemB->distribution_item_id, $itemIds);
+            })
+        );
+
+        $evidenceFile = UploadedFile::fake()->create('evidence.png', 100, 'image/png');
+
+        // 2. Blocked if attempting to submit a follow-up claim referencing the wrong item (Item B)
+        $wrongItemResponse = $this->actingAs($this->officeUser)->post(route('office.claims.store'), [
+            'distribution_record_id' => $distRecord->distribution_record_id,
+            'distribution_item_id' => $distItemB->distribution_item_id,
+            'parent_claim_id' => $parentClaimA->claims_id,
+            'source_type' => 'CLAIM_REPLACEMENT_FOLLOW_UP',
+            'office_id' => $this->office->id,
+            'claim_type' => 'DAMAGED_ITEM',
+            'claim_date' => now()->toDateString(),
+            'claim_location' => 'Office Desk',
+            'quantity_disputed' => 1,
+            'quantity_damaged' => 1,
+            'quantity_missing' => 0,
+            'remarks' => 'Trying to claim wrong item in follow-up',
+            'attachment_file' => $evidenceFile,
+        ]);
+        $wrongItemResponse->assertSessionHasErrors(['distribution_item_id']);
+
+        // 3. Blocked if attempting to claim more than the replacement quantity (e.g. 6 when replaced is 5)
+        $overclaimResponse = $this->actingAs($this->officeUser)->post(route('office.claims.store'), [
+            'distribution_record_id' => $distRecord->distribution_record_id,
+            'distribution_item_id' => $distItemA->distribution_item_id,
+            'parent_claim_id' => $parentClaimA->claims_id,
+            'source_type' => 'CLAIM_REPLACEMENT_FOLLOW_UP',
+            'office_id' => $this->office->id,
+            'claim_type' => 'DAMAGED_ITEM',
+            'claim_date' => now()->toDateString(),
+            'claim_location' => 'Office Desk',
+            'quantity_disputed' => 6,
+            'quantity_damaged' => 6,
+            'quantity_missing' => 0,
+            'remarks' => 'Trying to claim more than replaced quantity',
+            'attachment_file' => $evidenceFile,
+        ]);
+        $overclaimResponse->assertSessionHasErrors(['quantity_disputed']);
+
+        // 4. Blocked if attempting to submit multiple distinct items in a follow-up claim
+        $multiItemFollowUpResponse = $this->actingAs($this->officeUser)->post(route('office.claims.store'), [
+            'distribution_record_id' => $distRecord->distribution_record_id,
+            'distribution_item_id' => $distItemA->distribution_item_id,
+            'parent_claim_id' => $parentClaimA->claims_id,
+            'source_type' => 'CLAIM_REPLACEMENT_FOLLOW_UP',
+            'office_id' => $this->office->id,
+            'claim_type' => 'DAMAGED_ITEM',
+            'claim_date' => now()->toDateString(),
+            'claim_location' => 'Office Desk',
+            'quantity_disputed' => 2,
+            'remarks' => 'Multiple items attempt in follow-up',
+            'attachment_file' => $evidenceFile,
+            'items' => [
+                [
+                    'distribution_item_id' => $distItemA->distribution_item_id,
+                    'claim_type' => 'DAMAGED_ITEM',
+                    'quantity_disputed' => 1,
+                    'quantity_damaged' => 1,
+                    'quantity_missing' => 0,
+                ],
+                [
+                    'distribution_item_id' => $distItemB->distribution_item_id,
+                    'claim_type' => 'DAMAGED_ITEM',
+                    'quantity_disputed' => 1,
+                    'quantity_damaged' => 1,
+                    'quantity_missing' => 0,
+                ],
+            ],
+        ]);
+        $multiItemFollowUpResponse->assertSessionHasErrors(['items']);
+
+        // 5. Successful follow-up claim with multiple discrepancy lines on the SAME item (1 damaged, 1 missing -> MISSING_AND_DAMAGED)
+        $validFollowUpResponse = $this->actingAs($this->officeUser)->post(route('office.claims.store'), [
+            'distribution_record_id' => $distRecord->distribution_record_id,
+            'distribution_item_id' => $distItemA->distribution_item_id,
+            'parent_claim_id' => $parentClaimA->claims_id,
+            'source_type' => 'CLAIM_REPLACEMENT_FOLLOW_UP',
+            'office_id' => $this->office->id,
+            'claim_type' => 'MISSING_AND_DAMAGED',
+            'claim_date' => now()->toDateString(),
+            'claim_location' => 'Office Storage',
+            'quantity_disputed' => 2,
+            'quantity_damaged' => 1,
+            'quantity_missing' => 1,
+            'remarks' => 'Replacement received had 1 missing and 1 damaged',
+            'attachment_file' => $evidenceFile,
+            'items' => [
+                [
+                    'distribution_item_id' => $distItemA->distribution_item_id,
+                    'claim_type' => 'DAMAGED_ITEM',
+                    'quantity_disputed' => 1,
+                    'quantity_damaged' => 1,
+                    'quantity_missing' => 0,
+                ],
+                [
+                    'distribution_item_id' => $distItemA->distribution_item_id,
+                    'claim_type' => 'MISSING_ITEM',
+                    'quantity_disputed' => 1,
+                    'quantity_damaged' => 0,
+                    'quantity_missing' => 1,
+                ],
+            ],
+        ]);
+
+        $validFollowUpResponse->assertSessionHasNoErrors();
+        $validFollowUpResponse->assertRedirect();
+
+        $followUp = Claim::where('parent_claim_id', $parentClaimA->claims_id)->first();
+        $this->assertNotNull($followUp);
+        $this->assertSame('CLAIM_REPLACEMENT_FOLLOW_UP', (string) $followUp->source_type);
+        $this->assertSame('MISSING_AND_DAMAGED', (string) $followUp->claim_type);
+        $this->assertEquals(2.0, (float) $followUp->quantity_disputed);
+        $this->assertEquals(1.0, (float) $followUp->quantity_damaged);
+        $this->assertEquals(1.0, (float) $followUp->quantity_missing);
+        $this->assertEquals($distItemA->distribution_item_id, (int) $followUp->distribution_item_id);
+    }
 }
 
