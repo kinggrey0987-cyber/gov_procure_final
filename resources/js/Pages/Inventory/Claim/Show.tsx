@@ -157,8 +157,14 @@ export default function ClaimShow({ claim, parentClaim, followUpClaims = [], fol
         replacement_quantity: '',
         remarks: '',
     });
-    const usesReplacement = statusForm.data.status === 'RESOLVED' || statusForm.data.status === 'REPLACEMENT_RELEASED';
-    const isStockInsufficient = usesReplacement && (claim.replacement_available_stock ?? 0) < remainingReplacementQuantity;
+    const usesReplacement = statusForm.data.status === 'RESOLVED' || statusForm.data.status === 'REPLACEMENT_RELEASED' || statusForm.data.status === 'PARTIALLY_RESOLVED';
+    const isPartialRelease = statusForm.data.status === 'PARTIALLY_RESOLVED';
+    const enteredReplacementQty = Number(statusForm.data.replacement_quantity || 0);
+    const isStockInsufficient = usesReplacement && (
+        statusForm.data.status === 'REPLACEMENT_RELEASED'
+            ? (claim.replacement_available_stock ?? 0) < remainingReplacementQuantity
+            : (enteredReplacementQty <= 0 || (claim.replacement_available_stock ?? 0) < enteredReplacementQty || enteredReplacementQty >= remainingReplacementQuantity)
+    );
     const claimedItems = linkedDistribution?.items.filter((item) => {
         if (!claim.distribution_item_id) {
             return true;
@@ -186,6 +192,16 @@ export default function ClaimShow({ claim, parentClaim, followUpClaims = [], fol
         if (status === 'REPLACEMENT_RELEASED' || status === 'RESOLVED') {
             statusForm.setData('resolution_type', 'REPLACEMENT_RELEASED');
             statusForm.setData('replacement_quantity', String(Math.trunc(remainingReplacementQuantity)));
+            return;
+        }
+
+        if (status === 'PARTIALLY_RESOLVED') {
+            statusForm.setData('resolution_type', 'PARTIAL_REPLACEMENT');
+            const defaultPartial = Math.max(1, Math.min(
+                Math.trunc(claim.replacement_available_stock ?? remainingReplacementQuantity),
+                Math.trunc(remainingReplacementQuantity - 1 > 0 ? remainingReplacementQuantity - 1 : remainingReplacementQuantity)
+            ));
+            statusForm.setData('replacement_quantity', String(defaultPartial));
             return;
         }
 
@@ -404,18 +420,23 @@ export default function ClaimShow({ claim, parentClaim, followUpClaims = [], fol
                                         <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Replacement Qty</label>
                                         <input
                                             type="number"
-                                            min="0"
+                                            min="1"
+                                            max={isPartialRelease ? Math.min(claim.replacement_available_stock ?? remainingReplacementQuantity, Math.max(1, remainingReplacementQuantity - 1)) : remainingReplacementQuantity}
                                             step="1"
                                             inputMode="numeric"
                                             pattern="[0-9]*"
                                             className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm read-only:bg-slate-100 disabled:bg-slate-100"
                                             value={statusForm.data.replacement_quantity}
                                             disabled={!usesReplacement}
-                                            readOnly={usesReplacement}
+                                            readOnly={!isPartialRelease}
                                             onChange={(event) => statusForm.setData('replacement_quantity', event.target.value.replace(/\D/g, ''))}
                                         />
                                         {statusForm.errors.replacement_quantity ? <p className="mt-1 text-xs text-rose-600">{statusForm.errors.replacement_quantity}</p> : null}
-                                        {usesReplacement && (claim.replacement_available_stock ?? 0) < remainingReplacementQuantity ? (
+                                        {isPartialRelease ? (
+                                            <p className="mt-1 text-xs text-slate-500">
+                                                Enter partial quantity to release (available: {claim.replacement_available_stock ?? 0}, max partial: {Math.max(0, Math.trunc(remainingReplacementQuantity - 1))}).
+                                            </p>
+                                        ) : usesReplacement && (claim.replacement_available_stock ?? 0) < remainingReplacementQuantity ? (
                                             <p className="mt-1 text-xs text-amber-600">Available stock is below the remaining disputed quantity.</p>
                                         ) : null}
                                     </div>
@@ -431,14 +452,19 @@ export default function ClaimShow({ claim, parentClaim, followUpClaims = [], fol
                                     </div>
                                     <button
                                         type="submit"
-                                        disabled={statusForm.processing || statusForm.data.status === '' || (statusForm.data.status === 'REPLACEMENT_RELEASED' && isStockInsufficient)}
+                                        disabled={statusForm.processing || statusForm.data.status === '' || isStockInsufficient}
                                         className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60 md:mt-5"
                                     >
                                         {statusForm.processing ? 'Saving...' : 'Save Follow-up'}
                                     </button>
-                                    {statusForm.data.status === 'REPLACEMENT_RELEASED' && isStockInsufficient ? (
+                                    {statusForm.data.status === 'REPLACEMENT_RELEASED' && (claim.replacement_available_stock ?? 0) < remainingReplacementQuantity ? (
                                         <p className="col-span-full mt-2 text-xs font-medium text-amber-700">
-                                            Cannot release replacement: available inventory stock ({claim.replacement_available_stock ?? 0}) is less than the remaining disputed quantity ({remainingReplacementQuantity}). Forward a follow-up PR above or select Rejected.
+                                            Cannot release full replacement: available inventory stock ({claim.replacement_available_stock ?? 0}) is less than the remaining disputed quantity ({remainingReplacementQuantity}). Select Partially Resolved to release available stock, or forward a follow-up PR.
+                                        </p>
+                                    ) : null}
+                                    {isPartialRelease && (enteredReplacementQty <= 0 || (claim.replacement_available_stock ?? 0) < enteredReplacementQty || enteredReplacementQty >= remainingReplacementQuantity) ? (
+                                        <p className="col-span-full mt-2 text-xs font-medium text-amber-700">
+                                            Partial replacement quantity must be between 1 and {Math.min(claim.replacement_available_stock ?? remainingReplacementQuantity, Math.max(1, Math.trunc(remainingReplacementQuantity - 1)))}, and cannot exceed available stock.
                                         </p>
                                     ) : null}
                                 </form>
@@ -446,6 +472,8 @@ export default function ClaimShow({ claim, parentClaim, followUpClaims = [], fol
                                 <p className="mt-2 text-sm text-slate-600">
                                     {claim.status === 'REPLACEMENT_RELEASED'
                                         ? 'Replacement items have been released. Awaiting verification and acceptance by the requesting office.'
+                                        : claim.status === 'PARTIALLY_RESOLVED' && followUpPurchaseRequest
+                                        ? 'Partial replacement has been released. Follow-up purchase request is active for the remaining disputed quantity.'
                                         : claim.status === 'PENDING_REPLACEMENT' && followUpPurchaseRequest
                                         ? 'Follow-up purchase request has been forwarded to Procurement. Awaiting fulfillment and stock arrival.'
                                         : 'This claim has already been closed and can only be viewed.'}
@@ -658,9 +686,9 @@ function displayClaimStatus(status: string): string {
     const map: Record<string, string> = {
         OPEN: 'Pending Review',
         IN_REVIEW: 'In Claim Review',
-        PENDING_REPLACEMENT: 'Pending Replacement',
-        REPLACEMENT_RELEASED: 'Replacement Released (Pending Office Verification)',
-        PARTIALLY_RESOLVED: 'Partially Resolved',
+        PENDING_REPLACEMENT: 'Pending Replacement (Forward to Procurement)',
+        REPLACEMENT_RELEASED: 'Replacement Released (Full Replacement)',
+        PARTIALLY_RESOLVED: 'Partially Resolved (Partial Replacement Released)',
         RESOLVED: 'Resolved',
         REJECTED: 'Rejected',
     };
@@ -699,21 +727,35 @@ function getNextStatusOptions(
     hasFollowUpPr: boolean = false,
     replacementQuantity: number = 0
 ): Array<{ value: string; label: string }> {
-    const hasSufficientStock = availableStock !== null && availableStock !== undefined && (remainingDisputed ?? 0) <= availableStock;
-    const hasInsufficientStock = availableStock !== null && availableStock !== undefined && (remainingDisputed ?? 0) > availableStock;
+    const remDisputed = remainingDisputed ?? 0;
+    const hasSufficientStock = availableStock !== null && availableStock !== undefined && remDisputed <= availableStock;
+    const hasPartialStock = availableStock !== null && availableStock !== undefined && availableStock > 0 && remDisputed > availableStock;
+    const hasInsufficientStock = availableStock !== null && availableStock !== undefined && remDisputed > availableStock;
 
     let allowed: string[] = [];
-    if (status === 'OPEN' || status === 'IN_REVIEW' || status === 'PARTIALLY_RESOLVED') {
+    if (status === 'OPEN' || status === 'IN_REVIEW') {
         if (hasSufficientStock) {
-            allowed = ['REPLACEMENT_RELEASED', 'REJECTED'];
+            allowed = remDisputed > 1 ? ['REPLACEMENT_RELEASED', 'PARTIALLY_RESOLVED', 'REJECTED'] : ['REPLACEMENT_RELEASED', 'REJECTED'];
+        } else if (hasPartialStock) {
+            allowed = ['PARTIALLY_RESOLVED', 'PENDING_REPLACEMENT', 'REJECTED'];
         } else if (hasInsufficientStock) {
             allowed = ['PENDING_REPLACEMENT', 'REJECTED'];
         } else {
-            allowed = ['REPLACEMENT_RELEASED', 'PENDING_REPLACEMENT', 'REJECTED'];
+            allowed = ['REPLACEMENT_RELEASED', 'PARTIALLY_RESOLVED', 'PENDING_REPLACEMENT', 'REJECTED'];
+        }
+    } else if (status === 'PARTIALLY_RESOLVED') {
+        if (hasSufficientStock) {
+            allowed = remDisputed > 1 ? ['REPLACEMENT_RELEASED', 'PARTIALLY_RESOLVED', 'PENDING_REPLACEMENT'] : ['REPLACEMENT_RELEASED', 'PENDING_REPLACEMENT'];
+        } else if (hasPartialStock) {
+            allowed = ['PARTIALLY_RESOLVED', 'PENDING_REPLACEMENT'];
+        } else {
+            allowed = ['PENDING_REPLACEMENT'];
         }
     } else if (status === 'PENDING_REPLACEMENT') {
         if (hasSufficientStock) {
-            allowed = ['REPLACEMENT_RELEASED'];
+            allowed = remDisputed > 1 ? ['REPLACEMENT_RELEASED', 'PARTIALLY_RESOLVED'] : ['REPLACEMENT_RELEASED'];
+        } else if (hasPartialStock) {
+            allowed = ['PARTIALLY_RESOLVED'];
         } else if (!hasFollowUpPr && replacementQuantity <= 0) {
             allowed = ['REJECTED'];
         } else {

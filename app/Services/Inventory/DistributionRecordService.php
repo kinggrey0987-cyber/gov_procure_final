@@ -618,26 +618,28 @@ class DistributionRecordService
         $maxReleasable = max($requestedQuantity - (float) $releasedForRequest, 0);
 
         $rootSupplyRequest = $this->followUpService->resolveRootSupplyRequest($record->supplyRequest);
-        if ($rootSupplyRequest && (int) $rootSupplyRequest->supply_request_id !== (int) $record->supplyRequest->supply_request_id) {
-            $rootRequestedQuantity = (float) $rootSupplyRequest->items
-                ->where('item_id', $itemId)
-                ->sum('quantity_requested');
-
-            $rootReleased = (float) $this->allFulfillmentDistributionRecords($rootSupplyRequest)
+        if ($rootSupplyRequest->supply_request_id !== $record->supplyRequest->supply_request_id) {
+            $rootRequested = (float) $rootSupplyRequest->items->where('item_id', $itemId)->sum('quantity_requested');
+            $rootReleasedRecords = $this->allFulfillmentDistributionRecords($rootSupplyRequest)
                 ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
-                ->flatMap(fn ($distributionRecord) => $distributionRecord->items)
-                ->filter(function ($distributionItem) use ($itemId, $ignoreDistributionItemId): bool {
-                    if ((int) $distributionItem->item_id !== $itemId) {
-                        return false;
-                    }
+                ->flatMap(fn ($r) => $r->items)
+                ->where('item_id', $itemId);
 
-                    return $ignoreDistributionItemId === null
-                        || (int) $distributionItem->distribution_item_id !== $ignoreDistributionItemId;
-                })
-                ->sum(fn ($distributionItem): float => (float) $distributionItem->quantity_released);
+            $rootEffectiveReleased = (float) $rootReleasedRecords->sum(function ($item): float {
+                $damaged = (float) ($item->quantity_damaged ?? 0.0);
+                return max((float) $item->quantity_released - $damaged, 0.0);
+            });
 
-            $rootMaxReleasable = max($rootRequestedQuantity - $rootReleased, 0.0);
-            $maxReleasable = min($maxReleasable, $rootMaxReleasable);
+            if ($linkedSourceClaim !== null && $linkedSourceClaim->distributionItem && (int) $linkedSourceClaim->distributionItem->item_id === $itemId) {
+                $rootEffectiveReleased = max($rootEffectiveReleased - (float) $linkedSourceClaim->quantity_disputed, 0.0);
+            }
+
+            $rootRemaining = max($rootRequested - $rootEffectiveReleased, 0.0);
+            if ($linkedSourceClaim !== null && (int) ($linkedSourceClaim->distributionItem?->item_id ?? 0) === $itemId) {
+                $rootRemaining = max($rootRemaining, (float) $linkedSourceClaim->quantity_disputed);
+            }
+
+            $maxReleasable = min($maxReleasable, $rootRemaining);
         }
 
         $undistributed = $this->undistributedDeliveryStock($itemId, $record->delivery_id ? (int) $record->delivery_id : null);
@@ -764,19 +766,9 @@ class DistributionRecordService
                 ->map(fn (float $accepted, int $itemId): float => max($accepted - (float) ($deliveryReleasedByItemId->get($itemId) ?? 0.0), 0));
         }
 
-        $rootSupplyRequest = $this->followUpService->resolveRootSupplyRequest($record->supplyRequest);
-        $rootReleasedByItemId = collect();
-        if ($rootSupplyRequest && (int) $rootSupplyRequest->supply_request_id !== (int) $record->supplyRequest->supply_request_id) {
-            $rootReleasedByItemId = $this->allFulfillmentDistributionRecords($rootSupplyRequest)
-                ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
-                ->flatMap(fn ($distributionRecord) => $distributionRecord->items)
-                ->groupBy(fn ($item) => (int) $item->item_id)
-                ->map(fn ($items): float => (float) $items->sum('quantity_released'));
-        }
-
         return $record->supplyRequest->items
             ->groupBy(fn ($item) => (int) $item->item_id)
-            ->map(function ($items, int $itemId) use ($requestReleasedByItemId, $deliveryRemainingByItemId, $record, $rootSupplyRequest, $rootReleasedByItemId): ?array {
+            ->map(function ($items, int $itemId) use ($requestReleasedByItemId, $deliveryRemainingByItemId, $record): ?array {
                 $first = $items->first();
                 $requested = (float) $items->sum('quantity_requested');
                 $requestRemaining = max($requested - (float) ($requestReleasedByItemId->get($itemId) ?? 0.0), 0);
@@ -830,9 +822,33 @@ class DistributionRecordService
                     $quantity = min($requestRemaining, $availableWarehouseStock);
                 }
 
-                if ($rootSupplyRequest && (int) $rootSupplyRequest->supply_request_id !== (int) $record->supplyRequest->supply_request_id) {
+                if ($quantity <= 0.0001) {
+                    return null;
+                }
+
+                $rootSupplyRequest = $this->followUpService->resolveRootSupplyRequest($record->supplyRequest);
+                if ($rootSupplyRequest->supply_request_id !== $record->supplyRequest->supply_request_id) {
                     $rootRequested = (float) $rootSupplyRequest->items->where('item_id', $itemId)->sum('quantity_requested');
-                    $rootRemaining = max($rootRequested - (float) ($rootReleasedByItemId->get($itemId) ?? 0.0), 0.0);
+                    $rootReleasedRecords = $this->allFulfillmentDistributionRecords($rootSupplyRequest)
+                        ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
+                        ->flatMap(fn ($r) => $r->items)
+                        ->where('item_id', $itemId);
+
+                    $rootEffectiveReleased = (float) $rootReleasedRecords->sum(function ($item): float {
+                        $damaged = (float) ($item->quantity_damaged ?? 0.0);
+                        return max((float) $item->quantity_released - $damaged, 0.0);
+                    });
+
+                    $linkedClaim = $this->resolveLinkedSourceClaim($record);
+                    if ($linkedClaim !== null && $linkedClaim->distributionItem && (int) $linkedClaim->distributionItem->item_id === $itemId) {
+                        $rootEffectiveReleased = max($rootEffectiveReleased - (float) $linkedClaim->quantity_disputed, 0.0);
+                    }
+
+                    $rootRemaining = max($rootRequested - $rootEffectiveReleased, 0.0);
+                    if ($linkedClaim !== null && (int) ($linkedClaim->distributionItem?->item_id ?? 0) === $itemId) {
+                        $rootRemaining = max($rootRemaining, (float) $linkedClaim->quantity_disputed);
+                    }
+
                     $quantity = min($quantity, $rootRemaining);
                 }
 
@@ -900,6 +916,26 @@ class DistributionRecordService
     private function generateDistributionCode(?DateTimeInterface $date = null): string
     {
         return $this->generateNextDistributionCode($date);
+    }
+
+    private function calculateNetFulfilledQuantityForDistributionItem(DistributionItem $distributionItem): float
+    {
+        $released = (float) $distributionItem->quantity_released;
+        $damaged = (float) ($distributionItem->quantity_damaged ?? 0);
+        $missing = (float) ($distributionItem->quantity_missing ?? 0);
+        $netFulfilled = max($released - $damaged - $missing, 0.0);
+
+        if ($distributionItem->distribution_item_id) {
+            $unreplacedClaimQty = (float) \App\Models\Claim::query()
+                ->where('distribution_item_id', (int) $distributionItem->distribution_item_id)
+                ->whereIn('status', ['OPEN', 'IN_REVIEW', 'PENDING_REPLACEMENT', 'PARTIALLY_RESOLVED', 'REPLACEMENT_RELEASED'])
+                ->get()
+                ->sum(fn ($c) => max((float) $c->quantity_disputed - (float) $c->replacement_quantity, 0.0));
+
+            $netFulfilled = max($netFulfilled - $unreplacedClaimQty, 0.0);
+        }
+
+        return $netFulfilled;
     }
 
     private function assertGsoOfficer(User $actor): void
@@ -1062,10 +1098,9 @@ class DistributionRecordService
                 'replacement_quantity' => $newReplacementQty,
             ])->save();
 
-            $remarks = sprintf(
-                'Replacement items released by GSO under distribution record %s.',
-                (string) $record->distribution_code
-            );
+            $remarks = ($newReplacementQty >= ($disputedQty - 0.0001))
+                ? sprintf('Replacement items released by GSO under distribution record %s.', (string) $record->distribution_code)
+                : sprintf('Partial replacement items (%.2f of %.2f) released by GSO under distribution record %s.', $newReplacementQty, $disputedQty, (string) $record->distribution_code);
 
             StatusHistory::query()->create([
                 'reference_type' => Claim::class,

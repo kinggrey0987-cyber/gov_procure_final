@@ -7,6 +7,7 @@ use App\Http\Requests\DistributionRecord\UpdateDistributionRecordRequest;
 use App\Models\DistributionRecord;
 use App\Models\Delivery;
 use App\Models\DeliveryItem;
+use App\Models\PurchaseRequest;
 use App\Models\SupplyRequest;
 use Illuminate\Support\Collection;
 use App\Services\Inventory\DistributionRecordService;
@@ -178,23 +179,52 @@ class DistributionRecordController
         }
 
         $sourceSupplyRequests = collect();
-        if ($delivery->purchaseOrder?->supplyRequest instanceof SupplyRequest) {
-            $sourceSupplyRequests->push($delivery->purchaseOrder->supplyRequest);
+        $isFollowUpDelivery = (string) ($delivery->purchaseOrder?->purchaseRequest?->source_type ?? '') === 'PARTIAL_DELIVERY_FOLLOW_UP'
+            || (int) ($delivery->purchaseOrder?->purchaseRequest?->source_delivery_id ?? 0) > 0;
+
+        if ($isFollowUpDelivery) {
+            // A follow-up delivery fulfills its specific child supply request
+            $targetChildSr = $delivery->purchaseOrder?->purchaseRequest?->supplyRequest
+                ?? $delivery->purchaseOrder?->supplyRequest;
+            if ($targetChildSr instanceof SupplyRequest) {
+                $sourceSupplyRequests->push($targetChildSr);
+            }
+        } else {
+            if ($delivery->purchaseOrder?->supplyRequest instanceof SupplyRequest) {
+                $sourceSupplyRequests->push($delivery->purchaseOrder->supplyRequest);
+            }
+            if ($delivery->purchaseOrder?->purchaseRequest?->supplyRequest instanceof SupplyRequest) {
+                $sourceSupplyRequests->push($delivery->purchaseOrder->purchaseRequest->supplyRequest);
+            }
+            if ($delivery->purchaseOrder) {
+                $consolidated = $this->traceabilityService->getSourceSupplyRequests($delivery->purchaseOrder);
+                $sourceSupplyRequests = $sourceSupplyRequests->merge($consolidated);
+            }
+
+            // Exclude any child follow-up requests that were created FROM this delivery discrepancy
+            // (they are waiting for future deliveries, not this delivery where items were missing/damaged)
+            $downstreamDiscrepancyChildIds = PurchaseRequest::query()
+                ->where('source_delivery_id', (int) $delivery->delivery_id)
+                ->pluck('supply_request_id')
+                ->filter()
+                ->all();
+
+            if (! empty($downstreamDiscrepancyChildIds)) {
+                $sourceSupplyRequests = $sourceSupplyRequests->reject(
+                    fn ($sr) => in_array((int) $sr->supply_request_id, $downstreamDiscrepancyChildIds, true)
+                );
+            }
         }
-        if ($delivery->purchaseOrder?->purchaseRequest?->supplyRequest instanceof SupplyRequest) {
-            $sourceSupplyRequests->push($delivery->purchaseOrder->purchaseRequest->supplyRequest);
-        }
-        if ($delivery->purchaseOrder) {
-            $consolidated = $this->traceabilityService->getSourceSupplyRequests($delivery->purchaseOrder);
-            $sourceSupplyRequests = $sourceSupplyRequests->merge($consolidated);
-        }
+
+        // Never offer supply requests that are already fully received, completed, or closed
+        $sourceSupplyRequests = $sourceSupplyRequests->reject(function ($sr): bool {
+            if (! $sr instanceof SupplyRequest) {
+                return true;
+            }
+            return in_array(strtoupper((string) $sr->status), ['RECEIVED', 'COMPLETED', 'CLOSED', 'CANCELLED', 'REJECTED'], true);
+        });
 
         $sourceSupplyRequests = $sourceSupplyRequests->unique('supply_request_id')->values();
-
-        $deliveryItemIds = $delivery->items
-            ->map(fn ($di) => (int) ($di->purchaseOrderItem?->item_id ?? 0))
-            ->filter()
-            ->all();
 
         $rows = collect();
 
@@ -207,13 +237,7 @@ class DistributionRecordController
                 continue;
             }
 
-            if (! $this->hasRemainingQuantity($supplyRequest)) {
-                continue;
-            }
-
-            $hasMatchingItem = $supplyRequest->items
-                ->contains(fn ($sri) => in_array((int) $sri->item_id, $deliveryItemIds, true));
-            if (! $hasMatchingItem) {
+            if (! $this->hasReleasableQuantityForDelivery($supplyRequest, $delivery)) {
                 continue;
             }
 
@@ -379,6 +403,52 @@ class DistributionRecordController
         }
 
         return $shortageTotal;
+    }
+
+    private function hasReleasableQuantityForDelivery(SupplyRequest $supplyRequest, Delivery $delivery): bool
+    {
+        if (in_array(strtoupper((string) $supplyRequest->status), ['RECEIVED', 'COMPLETED', 'CLOSED', 'CANCELLED', 'REJECTED'], true)) {
+            return false;
+        }
+
+        $deliveryAcceptedByItem = $delivery->items
+            ->groupBy(fn ($item) => (int) ($item->purchaseOrderItem?->item_id ?? 0))
+            ->map(fn ($items): float => (float) $items->sum(
+                fn ($item): float => max((float) $item->received_quantity - (float) $item->damaged_quantity, 0)
+            ));
+
+        $deliveryReleasedByItem = $delivery->distributionRecords
+            ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
+            ->flatMap(fn ($record) => $record->items)
+            ->groupBy(fn ($item) => (int) $item->item_id)
+            ->map(fn ($items): float => (float) $items->sum('quantity_released'));
+
+        $srReleasedByItem = $this->allFulfillmentDistributionRecords($supplyRequest)
+            ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
+            ->flatMap(fn ($record) => $record->items)
+            ->groupBy(fn ($item) => (int) $item->item_id)
+            ->map(fn ($items): float => (float) $items->sum('quantity_released'));
+
+        foreach ($supplyRequest->items as $item) {
+            $itemId = (int) $item->item_id;
+            $accepted = (float) ($deliveryAcceptedByItem->get($itemId) ?? 0.0);
+            $deliveryRel = (float) ($deliveryReleasedByItem->get($itemId) ?? 0.0);
+            $deliveryAvail = max($accepted - $deliveryRel, 0.0);
+
+            if ($deliveryAvail <= 0.0001) {
+                continue;
+            }
+
+            $requested = (float) $item->quantity_requested;
+            $srRel = (float) ($srReleasedByItem->get($itemId) ?? 0.0);
+            $srNeeded = max($requested - $srRel, 0.0);
+
+            if ($srNeeded > 0.0001) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function hasRemainingQuantity(SupplyRequest $request): bool

@@ -454,12 +454,33 @@ class SupplyRequestController extends Controller
     {
         $baseStatus = strtoupper((string) $supplyRequest->status);
 
+        if ($baseStatus === 'REJECTED') {
+            return 'REJECTED';
+        }
+
+        if ($baseStatus === 'CANCELLED') {
+            return 'CANCELLED';
+        }
+
+        if ($baseStatus === 'RECEIVED') {
+            return 'RECEIVED';
+        }
+
         $progress = $this->distributionProgress($supplyRequest);
 
         if ($progress['received'] > 0) {
             return $progress['received'] + 0.0001 >= $progress['requested']
                 ? 'RECEIVED'
                 : 'PARTIALLY_RECEIVED';
+        }
+
+        // Check if this request is a follow-up child whose lineage/root is already fully received
+        $rootSr = $this->followUpService->resolveRootSupplyRequest($supplyRequest);
+        if ($rootSr && (int) $rootSr->supply_request_id !== (int) $supplyRequest->supply_request_id) {
+            $rootProgress = $this->distributionProgress($rootSr);
+            if ($rootSr->status === 'RECEIVED' || ($rootProgress['received'] > 0 && $rootProgress['received'] + 0.0001 >= $rootProgress['requested'])) {
+                return 'RECEIVED';
+            }
         }
 
         if ($progress['released'] > 0) {
@@ -469,12 +490,31 @@ class SupplyRequestController extends Controller
         }
 
         $deliveryIds = $this->followUpService->resolveDeliveryIdsForSupplyRequest($supplyRequest);
-        $hasVerifiedDelivery = ! empty($deliveryIds) && \App\Models\Delivery::query()
-            ->whereIn('delivery_id', $deliveryIds)
-            ->whereIn('receipt_status', ['VERIFIED', 'PARTIALLY_RECEIVED'])
-            ->exists();
+        $hasUndistributedVerifiedDelivery = false;
+        if (! empty($deliveryIds)) {
+            $verifiedDeliveries = \App\Models\Delivery::query()
+                ->whereIn('delivery_id', $deliveryIds)
+                ->whereIn('receipt_status', ['VERIFIED', 'PARTIALLY_RECEIVED'])
+                ->with(['items', 'distributionRecords.items'])
+                ->get();
 
-        if ($hasVerifiedDelivery) {
+            foreach ($verifiedDeliveries as $del) {
+                $delAccepted = (float) $del->items->sum(
+                    fn ($i): float => max((float) $i->received_quantity - (float) $i->damaged_quantity, 0)
+                );
+                $delReleased = (float) $del->distributionRecords
+                    ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
+                    ->flatMap(fn ($record) => $record->items)
+                    ->sum('quantity_released');
+
+                if ($delAccepted - $delReleased > 0.0001) {
+                    $hasUndistributedVerifiedDelivery = true;
+                    break;
+                }
+            }
+        }
+
+        if ($hasUndistributedVerifiedDelivery) {
             return 'READY_FOR_RELEASE';
         }
 

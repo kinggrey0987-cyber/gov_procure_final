@@ -203,11 +203,11 @@ class ClaimService
         $currentStatus = (string) $claim->status;
 
         $validTransitions = [
-            'OPEN' => ['REJECTED', 'RESOLVED', 'PENDING_REPLACEMENT', 'REPLACEMENT_RELEASED'],
-            'IN_REVIEW' => ['REJECTED', 'RESOLVED', 'PENDING_REPLACEMENT', 'REPLACEMENT_RELEASED'],
-            'PENDING_REPLACEMENT' => ['REJECTED', 'RESOLVED', 'REPLACEMENT_RELEASED'],
+            'OPEN' => ['REJECTED', 'RESOLVED', 'PENDING_REPLACEMENT', 'REPLACEMENT_RELEASED', 'PARTIALLY_RESOLVED'],
+            'IN_REVIEW' => ['REJECTED', 'RESOLVED', 'PENDING_REPLACEMENT', 'REPLACEMENT_RELEASED', 'PARTIALLY_RESOLVED'],
+            'PENDING_REPLACEMENT' => ['REJECTED', 'RESOLVED', 'REPLACEMENT_RELEASED', 'PARTIALLY_RESOLVED'],
             'REPLACEMENT_RELEASED' => ['RESOLVED'],
-            'PARTIALLY_RESOLVED' => ['RESOLVED', 'PENDING_REPLACEMENT', 'REPLACEMENT_RELEASED'],
+            'PARTIALLY_RESOLVED' => ['RESOLVED', 'PENDING_REPLACEMENT', 'REPLACEMENT_RELEASED', 'PARTIALLY_RESOLVED'],
             'REJECTED' => [],
             'RESOLVED' => [],
         ];
@@ -242,7 +242,7 @@ class ClaimService
             $resolutionType = isset($payload['resolution_type']) ? strtoupper((string) $payload['resolution_type']) : null;
             $replacementQuantity = round((float) ($payload['replacement_quantity'] ?? 0), 2);
             $isReleasingReplacement = in_array($resolutionType, ['REPLACEMENT_RELEASED', 'PARTIAL_REPLACEMENT'], true)
-                || $newStatus === 'REPLACEMENT_RELEASED';
+                || in_array($newStatus, ['REPLACEMENT_RELEASED', 'PARTIALLY_RESOLVED'], true);
 
             $appliedReplacementQuantity = $isReleasingReplacement
                 ? $replacementQuantity

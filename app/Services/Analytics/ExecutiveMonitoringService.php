@@ -251,10 +251,29 @@ class ExecutiveMonitoringService
         }
 
         $statusFilter = $filters['status'] ?? null;
+        $prStatuses = ['OPEN', 'APPROVED', 'PROCESSING', 'REJECTED', 'RETURNED_FOR_REVISION', 'FOR_PROCUREMENT'];
+        $poStatuses = ['DRAFT', 'PLACED', 'RECEIVED', 'CANCELLED'];
 
         if (! empty($statusFilter)) {
-            $purchaseRequestQuery->where('purchase_requests.status', $statusFilter);
-            $purchaseOrderQuery->where('purchase_orders.status', $statusFilter);
+            if ($recordType === 'pr') {
+                $purchaseRequestQuery->where('purchase_requests.status', $statusFilter);
+            } elseif ($recordType === 'po') {
+                $purchaseOrderQuery->where('purchase_orders.status', $statusFilter);
+            } else {
+                $isPrStatus = in_array($statusFilter, $prStatuses, true);
+                $isPoStatus = in_array($statusFilter, $poStatuses, true);
+
+                if ($isPrStatus && ! $isPoStatus) {
+                    $purchaseRequestQuery->where('purchase_requests.status', $statusFilter);
+                    $purchaseOrderQuery->whereHas('purchaseRequest', static fn (Builder $q) => $q->where('status', $statusFilter));
+                } elseif ($isPoStatus && ! $isPrStatus) {
+                    $purchaseOrderQuery->where('purchase_orders.status', $statusFilter);
+                    $purchaseRequestQuery->whereHas('purchaseOrders', static fn (Builder $q) => $q->where('status', $statusFilter));
+                } else {
+                    $purchaseRequestQuery->where('purchase_requests.status', $statusFilter);
+                    $purchaseOrderQuery->where('purchase_orders.status', $statusFilter);
+                }
+            }
         } elseif (! empty($filters['pr_status'])) {
             $purchaseRequestQuery->where('purchase_requests.status', $filters['pr_status']);
         }
@@ -281,6 +300,14 @@ class ExecutiveMonitoringService
         $exportPurchaseOrders = (clone $purchaseOrderBase)
             ->latest('purchase_order_id')
             ->get();
+
+        $prCount = $recordType === 'po' ? 0 : (clone $purchaseRequestBase)->count();
+        $poCount = $recordType === 'pr' ? 0 : (clone $purchaseOrderBase)->count();
+        $poAmount = $recordType === 'pr' ? 0.0 : (float) (clone $purchaseOrderBase)->sum('total_amount');
+        $prItems = $recordType === 'po' ? 0 : (int) (clone $purchaseRequestBase)->get()->sum('items_count');
+        $poItems = $recordType === 'pr' ? 0 : (int) (clone $purchaseOrderBase)->get()->sum('items_count');
+
+        $filteredYear = ! empty($filters['year']) ? (string) $filters['year'] : null;
 
         return [
             'filters' => [
@@ -310,12 +337,12 @@ class ExecutiveMonitoringService
                 ),
             ],
             'totals' => [
-                'purchase_request_count' => (clone $purchaseRequestBase)->count(),
-                'purchase_order_count' => (clone $purchaseOrderBase)->count(),
-                'purchase_order_total_amount' => (float) (clone $purchaseOrderBase)->sum('total_amount'),
-                'procurement_record_count' => (clone $purchaseRequestBase)->count() + (clone $purchaseOrderBase)->count(),
-                'purchase_request_item_count' => (int) (clone $purchaseRequestBase)->get()->sum('items_count'),
-                'purchase_order_item_count' => (int) (clone $purchaseOrderBase)->get()->sum('items_count'),
+                'purchase_request_count' => $prCount,
+                'purchase_order_count' => $poCount,
+                'purchase_order_total_amount' => $poAmount,
+                'procurement_record_count' => $prCount + $poCount,
+                'purchase_request_item_count' => $prItems,
+                'purchase_order_item_count' => $poItems,
             ],
             'status_breakdown' => [
                 'purchase_requests' => (clone $purchaseRequestBase)
@@ -332,9 +359,9 @@ class ExecutiveMonitoringService
                     ->get(),
             ],
             'monthly_trends' => [
-                'purchase_requests' => $this->buildMonthlyTrend((clone $purchaseRequestBase)->get(['created_at'])),
-                'purchase_orders' => $this->buildMonthlyTrend((clone $purchaseOrderBase)->get(['created_at'])),
-                'spending' => $this->buildMonthlySpendTrend((clone $purchaseOrderBase)->get(['created_at', 'total_amount'])),
+                'purchase_requests' => $recordType === 'po' ? collect() : $this->buildMonthlyTrend((clone $purchaseRequestBase)->get(['created_at']), $filteredYear),
+                'purchase_orders' => $recordType === 'pr' ? collect() : $this->buildMonthlyTrend((clone $purchaseOrderBase)->get(['created_at']), $filteredYear),
+                'spending' => $recordType === 'pr' ? collect() : $this->buildMonthlySpendTrend((clone $purchaseOrderBase)->get(['created_at', 'total_amount']), $filteredYear),
             ],
             'office_comparison' => $this->buildProcurementOfficeComparison($purchaseRequestBase, $purchaseOrderBase),
             'recent' => [
@@ -841,35 +868,82 @@ class ExecutiveMonitoringService
      * @param  Collection<int, mixed>  $rows
      * @return Collection<int, array<string, mixed>>
      */
-    private function buildMonthlyTrend(Collection $rows): Collection
+    private function buildMonthlyTrend(Collection $rows, ?string $filteredYear = null): Collection
     {
-        $trend = $rows
+        $byMonth = $rows
             ->groupBy(static fn ($row) => Carbon::parse($row->created_at)->format('Y-m'))
             ->map(static fn (Collection $group, string $month) => [
                 'month' => $month,
                 'total' => $group->count(),
-            ])
-            ->sortBy('month')
-            ->values();
+            ]);
 
-        return $trend;
+        if ($byMonth->isEmpty()) {
+            return collect();
+        }
+
+        $allMonths = $byMonth->keys()->sort()->values();
+        $startMonth = Carbon::parse($allMonths->first() . '-01');
+        $endMonth = Carbon::parse($allMonths->last() . '-01');
+
+        if ($filteredYear && preg_match('/^\d{4}$/', $filteredYear)) {
+            $startMonth = Carbon::parse("{$filteredYear}-01-01");
+            $endMonth = Carbon::parse("{$filteredYear}-12-01");
+        }
+
+        $result = collect();
+        $curr = $startMonth->copy();
+        while ($curr->lessThanOrEqualTo($endMonth)) {
+            $key = $curr->format('Y-m');
+            $result->push([
+                'month' => $key,
+                'total' => $byMonth->get($key)['total'] ?? 0,
+            ]);
+            $curr->addMonth();
+        }
+
+        return $result;
     }
 
     /**
      * @param  Collection<int, mixed>  $rows
      * @return Collection<int, array<string, mixed>>
      */
-    private function buildMonthlySpendTrend(Collection $rows): Collection
+    private function buildMonthlySpendTrend(Collection $rows, ?string $filteredYear = null): Collection
     {
-        return $rows
+        $byMonth = $rows
             ->groupBy(static fn ($row) => Carbon::parse($row->created_at)->format('Y-m'))
             ->map(static fn (Collection $group, string $month) => [
                 'month' => $month,
                 'total' => (float) $group->sum(static fn ($row) => (float) ($row->total_amount ?? 0)),
                 'order_count' => $group->count(),
-            ])
-            ->sortBy('month')
-            ->values();
+            ]);
+
+        if ($byMonth->isEmpty()) {
+            return collect();
+        }
+
+        $allMonths = $byMonth->keys()->sort()->values();
+        $startMonth = Carbon::parse($allMonths->first() . '-01');
+        $endMonth = Carbon::parse($allMonths->last() . '-01');
+
+        if ($filteredYear && preg_match('/^\d{4}$/', $filteredYear)) {
+            $startMonth = Carbon::parse("{$filteredYear}-01-01");
+            $endMonth = Carbon::parse("{$filteredYear}-12-01");
+        }
+
+        $result = collect();
+        $curr = $startMonth->copy();
+        while ($curr->lessThanOrEqualTo($endMonth)) {
+            $key = $curr->format('Y-m');
+            $result->push([
+                'month' => $key,
+                'total' => (float) ($byMonth->get($key)['total'] ?? 0.0),
+                'order_count' => (int) ($byMonth->get($key)['order_count'] ?? 0),
+            ]);
+            $curr->addMonth();
+        }
+
+        return $result;
     }
 
     /**

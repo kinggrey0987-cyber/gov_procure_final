@@ -37,6 +37,20 @@ class ProcurementStatusSyncService
                 $this->transitionSupplyRequest($supplyRequest, $actor, $remarks);
                 $this->transitionPurchaseRequests($supplyRequest->purchaseRequests, $actor, $remarks);
                 $this->transitionPurchaseOrders($supplyRequest->purchaseOrders, $actor, $remarks);
+
+                $childIds = $this->followUpService->resolveAllFollowUpChildSupplyRequestIds($supplyRequest);
+                if (! empty($childIds)) {
+                    $children = SupplyRequest::query()
+                        ->with(['items', 'distributionRecords.items', 'purchaseRequests', 'purchaseOrders'])
+                        ->whereIn('supply_request_id', $childIds)
+                        ->get();
+                    foreach ($children as $child) {
+                        $childRemarks = 'Parent supply request lineage was fully received by the requesting office.';
+                        $this->transitionSupplyRequest($child, $actor, $childRemarks);
+                        $this->transitionPurchaseRequests($child->purchaseRequests, $actor, $childRemarks);
+                        $this->transitionPurchaseOrders($child->purchaseOrders, $actor, $childRemarks);
+                    }
+                }
             }
 
             $current = $supplyRequest;
@@ -63,6 +77,20 @@ class ProcurementStatusSyncService
                     $this->transitionSupplyRequest($parent, $actor, $remarks);
                     $this->transitionPurchaseRequests($parent->purchaseRequests, $actor, $remarks);
                     $this->transitionPurchaseOrders($parent->purchaseOrders, $actor, $remarks);
+
+                    $siblingIds = $this->followUpService->resolveAllFollowUpChildSupplyRequestIds($parent);
+                    if (! empty($siblingIds)) {
+                        $siblings = SupplyRequest::query()
+                            ->with(['items', 'distributionRecords.items', 'purchaseRequests', 'purchaseOrders'])
+                            ->whereIn('supply_request_id', $siblingIds)
+                            ->get();
+                        foreach ($siblings as $sibling) {
+                            $siblingRemarks = 'Parent supply request lineage was fully received across follow-up deliveries.';
+                            $this->transitionSupplyRequest($sibling, $actor, $siblingRemarks);
+                            $this->transitionPurchaseRequests($sibling->purchaseRequests, $actor, $siblingRemarks);
+                            $this->transitionPurchaseOrders($sibling->purchaseOrders, $actor, $siblingRemarks);
+                        }
+                    }
                 }
 
                 $current = $parent;

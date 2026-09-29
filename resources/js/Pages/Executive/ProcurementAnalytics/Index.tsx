@@ -413,11 +413,36 @@ export default function ProcurementAnalyticsIndex({
                                 onChange={(event) => setForm((current) => ({ ...current, status: event.target.value, records_page: '' }))}
                             >
                                 <option value="">All statuses</option>
-                                {filter_options.statuses.map((status) => (
-                                    <option key={status} value={status}>
-                                        {status}
-                                    </option>
-                                ))}
+                                {form.record_type === 'pr' ? (
+                                    filter_options.pr_statuses.map((status) => (
+                                        <option key={status} value={status}>
+                                            {status}
+                                        </option>
+                                    ))
+                                ) : form.record_type === 'po' ? (
+                                    filter_options.po_statuses.map((status) => (
+                                        <option key={status} value={status}>
+                                            {status}
+                                        </option>
+                                    ))
+                                ) : (
+                                    <>
+                                        <optgroup label="Purchase Request Statuses">
+                                            {filter_options.pr_statuses.map((status) => (
+                                                <option key={`pr-${status}`} value={status}>
+                                                    PR: {status}
+                                                </option>
+                                            ))}
+                                        </optgroup>
+                                        <optgroup label="Purchase Order Statuses">
+                                            {filter_options.po_statuses.map((status) => (
+                                                <option key={`po-${status}`} value={status}>
+                                                    PO: {status}
+                                                </option>
+                                            ))}
+                                        </optgroup>
+                                    </>
+                                )}
                             </select>
 
                             <MonthFilterSelect

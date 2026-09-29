@@ -38,6 +38,7 @@ class UpdateClaimStatusRequest extends FormRequest
             $resolutionType = match ($status) {
                 'REPLACEMENT_RELEASED' => 'REPLACEMENT_RELEASED',
                 'RESOLVED' => 'REPLACEMENT_RELEASED',
+                'PARTIALLY_RESOLVED' => 'PARTIAL_REPLACEMENT',
                 'PENDING_REPLACEMENT' => 'PENDING_REPLACEMENT',
                 'REJECTED' => 'OTHER_RESOLUTION',
                 default => '',
@@ -80,8 +81,12 @@ class UpdateClaimStatusRequest extends FormRequest
                 return;
             }
 
-            if (in_array($status, ['RESOLVED', 'REPLACEMENT_RELEASED'], true) && ! in_array($resolutionType, ['REPLACEMENT_RELEASED', 'PARTIAL_REPLACEMENT'], true)) {
+            if (in_array($status, ['RESOLVED', 'REPLACEMENT_RELEASED', 'PARTIALLY_RESOLVED'], true) && ! in_array($resolutionType, ['REPLACEMENT_RELEASED', 'PARTIAL_REPLACEMENT'], true)) {
                 $validator->errors()->add('resolution_type', 'Released claims require released replacement stock.');
+            }
+
+            if ($status === 'PARTIALLY_RESOLVED' && $resolutionType !== 'PARTIAL_REPLACEMENT') {
+                $validator->errors()->add('resolution_type', 'Partial resolution requires the partial replacement resolution type.');
             }
 
             if ($status === 'PENDING_REPLACEMENT' && $resolutionType !== 'PENDING_REPLACEMENT') {
