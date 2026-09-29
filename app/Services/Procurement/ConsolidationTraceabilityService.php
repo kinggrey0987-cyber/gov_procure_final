@@ -12,6 +12,92 @@ use App\Models\User;
 
 class ConsolidationTraceabilityService
 {
+    /** @var \Illuminate\Support\Collection<int, PurchaseRequest>|null */
+    private ?\Illuminate\Support\Collection $prsWithConsolidatedRemarksIndex = null;
+
+    /** @var array<string, array<int>>|null */
+    private ?array $statusHistorySrLinksIndex = null;
+
+    /** @var array<int, array<string>>|null */
+    private ?array $statusHistoryRemarksBySrId = null;
+
+    /**
+     * Clear memoized cache for testing or batch operations.
+     */
+    public function clearCache(): void
+    {
+        $this->supplyRequestPrsCache = [];
+        $this->prsWithConsolidatedRemarksIndex = null;
+        $this->statusHistorySrLinksIndex = null;
+        $this->statusHistoryRemarksBySrId = null;
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, PurchaseRequest>
+     */
+    private function getPrsWithConsolidatedRemarks(): \Illuminate\Support\Collection
+    {
+        if ($this->prsWithConsolidatedRemarksIndex === null) {
+            $this->prsWithConsolidatedRemarksIndex = PurchaseRequest::query()
+                ->where(function ($q) {
+                    $q->where('remarks', 'like', '%PR-%')
+                        ->orWhere('remarks', 'like', '%SR-%')
+                        ->orWhere('remarks', 'like', '%consolidat%');
+                })
+                ->with([
+                    'supplyRequest.office',
+                    'supplyRequest.requester',
+                    'supplyRequest.items.item',
+                    'supplyRequest.items.ppmpItem',
+                    'requester.role',
+                    'purchaseOrders.supplier',
+                    'purchaseOrders.creator.role',
+                    'purchaseOrders.approver.role',
+                ])
+                ->get();
+        }
+
+        return $this->prsWithConsolidatedRemarksIndex;
+    }
+
+    /**
+     * @return array{sr_links: array<string, array<int>>, remarks_by_sr: array<int, array<string>>}
+     */
+    private function getStatusHistoryConsolidationIndexes(): array
+    {
+        if ($this->statusHistorySrLinksIndex === null || $this->statusHistoryRemarksBySrId === null) {
+            $rows = StatusHistory::query()
+                ->where('reference_type', SupplyRequest::class)
+                ->where(function ($q) {
+                    $q->where('remarks', 'like', '%PR-%')
+                        ->orWhere('remarks', 'like', '%consolidat%');
+                })
+                ->get(['reference_id', 'remarks']);
+
+            $srLinks = [];
+            $remarksBySr = [];
+            foreach ($rows as $h) {
+                $srId = (int) $h->reference_id;
+                $rem = (string) $h->remarks;
+                $remarksBySr[$srId][] = $rem;
+                preg_match_all('/PR-[A-Z0-9-]+/', $rem, $matches);
+                if (! empty($matches[0])) {
+                    foreach ($matches[0] as $token) {
+                        $srLinks[$token][] = $srId;
+                    }
+                }
+            }
+
+            $this->statusHistorySrLinksIndex = $srLinks;
+            $this->statusHistoryRemarksBySrId = $remarksBySr;
+        }
+
+        return [
+            'sr_links' => $this->statusHistorySrLinksIndex,
+            'remarks_by_sr' => $this->statusHistoryRemarksBySrId,
+        ];
+    }
+
     /**
      * Get all source supply requests associated with a Purchase Request or Purchase Order.
      *
@@ -48,16 +134,10 @@ class ConsolidationTraceabilityService
                 $remarks = (string) $purchaseRequest->remarks;
                 $prIdPad = sprintf('%06d', (int) $purchaseRequest->purchase_request_id);
 
-                $linkedPrs = PurchaseRequest::query()
-                    ->where('remarks', 'like', "%PR-{$prIdPad}%")
+                $consolidatedPrs = $this->getPrsWithConsolidatedRemarks();
+                $linkedPrs = $consolidatedPrs
                     ->where('purchase_request_id', '!=', $purchaseRequest->purchase_request_id)
-                    ->with([
-                        'supplyRequest.office',
-                        'supplyRequest.requester',
-                        'supplyRequest.items.item',
-                        'supplyRequest.items.ppmpItem',
-                    ])
-                    ->get();
+                    ->filter(fn ($pr) => str_contains((string) $pr->remarks, "PR-{$prIdPad}"));
 
                 foreach ($linkedPrs as $lPr) {
                     if ($lPr->supplyRequest instanceof SupplyRequest) {
@@ -79,24 +159,14 @@ class ConsolidationTraceabilityService
                     $allSupplyRequests = $allSupplyRequests->merge($extraRequests);
                 }
 
-                $historySrIds = StatusHistory::query()
-                    ->where('reference_type', SupplyRequest::class)
-                    ->where('remarks', 'like', "%PR-{$prIdPad}%")
-                    ->pluck('reference_id')
-                    ->toArray();
-
-                // Also search by pr_number since consolidated PR status history
-                // uses the full pr_number format (e.g. "PR-2026-09-0015"), not the
-                // zero-padded ID format (e.g. "PR-000103").
+                $indexes = $this->getStatusHistoryConsolidationIndexes();
+                $token1 = "PR-{$prIdPad}";
                 $prNumber = (string) $purchaseRequest->pr_number;
-                if ($prNumber !== '') {
-                    $historySrIdsByPrNumber = StatusHistory::query()
-                        ->where('reference_type', SupplyRequest::class)
-                        ->where('remarks', 'like', "%{$prNumber}%")
-                        ->pluck('reference_id')
-                        ->toArray();
-                    $historySrIds = array_unique(array_merge($historySrIds, $historySrIdsByPrNumber));
-                }
+
+                $historySrIds = array_values(array_unique(array_merge(
+                    $indexes['sr_links'][$token1] ?? [],
+                    $prNumber !== '' ? ($indexes['sr_links'][$prNumber] ?? []) : []
+                )));
 
                 if (! empty($historySrIds)) {
                     $historyRequests = SupplyRequest::query()
@@ -414,12 +484,22 @@ class ConsolidationTraceabilityService
     }
 
     /**
+     * @var array<int, \Illuminate\Support\Collection<int, PurchaseRequest>>
+     */
+    private array $supplyRequestPrsCache = [];
+
+    /**
      * Get all Purchase Requests associated with a Supply Request (direct + consolidated).
      *
      * @return \Illuminate\Support\Collection<int, PurchaseRequest>
      */
     public function getPurchaseRequestsForSupplyRequest(SupplyRequest $supplyRequest): \Illuminate\Support\Collection
     {
+        $srId = (int) $supplyRequest->supply_request_id;
+        if ($srId > 0 && isset($this->supplyRequestPrsCache[$srId])) {
+            return $this->supplyRequestPrsCache[$srId];
+        }
+
         $prs = collect();
 
         // 1. Direct relationship
@@ -437,28 +517,14 @@ class ConsolidationTraceabilityService
         // 2. PRs where this supply request code is explicitly listed in consolidated remarks
         $requestCode = trim((string) $supplyRequest->request_code);
         if ($requestCode !== '') {
-            $matchingPrs = PurchaseRequest::query()
-                ->where('remarks', 'like', "%{$requestCode}%")
-                ->with([
-                    'requester.role',
-                    'purchaseOrders.supplier',
-                    'purchaseOrders.creator.role',
-                    'purchaseOrders.approver.role',
-                ])
-                ->get();
+            $matchingPrs = $this->getPrsWithConsolidatedRemarks()
+                ->filter(fn ($pr) => str_contains((string) $pr->remarks, $requestCode));
             $prs = $prs->merge($matchingPrs);
         }
 
         // 3. Status history references linking this supply request to a PR
-        $historyRemarks = StatusHistory::query()
-            ->where('reference_type', SupplyRequest::class)
-            ->where('reference_id', (int) $supplyRequest->supply_request_id)
-            ->where(function ($q) {
-                $q->where('remarks', 'like', '%PR-%')
-                    ->orWhere('remarks', 'like', '%consolidated%');
-            })
-            ->pluck('remarks')
-            ->toArray();
+        $indexes = $this->getStatusHistoryConsolidationIndexes();
+        $historyRemarks = $indexes['remarks_by_sr'][(int) $supplyRequest->supply_request_id] ?? [];
 
         $prNumbers = [];
         foreach ($historyRemarks as $histRemark) {
@@ -483,7 +549,12 @@ class ConsolidationTraceabilityService
             $prs = $prs->merge($historyPrs);
         }
 
-        return $prs->unique('purchase_request_id')->values();
+        $resolved = $prs->unique('purchase_request_id')->values();
+        if ($srId > 0) {
+            $this->supplyRequestPrsCache[$srId] = $resolved;
+        }
+
+        return $resolved;
     }
 
     /**
@@ -547,7 +618,7 @@ class ConsolidationTraceabilityService
         $deficitByCandidateId = [];
 
         foreach ($candidateRequests as $sr) {
-            $sr->loadMissing(['items', 'distributionRecords.items']);
+            $sr->load(['items', 'distributionRecords.items']);
             $srId = (int) $sr->supply_request_id;
             $totalDeficit = 0.0;
 

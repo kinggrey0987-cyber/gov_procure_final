@@ -36,7 +36,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->scoped(\App\Services\Procurement\ConsolidationTraceabilityService::class);
+        $this->app->scoped(\App\Services\Inventory\SupplyRequestFollowUpService::class);
+        $this->app->scoped(\App\Services\Inventory\InventoryService::class);
     }
 
     /**

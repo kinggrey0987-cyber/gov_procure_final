@@ -448,7 +448,7 @@ class SupplyRequestFollowUpService
 
     public function isSupplyRequestFullyFulfilled(SupplyRequest $supplyRequest): bool
     {
-        $supplyRequest->loadMissing(['items', 'distributionRecords.items']);
+        $supplyRequest->load(['items', 'distributionRecords.items']);
         if ($supplyRequest->items->isEmpty()) {
             return false;
         }

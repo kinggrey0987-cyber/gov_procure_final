@@ -86,6 +86,9 @@ class PurchaseRequestService
                 notificationType: 'PROCUREMENT_PURCHASE_REQUEST_CREATED',
             );
 
+            $this->traceabilityService->clearCache();
+            $this->inventoryService->clearCache();
+
             return $purchaseRequest->fresh(['items', 'office', 'requester', 'supplyRequest']) ?? $purchaseRequest;
         });
     }
@@ -178,6 +181,9 @@ class PurchaseRequestService
                 $this->recordAudit($actor, 'QUEUE', $purchaseRequest);
             }
 
+            $this->traceabilityService->clearCache();
+            $this->inventoryService->clearCache();
+
             $this->syncSupplyRequestStatus(
                 $purchaseRequest,
                 $actor,
@@ -204,6 +210,9 @@ class PurchaseRequestService
                 referenceType: PurchaseRequest::class,
                 referenceId: (int) $purchaseRequest->purchase_request_id,
             );
+
+            $this->traceabilityService->clearCache();
+            $this->inventoryService->clearCache();
 
             return $purchaseRequest->fresh(['items', 'office', 'requester', 'supplyRequest']) ?? $purchaseRequest;
         });
@@ -952,6 +961,9 @@ class PurchaseRequestService
                 'remarks' => $finalRemarks,
             ])->save();
 
+            $this->traceabilityService->clearCache();
+            $this->inventoryService->clearCache();
+
             $this->syncSupplyRequestStatus(
                 $purchaseRequest,
                 $actor,
@@ -961,6 +973,9 @@ class PurchaseRequestService
 
             $this->recordStatus($purchaseRequest, $oldStatus, 'RETURNED_FOR_REVISION', $actor, 'Purchase request returned for revision by procurement.');
             $this->recordAudit($actor, 'RETURN_FOR_REVISION', $purchaseRequest);
+
+            $this->traceabilityService->clearCache();
+            $this->inventoryService->clearCache();
 
             return $purchaseRequest->fresh(['items', 'office', 'requester', 'supplyRequest']) ?? $purchaseRequest;
         });
@@ -998,6 +1013,9 @@ class PurchaseRequestService
                 'status' => 'REJECTED',
                 'remarks' => $finalRemarks,
             ])->save();
+
+            $this->traceabilityService->clearCache();
+            $this->inventoryService->clearCache();
 
             $this->syncSupplyRequestStatus(
                 $purchaseRequest,
@@ -1495,6 +1513,9 @@ class PurchaseRequestService
                 referenceType: PurchaseRequest::class,
                 referenceId: (int) $purchaseRequest->purchase_request_id,
             );
+
+            $this->traceabilityService->clearCache();
+            $this->inventoryService->clearCache();
 
             return $purchaseRequest->fresh(['items', 'office', 'requester', 'supplyRequest']) ?? $purchaseRequest;
         });

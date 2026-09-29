@@ -131,7 +131,7 @@ class DistributionRecordController
      */
     private function procurementBackedReleaseRows(): Collection
     {
-        return Delivery::query()
+        $deliveries = Delivery::query()
             ->whereIn('receipt_status', ['VERIFIED', 'PARTIALLY_RECEIVED'])
             ->whereHas('purchaseOrder', function ($query): void {
                 $query->where(function ($poQuery) {
@@ -150,20 +150,38 @@ class DistributionRecordController
                 'purchaseOrder.supplyRequest.office',
                 'purchaseOrder.purchaseRequest.supplyRequest.office',
                 'purchaseOrder.purchaseRequest.office',
+                'purchaseOrder.purchaseRequest.sourceDelivery.purchaseOrder',
                 'items.purchaseOrderItem',
                 'distributionRecords.items',
             ])
             ->latest('delivery_id')
-            ->get()
-            ->flatMap(fn (Delivery $delivery): Collection => $this->releaseRowsFromVerifiedDelivery($delivery))
+            ->get();
+
+        $deliveryIds = $deliveries->pluck('delivery_id')->filter()->map(fn ($id): int => (int) $id)->all();
+        $downstreamDiscrepanciesByDeliveryId = [];
+        if (! empty($deliveryIds)) {
+            $downstreamDiscrepanciesByDeliveryId = PurchaseRequest::query()
+                ->whereIn('source_delivery_id', $deliveryIds)
+                ->get(['source_delivery_id', 'supply_request_id'])
+                ->groupBy(fn ($pr) => (int) $pr->source_delivery_id)
+                ->map(fn ($prs) => $prs->pluck('supply_request_id')->filter()->map(fn ($id) => (int) $id)->all())
+                ->all();
+        }
+
+        return $deliveries
+            ->flatMap(fn (Delivery $delivery): Collection => $this->releaseRowsFromVerifiedDelivery(
+                $delivery,
+                $downstreamDiscrepanciesByDeliveryId[(int) $delivery->delivery_id] ?? []
+            ))
             ->filter()
             ->values();
     }
 
     /**
+     * @param  array<int, int>  $preloadedDownstreamChildIds
      * @return Collection<int, array<string, mixed>>
      */
-    private function releaseRowsFromVerifiedDelivery(Delivery $delivery): Collection
+    private function releaseRowsFromVerifiedDelivery(Delivery $delivery, array $preloadedDownstreamChildIds = []): Collection
     {
         $acceptedTotal = (float) $delivery->items->sum(function ($item): float {
             return max((float) $item->received_quantity - (float) $item->damaged_quantity, 0);
@@ -216,11 +234,13 @@ class DistributionRecordController
 
             // Exclude any child follow-up requests that were created FROM this delivery discrepancy
             // (they are waiting for future deliveries, not this delivery where items were missing/damaged)
-            $downstreamDiscrepancyChildIds = PurchaseRequest::query()
-                ->where('source_delivery_id', (int) $delivery->delivery_id)
-                ->pluck('supply_request_id')
-                ->filter()
-                ->all();
+            $downstreamDiscrepancyChildIds = ! empty($preloadedDownstreamChildIds)
+                ? $preloadedDownstreamChildIds
+                : PurchaseRequest::query()
+                    ->where('source_delivery_id', (int) $delivery->delivery_id)
+                    ->pluck('supply_request_id')
+                    ->filter()
+                    ->all();
 
             if (! empty($downstreamDiscrepancyChildIds)) {
                 $sourceSupplyRequests = $sourceSupplyRequests->reject(
@@ -284,7 +304,7 @@ class DistributionRecordController
             ->whereHas('office', fn ($officeQuery) => $officeQuery->where('code', '!=', 'GSO'))
             ->whereDoesntHave('distributionRecords', fn ($query) => $query->where('status', 'DRAFT'))
             ->when(! empty($excludeSupplyRequestIds), fn ($query) => $query->whereNotIn('supply_request_id', $excludeSupplyRequestIds))
-            ->with(['office', 'items.item.inventory', 'distributionRecords.items', 'purchaseRequests', 'purchaseOrders.items'])
+            ->with(['office', 'items.item.inventory', 'distributionRecords.items', 'distributionRecords.delivery.items.purchaseOrderItem', 'purchaseRequests', 'purchaseOrders.items'])
             ->latest('supply_request_id')
             ->get()
             ->map(fn (SupplyRequest $request): ?array => $this->releaseRowFromAvailableInventory($request))

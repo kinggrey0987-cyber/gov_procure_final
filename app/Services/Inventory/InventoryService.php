@@ -17,6 +17,25 @@ use Illuminate\Validation\ValidationException;
 
 class InventoryService
 {
+    /** @var array<string, float> */
+    private array $undistributedStockCache = [];
+
+    /** @var array<int, ?Inventory> */
+    private array $inventoryByItemCache = [];
+
+    /** @var array<int, bool> */
+    private array $generalInventoryDeliveryCache = [];
+
+    /**
+     * Clear memoized cache for testing or batch operations.
+     */
+    public function clearCache(): void
+    {
+        $this->undistributedStockCache = [];
+        $this->inventoryByItemCache = [];
+        $this->generalInventoryDeliveryCache = [];
+    }
+
     public function __construct(
         private readonly InventoryMovementService $movementService,
         private readonly AuditLogService $auditLogService,
@@ -38,6 +57,8 @@ class InventoryService
                 'delivery_id' => 'Only VERIFIED or PARTIALLY_RECEIVED deliveries can update inventory.',
             ]);
         }
+
+        $this->clearCache();
 
         return DB::transaction(function () use ($delivery, $actor): Collection {
             $inventories = collect();
@@ -135,6 +156,8 @@ class InventoryService
             ]);
         }
 
+        $this->clearCache();
+
         return DB::transaction(function () use ($itemId, $quantity, $actor, $referenceType, $referenceId, $remarks): Inventory {
             /** @var Inventory|null $inventory */
             $inventory = Inventory::query()->where('item_id', $itemId)->lockForUpdate()->first();
@@ -198,6 +221,8 @@ class InventoryService
             ]);
         }
 
+        $this->clearCache();
+
         return DB::transaction(function () use ($itemId, $quantity, $actor, $referenceType, $referenceId, $remarks): Inventory {
             /** @var Inventory|null $inventory */
             $inventory = Inventory::query()->where('item_id', $itemId)->lockForUpdate()->first();
@@ -259,6 +284,8 @@ class InventoryService
                 'quantity_released' => 'Restored quantity must be greater than zero.',
             ]);
         }
+
+        $this->clearCache();
 
         return DB::transaction(function () use ($itemId, $quantity, $actor, $referenceType, $referenceId, $remarks): Inventory {
             /** @var Inventory $inventory */
@@ -360,19 +387,50 @@ class InventoryService
      */
     public function isGeneralInventoryDelivery(Delivery $delivery): bool
     {
+        $deliveryId = (int) $delivery->delivery_id;
+        if ($deliveryId > 0 && isset($this->generalInventoryDeliveryCache[$deliveryId])) {
+            return $this->generalInventoryDeliveryCache[$deliveryId];
+        }
+
         $po = $delivery->purchaseOrder;
         if (! $po) {
+            if ($deliveryId > 0) {
+                $this->generalInventoryDeliveryCache[$deliveryId] = true;
+            }
+
             return true;
         }
 
         $pr = $po->purchaseRequest;
         if ($pr) {
             if ((string) ($pr->source_type ?? '') === 'LOW_STOCK') {
+                if ($deliveryId > 0) {
+                    $this->generalInventoryDeliveryCache[$deliveryId] = true;
+                }
+
                 return true;
             }
             $prRemarks = (string) ($pr->remarks ?? '');
             if (str_contains($prRemarks, 'LOW_STOCK_SIGNAL:inventory:') || str_contains($prRemarks, 'Proactive GSO Demand Forecast Signal')) {
+                if ($deliveryId > 0) {
+                    $this->generalInventoryDeliveryCache[$deliveryId] = true;
+                }
+
                 return true;
+            }
+        }
+
+        $directSr = $po->supplyRequest ?? $pr?->supplyRequest;
+        if ($directSr instanceof SupplyRequest) {
+            $directSr->loadMissing('office');
+            $officeCode = strtoupper(trim((string) ($directSr->office?->code ?? '')));
+            $purpose = (string) ($directSr->purpose ?? '');
+            if ($officeCode !== '' && $officeCode !== 'GSO' && ! str_contains($purpose, 'Proactive GSO Demand Forecast Signal')) {
+                if ($deliveryId > 0) {
+                    $this->generalInventoryDeliveryCache[$deliveryId] = false;
+                }
+
+                return false;
             }
         }
 
@@ -397,6 +455,10 @@ class InventoryService
         $sourceSupplyRequests = $sourceSupplyRequests->unique('supply_request_id')->values();
 
         if ($sourceSupplyRequests->isEmpty()) {
+            if ($deliveryId > 0) {
+                $this->generalInventoryDeliveryCache[$deliveryId] = true;
+            }
+
             return true;
         }
 
@@ -415,7 +477,12 @@ class InventoryService
             break;
         }
 
-        return ! $hasNonGsoClientRequest;
+        $result = ! $hasNonGsoClientRequest;
+        if ($deliveryId > 0) {
+            $this->generalInventoryDeliveryCache[$deliveryId] = $result;
+        }
+
+        return $result;
     }
 
     /**
@@ -430,8 +497,14 @@ class InventoryService
         $excludeIds = is_array($excludeDeliveryIds)
             ? array_filter(array_map('intval', $excludeDeliveryIds))
             : ($excludeDeliveryIds !== null ? [(int) $excludeDeliveryIds] : []);
+        sort($excludeIds);
+        $cacheKey = $itemId . '_' . implode(',', $excludeIds);
 
-        return (float) DeliveryItem::query()
+        if (isset($this->undistributedStockCache[$cacheKey])) {
+            return $this->undistributedStockCache[$cacheKey];
+        }
+
+        $undistributed = (float) DeliveryItem::query()
             ->whereHas('purchaseOrderItem', fn ($q) => $q->where('item_id', $itemId))
             ->whereHas('delivery', fn ($q) => $q->whereIn('receipt_status', ['VERIFIED', 'PARTIALLY_RECEIVED']))
             ->when(! empty($excludeIds), fn ($q) => $q->whereNotIn('delivery_id', $excludeIds))
@@ -503,6 +576,10 @@ class InventoryService
 
                 return min($unreleasedInDelivery, $totalOfficeRemainingNeeded);
             });
+
+        $this->undistributedStockCache[$cacheKey] = $undistributed;
+
+        return $undistributed;
     }
 
     /**
@@ -530,14 +607,24 @@ class InventoryService
 
         $undistributed = $this->getUndistributedDeliveryStock($itemId, $excludeIds);
 
-        $inventory = Inventory::query()->where('item_id', $itemId)->first();
+        if (! array_key_exists($itemId, $this->inventoryByItemCache)) {
+            $this->inventoryByItemCache[$itemId] = Inventory::query()->where('item_id', $itemId)->first();
+        }
+        $inventory = $this->inventoryByItemCache[$itemId];
+
         if (! $inventory) {
             return 0.0;
         }
 
         $reservedPortion = 0.0;
-        if ($supplyRequest instanceof SupplyRequest && $supplyRequest->purchaseRequests()->exists()) {
-            $supplyRequest->loadMissing(['items', 'distributionRecords.items']);
+        $hasPr = $supplyRequest instanceof SupplyRequest && (
+            $supplyRequest->relationLoaded('purchaseRequests')
+                ? $supplyRequest->purchaseRequests->isNotEmpty()
+                : $supplyRequest->purchaseRequests()->exists()
+        );
+
+        if ($hasPr) {
+            $supplyRequest->load(['items', 'distributionRecords.items']);
             $itemRequested = (float) $supplyRequest->items
                 ->where('item_id', $itemId)
                 ->sum('quantity_requested');
