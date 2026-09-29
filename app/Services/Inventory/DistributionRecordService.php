@@ -396,26 +396,7 @@ class DistributionRecordService
 
     private function undistributedDeliveryStock(int $itemId, array|int|null $excludeDeliveryId = null): float
     {
-        $excludeIds = is_array($excludeDeliveryId)
-            ? array_filter(array_map('intval', $excludeDeliveryId))
-            : ($excludeDeliveryId !== null ? [(int) $excludeDeliveryId] : []);
-
-        return (float) \App\Models\DeliveryItem::query()
-            ->whereHas('purchaseOrderItem', fn ($q) => $q->where('item_id', $itemId))
-            ->whereHas('delivery', fn ($q) => $q->whereIn('receipt_status', ['VERIFIED', 'PARTIALLY_RECEIVED']))
-            ->when(! empty($excludeIds), fn ($q) => $q->whereNotIn('delivery_id', $excludeIds))
-            ->with(['delivery.distributionRecords.items'])
-            ->get()
-            ->sum(function (\App\Models\DeliveryItem $di) use ($itemId): float {
-                $accepted = max((float) $di->received_quantity - (float) $di->damaged_quantity, 0.0);
-                $released = (float) ($di->delivery?->distributionRecords ?? collect())
-                    ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
-                    ->flatMap(fn ($dr) => $dr->items)
-                    ->where('item_id', $itemId)
-                    ->sum('quantity_released');
-
-                return max($accepted - $released, 0.0);
-            });
+        return $this->inventoryService->getUndistributedDeliveryStock($itemId, $excludeDeliveryId);
     }
 
     private function calculateAlreadyReleasedInventory(\App\Models\SupplyRequest $supplyRequest, int $itemId, ?int $ignoreDistributionItemId = null): float

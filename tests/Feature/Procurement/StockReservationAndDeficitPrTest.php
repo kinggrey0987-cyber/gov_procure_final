@@ -296,6 +296,119 @@ class StockReservationAndDeficitPrTest extends TestCase
         $this->assertEquals(5, (float) $inv2->reserved_quantity);
     }
 
+    public function test_proactive_demand_forecast_replenishment_delivery_is_counted_as_available_stock_for_pending_office_supply_requests(): void
+    {
+        // 0 initial stock for A4 Bond Paper
+        $item = $this->createItemWithInventory('A4 Bond Paper', 0);
+        $inv = Inventory::query()->where('item_id', $item->item_id)->firstOrFail();
+
+        // 1. Accounting Office submits Supply Request for 50 units
+        $sr = $this->createSupplyRequest([
+            ['item' => $item, 'quantity' => 50],
+        ]);
+
+        $invService = app(\App\Services\Inventory\InventoryService::class);
+        $this->assertEquals(0.0, $invService->getAvailableStockForSupplyRequest($item->item_id, $sr));
+
+        // 2. GSO creates proactive low stock forecast PR for 50 units
+        $gsoOffice = Office::query()->firstOrCreate(
+            ['code' => 'GSO'],
+            ['name' => 'General Services Office', 'is_active' => true]
+        );
+        $gsoUser = $this->createUser(UserRole::GSO_OFFICER, $gsoOffice);
+
+        $prService = app(PurchaseRequestService::class);
+        $forecastPr = $prService->createFromLowStockSignal($gsoUser, $inv, 50);
+
+        // 3. Purchase Order placed and Supplier delivers 30 units
+        $supplier = Supplier::query()->create([
+            'supplier_name' => 'Paper Supplier Co.',
+            'contact_person' => 'John Doe',
+            'contact_number' => '09123456789',
+            'is_active' => true,
+        ]);
+
+        $po = PurchaseOrder::query()->create([
+            'po_number' => 'PO-TEST-PROACTIVE-001',
+            'purchase_request_id' => $forecastPr->purchase_request_id,
+            'supply_request_id' => $forecastPr->supply_request_id,
+            'supplier_id' => $supplier->supplier_id,
+            'order_date' => now()->toDateString(),
+            'procurement_method' => 'DIRECT_CONTRACTING',
+            'status' => 'APPROVED',
+            'total_amount' => 1500,
+            'created_by' => $gsoUser->id,
+        ]);
+
+        $forecastSri = $forecastPr->supplyRequest->items()->firstOrFail();
+        $poi = \App\Models\PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $po->purchase_order_id,
+            'supply_request_item_id' => $forecastSri->supply_request_item_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => $item->item_name,
+            'quantity_ordered' => 50,
+            'unit' => 'ream',
+            'unit_price' => 30,
+            'total_price' => 1500,
+        ]);
+
+        $delivery = \App\Models\Delivery::query()->create([
+            'delivery_code' => 'DEL-TEST-PROACTIVE-001',
+            'purchase_order_id' => $po->purchase_order_id,
+            'supplier_id' => $supplier->supplier_id,
+            'actual_delivery_date' => now()->toDateString(),
+            'received_by' => $gsoUser->id,
+            'receipt_status' => 'RECEIVED',
+        ]);
+
+        $di = \App\Models\DeliveryItem::query()->create([
+            'delivery_id' => $delivery->delivery_id,
+            'purchase_order_item_id' => $poi->purchase_order_item_id,
+            'expected_quantity' => 50,
+            'received_quantity' => 30,
+            'damaged_quantity' => 0,
+        ]);
+
+        // 4. GSO verifies the delivery into warehouse inventory
+        $delVerService = app(\App\Services\Delivery\DeliveryVerificationService::class);
+        $delVerService->create(
+            delivery: $delivery,
+            actor: $gsoUser,
+            payload: [
+                'verification_status' => 'APPROVED',
+                'remarks' => 'Verified 30 reams into warehouse inventory',
+            ]
+        );
+
+        $inv->refresh();
+        $this->assertEquals(30.0, (float) $inv->stock_on_hand);
+        $this->assertEquals(30.0, (float) $inv->available_stock);
+
+        // Undistributed delivery stock must be 0 because proactive delivery is for general inventory
+        $this->assertEquals(0.0, $invService->getUndistributedDeliveryStock($item->item_id));
+
+        // Available stock for Office SR must now reflect the 30 delivered reams
+        $availableForSr = $invService->getAvailableStockForSupplyRequest($item->item_id, $sr);
+        $this->assertEquals(30.0, $availableForSr);
+
+        // 5. When GSO queues this office SR for procurement, it should queue ONLY the remaining 20 shortage
+        $officePr = $prService->queueFromSupplyRequest($this->gsoOfficer, [
+            'supply_request_id' => $sr->supply_request_id,
+            'remarks' => 'Queued by GSO due to stock shortage.',
+        ]);
+
+        $this->assertSame(1, $officePr->items()->count());
+        $officePrItem = $officePr->items()->firstOrFail();
+        $this->assertEquals(20.0, (float) $officePrItem->quantity_requested);
+        $this->assertStringContainsString('50.00 requested, 30.00 reserved from warehouse', (string) $officePrItem->remarks);
+
+        // Warehouse inventory reservations
+        $inv->refresh();
+        $this->assertEquals(30.0, (float) $inv->stock_on_hand);
+        $this->assertEquals(0.0, (float) $inv->available_stock);
+        $this->assertEquals(30.0, (float) $inv->reserved_quantity);
+    }
+
     private function createItemWithInventory(string $name, float $stock): Item
     {
         $item = Item::query()->create([

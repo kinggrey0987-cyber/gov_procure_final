@@ -10,6 +10,7 @@ use App\Models\SupplyRequest;
 use App\Models\User;
 use App\Services\AuditLogService;
 use App\Services\NotificationService;
+use App\Services\Procurement\ConsolidationTraceabilityService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -21,6 +22,7 @@ class InventoryService
         private readonly AuditLogService $auditLogService,
         private readonly NotificationService $notificationService,
         private readonly SupplyRequestFollowUpService $followUpService,
+        private readonly ConsolidationTraceabilityService $traceabilityService,
     ) {
     }
 
@@ -353,8 +355,71 @@ class InventoryService
     }
 
     /**
-     * Get the quantity of stock in warehouse from verified or partially received deliveries
-     * that has not yet been distributed via a distribution record.
+     * Determine whether a delivery represents general warehouse stock / proactive replenishment,
+     * rather than an office-targeted delivery earmarked for delivery handover.
+     */
+    public function isGeneralInventoryDelivery(Delivery $delivery): bool
+    {
+        $po = $delivery->purchaseOrder;
+        if (! $po) {
+            return true;
+        }
+
+        $pr = $po->purchaseRequest;
+        if ($pr) {
+            if ((string) ($pr->source_type ?? '') === 'LOW_STOCK') {
+                return true;
+            }
+            $prRemarks = (string) ($pr->remarks ?? '');
+            if (str_contains($prRemarks, 'LOW_STOCK_SIGNAL:inventory:') || str_contains($prRemarks, 'Proactive GSO Demand Forecast Signal')) {
+                return true;
+            }
+        }
+
+        $sourceSupplyRequests = collect();
+        if ($po->supplyRequest instanceof SupplyRequest) {
+            $sourceSupplyRequests->push($po->supplyRequest);
+        }
+        if ($pr?->supplyRequest instanceof SupplyRequest) {
+            $sourceSupplyRequests->push($pr->supplyRequest);
+        }
+
+        $consolidated = $this->traceabilityService->getSourceSupplyRequests($po);
+        if ($consolidated->isNotEmpty()) {
+            $sourceSupplyRequests = $sourceSupplyRequests->merge($consolidated);
+        } elseif ($pr) {
+            $consolidatedPr = $this->traceabilityService->getSourceSupplyRequests($pr);
+            if ($consolidatedPr->isNotEmpty()) {
+                $sourceSupplyRequests = $sourceSupplyRequests->merge($consolidatedPr);
+            }
+        }
+
+        $sourceSupplyRequests = $sourceSupplyRequests->unique('supply_request_id')->values();
+
+        if ($sourceSupplyRequests->isEmpty()) {
+            return true;
+        }
+
+        $hasNonGsoClientRequest = false;
+        foreach ($sourceSupplyRequests as $sr) {
+            if (! $sr instanceof SupplyRequest) {
+                continue;
+            }
+            $sr->loadMissing('office');
+            $officeCode = strtoupper(trim((string) ($sr->office?->code ?? '')));
+            $purpose = (string) ($sr->purpose ?? '');
+            if ($officeCode === 'GSO' || str_contains($purpose, 'Proactive GSO Demand Forecast Signal')) {
+                continue;
+            }
+            $hasNonGsoClientRequest = true;
+            break;
+        }
+
+        return ! $hasNonGsoClientRequest;
+    }
+
+    /**
+     * Get the total delivered stock earmarked for specific office distribution handovers.
      *
      * @param  int  $itemId
      * @param  array<int>|int|null  $excludeDeliveryIds  Delivery ID(s) to exclude
@@ -370,17 +435,73 @@ class InventoryService
             ->whereHas('purchaseOrderItem', fn ($q) => $q->where('item_id', $itemId))
             ->whereHas('delivery', fn ($q) => $q->whereIn('receipt_status', ['VERIFIED', 'PARTIALLY_RECEIVED']))
             ->when(! empty($excludeIds), fn ($q) => $q->whereNotIn('delivery_id', $excludeIds))
-            ->with(['delivery.distributionRecords.items'])
+            ->with([
+                'delivery.purchaseOrder.purchaseRequest.supplyRequest.office',
+                'delivery.purchaseOrder.supplyRequest.office',
+                'delivery.distributionRecords.items',
+            ])
             ->get()
             ->sum(function (DeliveryItem $di) use ($itemId): float {
+                $delivery = $di->delivery;
+                if (! $delivery || $this->isGeneralInventoryDelivery($delivery)) {
+                    return 0.0;
+                }
+
                 $accepted = max((float) $di->received_quantity - (float) $di->damaged_quantity, 0.0);
-                $released = (float) ($di->delivery?->distributionRecords ?? collect())
+                $released = (float) ($delivery->distributionRecords ?? collect())
                     ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
                     ->flatMap(fn ($dr) => $dr->items)
                     ->where('item_id', $itemId)
                     ->sum('quantity_released');
 
-                return max($accepted - $released, 0.0);
+                $unreleasedInDelivery = max($accepted - $released, 0.0);
+                if ($unreleasedInDelivery <= 0.0001) {
+                    return 0.0;
+                }
+
+                $sourceSupplyRequests = collect();
+                if ($delivery->purchaseOrder?->supplyRequest instanceof SupplyRequest) {
+                    $sourceSupplyRequests->push($delivery->purchaseOrder->supplyRequest);
+                }
+                if ($delivery->purchaseOrder?->purchaseRequest?->supplyRequest instanceof SupplyRequest) {
+                    $sourceSupplyRequests->push($delivery->purchaseOrder->purchaseRequest->supplyRequest);
+                }
+                if ($delivery->purchaseOrder) {
+                    $consolidated = $this->traceabilityService->getSourceSupplyRequests($delivery->purchaseOrder);
+                    if ($consolidated->isNotEmpty()) {
+                        $sourceSupplyRequests = $sourceSupplyRequests->merge($consolidated);
+                    }
+                }
+                $sourceSupplyRequests = $sourceSupplyRequests->unique('supply_request_id')->values();
+
+                $totalOfficeRemainingNeeded = 0.0;
+                foreach ($sourceSupplyRequests as $sr) {
+                    if (! $sr instanceof SupplyRequest) {
+                        continue;
+                    }
+                    $officeCode = strtoupper(trim((string) ($sr->office?->code ?? '')));
+                    if ($officeCode === 'GSO') {
+                        continue;
+                    }
+                    if (in_array((string) $sr->status, ['CANCELLED', 'REJECTED'], true)) {
+                        continue;
+                    }
+
+                    $sr->loadMissing(['items', 'distributionRecords.items']);
+                    $itemRequested = (float) $sr->items
+                        ->where('item_id', $itemId)
+                        ->sum('quantity_requested');
+
+                    $alreadyReleasedToOffice = (float) $sr->distributionRecords
+                        ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
+                        ->flatMap(fn ($dr) => $dr->items)
+                        ->where('item_id', $itemId)
+                        ->sum('quantity_released');
+
+                    $totalOfficeRemainingNeeded += max($itemRequested - $alreadyReleasedToOffice, 0.0);
+                }
+
+                return min($unreleasedInDelivery, $totalOfficeRemainingNeeded);
             });
     }
 
