@@ -194,19 +194,35 @@ class ProcurementStatusSyncService
         return $synced;
     }
 
-    private function isFullyReceived(SupplyRequest $supplyRequest): bool
+    public function isFullyReceived(SupplyRequest $supplyRequest): bool
     {
-        $requested = (float) $supplyRequest->items->sum('quantity_requested');
-        if ($requested <= 0) {
+        $supplyRequest->loadMissing('items');
+        if ($supplyRequest->items->isEmpty()) {
             return false;
         }
 
-        $received = (float) $this->allFulfillmentDistributionRecords($supplyRequest)
-            ->where('status', 'RECEIVED')
-            ->flatMap(fn (DistributionRecord $record) => $record->items)
-            ->sum('quantity_received');
+        $fulfillmentRecords = $this->allFulfillmentDistributionRecords($supplyRequest)
+            ->where('status', 'RECEIVED');
 
-        return $received + 0.0001 >= $requested;
+        $receivedByItem = [];
+        foreach ($fulfillmentRecords as $record) {
+            foreach ($record->items as $item) {
+                $itemId = (int) $item->item_id;
+                $receivedByItem[$itemId] = ($receivedByItem[$itemId] ?? 0.0) + (float) $item->quantity_received;
+            }
+        }
+
+        foreach ($supplyRequest->items as $item) {
+            $itemId = (int) $item->item_id;
+            $requested = (float) $item->quantity_requested;
+            $received = (float) ($receivedByItem[$itemId] ?? 0.0);
+
+            if ($received + 0.0001 < $requested) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -246,17 +262,97 @@ class ProcurementStatusSyncService
         $this->recordApproval(SupplyRequest::class, (int) $supplyRequest->supply_request_id, 'RECEIVED', $actor, $remarks);
     }
 
+    public function canTransitionPurchaseRequestToCompleted(PurchaseRequest $purchaseRequest): bool
+    {
+        $oldStatus = strtoupper((string) $purchaseRequest->status);
+        if (in_array($oldStatus, ['COMPLETED', 'CLOSED', 'CANCELLED', 'REJECTED'], true)) {
+            return false;
+        }
+
+        $purchaseRequest->loadMissing([
+            'purchaseOrders.items',
+            'purchaseOrders.deliveries.items',
+            'supplyRequest',
+        ]);
+
+        if ($purchaseRequest->purchaseOrders->isEmpty()) {
+            return false;
+        }
+
+        foreach ($purchaseRequest->purchaseOrders as $po) {
+            if (! $this->canTransitionPurchaseOrderToCompleted($po)) {
+                return false;
+            }
+        }
+
+        $traceability = app(\App\Services\Procurement\ConsolidationTraceabilityService::class);
+        $sourceRequests = $traceability->getSourceSupplyRequests($purchaseRequest);
+
+        if ($sourceRequests->isNotEmpty()) {
+            foreach ($sourceRequests as $sourceSr) {
+                if (! in_array(strtoupper((string) $sourceSr->status), ['RECEIVED', 'COMPLETED'], true)) {
+                    if (! $this->isFullyReceived($sourceSr)) {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        return true;
+    }
+
+    public function canTransitionPurchaseOrderToCompleted(PurchaseOrder $purchaseOrder): bool
+    {
+        $status = strtoupper((string) $purchaseOrder->status);
+        if (in_array($status, ['CANCELLED', 'REJECTED'], true)) {
+            return false;
+        }
+
+        $purchaseOrder->loadMissing(['items', 'deliveries.items']);
+
+        if ($purchaseOrder->deliveries->isEmpty()) {
+            return false;
+        }
+
+        $hasPendingDeliveries = $purchaseOrder->deliveries
+            ->whereNotIn('receipt_status', ['VERIFIED', 'COMPLETED', 'CANCELLED'])
+            ->isNotEmpty();
+
+        if ($hasPendingDeliveries) {
+            return false;
+        }
+
+        $verifiedDeliveries = $purchaseOrder->deliveries->whereIn('receipt_status', ['VERIFIED', 'COMPLETED']);
+        foreach ($purchaseOrder->items as $poItem) {
+            $orderedQty = (float) $poItem->quantity_ordered;
+            if ($orderedQty <= 0) {
+                continue;
+            }
+
+            $receivedQty = (float) $verifiedDeliveries
+                ->flatMap(fn (Delivery $del) => $del->items)
+                ->where('purchase_order_item_id', (int) $poItem->purchase_order_item_id)
+                ->sum('received_quantity');
+
+            if ($receivedQty + 0.0001 < $orderedQty) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     /**
      * @param  EloquentCollection<int, PurchaseRequest>  $purchaseRequests
      */
     private function transitionPurchaseRequests(EloquentCollection $purchaseRequests, ?User $actor, string $remarks): void
     {
         foreach ($purchaseRequests as $purchaseRequest) {
-            $oldStatus = strtoupper((string) $purchaseRequest->status);
-            if (! in_array($oldStatus, ['OPEN', 'PROCESSING'], true)) {
+            if (! $this->canTransitionPurchaseRequestToCompleted($purchaseRequest)) {
                 continue;
             }
 
+            $oldStatus = strtoupper((string) $purchaseRequest->status);
             $purchaseRequest->forceFill([
                 'status' => 'COMPLETED',
                 'remarks' => trim((string) $purchaseRequest->remarks) !== ''
@@ -275,8 +371,12 @@ class ProcurementStatusSyncService
     private function transitionPurchaseOrders(EloquentCollection $purchaseOrders, ?User $actor, string $remarks): void
     {
         foreach ($purchaseOrders as $purchaseOrder) {
+            if (! $this->canTransitionPurchaseOrderToCompleted($purchaseOrder)) {
+                continue;
+            }
+
             $oldStatus = strtoupper((string) $purchaseOrder->status);
-            if ($oldStatus !== 'PLACED') {
+            if (in_array($oldStatus, ['COMPLETED', 'CLOSED'], true)) {
                 continue;
             }
 

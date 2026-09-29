@@ -2,6 +2,7 @@
 
 namespace App\Services\Procurement;
 
+use App\Models\Delivery;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequest;
 use App\Models\StatusHistory;
@@ -38,70 +39,77 @@ class ConsolidationTraceabilityService
                 $allSupplyRequests->push($purchaseRequest->supplyRequest);
             }
 
-            $remarks = (string) $purchaseRequest->remarks;
-            $prIdPad = sprintf('%06d', (int) $purchaseRequest->purchase_request_id);
+            $isFollowUp = in_array((string) $purchaseRequest->source_type, ['PARTIAL_DELIVERY_FOLLOW_UP', 'CLAIM_REPLACEMENT_FOLLOW_UP'], true)
+                || (int) ($purchaseRequest->source_delivery_id ?? 0) > 0
+                || (int) ($purchaseRequest->source_claim_id ?? 0) > 0
+                || (int) ($purchaseRequest->source_supply_request_id ?? 0) > 0;
 
-            $linkedPrs = PurchaseRequest::query()
-                ->where('remarks', 'like', "%PR-{$prIdPad}%")
-                ->where('purchase_request_id', '!=', $purchaseRequest->purchase_request_id)
-                ->with([
-                    'supplyRequest.office',
-                    'supplyRequest.requester',
-                    'supplyRequest.items.item',
-                    'supplyRequest.items.ppmpItem',
-                ])
-                ->get();
+            if (! $isFollowUp) {
+                $remarks = (string) $purchaseRequest->remarks;
+                $prIdPad = sprintf('%06d', (int) $purchaseRequest->purchase_request_id);
 
-            foreach ($linkedPrs as $lPr) {
-                if ($lPr->supplyRequest instanceof SupplyRequest) {
-                    $allSupplyRequests->push($lPr->supplyRequest);
-                }
-            }
-
-            preg_match_all('/SR-[A-Z0-9-]+/', $remarks, $matches);
-            if (! empty($matches[0])) {
-                $extraRequests = SupplyRequest::query()
-                    ->whereIn('request_code', $matches[0])
+                $linkedPrs = PurchaseRequest::query()
+                    ->where('remarks', 'like', "%PR-{$prIdPad}%")
+                    ->where('purchase_request_id', '!=', $purchaseRequest->purchase_request_id)
                     ->with([
-                        'office',
-                        'requester',
-                        'items.item',
-                        'items.ppmpItem',
+                        'supplyRequest.office',
+                        'supplyRequest.requester',
+                        'supplyRequest.items.item',
+                        'supplyRequest.items.ppmpItem',
                     ])
                     ->get();
-                $allSupplyRequests = $allSupplyRequests->merge($extraRequests);
-            }
 
-            $historySrIds = StatusHistory::query()
-                ->where('reference_type', SupplyRequest::class)
-                ->where('remarks', 'like', "%PR-{$prIdPad}%")
-                ->pluck('reference_id')
-                ->toArray();
+                foreach ($linkedPrs as $lPr) {
+                    if ($lPr->supplyRequest instanceof SupplyRequest) {
+                        $allSupplyRequests->push($lPr->supplyRequest);
+                    }
+                }
 
-            // Also search by pr_number since consolidated PR status history
-            // uses the full pr_number format (e.g. "PR-2026-09-0015"), not the
-            // zero-padded ID format (e.g. "PR-000103").
-            $prNumber = (string) $purchaseRequest->pr_number;
-            if ($prNumber !== '') {
-                $historySrIdsByPrNumber = StatusHistory::query()
+                preg_match_all('/SR-[A-Z0-9-]+/', $remarks, $matches);
+                if (! empty($matches[0])) {
+                    $extraRequests = SupplyRequest::query()
+                        ->whereIn('request_code', $matches[0])
+                        ->with([
+                            'office',
+                            'requester',
+                            'items.item',
+                            'items.ppmpItem',
+                        ])
+                        ->get();
+                    $allSupplyRequests = $allSupplyRequests->merge($extraRequests);
+                }
+
+                $historySrIds = StatusHistory::query()
                     ->where('reference_type', SupplyRequest::class)
-                    ->where('remarks', 'like', "%{$prNumber}%")
+                    ->where('remarks', 'like', "%PR-{$prIdPad}%")
                     ->pluck('reference_id')
                     ->toArray();
-                $historySrIds = array_unique(array_merge($historySrIds, $historySrIdsByPrNumber));
-            }
 
-            if (! empty($historySrIds)) {
-                $historyRequests = SupplyRequest::query()
-                    ->whereIn('supply_request_id', $historySrIds)
-                    ->with([
-                        'office',
-                        'requester',
-                        'items.item',
-                        'items.ppmpItem',
-                    ])
-                    ->get();
-                $allSupplyRequests = $allSupplyRequests->merge($historyRequests);
+                // Also search by pr_number since consolidated PR status history
+                // uses the full pr_number format (e.g. "PR-2026-09-0015"), not the
+                // zero-padded ID format (e.g. "PR-000103").
+                $prNumber = (string) $purchaseRequest->pr_number;
+                if ($prNumber !== '') {
+                    $historySrIdsByPrNumber = StatusHistory::query()
+                        ->where('reference_type', SupplyRequest::class)
+                        ->where('remarks', 'like', "%{$prNumber}%")
+                        ->pluck('reference_id')
+                        ->toArray();
+                    $historySrIds = array_unique(array_merge($historySrIds, $historySrIdsByPrNumber));
+                }
+
+                if (! empty($historySrIds)) {
+                    $historyRequests = SupplyRequest::query()
+                        ->whereIn('supply_request_id', $historySrIds)
+                        ->with([
+                            'office',
+                            'requester',
+                            'items.item',
+                            'items.ppmpItem',
+                        ])
+                        ->get();
+                    $allSupplyRequests = $allSupplyRequests->merge($historyRequests);
+                }
             }
         }
 
@@ -476,5 +484,136 @@ class ConsolidationTraceabilityService
         }
 
         return $prs->unique('purchase_request_id')->values();
+    }
+
+    /**
+     * Determine which candidate supply request has the active deficit for a delivery with discrepancies.
+     *
+     * @param  Delivery  $delivery
+     * @param  \Illuminate\Support\Collection<int, SupplyRequest>  $candidateRequests
+     * @return SupplyRequest|null
+     */
+    public function resolveCandidateSupplyRequestWithDeficit(Delivery $delivery, \Illuminate\Support\Collection $candidateRequests): ?SupplyRequest
+    {
+        if ($candidateRequests->isEmpty()) {
+            return null;
+        }
+
+        if ($candidateRequests->count() === 1) {
+            return $candidateRequests->first();
+        }
+
+        $delivery->loadMissing(['items.purchaseOrderItem', 'distributionRecords.items']);
+
+        // 1. Identify discrepancy items and accepted quantities in this delivery
+        $discrepancyByItem = [];
+        $acceptedInDeliveryByItem = [];
+
+        foreach ($delivery->items as $item) {
+            $itemId = (int) ($item->purchaseOrderItem?->item_id ?? 0);
+            if ($itemId <= 0) {
+                continue;
+            }
+
+            $missing = (float) $item->missing_quantity;
+            $damaged = (float) $item->damaged_quantity;
+            $accepted = max((float) $item->received_quantity - $damaged, 0.0);
+
+            if (($missing + $damaged) > 0.0001) {
+                $discrepancyByItem[$itemId] = ($discrepancyByItem[$itemId] ?? 0.0) + $missing + $damaged;
+            }
+            $acceptedInDeliveryByItem[$itemId] = ($acceptedInDeliveryByItem[$itemId] ?? 0.0) + $accepted;
+        }
+
+        // If no items have discrepancies, fallback to first candidate
+        if (empty($discrepancyByItem)) {
+            return $candidateRequests->first();
+        }
+
+        // 2. Identify how much has ALREADY been released specifically from this delivery
+        $deliveryReleasedByItem = $delivery->distributionRecords
+            ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
+            ->flatMap(fn ($record) => $record->items)
+            ->groupBy(fn ($di) => (int) $di->item_id)
+            ->map(fn ($group): float => (float) $group->sum('quantity_released'));
+
+        // Unreleased stock remaining in this delivery available to allocate
+        $availableToAllocate = [];
+        foreach ($acceptedInDeliveryByItem as $itemId => $acc) {
+            $rel = (float) ($deliveryReleasedByItem->get($itemId) ?? 0.0);
+            $availableToAllocate[$itemId] = max($acc - $rel, 0.0);
+        }
+
+        $deficitByCandidateId = [];
+
+        foreach ($candidateRequests as $sr) {
+            $sr->loadMissing(['items', 'distributionRecords.items']);
+            $srId = (int) $sr->supply_request_id;
+            $totalDeficit = 0.0;
+
+            // Quantity already released to this candidate from PRIOR/OTHER deliveries (excluding this delivery)
+            $srPriorReleasedByItem = $sr->distributionRecords
+                ->where('delivery_id', '!=', (int) $delivery->delivery_id)
+                ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
+                ->flatMap(fn ($record) => $record->items)
+                ->groupBy(fn ($di) => (int) $di->item_id)
+                ->map(fn ($group): float => (float) $group->sum('quantity_released'));
+
+            // Quantity released to this candidate specifically FROM THIS delivery
+            $srFromThisDeliveryByItem = $sr->distributionRecords
+                ->where('delivery_id', (int) $delivery->delivery_id)
+                ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
+                ->flatMap(fn ($record) => $record->items)
+                ->groupBy(fn ($di) => (int) $di->item_id)
+                ->map(fn ($group): float => (float) $group->sum('quantity_released'));
+
+            foreach ($sr->items as $sri) {
+                $itemId = (int) $sri->item_id;
+                if (! isset($discrepancyByItem[$itemId])) {
+                    continue;
+                }
+
+                $requested = (float) $sri->quantity_requested;
+                $priorReleased = (float) ($srPriorReleasedByItem->get($itemId) ?? 0.0);
+                $stillNeeded = max($requested - $priorReleased, 0.0);
+
+                // If candidate already got released from this delivery, subtract that directly
+                $fromThisDel = (float) ($srFromThisDeliveryByItem->get($itemId) ?? 0.0);
+                $stillNeeded = max($stillNeeded - $fromThisDel, 0.0);
+
+                if ($stillNeeded <= 0.0001) {
+                    continue;
+                }
+
+                $availDelivery = $availableToAllocate[$itemId] ?? 0.0;
+                $covered = min($stillNeeded, $availDelivery);
+                $availableToAllocate[$itemId] = max($availDelivery - $covered, 0.0);
+
+                $uncovered = max($stillNeeded - $covered, 0.0);
+                $totalDeficit += $uncovered;
+            }
+
+            $deficitByCandidateId[$srId] = $totalDeficit;
+        }
+
+        // 3. Find candidate with active deficit (> 0)
+        foreach ($candidateRequests as $sr) {
+            $srId = (int) $sr->supply_request_id;
+            if (($deficitByCandidateId[$srId] ?? 0.0) > 0.0001) {
+                return $sr;
+            }
+        }
+
+        // Fallback: candidate request with highest deficit
+        arsort($deficitByCandidateId);
+        $topSrId = key($deficitByCandidateId);
+        if ($topSrId) {
+            $found = $candidateRequests->firstWhere('supply_request_id', $topSrId);
+            if ($found instanceof SupplyRequest) {
+                return $found;
+            }
+        }
+
+        return $candidateRequests->first();
     }
 }

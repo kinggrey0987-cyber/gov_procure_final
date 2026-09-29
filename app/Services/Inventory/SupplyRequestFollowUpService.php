@@ -287,17 +287,7 @@ class SupplyRequestFollowUpService
         }
 
         if ($candidateRequests->count() > 1) {
-            // Find candidate request with active shortage / unfulfilled demand
-            $targetParent = $candidateRequests->first(function (SupplyRequest $sr): bool {
-                $sr->loadMissing('items', 'distributionRecords.items');
-                $requested = (float) $sr->items->sum('quantity_requested');
-                $released = (float) $sr->distributionRecords
-                    ->whereIn('status', ['RELEASED', 'RECEIVED'])
-                    ->flatMap->items
-                    ->sum('quantity_released');
-
-                return $requested > ($released + 0.0001);
-            });
+            $targetParent = $traceability->resolveCandidateSupplyRequestWithDeficit($delivery, $candidateRequests);
 
             if ($targetParent instanceof SupplyRequest) {
                 return $targetParent;

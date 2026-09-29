@@ -623,16 +623,7 @@ class PurchaseRequestService
 
         $sourceSupplyRequest = null;
         if ($candidateRequests->count() > 1) {
-            $sourceSupplyRequest = $candidateRequests->first(function (SupplyRequest $sr): bool {
-                $sr->loadMissing('items', 'distributionRecords.items');
-                $requested = (float) $sr->items->sum('quantity_requested');
-                $released = (float) $sr->distributionRecords
-                    ->whereIn('status', ['RELEASED', 'RECEIVED'])
-                    ->flatMap->items
-                    ->sum('quantity_released');
-
-                return $requested > ($released + 0.0001);
-            });
+            $sourceSupplyRequest = $this->traceabilityService->resolveCandidateSupplyRequestWithDeficit($delivery, $candidateRequests);
         }
 
         if (! $sourceSupplyRequest instanceof SupplyRequest) {
