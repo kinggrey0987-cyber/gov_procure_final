@@ -5,7 +5,7 @@ import NavLink from '@/Components/NavLink';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink';
 import SessionTimeoutGuard from '@/Components/SessionTimeoutGuard';
 import { Link, usePage } from '@inertiajs/react';
-import { PropsWithChildren, ReactNode, useState } from 'react';
+import { PropsWithChildren, ReactNode, useEffect, useState } from 'react';
 
 type AuthCan = {
     admin_tech: boolean;
@@ -77,6 +77,21 @@ export default function Authenticated({
         (route().current('inventory.*') ||
             route().current('profile.*') ||
             route().current('notifications.*'));
+
+    const isAnyShell =
+        Boolean(isAdminTechShell || isExecutiveShell || isOfficeShell || isProcurementShell || isInventoryShell);
+
+    useEffect(() => {
+        if (!isAnyShell) return;
+
+        document.documentElement.classList.add('app-shell-active');
+        document.body.classList.add('app-shell-active');
+
+        return () => {
+            document.documentElement.classList.remove('app-shell-active');
+            document.body.classList.remove('app-shell-active');
+        };
+    }, [isAnyShell]);
 
     if (isAdminTechShell) {
         const adminLinks = [
@@ -161,7 +176,7 @@ export default function Authenticated({
 
         return (
             <div className="app-shell-locked min-h-screen bg-slate-100 md:flex md:h-screen md:max-h-screen md:min-h-0 md:overflow-hidden">
-                <aside className="hidden md:flex md:sticky md:top-0 h-screen w-64 shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white z-20">
+                <aside className="hidden md:flex h-full w-64 shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white z-20">
                     <div className="shrink-0 border-b border-slate-200 px-5 py-4">
                         <Link href={route('dashboard')} className="flex items-center gap-3 transition hover:opacity-85 group">
                             <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover group-hover:ring-2 group-hover:ring-red-500/30 transition" />
@@ -200,8 +215,8 @@ export default function Authenticated({
                     </div>
                 </aside>
 
-                <div className="flex min-h-screen flex-1 flex-col md:min-h-0 md:h-screen md:max-h-screen md:overflow-hidden">
-                    <header className="shrink-0 border-b border-slate-200 bg-white md:sticky md:top-0 z-10">
+                <div className="flex min-h-screen flex-1 min-w-0 flex-col md:min-h-0 md:h-full md:overflow-hidden">
+                    <header className="shrink-0 border-b border-slate-200 bg-white z-10">
                         <div className="mx-auto flex min-h-16 w-full max-w-[1300px] items-center justify-between gap-3 px-4 py-3 sm:min-h-20 sm:px-6">
                             <Link href={route('dashboard')} className="flex items-center gap-3 transition hover:opacity-85 md:hidden">
                                 <img src="/logo.jpg" alt="GovSupply Connect" className="h-9 w-9 rounded-full border border-slate-300 bg-white object-cover sm:h-10 sm:w-10" />
@@ -269,23 +284,25 @@ export default function Authenticated({
                         </div>
                     </nav>
 
-                    <div className="mx-auto w-full max-w-[1300px] flex-1 min-h-0 overflow-y-auto px-3 py-3 sm:px-6 sm:py-4">
-                        {header && (
-                            <header className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
-                                <div>
-                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Municipality of E.B. Magalona &bull; {roleLabel}</p>
-                                    <h1 className="mt-0.5 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{header}</h1>
-                                </div>
-                                {headerActions && (
-                                    <div className="flex items-center gap-2">
-                                        {headerActions}
+                    <div className="flex-1 w-full md:min-h-0 md:overflow-y-auto">
+                        <div className="mx-auto w-full max-w-[1300px] px-3 py-3 sm:px-6 sm:py-4">
+                            {header && (
+                                <header className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                                    <div>
+                                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Municipality of E.B. Magalona &bull; {roleLabel}</p>
+                                        <h1 className="mt-0.5 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{header}</h1>
                                     </div>
-                                )}
-                            </header>
-                        )}
+                                    {headerActions && (
+                                        <div className="flex items-center gap-2">
+                                            {headerActions}
+                                        </div>
+                                    )}
+                                </header>
+                            )}
 
-                        <main>{children}</main>
-                        <SessionTimeoutGuard />
+                            <main>{children}</main>
+                            <SessionTimeoutGuard />
+                        </div>
                     </div>
                 </div>
             </div>
@@ -340,7 +357,7 @@ export default function Authenticated({
 
         return (
             <div className="app-shell-locked min-h-screen bg-slate-100 md:flex md:h-screen md:max-h-screen md:min-h-0 md:overflow-hidden">
-                <aside className="hidden md:flex md:sticky md:top-0 h-screen w-72 shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white z-20">
+                <aside className="hidden md:flex h-full w-72 shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white z-20">
                     <div className="shrink-0 border-b border-slate-200 px-5 py-4">
                         <Link href={route('dashboard')} className="flex items-center gap-3 transition hover:opacity-85 group">
                             <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover group-hover:ring-2 group-hover:ring-red-500/30 transition" />
@@ -378,8 +395,8 @@ export default function Authenticated({
                     </div>
                 </aside>
 
-                <div className="flex min-h-screen flex-1 flex-col md:min-h-0 md:h-screen md:max-h-screen md:overflow-hidden">
-                    <header className="shrink-0 border-b border-slate-200 bg-white md:sticky md:top-0 z-10">
+                <div className="flex min-h-screen flex-1 min-w-0 flex-col md:min-h-0 md:h-full md:overflow-hidden">
+                    <header className="shrink-0 border-b border-slate-200 bg-white z-10">
                         <div className="mx-auto flex min-h-16 w-full max-w-[1400px] items-center justify-between gap-3 px-4 py-3 sm:min-h-20 sm:px-6">
                             <Link href={route('dashboard')} className="flex items-center gap-3 transition hover:opacity-85 md:hidden">
                                 <img src="/logo.jpg" alt="GovSupply Connect" className="h-9 w-9 rounded-full border border-slate-300 bg-white object-cover sm:h-11 sm:w-11" />
@@ -449,23 +466,25 @@ export default function Authenticated({
                         </div>
                     </nav>
 
-                    <div className="mx-auto w-full max-w-[1400px] flex-1 min-h-0 overflow-y-auto px-3 py-3 sm:px-6 sm:py-4">
-                        {header && (
-                            <header className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
-                                <div>
-                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Municipality of E.B. Magalona &bull; Procurement Unit Staff</p>
-                                    <h1 className="mt-0.5 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{header}</h1>
-                                </div>
-                                {headerActions && (
-                                    <div className="flex items-center gap-2">
-                                        {headerActions}
+                    <div className="flex-1 w-full md:min-h-0 md:overflow-y-auto">
+                        <div className="mx-auto w-full max-w-[1400px] px-3 py-3 sm:px-6 sm:py-4">
+                            {header && (
+                                <header className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                                    <div>
+                                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Municipality of E.B. Magalona &bull; Procurement Unit Staff</p>
+                                        <h1 className="mt-0.5 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{header}</h1>
                                     </div>
-                                )}
-                            </header>
-                        )}
+                                    {headerActions && (
+                                        <div className="flex items-center gap-2">
+                                            {headerActions}
+                                        </div>
+                                    )}
+                                </header>
+                            )}
 
-                        <main>{children}</main>
-                        <SessionTimeoutGuard />
+                            <main>{children}</main>
+                            <SessionTimeoutGuard />
+                        </div>
                     </div>
                 </div>
             </div>
@@ -521,7 +540,7 @@ export default function Authenticated({
 
         return (
             <div className="app-shell-locked min-h-screen bg-slate-100 md:flex md:h-screen md:max-h-screen md:min-h-0 md:overflow-hidden">
-                <aside className="hidden md:flex md:sticky md:top-0 h-screen w-72 shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white z-20">
+                <aside className="hidden md:flex h-full w-72 shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white z-20">
                     <div className="shrink-0 border-b border-slate-200 px-5 py-4">
                         <Link href={route('dashboard')} className="flex items-center gap-3 transition hover:opacity-85 group">
                             <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover group-hover:ring-2 group-hover:ring-red-500/30 transition" />
@@ -559,8 +578,8 @@ export default function Authenticated({
                     </div>
                 </aside>
 
-                <div className="flex min-h-screen flex-1 flex-col md:min-h-0 md:h-screen md:max-h-screen md:overflow-hidden">
-                    <header className="shrink-0 border-b border-slate-200 bg-white md:sticky md:top-0 z-10">
+                <div className="flex min-h-screen flex-1 min-w-0 flex-col md:min-h-0 md:h-full md:overflow-hidden">
+                    <header className="shrink-0 border-b border-slate-200 bg-white z-10">
                         <div className="mx-auto flex min-h-16 w-full max-w-[1400px] items-center justify-between gap-3 px-4 py-3 sm:min-h-20 sm:px-6">
                             <Link href={route('dashboard')} className="flex items-center gap-3 transition hover:opacity-85 md:hidden">
                                 <img src="/logo.jpg" alt="GovSupply Connect" className="h-9 w-9 rounded-full border border-slate-300 bg-white object-cover sm:h-11 sm:w-11" />
@@ -630,23 +649,25 @@ export default function Authenticated({
                         </div>
                     </nav>
 
-                    <div className="mx-auto w-full max-w-[1400px] flex-1 min-h-0 overflow-y-auto px-3 py-3 sm:px-6 sm:py-4">
-                        {header && (
-                            <header className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
-                                <div>
-                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Municipality of E.B. Magalona &bull; {officeLabel}</p>
-                                    <h1 className="mt-0.5 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{header}</h1>
-                                </div>
-                                {headerActions && (
-                                    <div className="flex items-center gap-2">
-                                        {headerActions}
+                    <div className="flex-1 w-full md:min-h-0 md:overflow-y-auto">
+                        <div className="mx-auto w-full max-w-[1400px] px-3 py-3 sm:px-6 sm:py-4">
+                            {header && (
+                                <header className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                                    <div>
+                                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Municipality of E.B. Magalona &bull; {officeLabel}</p>
+                                        <h1 className="mt-0.5 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{header}</h1>
                                     </div>
-                                )}
-                            </header>
-                        )}
+                                    {headerActions && (
+                                        <div className="flex items-center gap-2">
+                                            {headerActions}
+                                        </div>
+                                    )}
+                                </header>
+                            )}
 
-                        <main>{children}</main>
-                        <SessionTimeoutGuard />
+                            <main>{children}</main>
+                            <SessionTimeoutGuard />
+                        </div>
                     </div>
                 </div>
             </div>
@@ -708,7 +729,7 @@ export default function Authenticated({
 
         return (
             <div className="app-shell-locked min-h-screen bg-slate-100 md:flex md:h-screen md:max-h-screen md:min-h-0 md:overflow-hidden">
-                <aside className="hidden md:flex md:sticky md:top-0 h-screen w-72 shrink-0 flex-col overflow-hidden border-r border-red-200 bg-white z-20">
+                <aside className="hidden md:flex h-full w-72 shrink-0 flex-col overflow-hidden border-r border-red-200 bg-white z-20">
                     <div className="shrink-0 border-b border-slate-200 px-5 py-4">
                         <Link href={route('dashboard')} className="flex items-center gap-3 transition hover:opacity-85 group">
                             <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover group-hover:ring-2 group-hover:ring-red-500/30 transition" />
@@ -746,8 +767,8 @@ export default function Authenticated({
                     </div>
                 </aside>
 
-                <div className="flex min-h-screen flex-1 flex-col md:min-h-0 md:h-screen md:max-h-screen md:overflow-hidden">
-                    <header className="shrink-0 border-b border-slate-200 bg-white md:sticky md:top-0 z-10">
+                <div className="flex min-h-screen flex-1 min-w-0 flex-col md:min-h-0 md:h-full md:overflow-hidden">
+                    <header className="shrink-0 border-b border-slate-200 bg-white z-10">
                         <div className="mx-auto flex min-h-16 w-full max-w-[1400px] items-center justify-between gap-3 px-4 py-3 sm:min-h-20 sm:px-6">
                             <Link href={route('dashboard')} className="flex items-center gap-3 transition hover:opacity-85 md:hidden">
                                 <img src="/logo.jpg" alt="GovSupply Connect" className="h-9 w-9 rounded-full border border-slate-300 bg-white object-cover sm:h-11 sm:w-11" />
@@ -817,23 +838,25 @@ export default function Authenticated({
                         </div>
                     </nav>
 
-                    <div className="mx-auto w-full max-w-[1400px] flex-1 min-h-0 overflow-y-auto px-3 py-3 sm:px-6 sm:py-4">
-                        {header && (
-                            <header className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
-                                <div>
-                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Municipality of E.B. Magalona &bull; Executive Oversight</p>
-                                    <h1 className="mt-0.5 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{header}</h1>
-                                </div>
-                                {headerActions && (
-                                    <div className="flex items-center gap-2">
-                                        {headerActions}
+                    <div className="flex-1 w-full md:min-h-0 md:overflow-y-auto">
+                        <div className="mx-auto w-full max-w-[1400px] px-3 py-3 sm:px-6 sm:py-4">
+                            {header && (
+                                <header className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                                    <div>
+                                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Municipality of E.B. Magalona &bull; Executive Oversight</p>
+                                        <h1 className="mt-0.5 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{header}</h1>
                                     </div>
-                                )}
-                            </header>
-                        )}
+                                    {headerActions && (
+                                        <div className="flex items-center gap-2">
+                                            {headerActions}
+                                        </div>
+                                    )}
+                                </header>
+                            )}
 
-                        <main>{children}</main>
-                        <SessionTimeoutGuard />
+                            <main>{children}</main>
+                            <SessionTimeoutGuard />
+                        </div>
                     </div>
                 </div>
             </div>
@@ -922,7 +945,7 @@ export default function Authenticated({
 
         return (
             <div className="app-shell-locked min-h-screen bg-slate-100 md:flex md:h-screen md:max-h-screen md:min-h-0 md:overflow-hidden">
-                <aside className="hidden md:flex md:sticky md:top-0 h-screen w-72 shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white z-20">
+                <aside className="hidden md:flex h-full w-72 shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white z-20">
                     <div className="shrink-0 border-b border-slate-200 px-5 py-4">
                         <Link href={route('dashboard')} className="flex items-center gap-3 transition hover:opacity-85 group">
                             <img src="/logo.jpg" alt="GovSupply Connect" className="h-12 w-12 rounded-full border border-slate-300 bg-white object-cover group-hover:ring-2 group-hover:ring-red-500/30 transition" />
@@ -960,8 +983,8 @@ export default function Authenticated({
                     </div>
                 </aside>
 
-                <div className="flex min-h-screen flex-1 flex-col md:min-h-0 md:h-screen md:max-h-screen md:overflow-hidden">
-                    <header className="shrink-0 border-b border-slate-200 bg-white md:sticky md:top-0 z-10">
+                <div className="flex min-h-screen flex-1 min-w-0 flex-col md:min-h-0 md:h-full md:overflow-hidden">
+                    <header className="shrink-0 border-b border-slate-200 bg-white z-10">
                         <div className="mx-auto flex min-h-16 w-full max-w-[1400px] items-center justify-between gap-3 px-4 py-3 sm:min-h-20 sm:px-6">
                             <Link href={route('dashboard')} className="flex items-center gap-3 transition hover:opacity-85 md:hidden">
                                 <img src="/logo.jpg" alt="GovSupply Connect" className="h-9 w-9 rounded-full border border-slate-300 bg-white object-cover sm:h-11 sm:w-11" />
@@ -1031,23 +1054,25 @@ export default function Authenticated({
                         </div>
                     </nav>
 
-                    <div className="mx-auto w-full max-w-[1400px] flex-1 min-h-0 overflow-y-auto px-3 py-3 sm:px-6 sm:py-4">
-                        {header && (
-                            <header className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
-                                <div>
-                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Municipality of E.B. Magalona &bull; Inventory and Logistics</p>
-                                    <h1 className="mt-0.5 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{header}</h1>
-                                </div>
-                                {headerActions && (
-                                    <div className="flex items-center gap-2">
-                                        {headerActions}
+                    <div className="flex-1 w-full md:min-h-0 md:overflow-y-auto">
+                        <div className="mx-auto w-full max-w-[1400px] px-3 py-3 sm:px-6 sm:py-4">
+                            {header && (
+                                <header className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                                    <div>
+                                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Municipality of E.B. Magalona &bull; Inventory and Logistics</p>
+                                        <h1 className="mt-0.5 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{header}</h1>
                                     </div>
-                                )}
-                            </header>
-                        )}
+                                    {headerActions && (
+                                        <div className="flex items-center gap-2">
+                                            {headerActions}
+                                        </div>
+                                    )}
+                                </header>
+                            )}
 
-                        <main>{children}</main>
-                        <SessionTimeoutGuard />
+                            <main>{children}</main>
+                            <SessionTimeoutGuard />
+                        </div>
                     </div>
                 </div>
             </div>

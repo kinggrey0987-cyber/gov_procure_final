@@ -10,12 +10,21 @@
         overflow-x: hidden;
     }
 
-    /* Lock desktop body viewport when authenticated app shell is active */
+    /* Lock desktop viewport completely when authenticated app shell is active */
     @media (min-width: 768px) {
-        body:has(.app-shell-locked) {
-            overflow: hidden;
-            height: 100vh;
-            max-height: 100vh;
+        html:has(.app-shell-locked),
+        body:has(.app-shell-locked),
+        html:has(.app-shell-locked) body,
+        html:has(.app-shell-locked) #app,
+        html.app-shell-active,
+        body.app-shell-active,
+        html.app-shell-active body,
+        html.app-shell-active #app {
+            overflow: hidden !important;
+            height: 100% !important;
+            height: 100vh !important;
+            max-height: 100vh !important;
+            min-height: 0 !important;
         }
     }
 
