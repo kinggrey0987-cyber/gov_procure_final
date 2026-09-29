@@ -21,7 +21,8 @@ class StoreClaimRequest extends FormRequest
         $distributionRecord = DistributionRecord::query()
             ->where('distribution_record_id', (int) $this->input('distribution_record_id'))
             ->first();
-        $earliestClaimDate = optional($distributionRecord?->release_date)?->toDateString() ?? now()->toDateString();
+        $earliestClaimDate = optional($distributionRecord?->release_date)?->toDateString() ?? now('Asia/Manila')->toDateString();
+        $maxAllowedClaimDate = now('Asia/Manila')->addDay()->toDateString();
 
         return [
             'claim_code' => ['nullable', 'string', 'max:80', 'unique:claims,claim_code'],
@@ -31,7 +32,7 @@ class StoreClaimRequest extends FormRequest
             'source_type' => ['nullable', 'string', 'max:60'],
             'office_id' => ['required', 'integer', 'exists:offices,id'],
             'claim_type' => ['required', 'string', Rule::in(['MISSING_ITEM', 'DAMAGED_ITEM', 'MISSING_AND_DAMAGED'])],
-            'claim_date' => ['required', 'date', 'after_or_equal:'.$earliestClaimDate, 'before_or_equal:today'],
+            'claim_date' => ['required', 'date', 'after_or_equal:'.$earliestClaimDate, 'before_or_equal:'.$maxAllowedClaimDate],
             'claim_location' => ['required', 'string', 'max:150'],
             'quantity_disputed' => ['nullable', 'integer', 'min:0'],
             'quantity_damaged' => ['nullable', 'integer', 'min:0'],

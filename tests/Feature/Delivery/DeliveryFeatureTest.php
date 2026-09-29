@@ -1269,4 +1269,39 @@ class DeliveryFeatureTest extends TestCase
             'document_kind' => 'delivery_receipt',
         ]);
     }
+
+    public function test_delivery_can_be_verified_at_midnight_boundary_in_philippine_timezone(): void
+    {
+        // Simulate midnight in Manila (00:05 AM on Sept 30, which is Sept 29 16:05 in UTC)
+        \Carbon\Carbon::setTestNow(\Carbon\Carbon::parse('2026-09-30 00:05:00', 'Asia/Manila'));
+
+        $delivery = $this->createDelivery(status: 'RECEIVED');
+        $delivery->forceFill([
+            'actual_delivery_date' => '2026-09-30',
+            'receipt_status' => 'RECEIVED',
+        ])->save();
+
+        DeliveryItem::create([
+            'delivery_id' => $delivery->delivery_id,
+            'purchase_order_item_id' => $this->purchaseOrderItem->purchase_order_item_id,
+            'expected_quantity' => 5,
+            'received_quantity' => 5,
+            'damaged_quantity' => 0,
+            'missing_quantity' => 0,
+            'item_status' => 'RECEIVED',
+        ]);
+
+        $response = $this->actingAs($this->gsoOfficer)
+            ->post(route('inventory.delivery-verifications.store', $delivery->delivery_id), [
+                'verification_date' => '2026-09-30',
+                'verification_status' => 'APPROVED',
+                'remarks' => 'Midnight verified on new day',
+            ]);
+
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect(route('inventory.deliveries.show', $delivery->delivery_id));
+        $this->assertSame('VERIFIED', (string) $delivery->fresh()->receipt_status);
+
+        \Carbon\Carbon::setTestNow();
+    }
 }

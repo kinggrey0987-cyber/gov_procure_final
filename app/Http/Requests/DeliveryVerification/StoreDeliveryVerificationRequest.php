@@ -18,10 +18,11 @@ class StoreDeliveryVerificationRequest extends FormRequest
     public function rules(): array
     {
         $delivery = $this->route('delivery');
-        $earliestAllowedVerificationDate = $delivery?->actual_delivery_date?->toDateString() ?? now()->toDateString();
+        $earliestAllowedVerificationDate = $delivery?->actual_delivery_date?->toDateString() ?? now('Asia/Manila')->toDateString();
+        $maxAllowedVerificationDate = now('Asia/Manila')->addDay()->toDateString();
 
         return [
-            'verification_date' => ['required', 'date', 'after_or_equal:'.$earliestAllowedVerificationDate, 'before_or_equal:today'],
+            'verification_date' => ['required', 'date', 'after_or_equal:'.$earliestAllowedVerificationDate, 'before_or_equal:'.$maxAllowedVerificationDate],
             'verification_status' => ['required', 'string', 'in:APPROVED,REJECTED'],
             'discrepancy_notes' => ['nullable', 'string', 'max:1000'],
             'remarks' => ['nullable', 'string', 'max:500'],
