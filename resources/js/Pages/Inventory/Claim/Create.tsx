@@ -122,6 +122,33 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
     const [validationError, setValidationError] = useState<string | null>(null);
     const [fileWarning, setFileWarning] = useState<string | null>(null);
 
+    const groupedDistributionRecords = useMemo(() => {
+        const groups: {
+            requestCode: string;
+            officeName: string;
+            records: DistributionRecordOption[];
+        }[] = [];
+
+        const groupMap = new Map<string, { requestCode: string; officeName: string; records: DistributionRecordOption[] }>();
+
+        for (const record of distributionRecords) {
+            const key = record.request_code || 'Other';
+            let group = groupMap.get(key);
+            if (!group) {
+                group = {
+                    requestCode: key,
+                    officeName: record.office_name,
+                    records: [],
+                };
+                groupMap.set(key, group);
+                groups.push(group);
+            }
+            group.records.push(record);
+        }
+
+        return groups;
+    }, [distributionRecords]);
+
     const selectedRecord = useMemo(
         () => distributionRecords.find((record) => record.distribution_record_id === Number(form.data.distribution_record_id)),
         [distributionRecords, form.data.distribution_record_id],
@@ -329,7 +356,9 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                         }}
                     >
                         <div>
-                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Select Received Supply Request</label>
+                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Select Received Supply Request & Delivery Batch
+                            </label>
                             <select
                                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                                 value={form.data.distribution_record_id}
@@ -353,16 +382,30 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                     setIssueLines(buildInitialIssueLines(firstItem));
                                 }}
                             >
-                                <option value="">Select Received Supply Request</option>
-                                {distributionRecords.map((record) => (
-                                    <option
-                                        key={record.distribution_record_id}
-                                        value={record.distribution_record_id}
-                                        disabled={record.has_ongoing_claim}
+                                <option value="">Select Received Supply Request / Delivery Batch</option>
+                                {groupedDistributionRecords.map((group) => (
+                                    <optgroup
+                                        key={group.requestCode}
+                                        label={`${group.requestCode} — ${group.officeName}`}
                                     >
-                                        {record.request_code} - {record.office_name}
-                                        {record.has_ongoing_claim ? ` (Has Ongoing Claim: ${record.ongoing_claim_code} - Pending)` : ''}
-                                    </option>
+                                        {group.records.map((record, index) => {
+                                            const batchPrefix = group.records.length > 1 ? `Batch ${index + 1}: ` : '';
+                                            const itemsSummary = record.items && record.items.length > 0
+                                                ? record.items.slice(0, 2).map((i) => `${Math.trunc(i.quantity_released)} ${i.unit || 'unit'} ${i.item_name}`).join(', ') + (record.items.length > 2 ? ` +${record.items.length - 2} more` : '')
+                                                : 'No items recorded';
+
+                                            return (
+                                                <option
+                                                    key={record.distribution_record_id}
+                                                    value={record.distribution_record_id}
+                                                    disabled={record.has_ongoing_claim}
+                                                >
+                                                    {batchPrefix}{record.distribution_code} ({formatDate(record.release_date)}) — {itemsSummary}
+                                                    {record.has_ongoing_claim ? ` (Has Ongoing Claim: ${record.ongoing_claim_code} - Pending)` : ''}
+                                                </option>
+                                            );
+                                        })}
+                                    </optgroup>
                                 ))}
                             </select>
                             {form.errors.distribution_record_id ? <p className="mt-1 text-xs text-rose-600">{form.errors.distribution_record_id}</p> : null}
@@ -372,10 +415,18 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
 
                         {selectedRecord ? (
                             <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                                <p><span className="font-semibold text-slate-800">Office:</span> {selectedRecord.office_name}</p>
-                                <p><span className="font-semibold text-slate-800">Received Supply Request:</span> {selectedRecord.request_code}</p>
-                                <p><span className="font-semibold text-slate-800">Ready Since:</span> {formatDate(selectedRecord.release_date)}</p>
-                                <p><span className="font-semibold text-slate-800">Receipt Status:</span> {selectedRecord.status}</p>
+                                <div className="grid gap-2 sm:grid-cols-2">
+                                    <div>
+                                        <p><span className="font-semibold text-slate-800">Office:</span> {selectedRecord.office_name}</p>
+                                        <p><span className="font-semibold text-slate-800">Supply Request:</span> {selectedRecord.request_code}</p>
+                                        <p><span className="font-semibold text-slate-800">Distribution Voucher:</span> <span className="font-mono font-medium text-slate-900">{selectedRecord.distribution_code}</span></p>
+                                    </div>
+                                    <div>
+                                        <p><span className="font-semibold text-slate-800">Delivered / Released:</span> {formatDate(selectedRecord.release_date)}</p>
+                                        <p><span className="font-semibold text-slate-800">Receipt Status:</span> <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200">{selectedRecord.status}</span></p>
+                                        <p><span className="font-semibold text-slate-800">Delivered Items:</span> {selectedRecord.items?.length ?? 0} item line(s)</p>
+                                    </div>
+                                </div>
                                 {selectedRecord.has_ongoing_claim ? (
                                     <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
                                         <p className="font-bold">Ongoing Claim in Progress</p>

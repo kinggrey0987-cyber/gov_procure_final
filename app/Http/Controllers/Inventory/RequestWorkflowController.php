@@ -216,6 +216,8 @@ class RequestWorkflowController
         $hasRemainingQuantity = false;
         $hasAvailableStock = false;
 
+        $isCompleted = in_array((string) $request->status, ['COMPLETED', 'FULFILLED', 'RECEIVED'], true);
+
         foreach ($request->items as $item) {
             $itemId = (int) $item->item_id;
             $requested = (float) $item->quantity_requested;
@@ -224,7 +226,10 @@ class RequestWorkflowController
             $releasedPool[$itemId] = max($availReleased - $released, 0.0);
 
             $remaining = max($requested - $released, 0.0);
-            $available = $this->inventoryService->getAvailableStockForSupplyRequest($itemId, $request);
+            $available = 0.0;
+            if (! $isCompleted && $remaining > 0.0001) {
+                $available = $this->inventoryService->getAvailableStockForSupplyRequest($itemId, $request);
+            }
 
             $requestedTotal += $requested;
             $shortageTotal += max($remaining - $available, 0.0);
