@@ -777,20 +777,45 @@ class RequestWorkflowController
                 ->with('error', 'All requested quantities have already been released for this request.');
         }
 
-        $hasAvailableStock = false;
-        $releasedPoolForStock = $this->releasedQuantityByItemId($supplyRequest);
-        foreach ($supplyRequest->items as $item) {
-            $itemId = (int) $item->item_id;
-            $requested = (float) $item->quantity_requested;
-            $availReleased = (float) ($releasedPoolForStock[$itemId] ?? 0.0);
-            $released = min($requested, $availReleased);
-            $releasedPoolForStock[$itemId] = max($availReleased - $released, 0.0);
+        $lineageIds = $this->followUpService->resolveLineageSupplyRequestIds($supplyRequest);
+        $verifiedDelivery = Delivery::query()
+            ->whereIn('receipt_status', ['VERIFIED', 'PARTIALLY_RECEIVED'])
+            ->whereHas('purchaseOrder', function ($query) use ($lineageIds): void {
+                $query->whereIn('supply_request_id', $lineageIds)
+                    ->orWhereHas('purchaseRequest', fn ($prQ) => $prQ->whereIn('supply_request_id', $lineageIds));
+            })
+            ->whereDoesntHave('distributionRecords', fn ($q) => $q->where('status', 'DRAFT'))
+            ->with(['items.purchaseOrderItem', 'distributionRecords.items'])
+            ->latest('delivery_id')
+            ->get()
+            ->first(function (Delivery $delivery): bool {
+                $acceptedTotal = (float) $delivery->items->sum(function ($item): float {
+                    return max((float) $item->received_quantity - (float) $item->damaged_quantity, 0);
+                });
+                $releasedTotal = (float) $delivery->distributionRecords
+                    ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
+                    ->flatMap(fn ($record) => $record->items)
+                    ->sum('quantity_released');
 
-            $remaining = max($requested - $released, 0);
-            $available = $this->inventoryService->getAvailableStockForSupplyRequest($itemId, $supplyRequest);
-            if ($remaining > 0.0001 && $available > 0.0001) {
-                $hasAvailableStock = true;
-                break;
+                return $acceptedTotal - $releasedTotal > 0.0001;
+            });
+
+        $hasAvailableStock = $verifiedDelivery !== null;
+        if (! $hasAvailableStock) {
+            $releasedPoolForStock = $this->releasedQuantityByItemId($supplyRequest);
+            foreach ($supplyRequest->items as $item) {
+                $itemId = (int) $item->item_id;
+                $requested = (float) $item->quantity_requested;
+                $availReleased = (float) ($releasedPoolForStock[$itemId] ?? 0.0);
+                $released = min($requested, $availReleased);
+                $releasedPoolForStock[$itemId] = max($availReleased - $released, 0.0);
+
+                $remaining = max($requested - $released, 0);
+                $available = $this->inventoryService->getAvailableStockForSupplyRequest($itemId, $supplyRequest);
+                if ($remaining > 0.0001 && $available > 0.0001) {
+                    $hasAvailableStock = true;
+                    break;
+                }
             }
         }
 
@@ -798,7 +823,7 @@ class RequestWorkflowController
             if ($supplyRequest->purchaseRequests->isNotEmpty()) {
                 return redirect()
                     ->route('inventory.office-supply-requests.index', $request->query())
-                    ->with('error', 'This request is already queued for procurement and has no available warehouse stock to release.');
+                    ->with('error', 'This request is procurement-backed and awaits verified delivery before distribution release.');
             }
 
             return redirect()
@@ -807,10 +832,15 @@ class RequestWorkflowController
         }
 
         try {
-            $record = $this->distributionService->createRecordWithAutomaticRelease($request->user(), [
+            $payload = [
                 'supply_request_id' => (int) $supplyRequest->supply_request_id,
                 'office_id' => (int) $supplyRequest->office_id,
-            ]);
+            ];
+            if ($verifiedDelivery instanceof Delivery) {
+                $payload['delivery_id'] = (int) $verifiedDelivery->delivery_id;
+            }
+
+            $record = $this->distributionService->createRecordWithAutomaticRelease($request->user(), $payload);
         } catch (ValidationException $exception) {
             $message = collect($exception->errors())
                 ->flatten()
