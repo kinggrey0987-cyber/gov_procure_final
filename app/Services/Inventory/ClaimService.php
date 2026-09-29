@@ -56,6 +56,12 @@ class ClaimService
 
         $parentClaim = $this->resolveParentClaim($payload, $distributionRecord);
 
+        $this->ensureNoOngoingClaimForSupplyRequest(
+            $distributionRecord,
+            $parentClaim,
+            $payload['batch_created_claim_ids'] ?? []
+        );
+
         $distributionItem = null;
         if (! empty($payload['distribution_item_id'])) {
             $distributionItem = $distributionRecord->items()
@@ -519,6 +525,44 @@ class ClaimService
         }
 
         return $parentClaim;
+    }
+
+    private function ensureNoOngoingClaimForSupplyRequest(DistributionRecord $distributionRecord, ?Claim $parentClaim, array $excludeClaimIds = []): void
+    {
+        if ($parentClaim instanceof Claim) {
+            return;
+        }
+
+        $activeQuery = Claim::query()
+            ->where(function ($query) use ($distributionRecord) {
+                $query->where('distribution_record_id', (int) $distributionRecord->distribution_record_id);
+                if ($distributionRecord->supply_request_id) {
+                    $query->orWhereHas('distributionRecord', function ($sub) use ($distributionRecord) {
+                        $sub->where('supply_request_id', (int) $distributionRecord->supply_request_id);
+                    });
+                }
+            })
+            ->whereNull('parent_claim_id')
+            ->whereIn('status', self::ACTIVE_STATUSES);
+
+        if (! empty($excludeClaimIds)) {
+            $activeQuery->whereNotIn('claims_id', $excludeClaimIds);
+        }
+
+        $activeClaim = $activeQuery->first();
+
+        if ($activeClaim) {
+            throw ValidationException::withMessages([
+                'distribution_record_id' => sprintf(
+                    'This supply request already has an ongoing claim (%s) pending resolution. A new claim cannot be filed until the existing claim is resolved or rejected.',
+                    $activeClaim->claim_code
+                ),
+                'quantity_disputed' => sprintf(
+                    'This supply request already has an ongoing claim (%s) pending resolution.',
+                    $activeClaim->claim_code
+                ),
+            ]);
+        }
     }
 
     private function ensureNoActiveDuplicateItemClaim(int $distributionItemId, ?Claim $parentClaim): void

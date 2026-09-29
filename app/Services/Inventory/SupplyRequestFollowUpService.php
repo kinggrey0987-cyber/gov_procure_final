@@ -25,14 +25,20 @@ class SupplyRequestFollowUpService
         $followUpPr = $supplyRequest->purchaseRequests
             ->first(fn (PurchaseRequest $pr): bool => in_array((string) $pr->source_type, ['PARTIAL_DELIVERY_FOLLOW_UP', 'CLAIM_REPLACEMENT_FOLLOW_UP'], true)
                 || (int) ($pr->source_delivery_id ?? 0) > 0
-                || (int) ($pr->source_claim_id ?? 0) > 0);
+                || (int) ($pr->source_claim_id ?? 0) > 0
+                || (int) ($pr->source_supply_request_id ?? 0) > 0);
 
         if ($followUpPr) {
             $parentSr = null;
             $type = 'DISCREPANCY_REPLACEMENT';
             $label = 'Delivery Discrepancy Replacement';
 
-            if ((int) $followUpPr->source_delivery_id > 0) {
+            if ((int) ($followUpPr->source_supply_request_id ?? 0) > 0) {
+                $type = 'REQUISITION_FOLLOW_UP';
+                $label = 'Follow-up Requisition Batch';
+                $parentSr = $followUpPr->sourceSupplyRequest
+                    ?? SupplyRequest::query()->find($followUpPr->source_supply_request_id);
+            } elseif ((int) $followUpPr->source_delivery_id > 0) {
                 $parentSr = $this->resolveParentSupplyRequestForDeliveryFollowUp($followUpPr);
             } elseif ((int) $followUpPr->source_claim_id > 0) {
                 $type = 'CLAIM_REPLACEMENT';
@@ -101,14 +107,20 @@ class SupplyRequestFollowUpService
             $followUpPr = $sr->purchaseRequests
                 ->first(fn (PurchaseRequest $pr): bool => in_array((string) $pr->source_type, ['PARTIAL_DELIVERY_FOLLOW_UP', 'CLAIM_REPLACEMENT_FOLLOW_UP'], true)
                     || (int) ($pr->source_delivery_id ?? 0) > 0
-                    || (int) ($pr->source_claim_id ?? 0) > 0);
+                    || (int) ($pr->source_claim_id ?? 0) > 0
+                    || (int) ($pr->source_supply_request_id ?? 0) > 0);
 
             if ($followUpPr) {
                 $parentSr = null;
                 $type = 'DISCREPANCY_REPLACEMENT';
                 $label = 'Delivery Discrepancy Replacement';
 
-                if ((int) $followUpPr->source_delivery_id > 0) {
+                if ((int) ($followUpPr->source_supply_request_id ?? 0) > 0) {
+                    $type = 'REQUISITION_FOLLOW_UP';
+                    $label = 'Follow-up Requisition Batch';
+                    $parentSr = $followUpPr->sourceSupplyRequest
+                        ?? SupplyRequest::query()->find($followUpPr->source_supply_request_id);
+                } elseif ((int) $followUpPr->source_delivery_id > 0) {
                     $parentSr = $this->resolveParentSupplyRequestForDeliveryFollowUp($followUpPr);
                 } elseif ((int) $followUpPr->source_claim_id > 0) {
                     $type = 'CLAIM_REPLACEMENT';
@@ -179,9 +191,12 @@ class SupplyRequestFollowUpService
 
         $results = [];
 
-        // 1. Through delivery discrepancies
+        // 1. Through delivery discrepancies and follow-up requisitions
         $deliveryPrs = PurchaseRequest::query()
-            ->where('source_type', 'PARTIAL_DELIVERY_FOLLOW_UP')
+            ->where(function ($q) {
+                $q->whereIn('source_type', ['PARTIAL_DELIVERY_FOLLOW_UP', 'REQUISITION_FOLLOW_UP', 'CLAIM_REPLACEMENT_FOLLOW_UP'])
+                    ->orWhereNotNull('source_supply_request_id');
+            })
             ->where(function ($query) use ($parentIds) {
                 $query->whereIn('source_supply_request_id', $parentIds)
                     ->orWhere(function ($fallbackQ) use ($parentIds) {
@@ -201,14 +216,16 @@ class SupplyRequestFollowUpService
             ->get();
 
         foreach ($deliveryPrs as $pr) {
-            $parent = $this->resolveParentSupplyRequestForDeliveryFollowUp($pr);
+            $parent = ((int) ($pr->source_supply_request_id ?? 0) > 0)
+                ? ($pr->sourceSupplyRequest ?? SupplyRequest::query()->find($pr->source_supply_request_id))
+                : $this->resolveParentSupplyRequestForDeliveryFollowUp($pr);
             $pId = (int) ($parent?->supply_request_id ?? 0);
             if (in_array($pId, $parentIds, true) && $pr->supplyRequest) {
                 $results[$pId][] = [
                     'supply_request_id' => (int) $pr->supplyRequest->supply_request_id,
                     'request_code' => (string) $pr->supplyRequest->request_code,
                     'status' => (string) $pr->supplyRequest->status,
-                    'reason' => 'Discrepancy Replacement',
+                    'reason' => ((int) ($pr->source_supply_request_id ?? 0) > 0) ? 'Follow-up Batch' : 'Discrepancy Replacement',
                 ];
             }
         }

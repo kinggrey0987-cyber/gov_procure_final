@@ -133,38 +133,71 @@ class ClaimController
             })
             ->values();
 
+        $activeClaims = Claim::query()
+            ->where('office_id', (int) $user->office_id)
+            ->whereNull('parent_claim_id')
+            ->whereIn('status', ['OPEN', 'IN_REVIEW', 'PENDING_REPLACEMENT', 'REPLACEMENT_RELEASED', 'PARTIALLY_RESOLVED'])
+            ->with('distributionRecord')
+            ->get();
+
+        $activeClaimsBySrId = $activeClaims
+            ->filter(fn (Claim $c) => ! empty($c->distributionRecord?->supply_request_id))
+            ->groupBy(fn (Claim $c) => (int) $c->distributionRecord->supply_request_id);
+
+        $activeClaimsByDistId = $activeClaims
+            ->groupBy(fn (Claim $c) => (int) $c->distribution_record_id);
+
         $requestedDistributionRecordId = (int) $request->query('distribution_record_id', 0);
         $requestedSupplyRequestId = (int) $request->query('supply_request_id', 0);
         $requestedDistributionItemId = (int) $request->query('distribution_item_id', 0);
-        $preselectedDistributionRecordId = $requestedDistributionRecordId > 0
-            && $distributionRecords->contains(fn (DistributionRecord $record): bool => (int) $record->distribution_record_id === $requestedDistributionRecordId)
-                ? $requestedDistributionRecordId
-                : ($requestedSupplyRequestId > 0
-                    ? $distributionRecords
-                        ->first(fn (DistributionRecord $record): bool => (int) $record->supply_request_id === $requestedSupplyRequestId)
-                        ?->distribution_record_id
-                    : null);
+
+        $preselectedCandidate = null;
+        if ($requestedDistributionRecordId > 0) {
+            $preselectedCandidate = $distributionRecords->first(fn (DistributionRecord $record): bool => (int) $record->distribution_record_id === $requestedDistributionRecordId);
+        } elseif ($requestedSupplyRequestId > 0) {
+            $preselectedCandidate = $distributionRecords->first(fn (DistributionRecord $record): bool => (int) $record->supply_request_id === $requestedSupplyRequestId);
+        }
+
+        $candidateHasOngoing = false;
+        if ($preselectedCandidate && ! ($parentClaim instanceof Claim)) {
+            $candidateHasOngoing = $activeClaimsByDistId->has((int) $preselectedCandidate->distribution_record_id)
+                || ($preselectedCandidate->supply_request_id && $activeClaimsBySrId->has((int) $preselectedCandidate->supply_request_id));
+        }
+
+        $preselectedDistributionRecordId = ($preselectedCandidate && ! $candidateHasOngoing)
+            ? (int) $preselectedCandidate->distribution_record_id
+            : null;
 
         return Inertia::render('Inventory/Claim/Create', [
-            'distributionRecords' => $distributionRecords->map(fn (DistributionRecord $record): array => [
-                'distribution_record_id' => (int) $record->distribution_record_id,
-                'distribution_code' => (string) $record->distribution_code,
-                'office_id' => (int) $record->office_id,
-                'office_name' => (string) ($record->office?->name ?? 'Unknown Office'),
-                'release_date' => optional($record->release_date)?->toDateString(),
-                'status' => (string) $record->status,
-                'request_code' => (string) ($record->supplyRequest?->request_code ?? '-'),
-                'items' => $record->items->map(fn ($item): array => [
-                    'distribution_item_id' => (int) $item->distribution_item_id,
-                    'item_id' => (int) $item->item_id,
-                    'item_name' => (string) ($item->item?->item_name ?? $item->item_name_snapshot),
-                    'quantity_released' => (float) $item->quantity_released,
-                    'quantity_received' => (float) $item->quantity_received,
-                    'quantity_damaged' => (float) $item->quantity_damaged,
-                    'quantity_missing' => (float) $item->quantity_missing,
-                    'unit' => (string) $item->unit,
-                ])->values(),
-            ])->values(),
+            'distributionRecords' => $distributionRecords->map(function (DistributionRecord $record) use ($activeClaimsByDistId, $activeClaimsBySrId, $parentClaim): array {
+                $ongoingClaim = null;
+                if (! ($parentClaim instanceof Claim)) {
+                    $ongoingClaim = $activeClaimsByDistId->get((int) $record->distribution_record_id)?->first()
+                        ?? ($record->supply_request_id ? $activeClaimsBySrId->get((int) $record->supply_request_id)?->first() : null);
+                }
+
+                return [
+                    'distribution_record_id' => (int) $record->distribution_record_id,
+                    'distribution_code' => (string) $record->distribution_code,
+                    'office_id' => (int) $record->office_id,
+                    'office_name' => (string) ($record->office?->name ?? 'Unknown Office'),
+                    'release_date' => optional($record->release_date)?->toDateString(),
+                    'status' => (string) $record->status,
+                    'request_code' => (string) ($record->supplyRequest?->request_code ?? '-'),
+                    'has_ongoing_claim' => $ongoingClaim !== null,
+                    'ongoing_claim_code' => $ongoingClaim?->claim_code,
+                    'items' => $record->items->map(fn ($item): array => [
+                        'distribution_item_id' => (int) $item->distribution_item_id,
+                        'item_id' => (int) $item->item_id,
+                        'item_name' => (string) ($item->item?->item_name ?? $item->item_name_snapshot),
+                        'quantity_released' => (float) $item->quantity_released,
+                        'quantity_received' => (float) $item->quantity_received,
+                        'quantity_damaged' => (float) $item->quantity_damaged,
+                        'quantity_missing' => (float) $item->quantity_missing,
+                        'unit' => (string) $item->unit,
+                    ])->values(),
+                ];
+            })->values(),
             'preselectedDistributionRecordId' => $preselectedDistributionRecordId,
             'preselectedDistributionItemId' => $requestedDistributionItemId > 0 ? $requestedDistributionItemId : null,
             'parentClaim' => $parentClaim instanceof Claim ? [
@@ -208,6 +241,7 @@ class ClaimController
             if (count($groupedByItem) > 1) {
                 $createdClaims = [];
                 DB::transaction(function () use (&$createdClaims, $groupedByItem, $validated, $distributionRecord, $request) {
+                    $batchClaimIds = [];
                     foreach ($groupedByItem as $itemGroup) {
                         $damaged = $itemGroup['quantity_damaged'];
                         $missing = $itemGroup['quantity_missing'];
@@ -224,9 +258,11 @@ class ClaimController
                             'quantity_damaged' => $damaged,
                             'quantity_missing' => $missing,
                             'claim_code' => null,
+                            'batch_created_claim_ids' => $batchClaimIds,
                         ]);
 
                         $createdClaim = $this->claimService->createClaim(request()->user(), $claimPayload);
+                        $batchClaimIds[] = (int) $createdClaim->claims_id;
                         $createdClaims[] = $createdClaim;
 
                         if ($request->hasFile('attachment_file')) {

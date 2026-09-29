@@ -23,6 +23,8 @@ type DistributionRecordOption = {
     release_date?: string | null;
     status: string;
     request_code: string;
+    has_ongoing_claim?: boolean;
+    ongoing_claim_code?: string | null;
     items?: DistributionItemOption[];
 };
 
@@ -224,6 +226,11 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                 return;
                             }
 
+                            if (selectedRecord?.has_ongoing_claim) {
+                                setValidationError(`This supply request already has an ongoing claim (${selectedRecord.ongoing_claim_code}) that is not yet completed. You cannot file a second claim until it is resolved or rejected.`);
+                                return;
+                            }
+
                             const unselectedLineIndex = issueLines.findIndex((l) => !l.distribution_item_id);
                             if (unselectedLineIndex !== -1) {
                                 setValidationError(`Please select an item on issue line #${unselectedLineIndex + 1} before submitting.`);
@@ -293,6 +300,10 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                     setValidationError(null);
                                     const selectedRecordId = Number(e.target.value);
                                     const selected = distributionRecords.find((record) => record.distribution_record_id === selectedRecordId);
+                                    if (selected?.has_ongoing_claim) {
+                                        setValidationError(`This supply request already has an ongoing claim (${selected.ongoing_claim_code}) that is not yet completed. You cannot file another claim until it is resolved or rejected.`);
+                                        return;
+                                    }
                                     const firstItem = selected?.items?.[0] ?? null;
                                     form.setData('distribution_record_id', selectedRecordId);
                                     form.setData('distribution_item_id', firstItem?.distribution_item_id ?? '');
@@ -306,8 +317,13 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                             >
                                 <option value="">Select Received Supply Request</option>
                                 {distributionRecords.map((record) => (
-                                    <option key={record.distribution_record_id} value={record.distribution_record_id}>
+                                    <option
+                                        key={record.distribution_record_id}
+                                        value={record.distribution_record_id}
+                                        disabled={record.has_ongoing_claim}
+                                    >
                                         {record.request_code} - {record.office_name}
+                                        {record.has_ongoing_claim ? ` (Has Ongoing Claim: ${record.ongoing_claim_code} - Pending)` : ''}
                                     </option>
                                 ))}
                             </select>
@@ -322,6 +338,15 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                 <p><span className="font-semibold text-slate-800">Received Supply Request:</span> {selectedRecord.request_code}</p>
                                 <p><span className="font-semibold text-slate-800">Ready Since:</span> {formatDate(selectedRecord.release_date)}</p>
                                 <p><span className="font-semibold text-slate-800">Receipt Status:</span> {selectedRecord.status}</p>
+                                {selectedRecord.has_ongoing_claim ? (
+                                    <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+                                        <p className="font-bold">Ongoing Claim in Progress</p>
+                                        <p className="mt-0.5">
+                                            This supply request already has an ongoing claim ({selectedRecord.ongoing_claim_code}) that is not yet completed.
+                                            Under GSO rules, you cannot file another claim for this request until the ongoing claim is resolved or rejected.
+                                        </p>
+                                    </div>
+                                ) : null}
                             </div>
                         ) : null}
 
@@ -663,7 +688,7 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                         <input type="hidden" value={form.data.parent_claim_id} readOnly />
                         <input type="hidden" value={form.data.source_type} readOnly />
 
-                        <button type="submit" disabled={form.processing} className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-60">
+                        <button type="submit" disabled={form.processing || Boolean(selectedRecord?.has_ongoing_claim)} className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-60">
                             {form.processing ? 'Submitting Claim...' : isFollowUpClaim ? 'Submit Follow-up Claim' : 'Submit Claim'}
                         </button>
                     </form>

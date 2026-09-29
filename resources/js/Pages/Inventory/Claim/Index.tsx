@@ -3,6 +3,7 @@ import PaginationNav from '@/Components/PaginationNav';
 import MonthFilterSelect from '@/Components/MonthFilterSelect';
 import useDebouncedValue from '@/hooks/useDebouncedValue';
 import { Head, Link, router } from '@inertiajs/react';
+import { humanizeEnum } from '@/lib/displayLabels';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 type ClaimRow = {
@@ -192,7 +193,7 @@ export default function ClaimIndex({ claims, filters, filter_options, routes, pe
                                 {claims.data.map((row) => (
                                     <tr key={row.claims_id} className="hover:bg-slate-50/60">
                                         <td className="px-3.5 py-2 font-mono text-[11px] font-semibold text-slate-700">{row.claim_code}</td>
-                                        <td className="px-3.5 py-2 text-slate-700">{row.claim_type}</td>
+                                        <td className="px-3.5 py-2 text-slate-700">{displayClaimType(row.claim_type)}</td>
                                         <td className="px-3.5 py-2">
                                             <span className={statusClass(row.status)}>{displayClaimStatus(row.status)}</span>
                                         </td>
@@ -254,6 +255,20 @@ function statusClass(status: string) {
     };
 
     return map[status] ?? `${base} bg-slate-100 text-slate-700`;
+}
+
+function displayClaimType(type: string): string {
+    const map: Record<string, string> = {
+        MISSING_ITEM: 'Missing Item',
+        DAMAGED_ITEM: 'Damaged Item',
+        MISSING_AND_DAMAGED: 'Missing and Damaged',
+        QUANTITY_MISMATCH: 'Quantity Mismatch',
+        WRONG_ITEM_RECEIVED: 'Wrong Item Received',
+        DEFECTIVE_PACKAGING: 'Defective Packaging',
+        SHORTAGE: 'Shortage',
+    };
+
+    return map[type] ?? humanizeEnum(type);
 }
 
 

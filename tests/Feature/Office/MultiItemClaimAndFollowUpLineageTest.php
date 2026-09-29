@@ -21,6 +21,7 @@ use App\Services\Procurement\PurchaseRequestService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class MultiItemClaimAndFollowUpLineageTest extends TestCase
@@ -323,4 +324,116 @@ class MultiItemClaimAndFollowUpLineageTest extends TestCase
         $this->assertSame('REPLACEMENT_RELEASED', (string) $updatedClaim->resolution_type);
         $this->assertEquals(50.0, (float) $updatedClaim->replacement_quantity);
     }
+
+    public function test_ongoing_claim_on_supply_request_blocks_second_claim_submission_and_dropdown_selection(): void
+    {
+        $category = \App\Models\ItemCategory::query()->create(['category_name' => 'IT Supplies', 'status' => 'active']);
+        $item = Item::create([
+            'item_category_id' => $category->item_category_id,
+            'item_code' => 'ITEM-INK-001',
+            'item_name' => 'Black Ink Bottle',
+            'default_unit' => 'bottle',
+            'status' => 'ACTIVE',
+        ]);
+
+        $supplyRequest = SupplyRequest::create([
+            'request_code' => 'SR-TEST-CLAIM-BLOCK-001',
+            'office_id' => $this->office->id,
+            'requested_by' => $this->officeUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(7)->toDateString(),
+            'priority_level' => 'NORMAL',
+            'request_category' => 'GENERAL',
+            'purpose' => 'Claim Blocker Test',
+            'status' => 'SUBMITTED',
+        ]);
+
+        $distRecord = DistributionRecord::create([
+            'distribution_code' => 'DIS-TEST-CLAIM-BLOCK-001',
+            'supply_request_id' => $supplyRequest->supply_request_id,
+            'office_id' => $this->office->id,
+            'prepared_by' => $this->gsoUser->id,
+            'release_date' => now()->toDateString(),
+            'status' => 'RECEIVED',
+        ]);
+
+        $distItem = DistributionItem::create([
+            'distribution_record_id' => $distRecord->distribution_record_id,
+            'item_id' => $item->item_id,
+            'item_name_snapshot' => $item->item_name,
+            'quantity_requested' => 10,
+            'quantity_released' => 10,
+            'quantity_received' => 10,
+            'unit' => 'bottle',
+        ]);
+
+        $evidenceFile = UploadedFile::fake()->create('defect.jpg', 200, 'image/jpeg');
+
+        // 1. Submit the first claim on this supply request
+        $firstClaimResponse = $this->actingAs($this->officeUser)->post(route('office.claims.store'), [
+            'distribution_record_id' => $distRecord->distribution_record_id,
+            'distribution_item_id' => $distItem->distribution_item_id,
+            'office_id' => $this->office->id,
+            'claim_type' => 'DAMAGED_ITEM',
+            'claim_date' => now()->toDateString(),
+            'claim_location' => 'Office Storage',
+            'quantity_disputed' => 3,
+            'quantity_damaged' => 3,
+            'quantity_missing' => 0,
+            'remarks' => 'First claim for damaged ink bottles.',
+            'attachment_file' => $evidenceFile,
+        ]);
+
+        $firstClaimResponse->assertSessionHasNoErrors();
+        $this->assertCount(1, Claim::where('distribution_record_id', $distRecord->distribution_record_id)->get());
+        $claim = Claim::where('distribution_record_id', $distRecord->distribution_record_id)->first();
+        $this->assertSame('OPEN', (string) $claim->status);
+
+        // 2. Attempt to submit a second claim while the first claim is still ongoing -> MUST be blocked
+        $secondClaimResponse = $this->actingAs($this->officeUser)->post(route('office.claims.store'), [
+            'distribution_record_id' => $distRecord->distribution_record_id,
+            'distribution_item_id' => $distItem->distribution_item_id,
+            'office_id' => $this->office->id,
+            'claim_type' => 'MISSING_ITEM',
+            'claim_date' => now()->toDateString(),
+            'claim_location' => 'Office Storage',
+            'quantity_disputed' => 2,
+            'quantity_damaged' => 0,
+            'quantity_missing' => 2,
+            'remarks' => 'Attempt to file second claim while first is ongoing.',
+            'attachment_file' => $evidenceFile,
+        ]);
+
+        $secondClaimResponse->assertSessionHasErrors(['distribution_record_id']);
+        $this->assertCount(1, Claim::where('distribution_record_id', $distRecord->distribution_record_id)->get());
+
+        // 3. Verify on the claims create page that this supply request is marked has_ongoing_claim = true
+        $createPageResponse = $this->actingAs($this->officeUser)->get(route('office.claims.create', [
+            'distribution_record_id' => $distRecord->distribution_record_id,
+        ]));
+
+        $createPageResponse->assertInertia(fn (Assert $page) => $page
+            ->component('Inventory/Claim/Create')
+            ->where('preselectedDistributionRecordId', null)
+            ->where('distributionRecords', fn ($records) => collect($records)
+                ->contains(fn ($r) => (int) $r['distribution_record_id'] === (int) $distRecord->distribution_record_id
+                    && $r['has_ongoing_claim'] === true
+                    && $r['ongoing_claim_code'] === $claim->claim_code
+                )
+            )
+        );
+
+        // 4. Resolve the claim and verify it unblocks the supply request
+        $claim->forceFill(['status' => 'RESOLVED'])->save();
+
+        $unblockedCreatePageResponse = $this->actingAs($this->officeUser)->get(route('office.claims.create'));
+        $unblockedCreatePageResponse->assertInertia(fn (Assert $page) => $page
+            ->where('distributionRecords', fn ($records) => collect($records)
+                ->contains(fn ($r) => (int) $r['distribution_record_id'] === (int) $distRecord->distribution_record_id
+                    && $r['has_ongoing_claim'] === false
+                )
+            )
+        );
+    }
 }
+

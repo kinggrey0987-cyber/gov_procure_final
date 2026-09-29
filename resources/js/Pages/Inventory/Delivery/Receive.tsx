@@ -240,6 +240,16 @@ export default function DeliveryReceive({ delivery }: Props) {
             return;
         }
 
+        if (data.delivery_receipt_no && !/\d/.test(data.delivery_receipt_no)) {
+            setFileError('Supplier Delivery Receipt (DR) Number must contain numbers or digits (e.g., DR-2026-0814 or 89201).');
+            return;
+        }
+
+        if (!isZeroCost && data.sales_invoice_no && !/\d/.test(data.sales_invoice_no)) {
+            setFileError('Supplier Sales Invoice (SI) Number must contain numbers or digits (e.g., SI-2026-4402 or 44102).');
+            return;
+        }
+
         transform((formData) => ({
             ...formData,
             _method: 'PUT',
