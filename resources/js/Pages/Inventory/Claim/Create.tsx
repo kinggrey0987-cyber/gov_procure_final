@@ -432,7 +432,7 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                         <span className="rounded bg-slate-200/80 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">Step 1</span>
                                     </label>
                                     <select
-                                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-2xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 disabled:bg-slate-100 disabled:text-slate-400"
+                                        className="w-full max-w-full truncate rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-2xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 disabled:bg-slate-100 disabled:text-slate-400"
                                         value={selectedRequestCode}
                                         disabled={isFollowUpClaim}
                                         onChange={(e) => handleRequestCodeChange(e.target.value)}
@@ -459,7 +459,7 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                         <span className="rounded bg-slate-200/80 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">Step 2</span>
                                     </label>
                                     <select
-                                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-2xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 disabled:bg-slate-100 disabled:text-slate-400"
+                                        className="w-full max-w-full truncate rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-2xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 disabled:bg-slate-100 disabled:text-slate-400"
                                         value={form.data.distribution_record_id}
                                         disabled={isFollowUpClaim || !selectedRequestCode}
                                         onChange={(e) => handleBatchSelect(Number(e.target.value))}
@@ -473,9 +473,8 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                         </option>
                                         {availableBatches.map((record, index) => {
                                             const batchPrefix = availableBatches.length > 1 ? `Batch ${index + 1}: ` : '';
-                                            const itemsSummary = record.items && record.items.length > 0
-                                                ? record.items.slice(0, 2).map((i) => `${Math.trunc(i.quantity_released)} ${i.unit || 'unit'} ${i.item_name}`).join(', ') + (record.items.length > 2 ? ` +${record.items.length - 2} more` : '')
-                                                : 'No items recorded';
+                                            const itemCount = record.items?.length ?? 0;
+                                            const countLabel = itemCount > 0 ? ` (${itemCount} ${itemCount === 1 ? 'item' : 'items'})` : '';
 
                                             return (
                                                 <option
@@ -483,7 +482,7 @@ export default function ClaimCreate({ distributionRecords, preselectedDistributi
                                                     value={record.distribution_record_id}
                                                     disabled={record.has_ongoing_claim}
                                                 >
-                                                    {batchPrefix}{record.distribution_code} ({formatDate(record.release_date)}) — {itemsSummary}
+                                                    {batchPrefix}{record.distribution_code} — {formatDate(record.release_date)}{countLabel}
                                                     {record.has_ongoing_claim ? ` [Ongoing Claim: ${record.ongoing_claim_code}]` : ''}
                                                 </option>
                                             );

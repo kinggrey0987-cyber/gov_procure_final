@@ -47,8 +47,7 @@ class PurchaseOrderService
 
             $this->assertPurchaseRequestCanCreatePurchaseOrder($purchaseRequest);
 
-            $isReplacement = (string) $purchaseRequest->source_type === 'PARTIAL_DELIVERY_FOLLOW_UP'
-                || (int) ($purchaseRequest->source_delivery_id ?? 0) > 0;
+            $isReplacement = (bool) $purchaseRequest->is_zero_cost_replacement;
 
             $supplierId = (int) $payload['supplier_id'];
             if ($isReplacement && $purchaseRequest->sourceDelivery) {

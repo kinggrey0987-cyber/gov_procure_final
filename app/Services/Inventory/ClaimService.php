@@ -334,7 +334,7 @@ class ClaimService
                 : 'Replacement items verified and accepted by requesting office.';
 
             $cumulativeReplacementQty = $distService->calculateCumulativeReplacementQuantity($claim);
-            $effectiveReplacementQty = max((float) $claim->replacement_quantity, $cumulativeReplacementQty);
+            $effectiveReplacementQty = min((float) $claim->quantity_disputed, max((float) $claim->replacement_quantity, $cumulativeReplacementQty));
 
             if ($effectiveReplacementQty <= 0) {
                 $followUpItemsQty = (float) \App\Models\DistributionItem::query()

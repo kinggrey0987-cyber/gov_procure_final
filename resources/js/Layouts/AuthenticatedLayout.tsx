@@ -87,9 +87,18 @@ export default function Authenticated({
         document.documentElement.classList.add('app-shell-active');
         document.body.classList.add('app-shell-active');
 
+        const handleWindowScroll = () => {
+            if (window.scrollY !== 0 || window.scrollX !== 0) {
+                window.scrollTo(0, 0);
+            }
+        };
+
+        window.addEventListener('scroll', handleWindowScroll, { passive: true });
+
         return () => {
             document.documentElement.classList.remove('app-shell-active');
             document.body.classList.remove('app-shell-active');
+            window.removeEventListener('scroll', handleWindowScroll);
         };
     }, [isAnyShell]);
 

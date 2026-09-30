@@ -1264,30 +1264,31 @@ class SupplyRequestController extends Controller
             ->values()
             ->all();
 
-        $followUpClaimIds = \App\Models\PurchaseRequest::query()
-            ->whereNotNull('source_claim_id')
-            ->pluck('source_claim_id')
-            ->map(fn ($id): int => (int) $id)
-            ->unique()
-            ->values()
-            ->all();
-
-        $excludedClaimIds = array_unique(array_merge($coveredClaimIds, $followUpClaimIds));
+        $excludedClaimIds = $coveredClaimIds;
 
         $claimReplacements = \App\Models\Claim::query()
             ->with(['distributionItem.item', 'distributionRecord.supplyRequest'])
             ->where('office_id', $officeId)
-            ->whereIn('status', ['REPLACEMENT_RELEASED', 'RESOLVED', 'PARTIALLY_RESOLVED'])
+            ->whereIn('status', ['REPLACEMENT_RELEASED', 'RESOLVED', 'PARTIALLY_RESOLVED', 'PENDING_REPLACEMENT'])
             ->where('replacement_quantity', '>', 0)
             ->whereNotIn('claims_id', $excludedClaimIds)
             ->latest('claims_id')
             ->get()
-            ->map(function (\App\Models\Claim $claim): array {
+            ->map(function (\App\Models\Claim $claim) use ($officeId): array {
                 $itemName = (string) ($claim->distributionItem?->item?->item_name
                     ?? $claim->distributionItem?->item_name_snapshot
                     ?? 'Replacement Item');
                 $qty = (int) ($claim->replacement_quantity > 0 ? $claim->replacement_quantity : $claim->quantity_disputed);
-                $isReleased = (string) $claim->status === 'REPLACEMENT_RELEASED';
+
+                $latestOfficeConfirmation = \App\Models\ApprovalHistory::query()
+                    ->where('reference_type', \App\Models\Claim::class)
+                    ->where('reference_id', (int) $claim->claims_id)
+                    ->where('remarks', 'like', '%Office accepted replacement items%')
+                    ->latest('approved_at')
+                    ->first();
+
+                $isReleased = in_array((string) $claim->status, ['REPLACEMENT_RELEASED', 'PARTIALLY_RESOLVED', 'PENDING_REPLACEMENT'], true)
+                    && (! $latestOfficeConfirmation || ($claim->updated_at && $claim->updated_at->gt($latestOfficeConfirmation->approved_at)));
 
                 return [
                     'distribution_record_id' => 0,

@@ -368,6 +368,7 @@ class DistributionRecordService
             $this->recordApproval($record, $actor, 'RECEIVED', 'Distribution received confirmation recorded.');
             $this->recordAudit($actor, 'MARK_RECEIVED', $record, []);
             $this->procurementStatusSyncService->syncCompletedStatusesForReceivedSupplyRequest($record->supplyRequest()->firstOrFail(), $actor);
+            $this->syncClaimOnReceipt($record, $actor);
 
             return $record->fresh(['office', 'receiver', 'items']) ?? $record;
         });
@@ -1135,7 +1136,18 @@ class DistributionRecordService
             }
         }
 
-        return $total;
+        $directStock = (float) \App\Models\InventoryMovement::query()
+            ->where('reference_type', Claim::class)
+            ->where('reference_id', (int) $claim->claims_id)
+            ->where('movement_type', 'CLAIM_REPLACEMENT')
+            ->sum('quantity');
+
+        if ($directStock <= 0.0001 && $total > 0 && (float) $claim->replacement_quantity > 0) {
+            $priorDirect = max(0.0, (float) $claim->replacement_quantity - $total);
+            return min((float) $claim->quantity_disputed, $total + $priorDirect);
+        }
+
+        return min((float) $claim->quantity_disputed, $total + $directStock);
     }
 
     private function syncClaimOnRelease(DistributionRecord $record, User $actor): void
@@ -1147,8 +1159,7 @@ class DistributionRecordService
 
         if (in_array((string) $claim->status, ['PENDING_REPLACEMENT', 'OPEN', 'IN_REVIEW', 'PARTIALLY_RESOLVED'], true)) {
             $oldStatus = (string) $claim->status;
-            $cumulativeReplacementQty = $this->calculateCumulativeReplacementQuantity($claim);
-            $newReplacementQty = max((float) $claim->replacement_quantity, $cumulativeReplacementQty);
+            $newReplacementQty = $this->calculateCumulativeReplacementQuantity($claim);
             $disputedQty = (float) $claim->quantity_disputed;
             $resolutionType = ($newReplacementQty >= ($disputedQty - 0.0001)) ? 'REPLACEMENT_RELEASED' : 'PARTIAL_REPLACEMENT';
 
@@ -1236,7 +1247,7 @@ class DistributionRecordService
             }
 
             $cumulativeReplacementQty = $this->calculateCumulativeReplacementQuantity($claim);
-            $totalReplacementQty = max((float) $claim->replacement_quantity, $cumulativeReplacementQty, $receivedQtyInThisRecord);
+            $totalReplacementQty = min((float) $claim->quantity_disputed, max((float) $claim->replacement_quantity, $cumulativeReplacementQty, $receivedQtyInThisRecord));
             $disputedQty = (float) $claim->quantity_disputed;
             $isFullyResolved = ($disputedQty > 0.0001)
                 ? ($totalReplacementQty >= ($disputedQty - 0.0001))

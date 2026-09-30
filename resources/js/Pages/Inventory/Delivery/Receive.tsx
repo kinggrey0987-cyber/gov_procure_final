@@ -149,6 +149,11 @@ export default function DeliveryReceive({ delivery }: Props) {
             return [...prev, ...valid.filter((f) => !existing.has(`${f.name}_${f.size}`))];
         });
         e.target.value = '';
+        requestAnimationFrame(() => {
+            if (window.scrollY !== 0 || window.scrollX !== 0) {
+                window.scrollTo(0, 0);
+            }
+        });
     };
 
     const removeDrFile = (index: number) => {
@@ -170,6 +175,11 @@ export default function DeliveryReceive({ delivery }: Props) {
             return [...prev, ...valid.filter((f) => !existing.has(`${f.name}_${f.size}`))];
         });
         e.target.value = '';
+        requestAnimationFrame(() => {
+            if (window.scrollY !== 0 || window.scrollX !== 0) {
+                window.scrollTo(0, 0);
+            }
+        });
     };
 
     const removeSiFile = (index: number) => {
@@ -191,6 +201,11 @@ export default function DeliveryReceive({ delivery }: Props) {
             return [...prev, ...valid.filter((f) => !existing.has(`${f.name}_${f.size}`))];
         });
         e.target.value = '';
+        requestAnimationFrame(() => {
+            if (window.scrollY !== 0 || window.scrollX !== 0) {
+                window.scrollTo(0, 0);
+            }
+        });
     };
 
     const removeSupportingFile = (index: number) => {
@@ -475,7 +490,7 @@ export default function DeliveryReceive({ delivery }: Props) {
                                                         accept="image/*,application/pdf"
                                                         capture="environment"
                                                         onChange={handleDrFilesAdd}
-                                                        className="sr-only"
+                                                        className="hidden"
                                                     />
                                                 </label>
                                                 <span className="text-[11px] text-slate-400">PDF, PNG, JPG (Max 10MB each)</span>
@@ -536,7 +551,7 @@ export default function DeliveryReceive({ delivery }: Props) {
                                                         accept="image/*,application/pdf"
                                                         capture="environment"
                                                         onChange={handleSiFilesAdd}
-                                                        className="sr-only"
+                                                        className="hidden"
                                                     />
                                                 </label>
                                                 <span className="text-[11px] text-slate-400">PDF, PNG, JPG (Max 10MB each)</span>
@@ -592,7 +607,7 @@ export default function DeliveryReceive({ delivery }: Props) {
                                                         accept="image/*,application/pdf"
                                                         capture="environment"
                                                         onChange={handleSupportingFilesAdd}
-                                                        className="sr-only"
+                                                        className="hidden"
                                                     />
                                                 </label>
                                                 <span className="text-[11px] text-slate-400">PDF, PNG, JPG (Max 10MB each)</span>

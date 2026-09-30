@@ -496,7 +496,7 @@ class PurchaseRequestService
             : 'Generated from claim pending replacement due to insufficient GSO stock.';
 
         return DB::transaction(function () use ($actor, $claim, $itemId, $itemName, $officeId, $quantityToProcure, $baseRemarks, $ppmpId, $ppmpItemId, $specification): PurchaseRequest {
-            if ((string) $claim->status !== 'PENDING_REPLACEMENT') {
+            if ((string) $claim->status !== 'PENDING_REPLACEMENT' && (string) $claim->status !== 'PARTIALLY_RESOLVED' && (float) $claim->replacement_quantity <= 0.0001) {
                 $oldClaimStatus = (string) $claim->status;
                 $claim->forceFill([
                     'status' => 'PENDING_REPLACEMENT',
