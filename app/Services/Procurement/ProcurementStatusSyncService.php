@@ -146,7 +146,10 @@ class ProcurementStatusSyncService
 
         SupplyRequest::query()
             ->with(['items', 'distributionRecords.items', 'purchaseRequests', 'purchaseOrders'])
-            ->whereHas('distributionRecords', fn ($query) => $query->where('status', 'RECEIVED'))
+            ->where(function ($query) {
+                $query->whereHas('distributionRecords', fn ($q) => $q->where('status', 'RECEIVED'))
+                    ->orWhereIn('status', ['APPROVED', 'PARTIALLY_RECEIVED']);
+            })
             ->orderBy('supply_request_id')
             ->chunkById(100, function ($requests) use ($actor, &$synced): void {
                 foreach ($requests as $supplyRequest) {

@@ -1289,4 +1289,173 @@ class ConsolidatedFollowUpParentVsChildReleaseTest extends TestCase
         $distRecords4Final = $show4Final->viewData('page')['props']['distributionRecords'];
         $this->assertCount(2, $distRecords4Final);
     }
+
+    public function test_nested_follow_up_sr_lineage_syncs_and_displays_records_properly(): void
+    {
+        $traceability = app(\App\Services\Procurement\ConsolidationTraceabilityService::class);
+        $syncService = app(ProcurementStatusSyncService::class);
+
+        // Root SR-4
+        $rootSr = SupplyRequest::query()->create([
+            'request_code' => 'SR-MPDO-2026-09-0004',
+            'office_id' => $this->office->id,
+            'requested_by' => $this->officeUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(7)->toDateString(),
+            'request_category' => 'NORMAL',
+            'priority_level' => 'NORMAL',
+            'purpose' => 'Root Requisition',
+            'status' => 'PARTIALLY_RECEIVED',
+        ]);
+        SupplyRequestItem::query()->create([
+            'supply_request_id' => $rootSr->supply_request_id,
+            'item_id' => $this->item->item_id,
+            'item_name_snapshot' => $this->item->item_name,
+            'quantity_requested' => 50,
+            'quantity_remaining' => 0,
+            'unit' => 'box',
+        ]);
+
+        // Direct distribution on root SR (10 boxes)
+        $distRoot = DistributionRecord::query()->create([
+            'distribution_code' => 'DIST-2026-09-0004',
+            'supply_request_id' => $rootSr->supply_request_id,
+            'office_id' => $this->office->id,
+            'prepared_by' => $this->gsoUser->id,
+            'release_date' => now()->toDateString(),
+            'status' => 'RECEIVED',
+        ]);
+        \App\Models\DistributionItem::query()->create([
+            'distribution_record_id' => $distRoot->distribution_record_id,
+            'item_id' => $this->item->item_id,
+            'item_name_snapshot' => $this->item->item_name,
+            'quantity_requested' => 10,
+            'quantity_released' => 10,
+            'quantity_received' => 10,
+            'unit' => 'box',
+        ]);
+
+        // Intermediate follow-up SR-8 (40 boxes deficit from root)
+        $sr8 = SupplyRequest::query()->create([
+            'request_code' => 'SR-MPDO-2026-09-0008',
+            'office_id' => $this->office->id,
+            'requested_by' => $this->officeUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(7)->toDateString(),
+            'request_category' => 'FOLLOW_UP',
+            'priority_level' => 'NORMAL',
+            'purpose' => 'Follow up requisition 1',
+            'status' => 'PARTIALLY_RECEIVED',
+        ]);
+        SupplyRequestItem::query()->create([
+            'supply_request_id' => $sr8->supply_request_id,
+            'item_id' => $this->item->item_id,
+            'item_name_snapshot' => $this->item->item_name,
+            'quantity_requested' => 40,
+            'quantity_remaining' => 0,
+            'unit' => 'box',
+        ]);
+        PurchaseRequest::query()->create([
+            'pr_number' => 'PR-2026-09-0008',
+            'supply_request_id' => $sr8->supply_request_id,
+            'office_id' => $this->office->id,
+            'requested_by' => $this->officeUser->id,
+            'source_supply_request_id' => $rootSr->supply_request_id,
+            'source_type' => 'PARTIAL_DELIVERY_FOLLOW_UP',
+            'status' => 'PROCESSING',
+        ]);
+
+        // First delivery/distribution on SR-8 (30 boxes)
+        $dist8 = DistributionRecord::query()->create([
+            'distribution_code' => 'DIST-2026-09-0008',
+            'supply_request_id' => $sr8->supply_request_id,
+            'office_id' => $this->office->id,
+            'prepared_by' => $this->gsoUser->id,
+            'release_date' => now()->toDateString(),
+            'status' => 'RECEIVED',
+        ]);
+        \App\Models\DistributionItem::query()->create([
+            'distribution_record_id' => $dist8->distribution_record_id,
+            'item_id' => $this->item->item_id,
+            'item_name_snapshot' => $this->item->item_name,
+            'quantity_requested' => 30,
+            'quantity_released' => 30,
+            'quantity_received' => 30,
+            'unit' => 'box',
+        ]);
+
+        // Second follow-up SR-9 (10 boxes deficit from SR-8)
+        $sr9 = SupplyRequest::query()->create([
+            'request_code' => 'SR-MPDO-2026-09-0009',
+            'office_id' => $this->office->id,
+            'requested_by' => $this->officeUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(7)->toDateString(),
+            'request_category' => 'FOLLOW_UP',
+            'priority_level' => 'NORMAL',
+            'purpose' => 'Follow up requisition 2',
+            'status' => 'APPROVED',
+        ]);
+        SupplyRequestItem::query()->create([
+            'supply_request_id' => $sr9->supply_request_id,
+            'item_id' => $this->item->item_id,
+            'item_name_snapshot' => $this->item->item_name,
+            'quantity_requested' => 10,
+            'quantity_remaining' => 0,
+            'unit' => 'box',
+        ]);
+        PurchaseRequest::query()->create([
+            'pr_number' => 'PR-2026-09-0009',
+            'supply_request_id' => $sr9->supply_request_id,
+            'office_id' => $this->office->id,
+            'requested_by' => $this->officeUser->id,
+            'source_supply_request_id' => $sr8->supply_request_id,
+            'source_type' => 'PARTIAL_DELIVERY_FOLLOW_UP',
+            'status' => 'PROCESSING',
+        ]);
+
+        // Distribution on SR-9 (10 boxes)
+        $dist9 = DistributionRecord::query()->create([
+            'distribution_code' => 'DIST-2026-09-0009',
+            'supply_request_id' => $sr9->supply_request_id,
+            'office_id' => $this->office->id,
+            'prepared_by' => $this->gsoUser->id,
+            'release_date' => now()->toDateString(),
+            'status' => 'RECEIVED',
+        ]);
+        \App\Models\DistributionItem::query()->create([
+            'distribution_record_id' => $dist9->distribution_record_id,
+            'item_id' => $this->item->item_id,
+            'item_name_snapshot' => $this->item->item_name,
+            'quantity_requested' => 10,
+            'quantity_released' => 10,
+            'quantity_received' => 10,
+            'unit' => 'box',
+        ]);
+
+        // Test calculateAllocatedFulfillment for SR-8
+        $fulfillment8 = $traceability->calculateAllocatedFulfillment($sr8);
+        $this->assertEquals(40.0, (float) $fulfillment8['requested']);
+        $this->assertEquals(40.0, (float) $fulfillment8['released']);
+        $this->assertEquals(40.0, (float) $fulfillment8['received']);
+        $this->assertTrue((bool) $fulfillment8['is_fully_received']);
+        $this->assertCount(2, $fulfillment8['allocated_records']);
+
+        // Now test syncCompletedStatusesForReceivedSupplyRequest starting from SR-9
+        $syncService->syncCompletedStatusesForReceivedSupplyRequest($sr9, $this->officeUser);
+
+        $sr9->refresh();
+        $sr8->refresh();
+        $rootSr->refresh();
+
+        $this->assertSame('RECEIVED', (string) $sr9->status);
+        $this->assertSame('RECEIVED', (string) $sr8->status);
+        $this->assertSame('RECEIVED', (string) $rootSr->status);
+
+        // Check Show page of SR-8: Related Records should display both records
+        $response8 = $this->actingAs($this->officeUser)->get(route('office.supply-requests.show', $sr8->supply_request_id));
+        $props8 = $response8->viewData('page')['props'];
+        $this->assertSame('RECEIVED', (string) $props8['supplyRequest']['status']);
+        $this->assertCount(2, $props8['distributionRecords']);
+    }
 }

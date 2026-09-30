@@ -829,30 +829,49 @@ class ConsolidationTraceabilityService
             $directRecords = $supplyRequest->distributionRecords
                 ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED']);
 
-            $released = (float) $directRecords
-                ->whereIn('status', ['RELEASED', 'RECEIVED'])
-                ->flatMap(fn ($r) => $r->items)
-                ->sum('quantity_released');
+            $childIds = $followUpService->resolveAllFollowUpChildSupplyRequestIds($supplyRequest);
+            $followUpRecords = empty($childIds)
+                ? collect()
+                : DistributionRecord::query()
+                    ->with(['items.item', 'delivery', 'supplyRequest'])
+                    ->whereIn('supply_request_id', $childIds)
+                    ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
+                    ->get();
 
-            $received = (float) $directRecords
-                ->where('status', 'RECEIVED')
-                ->flatMap(fn ($r) => $r->items)
-                ->sum('quantity_received');
+            $allRecords = $directRecords->concat($followUpRecords)->values();
 
+            $releasedByItem = [];
+            $receivedByItem = [];
+            foreach ($allRecords as $record) {
+                if (in_array($record->status, ['RELEASED', 'RECEIVED'], true)) {
+                    foreach ($record->items as $item) {
+                        $itemId = (int) $item->item_id;
+                        $releasedByItem[$itemId] = ($releasedByItem[$itemId] ?? 0.0) + (float) $item->quantity_released;
+                    }
+                }
+                if ($record->status === 'RECEIVED') {
+                    foreach ($record->items as $item) {
+                        $itemId = (int) $item->item_id;
+                        $receivedByItem[$itemId] = ($receivedByItem[$itemId] ?? 0.0) + (float) ($item->quantity_received ?? $item->quantity_released);
+                    }
+                }
+            }
+
+            $isFullyReceived = true;
+            $isFullyReleased = true;
             $byItem = [];
             foreach ($supplyRequest->items as $sri) {
                 $itemId = (int) $sri->item_id;
                 $req = (float) $sri->quantity_requested;
-                $itemRel = (float) $directRecords
-                    ->whereIn('status', ['RELEASED', 'RECEIVED'])
-                    ->flatMap(fn ($r) => $r->items)
-                    ->where('item_id', $itemId)
-                    ->sum('quantity_released');
-                $itemRec = (float) $directRecords
-                    ->where('status', 'RECEIVED')
-                    ->flatMap(fn ($r) => $r->items)
-                    ->where('item_id', $itemId)
-                    ->sum('quantity_received');
+                $itemRel = (float) ($releasedByItem[$itemId] ?? 0.0);
+                $itemRec = (float) ($receivedByItem[$itemId] ?? 0.0);
+
+                if ($itemRec + 0.0001 < $req) {
+                    $isFullyReceived = false;
+                }
+                if ($itemRel + 0.0001 < $req) {
+                    $isFullyReleased = false;
+                }
 
                 $byItem[$itemId] = [
                     'requested' => $req,
@@ -863,36 +882,40 @@ class ConsolidationTraceabilityService
                 ];
             }
 
-            $allocatedRecords = $directRecords
+            $allocatedRecords = $allRecords
                 ->filter(fn ($r) => in_array($r->status, ['RELEASED', 'RECEIVED'], true))
-                ->map(fn ($r): array => [
-                    'distribution_record_id' => (int) $r->distribution_record_id,
-                    'distribution_code' => (string) $r->distribution_code,
-                    'delivery_code' => (string) ($r->delivery?->delivery_code ?? 'Warehouse Inventory'),
-                    'supply_request_code' => (string) $supplyRequest->request_code,
-                    'is_follow_up' => false,
-                    'is_follow_up_fulfillment' => false,
-                    'status' => (string) $r->status,
-                    'release_date' => optional($r->release_date)?->toDateString(),
-                    'received_date' => optional($r->received_date)?->toDateString(),
-                    'storage_location' => (string) ($r->storage_location ?? 'GSO Storage'),
-                    'items' => $r->items->map(fn ($di): array => [
-                        'distribution_item_id' => (int) $di->distribution_item_id,
-                        'item_id' => (int) $di->item_id,
-                        'item_name' => (string) ($di->item?->item_name ?? $di->item_name_snapshot ?? 'Item'),
-                        'unit' => (string) ($di->unit ?? $di->item?->default_unit ?? 'UNIT'),
-                        'quantity_released' => (float) $di->quantity_released,
-                        'quantity_received' => (float) ($di->quantity_received ?? 0),
-                        'quantity_damaged' => (float) ($di->quantity_damaged ?? 0),
-                    ])->values()->all(),
-                ]);
+                ->map(function ($r) use ($supplyRequest): array {
+                    $isDirect = (int) $r->supply_request_id === (int) $supplyRequest->supply_request_id;
+
+                    return [
+                        'distribution_record_id' => (int) $r->distribution_record_id,
+                        'distribution_code' => (string) $r->distribution_code,
+                        'delivery_code' => (string) ($r->delivery?->delivery_code ?? 'Warehouse Inventory'),
+                        'supply_request_code' => (string) ($r->supplyRequest?->request_code ?? $supplyRequest->request_code),
+                        'is_follow_up' => ! $isDirect,
+                        'is_follow_up_fulfillment' => ! $isDirect,
+                        'status' => (string) $r->status,
+                        'release_date' => optional($r->release_date)?->toDateString(),
+                        'received_date' => optional($r->received_date)?->toDateString(),
+                        'storage_location' => (string) ($r->storage_location ?? 'GSO Storage'),
+                        'items' => $r->items->map(fn ($di): array => [
+                            'distribution_item_id' => (int) $di->distribution_item_id,
+                            'item_id' => (int) $di->item_id,
+                            'item_name' => (string) ($di->item?->item_name ?? $di->item_name_snapshot ?? 'Item'),
+                            'unit' => (string) ($di->unit ?? $di->item?->default_unit ?? 'UNIT'),
+                            'quantity_released' => (float) $di->quantity_released,
+                            'quantity_received' => (float) ($di->quantity_received ?? 0),
+                            'quantity_damaged' => (float) ($di->quantity_damaged ?? 0),
+                        ])->values()->all(),
+                    ];
+                });
 
             return [
                 'requested' => $requestedTotal,
-                'released' => $released,
-                'received' => $received,
-                'is_fully_received' => ($received + 0.0001 >= $requestedTotal),
-                'is_fully_released' => ($released + 0.0001 >= $requestedTotal),
+                'released' => (float) array_sum($releasedByItem),
+                'received' => (float) array_sum($receivedByItem),
+                'is_fully_received' => $isFullyReceived,
+                'is_fully_released' => $isFullyReleased,
                 'by_item' => $byItem,
                 'allocated_records' => $allocatedRecords,
             ];
