@@ -101,27 +101,37 @@ class ProcurementStatusSyncService
                 $current = $parent;
             }
 
-            // Consolidated procurement family completion check
+            // Consolidated procurement constituent fulfillment check
             $rootSr = $this->followUpService->resolveRootSupplyRequest($supplyRequest);
             $consolidatedCandidates = $this->resolveConsolidatedConstituentSupplyRequests($rootSr);
-            if ($consolidatedCandidates->count() > 1 && $this->isConsolidatedFamilyFullyReceived($consolidatedCandidates)) {
-                $consolidatedRemarks = 'Consolidated procurement was fully received across follow-up deliveries.';
+            if ($consolidatedCandidates->count() > 1) {
+                $allCandidatesFullyReceived = true;
                 foreach ($consolidatedCandidates as $candidate) {
-                    $this->transitionSupplyRequest($candidate, $actor, $consolidatedRemarks);
-                    $this->transitionPurchaseRequests($candidate->purchaseRequests, $actor, $consolidatedRemarks);
-                    $this->transitionPurchaseOrders($candidate->purchaseOrders, $actor, $consolidatedRemarks);
+                    if ($this->isFullyReceived($candidate)) {
+                        $constituentRemarks = 'Consolidated procurement constituent was fully received across deliveries.';
+                        $this->transitionSupplyRequest($candidate, $actor, $constituentRemarks);
+                        $this->transitionPurchaseRequests($candidate->purchaseRequests, $actor, $constituentRemarks);
+                        $this->transitionPurchaseOrders($candidate->purchaseOrders, $actor, $constituentRemarks);
+                    } else {
+                        $allCandidatesFullyReceived = false;
+                    }
+                }
 
-                    $childIds = $this->resolveFulfillmentChildSupplyRequestIds($candidate);
-                    if (! empty($childIds)) {
-                        $children = SupplyRequest::query()
-                            ->with(['items', 'distributionRecords.items', 'purchaseRequests', 'purchaseOrders'])
-                            ->whereIn('supply_request_id', $childIds)
-                            ->get();
-                        foreach ($children as $child) {
-                            if ($this->canSyncChildWhenParentFullyReceived($child, $candidate)) {
-                                $this->transitionSupplyRequest($child, $actor, $consolidatedRemarks);
-                                $this->transitionPurchaseRequests($child->purchaseRequests, $actor, $consolidatedRemarks);
-                                $this->transitionPurchaseOrders($child->purchaseOrders, $actor, $consolidatedRemarks);
+                if ($allCandidatesFullyReceived) {
+                    $consolidatedRemarks = 'Consolidated procurement was fully received across follow-up deliveries.';
+                    foreach ($consolidatedCandidates as $candidate) {
+                        $childIds = $this->resolveFulfillmentChildSupplyRequestIds($candidate);
+                        if (! empty($childIds)) {
+                            $children = SupplyRequest::query()
+                                ->with(['items', 'distributionRecords.items', 'purchaseRequests', 'purchaseOrders'])
+                                ->whereIn('supply_request_id', $childIds)
+                                ->get();
+                            foreach ($children as $child) {
+                                if ($this->canSyncChildWhenParentFullyReceived($child, $candidate)) {
+                                    $this->transitionSupplyRequest($child, $actor, $consolidatedRemarks);
+                                    $this->transitionPurchaseRequests($child->purchaseRequests, $actor, $consolidatedRemarks);
+                                    $this->transitionPurchaseOrders($child->purchaseOrders, $actor, $consolidatedRemarks);
+                                }
                             }
                         }
                     }
@@ -238,34 +248,9 @@ class ProcurementStatusSyncService
             return false;
         }
 
-        $rootSr = $this->followUpService->resolveRootSupplyRequest($supplyRequest);
-        $candidates = $this->resolveConsolidatedConstituentSupplyRequests($rootSr);
-        if ($candidates->count() > 1 && $this->isConsolidatedFamilyFullyReceived($candidates)) {
-            return true;
-        }
+        $fulfillment = $this->traceabilityService->calculateAllocatedFulfillment($supplyRequest);
 
-        $fulfillmentRecords = $this->allFulfillmentDistributionRecords($supplyRequest)
-            ->where('status', 'RECEIVED');
-
-        $receivedByItem = [];
-        foreach ($fulfillmentRecords as $record) {
-            foreach ($record->items as $item) {
-                $itemId = (int) $item->item_id;
-                $receivedByItem[$itemId] = ($receivedByItem[$itemId] ?? 0.0) + (float) $item->quantity_received;
-            }
-        }
-
-        foreach ($supplyRequest->items as $item) {
-            $itemId = (int) $item->item_id;
-            $requested = (float) $item->quantity_requested;
-            $received = (float) ($receivedByItem[$itemId] ?? 0.0);
-
-            if ($received + 0.0001 < $requested) {
-                return false;
-            }
-        }
-
-        return true;
+        return (bool) ($fulfillment['is_fully_received'] ?? false);
     }
 
     public function hasUnresolvedClaims(SupplyRequest $supplyRequest): bool

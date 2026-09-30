@@ -269,8 +269,9 @@ class SupplyRequestController extends Controller
         $requiresProcurement = $this->requiresProcurement($supplyRequest);
         $trackingStatus = $this->resolveTrackingStatus($supplyRequest, $requiresProcurement);
         $history = $this->historyTimelineService->forRecord($request->user(), $supplyRequest);
-        $supplyRequestData = $this->showPayload($supplyRequest, $trackingStatus, $requiresProcurement, $history);
-        $distributionRecords = $this->releasedDistributionRecords($supplyRequest);
+        $fulfillment = $this->traceabilityService->calculateAllocatedFulfillment($supplyRequest);
+        $supplyRequestData = $this->showPayload($supplyRequest, $trackingStatus, $requiresProcurement, $history, $fulfillment);
+        $distributionRecords = $fulfillment['allocated_records'];
 
         $canEdit = $request->user()?->can('office.supply-request.update', $supplyRequest) ?? false;
         $canSubmit = $request->user()?->can('office.supply-request.submit', $supplyRequest) ?? false;
@@ -308,7 +309,7 @@ class SupplyRequestController extends Controller
         ]);
     }
 
-    private function showPayload(SupplyRequest $supplyRequest, string $trackingStatus, bool $requiresProcurement, array $history = []): array
+    private function showPayload(SupplyRequest $supplyRequest, string $trackingStatus, bool $requiresProcurement, array $history = [], array $fulfillment = []): array
     {
         $ppmpItemContext = $this->ppmpItemContext($supplyRequest);
 
@@ -343,7 +344,7 @@ class SupplyRequestController extends Controller
                 ])
                 ->values()
                 ->all(),
-            'items' => $this->mappedSupplyRequestItems($supplyRequest, $ppmpItemContext),
+            'items' => $this->mappedSupplyRequestItems($supplyRequest, $ppmpItemContext, $fulfillment),
             'processing_timeline' => $this->buildProcessingTimeline($supplyRequest, $trackingStatus, $requiresProcurement, $history),
         ];
     }
@@ -361,42 +362,31 @@ class SupplyRequestController extends Controller
     /**
      * @param  \Illuminate\Support\Collection<int, array<string, mixed>>  $ppmpItemContext
      */
-    private function mappedSupplyRequestItems(SupplyRequest $supplyRequest, $ppmpItemContext): array
+    private function mappedSupplyRequestItems(SupplyRequest $supplyRequest, $ppmpItemContext, array $fulfillment = []): array
     {
-        $distributionRecords = $this->fulfillmentDistributionRecords($supplyRequest);
-
-        $releasedPool = $distributionRecords
-            ->whereIn('status', ['RELEASED', 'RECEIVED'])
-            ->flatMap(fn ($record) => $record->items)
-            ->groupBy(fn ($item) => (int) $item->item_id)
-            ->map(fn ($items): float => (float) $items->sum('quantity_released'));
-        $receivedPool = $distributionRecords
-            ->where('status', 'RECEIVED')
-            ->flatMap(fn ($record) => $record->items)
-            ->groupBy(fn ($item) => (int) $item->item_id)
-            ->map(fn ($items): float => (float) $items->sum('quantity_received'));
+        $byItem = $fulfillment['by_item'] ?? [];
 
         return $supplyRequest->items
-            ->map(function ($item) use ($ppmpItemContext, &$releasedPool, &$receivedPool): array {
+            ->map(function ($item) use ($ppmpItemContext, $byItem): array {
                 $context = $ppmpItemContext->get((int) $item->ppmp_item_id, []);
                 $itemId = (int) $item->item_id;
                 $requested = (float) $item->quantity_requested;
 
-                $availReleased = (float) ($releasedPool->get($itemId) ?? 0.0);
-                $allocReleased = min($requested, $availReleased);
-                $releasedPool->put($itemId, max($availReleased - $allocReleased, 0.0));
-
-                $availReceived = (float) ($receivedPool->get($itemId) ?? 0.0);
-                $allocReceived = min($requested, $availReceived);
-                $receivedPool->put($itemId, max($availReceived - $allocReceived, 0.0));
+                $itemMeta = $byItem[$itemId] ?? null;
+                $allocReleased = $itemMeta !== null
+                    ? (float) ($itemMeta['released'] ?? 0.0)
+                    : 0.0;
+                $allocReceived = $itemMeta !== null
+                    ? (float) ($itemMeta['received'] ?? 0.0)
+                    : 0.0;
 
                 return [
                     'supply_request_item_id' => (int) $item->supply_request_item_id,
                     'ppmp_item_id' => (int) $item->ppmp_item_id,
                     'item_name_snapshot' => (string) ($item->item_name_snapshot ?? ''),
                     'quantity_requested' => $requested,
-                    'quantity_released' => $allocReleased,
-                    'quantity_received' => $allocReceived,
+                    'quantity_released' => min($requested, $allocReleased),
+                    'quantity_received' => min($requested, $allocReceived),
                     'default_unit' => isset($context['default_unit']) ? (string) $context['default_unit'] : (string) ($item->item?->default_unit ?? 'box'),
                     'pieces_per_box' => isset($context['pieces_per_box']) ? (int) $context['pieces_per_box'] : (int) ($item->item?->pieces_per_box ?? 1),
                     'sub_unit' => isset($context['sub_unit']) ? (string) $context['sub_unit'] : (string) ($item->item?->sub_unit ?? 'piece'),
@@ -414,46 +404,15 @@ class SupplyRequestController extends Controller
             ->all();
     }
 
-    private function releasedDistributionRecords(SupplyRequest $supplyRequest)
+    private function releasedDistributionRecords(SupplyRequest $supplyRequest, array $fulfillment = [])
     {
-        $followUpSupplyRequestIds = $this->linkedFollowUpSupplyRequestIds($supplyRequest);
-        $allSrIds = array_merge([(int) $supplyRequest->supply_request_id], $followUpSupplyRequestIds);
-
-        $rootSr = $this->followUpService->resolveRootSupplyRequest($supplyRequest);
-        $syncService = app(\App\Services\Procurement\ProcurementStatusSyncService::class);
-        $candidates = $syncService->resolveConsolidatedConstituentSupplyRequests($rootSr);
-        if ($candidates->count() > 1) {
-            $allSrIds = array_merge($allSrIds, $candidates->pluck('supply_request_id')->all());
+        if (isset($fulfillment['allocated_records'])) {
+            return $fulfillment['allocated_records'];
         }
-        $allSrIds = array_values(array_unique(array_filter(array_map('intval', $allSrIds))));
 
-        return DistributionRecord::query()
-            ->with(['items.item', 'delivery', 'supplyRequest'])
-            ->whereIn('supply_request_id', $allSrIds)
-            ->whereIn('status', ['RELEASED', 'RECEIVED'])
-            ->latest('distribution_record_id')
-            ->get()
-            ->map(fn (DistributionRecord $record): array => [
-                'distribution_record_id' => (int) $record->distribution_record_id,
-                'supply_request_id' => (int) $record->supply_request_id,
-                'supply_request_code' => (string) ($record->supplyRequest?->request_code ?? ''),
-                'delivery_code' => $record->delivery?->delivery_code,
-                'is_follow_up_fulfillment' => (int) $record->supply_request_id !== (int) $supplyRequest->supply_request_id,
-                'status' => (string) $record->status,
-                'storage_location' => (string) ($record->storage_location ?? ''),
-                'release_date' => optional($record->release_date)?->toDateString(),
-                'items' => $record->items->map(fn ($item): array => [
-                    'distribution_item_id' => (int) $item->distribution_item_id,
-                    'item_id' => (int) $item->item_id,
-                    'item_name' => (string) ($item->item?->item_name ?? 'Item #' . $item->item_id),
-                    'unit' => (string) ($item->item?->default_unit ?? 'unit'),
-                    'quantity_released' => (float) $item->quantity_released,
-                    'quantity_received' => (float) ($item->quantity_received ?? 0),
-                    'quantity_damaged' => (float) ($item->quantity_damaged ?? 0),
-                    'status' => (string) ($item->status ?? ''),
-                ])->values()->all(),
-            ])
-            ->values();
+        $fulfillment = $this->traceabilityService->calculateAllocatedFulfillment($supplyRequest);
+
+        return $fulfillment['allocated_records'];
     }
 
     private function requiresProcurement(SupplyRequest $supplyRequest): bool
@@ -612,18 +571,12 @@ class SupplyRequestController extends Controller
      */
     private function distributionProgress(SupplyRequest $supplyRequest): array
     {
-        $distributionRecords = $this->fulfillmentDistributionRecords($supplyRequest);
+        $fulfillment = $this->traceabilityService->calculateAllocatedFulfillment($supplyRequest);
 
         return [
-            'requested' => (float) $supplyRequest->items->sum('quantity_requested'),
-            'released' => (float) $distributionRecords
-                ->whereIn('status', ['RELEASED', 'RECEIVED'])
-                ->flatMap(fn ($record) => $record->items)
-                ->sum('quantity_released'),
-            'received' => (float) $distributionRecords
-                ->where('status', 'RECEIVED')
-                ->flatMap(fn ($record) => $record->items)
-                ->sum('quantity_received'),
+            'requested' => (float) ($fulfillment['requested'] ?? 0.0),
+            'released' => (float) ($fulfillment['released'] ?? 0.0),
+            'received' => (float) ($fulfillment['received'] ?? 0.0),
         ];
     }
 

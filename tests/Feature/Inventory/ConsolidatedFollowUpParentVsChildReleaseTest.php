@@ -725,12 +725,18 @@ class ConsolidatedFollowUpParentVsChildReleaseTest extends TestCase
         $this->assertSame('RECEIVED', $ui15['status'] ?? null);
         $this->assertSame('RECEIVED', $ui16['status'] ?? null);
 
-        // Verify Show page for SR-14 contains related distribution records with item details:
+        // Verify Show page for SR-14 contains related distribution records that allocated stock to it (Delivery 1 and Delivery 2 via SR-15):
         $showResponse = $this->actingAs($this->officeUser)->get(route('office.supply-requests.show', $sr14->supply_request_id));
         $relatedDistributions = $showResponse->viewData('page')['props']['distributionRecords'];
         $this->assertNotEmpty($relatedDistributions);
-        $this->assertCount(3, $relatedDistributions);
+        $this->assertCount(2, $relatedDistributions);
         $this->assertNotNull($relatedDistributions[0]['items'] ?? null);
+
+        // Verify Show page for SR-13 contains the distribution records that allocated stock to it (Delivery 2 spillover of 100/100 and Delivery 3 of 100/100):
+        $showResponse13 = $this->actingAs($this->officeUser)->get(route('office.supply-requests.show', $sr13->supply_request_id));
+        $relatedDistributions13 = $showResponse13->viewData('page')['props']['distributionRecords'];
+        $this->assertNotEmpty($relatedDistributions13);
+        $this->assertCount(2, $relatedDistributions13);
     }
 
     public function test_claims_with_replacement_prs_releasing_to_parent_vs_child(): void
@@ -938,5 +944,349 @@ class ConsolidatedFollowUpParentVsChildReleaseTest extends TestCase
         $this->assertSame('RESOLVED', (string) $claim->status);
         $this->assertEquals(20.0, (float) $claim->replacement_quantity);
         $this->assertSame('RECEIVED', (string) $childReplacementSr->status);
+    }
+
+    public function test_waterfall_allocation_multi_sr_multi_followup_scenario(): void
+    {
+        $distService = app(DistributionRecordService::class);
+        $prService = app(PurchaseRequestService::class);
+
+        // SR-3: 200 A4, 200 Legal
+        $sr3 = SupplyRequest::query()->create([
+            'request_code' => 'SR-MPDO-2026-09-0003',
+            'office_id' => $this->office->id,
+            'requested_by' => $this->officeUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(7)->toDateString(),
+            'request_category' => 'SUPPLIES',
+            'priority_level' => 'NORMAL',
+            'status' => 'FOR_PROCUREMENT',
+            'purpose' => 'Consolidated SR-3',
+        ]);
+        SupplyRequestItem::query()->create([
+            'supply_request_id' => $sr3->supply_request_id,
+            'item_id' => $this->item->item_id,
+            'item_name_snapshot' => $this->item->item_name,
+            'quantity_requested' => 200,
+        ]);
+        SupplyRequestItem::query()->create([
+            'supply_request_id' => $sr3->supply_request_id,
+            'item_id' => $this->itemLegal->item_id,
+            'item_name_snapshot' => $this->itemLegal->item_name,
+            'quantity_requested' => 200,
+        ]);
+
+        // SR-4: 100 A4, 100 Legal
+        $sr4 = SupplyRequest::query()->create([
+            'request_code' => 'SR-MPDO-2026-09-0004',
+            'office_id' => $this->office->id,
+            'requested_by' => $this->officeUser->id,
+            'request_date' => now()->toDateString(),
+            'needed_by_date' => now()->addDays(7)->toDateString(),
+            'request_category' => 'SUPPLIES',
+            'priority_level' => 'NORMAL',
+            'status' => 'FOR_PROCUREMENT',
+            'purpose' => 'Consolidated SR-4',
+        ]);
+        SupplyRequestItem::query()->create([
+            'supply_request_id' => $sr4->supply_request_id,
+            'item_id' => $this->item->item_id,
+            'item_name_snapshot' => $this->item->item_name,
+            'quantity_requested' => 100,
+        ]);
+        SupplyRequestItem::query()->create([
+            'supply_request_id' => $sr4->supply_request_id,
+            'item_id' => $this->itemLegal->item_id,
+            'item_name_snapshot' => $this->itemLegal->item_name,
+            'quantity_requested' => 100,
+        ]);
+
+        // Consolidated PR & PO placed for 300 A4, 300 Legal
+        $consolidatedPr = PurchaseRequest::query()->create([
+            'pr_number' => 'PR-2026-09-0003',
+            'supply_request_id' => $sr3->supply_request_id,
+            'office_id' => $this->office->id,
+            'requested_by' => $this->gsoUser->id,
+            'status' => 'APPROVED',
+            'remarks' => sprintf('Consolidated procurement for %s, %s', $sr3->request_code, $sr4->request_code),
+        ]);
+        $priA4 = PurchaseRequestItem::query()->create([
+            'purchase_request_id' => $consolidatedPr->purchase_request_id,
+            'item_id' => $this->item->item_id,
+            'item_name_snapshot' => $this->item->item_name,
+            'quantity_requested' => 300,
+            'unit' => 'box',
+            'estimated_unit_cost' => 100,
+            'estimated_total_cost' => 30000,
+        ]);
+        $priLegal = PurchaseRequestItem::query()->create([
+            'purchase_request_id' => $consolidatedPr->purchase_request_id,
+            'item_id' => $this->itemLegal->item_id,
+            'item_name_snapshot' => $this->itemLegal->item_name,
+            'quantity_requested' => 300,
+            'unit' => 'box',
+            'estimated_unit_cost' => 120,
+            'estimated_total_cost' => 36000,
+        ]);
+
+        $rootPo = PurchaseOrder::query()->create([
+            'po_number' => 'PO-2026-09-0003',
+            'purchase_request_id' => $consolidatedPr->purchase_request_id,
+            'supply_request_id' => $sr3->supply_request_id,
+            'created_by' => $this->gsoUser->id,
+            'supplier_id' => $this->supplier->supplier_id,
+            'procurement_method' => 'PUBLIC_BIDDING',
+            'status' => 'PLACED',
+            'total_amount' => 0,
+            'remarks' => 'Consolidated PO for SR-MPDO-2026-09-0003 and SR-MPDO-2026-09-0004',
+        ]);
+        $poiA4 = PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $rootPo->purchase_order_id,
+            'supply_request_item_id' => $sr3->items->where('item_id', $this->item->item_id)->first()->supply_request_item_id,
+            'item_id' => $this->item->item_id,
+            'item_name_snapshot' => $this->item->item_name,
+            'quantity_ordered' => 300,
+            'unit' => 'box',
+            'unit_price' => 0,
+            'total_price' => 0,
+        ]);
+        $poiLegal = PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $rootPo->purchase_order_id,
+            'supply_request_item_id' => $sr3->items->where('item_id', $this->itemLegal->item_id)->first()->supply_request_item_id,
+            'item_id' => $this->itemLegal->item_id,
+            'item_name_snapshot' => $this->itemLegal->item_name,
+            'quantity_ordered' => 300,
+            'unit' => 'box',
+            'unit_price' => 0,
+            'total_price' => 0,
+        ]);
+
+        // 1. Delivery 1 arrives: 50 A4, 50 Legal received. (Missing: 250 A4, 250 Legal)
+        $del1 = Delivery::query()->create([
+            'delivery_code' => 'DEL-2026-09-0001',
+            'purchase_order_id' => $rootPo->purchase_order_id,
+            'supplier_id' => $this->supplier->supplier_id,
+            'received_by' => $this->gsoUser->id,
+            'actual_delivery_date' => now()->toDateString(),
+            'status' => 'VERIFIED',
+            'receipt_status' => 'PARTIALLY_RECEIVED',
+        ]);
+        DeliveryItem::query()->create([
+            'delivery_id' => $del1->delivery_id,
+            'purchase_order_item_id' => $poiA4->purchase_order_item_id,
+            'expected_quantity' => 300,
+            'received_quantity' => 50,
+            'missing_quantity' => 250,
+            'item_status' => 'PARTIALLY_RECEIVED',
+        ]);
+        DeliveryItem::query()->create([
+            'delivery_id' => $del1->delivery_id,
+            'purchase_order_item_id' => $poiLegal->purchase_order_item_id,
+            'expected_quantity' => 300,
+            'received_quantity' => 50,
+            'missing_quantity' => 250,
+            'item_status' => 'PARTIALLY_RECEIVED',
+        ]);
+
+        Inventory::query()->where('item_id', $this->item->item_id)->update(['stock_on_hand' => 50, 'available_stock' => 50]);
+        Inventory::query()->where('item_id', $this->itemLegal->item_id)->update(['stock_on_hand' => 50, 'available_stock' => 50]);
+
+        // Release 50/50 to SR-4:
+        $dist1 = $distService->createRecordWithAutomaticRelease($this->gsoUser, [
+            'supply_request_id' => $sr4->supply_request_id,
+            'delivery_id' => $del1->delivery_id,
+            'office_id' => $this->office->id,
+        ]);
+        $this->actingAs($this->officeUser)->post(route('office.distribution-records.receive', $dist1->distribution_record_id));
+
+        // Follow-up PR 1 -> SR-5 (deficit: 250/250)
+        $followUpPr1 = $prService->createFromPartialDelivery($del1, $this->gsoUser);
+        $sr5 = $followUpPr1->supplyRequest;
+        $this->assertNotNull($sr5);
+
+        // Place PO for SR-5
+        $followUpPo1 = PurchaseOrder::query()->create([
+            'po_number' => 'PO-2026-09-0005',
+            'purchase_request_id' => $followUpPr1->purchase_request_id,
+            'supply_request_id' => $sr5->supply_request_id,
+            'created_by' => $this->gsoUser->id,
+            'supplier_id' => $this->supplier->supplier_id,
+            'procurement_method' => 'DIRECT_CONTRACTING',
+            'status' => 'PLACED',
+            'total_amount' => 0,
+        ]);
+        $fuPoi1A4 = PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $followUpPo1->purchase_order_id,
+            'supply_request_item_id' => $sr5->items->where('item_id', $this->item->item_id)->first()->supply_request_item_id,
+            'item_id' => $this->item->item_id,
+            'item_name_snapshot' => $this->item->item_name,
+            'quantity_ordered' => 250,
+            'unit' => 'box',
+            'unit_price' => 0,
+            'total_price' => 0,
+        ]);
+        $fuPoi1Legal = PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $followUpPo1->purchase_order_id,
+            'supply_request_item_id' => $sr5->items->where('item_id', $this->itemLegal->item_id)->first()->supply_request_item_id,
+            'item_id' => $this->itemLegal->item_id,
+            'item_name_snapshot' => $this->itemLegal->item_name,
+            'quantity_ordered' => 250,
+            'unit' => 'box',
+            'unit_price' => 0,
+            'total_price' => 0,
+        ]);
+
+        // 2. Delivery 2 arrives: only 50 A4, 50 Legal received on SR-5 (Missing: 200 A4, 200 Legal)
+        $del2 = Delivery::query()->create([
+            'delivery_code' => 'DEL-2026-09-0002',
+            'purchase_order_id' => $followUpPo1->purchase_order_id,
+            'supplier_id' => $this->supplier->supplier_id,
+            'received_by' => $this->gsoUser->id,
+            'actual_delivery_date' => now()->toDateString(),
+            'status' => 'VERIFIED',
+            'receipt_status' => 'PARTIALLY_RECEIVED',
+        ]);
+        DeliveryItem::query()->create([
+            'delivery_id' => $del2->delivery_id,
+            'purchase_order_item_id' => $fuPoi1A4->purchase_order_item_id,
+            'expected_quantity' => 250,
+            'received_quantity' => 50,
+            'missing_quantity' => 200,
+            'item_status' => 'PARTIALLY_RECEIVED',
+        ]);
+        DeliveryItem::query()->create([
+            'delivery_id' => $del2->delivery_id,
+            'purchase_order_item_id' => $fuPoi1Legal->purchase_order_item_id,
+            'expected_quantity' => 250,
+            'received_quantity' => 50,
+            'missing_quantity' => 200,
+            'item_status' => 'PARTIALLY_RECEIVED',
+        ]);
+
+        Inventory::query()->where('item_id', $this->item->item_id)->update(['stock_on_hand' => 50, 'available_stock' => 50]);
+        Inventory::query()->where('item_id', $this->itemLegal->item_id)->update(['stock_on_hand' => 50, 'available_stock' => 50]);
+
+        // Release to child SR-5:
+        $dist2 = $distService->createRecordWithAutomaticRelease($this->gsoUser, [
+            'supply_request_id' => $sr5->supply_request_id,
+            'delivery_id' => $del2->delivery_id,
+            'office_id' => $this->office->id,
+        ]);
+        $this->actingAs($this->officeUser)->post(route('office.distribution-records.receive', $dist2->distribution_record_id));
+
+        // CHECK MIDWAY STATE:
+        // SR-4 already had 50/100, needed 50 more -> Del 2 allocated 50 to SR-4!
+        // SR-4 is now 100/100 -> RECEIVED!
+        // SR-3 still has 0/200 received -> NOT received! (Zero fake items added to SR-3!)
+        $sr4->refresh();
+        $sr3->refresh();
+        $this->assertSame('RECEIVED', (string) $sr4->status);
+        $this->assertNotSame('RECEIVED', (string) $sr3->status);
+
+        // Check show page for SR-3: received must be 0!
+        $show3Mid = $this->actingAs($this->officeUser)->get(route('office.supply-requests.show', $sr3->supply_request_id));
+        $distRecords3Mid = $show3Mid->viewData('page')['props']['distributionRecords'];
+        $this->assertCount(0, $distRecords3Mid);
+
+        // Check show page for SR-4: received must be 100!
+        $show4Mid = $this->actingAs($this->officeUser)->get(route('office.supply-requests.show', $sr4->supply_request_id));
+        $distRecords4Mid = $show4Mid->viewData('page')['props']['distributionRecords'];
+        $this->assertCount(2, $distRecords4Mid);
+
+        // 3. Follow-up PR 2 -> SR-6 (deficit: 200/200)
+        $followUpPr2 = $prService->createFromPartialDelivery($del2, $this->gsoUser);
+        $sr6 = $followUpPr2->supplyRequest;
+        $this->assertNotNull($sr6);
+
+        $followUpPo2 = PurchaseOrder::query()->create([
+            'po_number' => 'PO-2026-09-0006',
+            'purchase_request_id' => $followUpPr2->purchase_request_id,
+            'supply_request_id' => $sr6->supply_request_id,
+            'created_by' => $this->gsoUser->id,
+            'supplier_id' => $this->supplier->supplier_id,
+            'procurement_method' => 'DIRECT_CONTRACTING',
+            'status' => 'PLACED',
+            'total_amount' => 0,
+        ]);
+        $fuPoi2A4 = PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $followUpPo2->purchase_order_id,
+            'supply_request_item_id' => $sr6->items->where('item_id', $this->item->item_id)->first()->supply_request_item_id,
+            'item_id' => $this->item->item_id,
+            'item_name_snapshot' => $this->item->item_name,
+            'quantity_ordered' => 200,
+            'unit' => 'box',
+            'unit_price' => 0,
+            'total_price' => 0,
+        ]);
+        $fuPoi2Legal = PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $followUpPo2->purchase_order_id,
+            'supply_request_item_id' => $sr6->items->where('item_id', $this->itemLegal->item_id)->first()->supply_request_item_id,
+            'item_id' => $this->itemLegal->item_id,
+            'item_name_snapshot' => $this->itemLegal->item_name,
+            'quantity_ordered' => 200,
+            'unit' => 'box',
+            'unit_price' => 0,
+            'total_price' => 0,
+        ]);
+
+        Inventory::query()->where('item_id', $this->item->item_id)->update(['stock_on_hand' => 200, 'available_stock' => 200]);
+        Inventory::query()->where('item_id', $this->itemLegal->item_id)->update(['stock_on_hand' => 200, 'available_stock' => 200]);
+
+        // Delivery 3 arrives: 200 A4, 200 Legal received (100% complete)
+        $del3 = Delivery::query()->create([
+            'delivery_code' => 'DEL-2026-09-0003',
+            'purchase_order_id' => $followUpPo2->purchase_order_id,
+            'supplier_id' => $this->supplier->supplier_id,
+            'received_by' => $this->gsoUser->id,
+            'actual_delivery_date' => now()->toDateString(),
+            'status' => 'VERIFIED',
+            'receipt_status' => 'VERIFIED',
+        ]);
+        DeliveryItem::query()->create([
+            'delivery_id' => $del3->delivery_id,
+            'purchase_order_item_id' => $fuPoi2A4->purchase_order_item_id,
+            'expected_quantity' => 200,
+            'received_quantity' => 200,
+            'missing_quantity' => 0,
+            'item_status' => 'VERIFIED',
+        ]);
+        DeliveryItem::query()->create([
+            'delivery_id' => $del3->delivery_id,
+            'purchase_order_item_id' => $fuPoi2Legal->purchase_order_item_id,
+            'expected_quantity' => 200,
+            'received_quantity' => 200,
+            'missing_quantity' => 0,
+            'item_status' => 'VERIFIED',
+        ]);
+
+        // Release to child SR-6:
+        $dist3 = $distService->createRecordWithAutomaticRelease($this->gsoUser, [
+            'supply_request_id' => $sr6->supply_request_id,
+            'delivery_id' => $del3->delivery_id,
+            'office_id' => $this->office->id,
+        ]);
+        $this->actingAs($this->officeUser)->post(route('office.distribution-records.receive', $dist3->distribution_record_id));
+
+        // NOW CHECK FINAL STATUSES:
+        $sr3->refresh();
+        $sr4->refresh();
+        $sr5->refresh();
+        $sr6->refresh();
+
+        $this->assertSame('RECEIVED', (string) $sr3->status);
+        $this->assertSame('RECEIVED', (string) $sr4->status);
+        $this->assertSame('RECEIVED', (string) $sr5->status);
+        $this->assertSame('RECEIVED', (string) $sr6->status);
+
+        // SR-3 now has exactly 1 distribution record (from Del 3 via SR-6 for 200 items):
+        $show3Final = $this->actingAs($this->officeUser)->get(route('office.supply-requests.show', $sr3->supply_request_id));
+        $distRecords3Final = $show3Final->viewData('page')['props']['distributionRecords'];
+        $this->assertCount(1, $distRecords3Final);
+        $this->assertEquals(200.0, (float) $distRecords3Final[0]['items'][0]['quantity_received']);
+
+        // SR-4 still has exactly 2 distribution records:
+        $show4Final = $this->actingAs($this->officeUser)->get(route('office.supply-requests.show', $sr4->supply_request_id));
+        $distRecords4Final = $show4Final->viewData('page')['props']['distributionRecords'];
+        $this->assertCount(2, $distRecords4Final);
     }
 }
