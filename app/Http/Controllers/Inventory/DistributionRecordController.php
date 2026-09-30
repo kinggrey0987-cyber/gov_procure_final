@@ -223,19 +223,6 @@ class DistributionRecordController
             if ($targetChildSr instanceof SupplyRequest) {
                 $sourceSupplyRequests->push($targetChildSr);
             }
-
-            // If this follow-up is for a consolidated procurement, also offer constituent requests with unmet shortage
-            $sourceDelivery = $delivery->purchaseOrder?->purchaseRequest?->sourceDelivery;
-            $parentPo = $sourceDelivery?->purchaseOrder
-                ?? $delivery->purchaseOrder?->purchaseRequest?->purchaseOrder;
-            if ($parentPo) {
-                $candidates = $this->traceabilityService->getSourceSupplyRequests($parentPo);
-                if ($candidates->count() >= 2) {
-                    foreach ($candidates as $candidate) {
-                        $sourceSupplyRequests->push($candidate);
-                    }
-                }
-            }
         } else {
             if ($delivery->purchaseOrder?->supplyRequest instanceof SupplyRequest) {
                 $sourceSupplyRequests->push($delivery->purchaseOrder->supplyRequest);

@@ -7,7 +7,9 @@ use App\Models\Claim;
 use App\Models\DistributionItem;
 use App\Models\DistributionRecord;
 use App\Models\Inventory;
+use App\Models\PurchaseOrder;
 use App\Models\StatusHistory;
+use App\Models\SupplyRequest;
 use App\Models\User;
 use App\Services\AuditLogService;
 use App\Services\NotificationService;
@@ -571,6 +573,26 @@ class DistributionRecordService
         $deliverySupplyRequestId = (int) ($delivery?->purchaseOrder?->supply_request_id ?? 0);
         $prSupplyRequestId = (int) ($delivery?->purchaseOrder?->purchaseRequest?->supply_request_id ?? 0);
 
+        $isFollowUpDelivery = in_array((string) ($delivery?->purchaseOrder?->purchaseRequest?->source_type ?? ''), ['PARTIAL_DELIVERY_FOLLOW_UP', 'CLAIM_REPLACEMENT_FOLLOW_UP'], true)
+            || (int) ($delivery?->purchaseOrder?->purchaseRequest?->source_delivery_id ?? 0) > 0
+            || (int) ($delivery?->purchaseOrder?->purchaseRequest?->source_claim_id ?? 0) > 0;
+
+        if ($isFollowUpDelivery) {
+            $targetChildSrId = (int) ($deliverySupplyRequestId ?: $prSupplyRequestId);
+            if ($targetChildSrId > 0 && $targetChildSrId !== (int) $record->supply_request_id) {
+                $targetChildSr = SupplyRequest::query()->find($targetChildSrId);
+                throw ValidationException::withMessages([
+                    'supply_request_id' => sprintf(
+                        'Follow-up delivery %s belongs to supply request %s and cannot be released directly against parent requisition %s. Please select %s.',
+                        (string) ($delivery->delivery_code ?? 'delivery'),
+                        (string) ($targetChildSr?->request_code ?? 'follow-up request'),
+                        (string) $record->supplyRequest->request_code,
+                        (string) ($targetChildSr?->request_code ?? 'the follow-up request')
+                    ),
+                ]);
+            }
+        }
+
         $isAllowed = false;
         if ($deliverySupplyRequestId === (int) $record->supply_request_id || $prSupplyRequestId === (int) $record->supply_request_id) {
             $isAllowed = true;
@@ -657,48 +679,7 @@ class DistributionRecordService
 
         $rootSupplyRequest = $this->followUpService->resolveRootSupplyRequest($record->supplyRequest);
         if ($rootSupplyRequest->supply_request_id !== $record->supplyRequest->supply_request_id) {
-            $rootRequested = (float) $rootSupplyRequest->items->where('item_id', $itemId)->sum('quantity_requested');
-            $rootReleasedRecords = $this->allFulfillmentDistributionRecords($rootSupplyRequest)
-                ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
-                ->flatMap(fn ($r) => $r->items)
-                ->where('item_id', $itemId);
-
-            $rootEffectiveReleased = (float) $rootReleasedRecords->sum(function ($item): float {
-                $damaged = (float) ($item->quantity_damaged ?? 0.0);
-                return max((float) $item->quantity_released - $damaged, 0.0);
-            });
-
-            if ($linkedSourceClaim !== null && $linkedSourceClaim->distributionItem && (int) $linkedSourceClaim->distributionItem->item_id === $itemId) {
-                $rootEffectiveReleased = max($rootEffectiveReleased - (float) $linkedSourceClaim->quantity_disputed, 0.0);
-            }
-
-            $rootRemaining = max($rootRequested - $rootEffectiveReleased, 0.0);
-            if ($linkedSourceClaim !== null && (int) ($linkedSourceClaim->distributionItem?->item_id ?? 0) === $itemId) {
-                $remainingDisputed = max((float) $linkedSourceClaim->quantity_disputed - (float) $linkedSourceClaim->replacement_quantity, 0.0);
-                $rootRemaining = max($rootRemaining, $remainingDisputed);
-            }
-
-            if ($rootRemaining <= 0.0001 && $record->delivery) {
-                $parentPo = $record->delivery->purchaseOrder?->purchaseRequest?->sourceDelivery?->purchaseOrder
-                    ?? $record->delivery->purchaseOrder;
-                if ($parentPo) {
-                    $candidates = $this->traceabilityService->getSourceSupplyRequests($parentPo);
-                    foreach ($candidates as $cand) {
-                        $candRequested = (float) $cand->items->where('item_id', $itemId)->sum('quantity_requested');
-                        $candReleased = (float) $this->allFulfillmentDistributionRecords($cand)
-                            ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
-                            ->flatMap(fn ($r) => $r->items)
-                            ->where('item_id', $itemId)
-                            ->sum(fn ($i) => max((float) $i->quantity_released - (float) ($i->quantity_damaged ?? 0), 0));
-                        $candRemaining = max($candRequested - $candReleased, 0.0);
-                        if ($candRemaining > 0.0001) {
-                            $rootRemaining = $candRemaining;
-                            break;
-                        }
-                    }
-                }
-            }
-
+            $rootRemaining = $this->calculateRootRemainingForFollowUp($record, $itemId, $linkedSourceClaim);
             $maxReleasable = min($maxReleasable, $rootRemaining);
         }
 
@@ -828,7 +809,7 @@ class DistributionRecordService
 
         return $record->supplyRequest->items
             ->groupBy(fn ($item) => (int) $item->item_id)
-            ->map(function ($items, int $itemId) use ($requestReleasedByItemId, $deliveryRemainingByItemId, $record): ?array {
+            ->map(function ($items, int $itemId) use ($requestReleasedByItemId, $deliveryRemainingByItemId, $record, $linkedSourceClaim): ?array {
                 $first = $items->first();
                 $requested = (float) $items->sum('quantity_requested');
                 $requestRemaining = max($requested - (float) ($requestReleasedByItemId->get($itemId) ?? 0.0), 0);
@@ -888,49 +869,7 @@ class DistributionRecordService
 
                 $rootSupplyRequest = $this->followUpService->resolveRootSupplyRequest($record->supplyRequest);
                 if ($rootSupplyRequest->supply_request_id !== $record->supplyRequest->supply_request_id) {
-                    $rootRequested = (float) $rootSupplyRequest->items->where('item_id', $itemId)->sum('quantity_requested');
-                    $rootReleasedRecords = $this->allFulfillmentDistributionRecords($rootSupplyRequest)
-                        ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
-                        ->flatMap(fn ($r) => $r->items)
-                        ->where('item_id', $itemId);
-
-                    $rootEffectiveReleased = (float) $rootReleasedRecords->sum(function ($item): float {
-                        $damaged = (float) ($item->quantity_damaged ?? 0.0);
-                        return max((float) $item->quantity_released - $damaged, 0.0);
-                    });
-
-                    $linkedClaim = $this->resolveLinkedSourceClaim($record);
-                    if ($linkedClaim !== null && $linkedClaim->distributionItem && (int) $linkedClaim->distributionItem->item_id === $itemId) {
-                        $rootEffectiveReleased = max($rootEffectiveReleased - (float) $linkedClaim->quantity_disputed, 0.0);
-                    }
-
-                    $rootRemaining = max($rootRequested - $rootEffectiveReleased, 0.0);
-                    if ($linkedClaim !== null && (int) ($linkedClaim->distributionItem?->item_id ?? 0) === $itemId) {
-                        $remainingDisputed = max((float) $linkedClaim->quantity_disputed - (float) $linkedClaim->replacement_quantity, 0.0);
-                        $rootRemaining = max($rootRemaining, $remainingDisputed);
-                    }
-
-                    if ($rootRemaining <= 0.0001 && $record->delivery) {
-                        $parentPo = $record->delivery->purchaseOrder?->purchaseRequest?->sourceDelivery?->purchaseOrder
-                            ?? $record->delivery->purchaseOrder;
-                        if ($parentPo) {
-                            $candidates = $this->traceabilityService->getSourceSupplyRequests($parentPo);
-                            foreach ($candidates as $cand) {
-                                $candRequested = (float) $cand->items->where('item_id', $itemId)->sum('quantity_requested');
-                                $candReleased = (float) $this->allFulfillmentDistributionRecords($cand)
-                                    ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
-                                    ->flatMap(fn ($r) => $r->items)
-                                    ->where('item_id', $itemId)
-                                    ->sum(fn ($i) => max((float) $i->quantity_released - (float) ($i->quantity_damaged ?? 0), 0));
-                                $candRemaining = max($candRequested - $candReleased, 0.0);
-                                if ($candRemaining > 0.0001) {
-                                    $rootRemaining = $candRemaining;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
+                    $rootRemaining = $this->calculateRootRemainingForFollowUp($record, $itemId, $linkedSourceClaim);
                     $quantity = min($quantity, $rootRemaining);
                 }
 
@@ -1314,4 +1253,118 @@ class DistributionRecordService
             );
         }
     }
+
+    private function resolveRootPurchaseOrder(DistributionRecord $record): ?PurchaseOrder
+    {
+        $currentPo = $record->delivery?->purchaseOrder
+            ?? $record->supplyRequest->purchaseOrders->first()
+            ?? $record->supplyRequest->purchaseRequests->first()?->purchaseOrder;
+
+        if (! $currentPo) {
+            $rootSr = $this->followUpService->resolveRootSupplyRequest($record->supplyRequest);
+            $currentPo = $rootSr->purchaseOrders->first()
+                ?? $rootSr->purchaseRequests->first()?->purchaseOrder;
+        }
+
+        if (! $currentPo) {
+            return null;
+        }
+
+        $visitedPoIds = [(int) $currentPo->purchase_order_id => true];
+        while (true) {
+            $sourceDelivery = $currentPo->purchaseRequest?->sourceDelivery;
+            if ($sourceDelivery && $sourceDelivery->purchaseOrder) {
+                $nextPo = $sourceDelivery->purchaseOrder;
+                $nextId = (int) $nextPo->purchase_order_id;
+                if (! isset($visitedPoIds[$nextId])) {
+                    $visitedPoIds[$nextId] = true;
+                    $currentPo = $nextPo;
+                    continue;
+                }
+            }
+
+            $sourceClaim = $currentPo->purchaseRequest?->sourceClaim;
+            if ($sourceClaim && $sourceClaim->distributionRecord?->delivery?->purchaseOrder) {
+                $nextPo = $sourceClaim->distributionRecord->delivery->purchaseOrder;
+                $nextId = (int) $nextPo->purchase_order_id;
+                if (! isset($visitedPoIds[$nextId])) {
+                    $visitedPoIds[$nextId] = true;
+                    $currentPo = $nextPo;
+                    continue;
+                }
+            }
+
+            break;
+        }
+
+        return $currentPo;
+    }
+
+    private function calculateRootRemainingForFollowUp(DistributionRecord $record, int $itemId, ?Claim $linkedClaim): float
+    {
+        $rootPo = $this->resolveRootPurchaseOrder($record);
+        $candidates = $rootPo ? $this->traceabilityService->getSourceSupplyRequests($rootPo) : collect();
+
+        if ($candidates->count() > 1) {
+            $familyRequested = (float) $candidates->sum(
+                fn (SupplyRequest $cand): float => (float) $cand->items->where('item_id', $itemId)->sum('quantity_requested')
+            );
+
+            $familySrIds = $candidates->pluck('supply_request_id')->all();
+            foreach ($candidates as $cand) {
+                $familySrIds = array_merge($familySrIds, $this->followUpService->resolveAllFollowUpChildSupplyRequestIds($cand));
+            }
+            $familySrIds = array_values(array_unique(array_filter(array_map('intval', $familySrIds))));
+
+            $familyReleasedRecords = DistributionRecord::query()
+                ->with('items')
+                ->whereIn('supply_request_id', $familySrIds)
+                ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
+                ->get()
+                ->flatMap(fn ($r) => $r->items)
+                ->where('item_id', $itemId);
+
+            $familyEffectiveReleased = (float) $familyReleasedRecords->sum(function ($item): float {
+                $damaged = (float) ($item->quantity_damaged ?? 0.0);
+                return max((float) $item->quantity_released - $damaged, 0.0);
+            });
+
+            if ($linkedClaim !== null && $linkedClaim->distributionItem && (int) $linkedClaim->distributionItem->item_id === $itemId) {
+                $familyEffectiveReleased = max($familyEffectiveReleased - (float) $linkedClaim->quantity_disputed, 0.0);
+            }
+
+            $rootRemaining = max($familyRequested - $familyEffectiveReleased, 0.0);
+            if ($linkedClaim !== null && (int) ($linkedClaim->distributionItem?->item_id ?? 0) === $itemId) {
+                $remainingDisputed = max((float) $linkedClaim->quantity_disputed - (float) $linkedClaim->replacement_quantity, 0.0);
+                $rootRemaining = max($rootRemaining, $remainingDisputed);
+            }
+
+            return $rootRemaining;
+        }
+
+        $rootSupplyRequest = $this->followUpService->resolveRootSupplyRequest($record->supplyRequest);
+        $rootRequested = (float) $rootSupplyRequest->items->where('item_id', $itemId)->sum('quantity_requested');
+        $rootReleasedRecords = $this->allFulfillmentDistributionRecords($rootSupplyRequest)
+            ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
+            ->flatMap(fn ($r) => $r->items)
+            ->where('item_id', $itemId);
+
+        $rootEffectiveReleased = (float) $rootReleasedRecords->sum(function ($item): float {
+            $damaged = (float) ($item->quantity_damaged ?? 0.0);
+            return max((float) $item->quantity_released - $damaged, 0.0);
+        });
+
+        if ($linkedClaim !== null && $linkedClaim->distributionItem && (int) $linkedClaim->distributionItem->item_id === $itemId) {
+            $rootEffectiveReleased = max($rootEffectiveReleased - (float) $linkedClaim->quantity_disputed, 0.0);
+        }
+
+        $rootRemaining = max($rootRequested - $rootEffectiveReleased, 0.0);
+        if ($linkedClaim !== null && (int) ($linkedClaim->distributionItem?->item_id ?? 0) === $itemId) {
+            $remainingDisputed = max((float) $linkedClaim->quantity_disputed - (float) $linkedClaim->replacement_quantity, 0.0);
+            $rootRemaining = max($rootRemaining, $remainingDisputed);
+        }
+
+        return $rootRemaining;
+    }
 }
+

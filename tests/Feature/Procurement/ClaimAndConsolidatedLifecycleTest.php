@@ -756,28 +756,30 @@ class ClaimAndConsolidatedLifecycleTest extends TestCase
             'item_status' => 'VERIFIED',
         ]);
 
-        // Verify that SR-16 is offered for release against Delivery 2 without zero releasable quantity errors
+        // Verify that child SR-18 is offered for release against follow-up Delivery 2 (parent SR-16 is blocked)
         $createResponse = $this->actingAs($this->gsoUser)->get(route('inventory.distribution-records.create'));
         $createResponse->assertOk();
-        $createResponse->assertInertia(function ($page) use ($sr16, $del02) {
+        $createResponse->assertInertia(function ($page) use ($sr16, $sr18, $del02) {
             $rows = collect($page->toArray()['props']['eligibleRows']['data'] ?? []);
             $sr16Row = $rows->first(fn ($r) => $r['supply_request_id'] === (int) $sr16->supply_request_id && $r['delivery_id'] === (int) $del02->delivery_id);
-            $this->assertNotNull($sr16Row, 'SR-16 must be eligible for release against follow-up Delivery 2!');
+            $sr18Row = $rows->first(fn ($r) => $r['supply_request_id'] === (int) $sr18->supply_request_id && $r['delivery_id'] === (int) $del02->delivery_id);
+            $this->assertNull($sr16Row, 'Parent SR-16 must NOT be offered for release against follow-up Delivery 2!');
+            $this->assertNotNull($sr18Row, 'Child SR-18 must be eligible for release against follow-up Delivery 2!');
         });
 
-        // Release the 100 items to SR-16
+        // Release the 100 items to child SR-18
         $inv->forceFill(['stock_on_hand' => 100, 'available_stock' => 100])->save();
         $distFollowUp = $distService->createRecordWithAutomaticRelease($this->gsoUser, [
-            'supply_request_id' => $sr16->supply_request_id,
+            'supply_request_id' => $sr18->supply_request_id,
             'delivery_id' => $del02->delivery_id,
             'office_id' => $this->office->id,
         ]);
         $this->assertEquals(100.0, (float) $distFollowUp->items->sum('quantity_released'));
 
-        // Office receives the final 100 items on SR-16
+        // Office receives the final 100 items on SR-18
         $this->actingAs($this->officeUser)->post(route('office.distribution-records.receive', $distFollowUp->distribution_record_id));
 
-        // Now both SR-16 and SR-17 are fully received!
+        // Now both parents SR-16 and SR-17 as well as child SR-18 are fully received!
         $this->assertSame('RECEIVED', (string) $sr16->fresh()->status);
         $this->assertSame('RECEIVED', (string) $sr17->fresh()->status);
         $this->assertSame('RECEIVED', (string) $sr18->fresh()->status);
@@ -1025,39 +1027,31 @@ class ClaimAndConsolidatedLifecycleTest extends TestCase
             'item_status' => 'VERIFIED',
         ]);
 
-        // User releases SR-16 first (200 A4, 200 Legal)
+        // Direct release of follow-up delivery to parent SR-16 or SR-17 is blocked
+        try {
+            $distService->createRecordWithAutomaticRelease($this->gsoUser, [
+                'supply_request_id' => $sr16->supply_request_id,
+                'delivery_id' => $del02->delivery_id,
+                'office_id' => $this->office->id,
+            ]);
+            $this->fail('Direct release of follow-up delivery to parent SR-16 must be blocked');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->assertStringContainsString('cannot be released directly against parent requisition', $e->getMessage());
+        }
+
+        // Child SR-18 is released (250 A4, 250 Legal)
         $invA4->forceFill(['stock_on_hand' => 250, 'available_stock' => 250])->save();
         $invLegal->forceFill(['stock_on_hand' => 250, 'available_stock' => 250])->save();
 
-        $dist16 = $distService->createRecordWithAutomaticRelease($this->gsoUser, [
-            'supply_request_id' => $sr16->supply_request_id,
+        $dist18 = $distService->createRecordWithAutomaticRelease($this->gsoUser, [
+            'supply_request_id' => $sr18->supply_request_id,
             'delivery_id' => $del02->delivery_id,
             'office_id' => $this->office->id,
         ]);
-        $this->assertEquals(400.0, (float) $dist16->items->sum('quantity_released'));
-        $this->actingAs($this->officeUser)->post(route('office.distribution-records.receive', $dist16->distribution_record_id));
+        $this->assertEquals(500.0, (float) $dist18->items->sum('quantity_released'));
+        $this->actingAs($this->officeUser)->post(route('office.distribution-records.receive', $dist18->distribution_record_id));
 
-        // SR-16 is now 100% fully received!
-        $this->assertSame('RECEIVED', (string) $sr16->fresh()->status);
-
-        // SR-18 must NOT be prematurely marked RECEIVED because SR-17 still needs 50/50!
-        $this->assertNotSame('RECEIVED', (string) $sr18->fresh()->status);
-        $this->assertNotSame('COMPLETED', (string) $followUpPr->fresh()->status);
-
-        // Dynamic rebinding: Follow-up PR parent context automatically transfers to SR-17 (which holds the deficit!)
-        $resolvedParent = $followUpService->resolveParentSupplyRequestForDeliveryFollowUp($followUpPr, $sr18);
-        $this->assertSame((int) $sr17->supply_request_id, (int) $resolvedParent->supply_request_id, 'Follow-up must transfer its parent context to SR-17!');
-
-        // GSO releases the remaining 50 A4 and 50 Legal to SR-17 directly
-        $dist17Final = $distService->createRecordWithAutomaticRelease($this->gsoUser, [
-            'supply_request_id' => $sr17->supply_request_id,
-            'delivery_id' => $del02->delivery_id,
-            'office_id' => $this->office->id,
-        ]);
-        $this->assertEquals(100.0, (float) $dist17Final->items->sum('quantity_released'));
-        $this->actingAs($this->officeUser)->post(route('office.distribution-records.receive', $dist17Final->distribution_record_id));
-
-        // Now BOTH SR-16 and SR-17 are fully received!
+        // Receiving the follow-up child SR-18 fulfills both parent SR-16 and parent SR-17, and completes the follow-up PR!
         $this->assertSame('RECEIVED', (string) $sr16->fresh()->status);
         $this->assertSame('RECEIVED', (string) $sr17->fresh()->status);
         $this->assertSame('RECEIVED', (string) $sr18->fresh()->status);

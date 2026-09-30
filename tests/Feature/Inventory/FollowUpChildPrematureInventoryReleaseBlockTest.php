@@ -283,9 +283,21 @@ class FollowUpChildPrematureInventoryReleaseBlockTest extends TestCase
             $this->assertSame('VERIFIED_DELIVERY', $deliveryRow['release_basis']);
         });
 
-        // Release the verified Delivery 2 to SR-16
+        // Direct release of follow-up Delivery 2 to parent SR-16 is blocked
+        try {
+            $distService->createRecordWithAutomaticRelease($gsoUser, [
+                'supply_request_id' => $sr16->supply_request_id,
+                'delivery_id' => $del02->delivery_id,
+                'office_id' => $office->id,
+            ]);
+            $this->fail('Direct release of follow-up delivery to parent SR-16 must be blocked');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->assertStringContainsString('cannot be released directly against parent requisition', $e->getMessage());
+        }
+
+        // Release the verified Delivery 2 to child SR-18
         $distFollowUp = $distService->createRecordWithAutomaticRelease($gsoUser, [
-            'supply_request_id' => $sr16->supply_request_id,
+            'supply_request_id' => $sr18->supply_request_id,
             'delivery_id' => $del02->delivery_id,
             'office_id' => $office->id,
         ]);

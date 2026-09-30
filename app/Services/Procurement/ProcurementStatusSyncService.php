@@ -18,6 +18,7 @@ class ProcurementStatusSyncService
 {
     public function __construct(
         private readonly SupplyRequestFollowUpService $followUpService,
+        private readonly ConsolidationTraceabilityService $traceabilityService,
     ) {
     }
 
@@ -98,6 +99,33 @@ class ProcurementStatusSyncService
                 }
 
                 $current = $parent;
+            }
+
+            // Consolidated procurement family completion check
+            $rootSr = $this->followUpService->resolveRootSupplyRequest($supplyRequest);
+            $consolidatedCandidates = $this->resolveConsolidatedConstituentSupplyRequests($rootSr);
+            if ($consolidatedCandidates->count() > 1 && $this->isConsolidatedFamilyFullyReceived($consolidatedCandidates)) {
+                $consolidatedRemarks = 'Consolidated procurement was fully received across follow-up deliveries.';
+                foreach ($consolidatedCandidates as $candidate) {
+                    $this->transitionSupplyRequest($candidate, $actor, $consolidatedRemarks);
+                    $this->transitionPurchaseRequests($candidate->purchaseRequests, $actor, $consolidatedRemarks);
+                    $this->transitionPurchaseOrders($candidate->purchaseOrders, $actor, $consolidatedRemarks);
+
+                    $childIds = $this->resolveFulfillmentChildSupplyRequestIds($candidate);
+                    if (! empty($childIds)) {
+                        $children = SupplyRequest::query()
+                            ->with(['items', 'distributionRecords.items', 'purchaseRequests', 'purchaseOrders'])
+                            ->whereIn('supply_request_id', $childIds)
+                            ->get();
+                        foreach ($children as $child) {
+                            if ($this->canSyncChildWhenParentFullyReceived($child, $candidate)) {
+                                $this->transitionSupplyRequest($child, $actor, $consolidatedRemarks);
+                                $this->transitionPurchaseRequests($child->purchaseRequests, $actor, $consolidatedRemarks);
+                                $this->transitionPurchaseOrders($child->purchaseOrders, $actor, $consolidatedRemarks);
+                            }
+                        }
+                    }
+                }
             }
         });
     }
@@ -210,6 +238,12 @@ class ProcurementStatusSyncService
             return false;
         }
 
+        $rootSr = $this->followUpService->resolveRootSupplyRequest($supplyRequest);
+        $candidates = $this->resolveConsolidatedConstituentSupplyRequests($rootSr);
+        if ($candidates->count() > 1 && $this->isConsolidatedFamilyFullyReceived($candidates)) {
+            return true;
+        }
+
         $fulfillmentRecords = $this->allFulfillmentDistributionRecords($supplyRequest)
             ->where('status', 'RECEIVED');
 
@@ -276,11 +310,9 @@ class ProcurementStatusSyncService
         }
 
         // 3. For consolidated procurements, verify ALL constituents of the parent consolidated procurement are fully received
-        $delivery = $child->purchaseRequests->firstWhere('source_delivery_id')?->sourceDelivery;
-        $parentPo = $delivery?->purchaseOrder;
-        if ($parentPo) {
-            $traceability = app(\App\Services\Procurement\ConsolidationTraceabilityService::class);
-            $candidates = $traceability->getSourceSupplyRequests($parentPo);
+        $rootPo = $this->resolveRootPurchaseOrderForSupplyRequest($child);
+        if ($rootPo) {
+            $candidates = $this->traceabilityService->getSourceSupplyRequests($rootPo);
             if ($candidates->count() > 1) {
                 foreach ($candidates as $cand) {
                     if (! $this->isFullyReceived($cand)) {
@@ -292,9 +324,151 @@ class ProcurementStatusSyncService
             }
         }
 
-        // 4. Verify the parent is indeed the constituent that this child corresponds to
-        $resolvedParent = $this->followUpService->resolveParentSupplyRequest($child);
-        if ($resolvedParent instanceof SupplyRequest && (int) $resolvedParent->supply_request_id !== (int) $parent->supply_request_id) {
+        // 4. Verify the parent is indeed in the same lineage or consolidated procurement family
+        $resolvedRootChild = $this->followUpService->resolveRootSupplyRequest($child);
+        $resolvedRootParent = $this->followUpService->resolveRootSupplyRequest($parent);
+        if ((int) $resolvedRootChild->supply_request_id !== (int) $resolvedRootParent->supply_request_id) {
+            $candidates = $this->resolveConsolidatedConstituentSupplyRequests($resolvedRootChild);
+            if (! $candidates->contains('supply_request_id', (int) $resolvedRootParent->supply_request_id)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public function resolveRootPurchaseOrderForSupplyRequest(SupplyRequest $supplyRequest): ?PurchaseOrder
+    {
+        $supplyRequest->loadMissing([
+            'purchaseOrders',
+            'purchaseRequests.purchaseOrders',
+            'purchaseRequests.sourceDelivery.purchaseOrder',
+            'purchaseRequests.sourceClaim.distributionRecord.delivery.purchaseOrder',
+        ]);
+
+        $currentPo = $supplyRequest->purchaseOrders->first()
+            ?? $supplyRequest->purchaseRequests->flatMap->purchaseOrders->first()
+            ?? $supplyRequest->purchaseRequests->firstWhere('source_delivery_id')?->sourceDelivery?->purchaseOrder
+            ?? $supplyRequest->purchaseRequests->firstWhere('source_claim_id')?->sourceClaim?->distributionRecord?->delivery?->purchaseOrder;
+
+        if (! $currentPo) {
+            $rootSr = $this->followUpService->resolveRootSupplyRequest($supplyRequest);
+            $currentPo = $rootSr->purchaseOrders->first()
+                ?? $rootSr->purchaseRequests->flatMap->purchaseOrders->first();
+        }
+
+        if (! $currentPo) {
+            return null;
+        }
+
+        $visitedPoIds = [(int) $currentPo->purchase_order_id => true];
+        while (true) {
+            $sourceDelivery = $currentPo->purchaseRequest?->sourceDelivery;
+            if ($sourceDelivery && $sourceDelivery->purchaseOrder) {
+                $nextPo = $sourceDelivery->purchaseOrder;
+                $nextId = (int) $nextPo->purchase_order_id;
+                if (! isset($visitedPoIds[$nextId])) {
+                    $visitedPoIds[$nextId] = true;
+                    $currentPo = $nextPo;
+                    continue;
+                }
+            }
+
+            $sourceClaim = $currentPo->purchaseRequest?->sourceClaim;
+            if ($sourceClaim && $sourceClaim->distributionRecord?->delivery?->purchaseOrder) {
+                $nextPo = $sourceClaim->distributionRecord->delivery->purchaseOrder;
+                $nextId = (int) $nextPo->purchase_order_id;
+                if (! isset($visitedPoIds[$nextId])) {
+                    $visitedPoIds[$nextId] = true;
+                    $currentPo = $nextPo;
+                    continue;
+                }
+            }
+
+            break;
+        }
+
+        return $currentPo;
+    }
+
+    public function resolveConsolidatedConstituentSupplyRequests(SupplyRequest $rootSr): \Illuminate\Support\Collection
+    {
+        $rootPo = $this->resolveRootPurchaseOrderForSupplyRequest($rootSr);
+        if ($rootPo) {
+            $candidates = $this->traceabilityService->getSourceSupplyRequests($rootPo);
+            if ($candidates->count() > 1) {
+                return $candidates;
+            }
+        }
+
+        $allPrs = $this->traceabilityService->getPurchaseRequestsForSupplyRequest($rootSr);
+        foreach ($allPrs as $pr) {
+            $candidates = $this->traceabilityService->getSourceSupplyRequests($pr);
+            if ($candidates->count() > 1) {
+                return $candidates;
+            }
+        }
+
+        return collect([$rootSr]);
+    }
+
+    public function isConsolidatedFamilyFullyReceived(\Illuminate\Support\Collection $candidates): bool
+    {
+        if ($candidates->isEmpty()) {
+            return false;
+        }
+
+        // 1. Gather all item requirements across all candidate requests
+        $familyRequestedByItem = [];
+        foreach ($candidates as $cand) {
+            $cand->loadMissing('items');
+            foreach ($cand->items as $item) {
+                $itemId = (int) $item->item_id;
+                $familyRequestedByItem[$itemId] = ($familyRequestedByItem[$itemId] ?? 0.0) + (float) $item->quantity_requested;
+            }
+        }
+
+        if (empty($familyRequestedByItem)) {
+            return false;
+        }
+
+        // 2. Gather all supply request IDs in the family (candidates + all follow-up descendants)
+        $allFamilySrIds = $candidates->pluck('supply_request_id')->all();
+        foreach ($candidates as $cand) {
+            $allFamilySrIds = array_merge($allFamilySrIds, $this->followUpService->resolveAllFollowUpChildSupplyRequestIds($cand));
+        }
+        $allFamilySrIds = array_values(array_unique(array_filter(array_map('intval', $allFamilySrIds))));
+
+        // 3. Gather all RECEIVED distribution records across the family
+        $receivedRecords = DistributionRecord::query()
+            ->with('items')
+            ->whereIn('supply_request_id', $allFamilySrIds)
+            ->where('status', 'RECEIVED')
+            ->get();
+
+        $familyReceivedByItem = [];
+        foreach ($receivedRecords as $record) {
+            foreach ($record->items as $item) {
+                $itemId = (int) $item->item_id;
+                $familyReceivedByItem[$itemId] = ($familyReceivedByItem[$itemId] ?? 0.0) + (float) $item->quantity_received;
+            }
+        }
+
+        // 4. Verify each requested item is fully received
+        foreach ($familyRequestedByItem as $itemId => $requested) {
+            $received = (float) ($familyReceivedByItem[$itemId] ?? 0.0);
+            if ($received + 0.0001 < $requested) {
+                return false;
+            }
+        }
+
+        // 5. Verify no unresolved claims exist on any distribution record of the family
+        $hasUnresolvedClaim = \App\Models\Claim::query()
+            ->whereIn('distribution_record_id', $receivedRecords->pluck('distribution_record_id'))
+            ->whereNotIn('status', ['RESOLVED', 'REJECTED'])
+            ->exists();
+
+        if ($hasUnresolvedClaim) {
             return false;
         }
 

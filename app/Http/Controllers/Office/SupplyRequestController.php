@@ -125,7 +125,10 @@ class SupplyRequestController extends Controller
     private function applyTrackingStatusFilter(Builder $query, string $status): void
     {
         match ($status) {
-            'RECEIVED' => $query->whereHas('distributionRecords', fn (Builder $distributionQuery) => $distributionQuery->where('status', 'RECEIVED')),
+            'RECEIVED' => $query->where(function (Builder $q) {
+                $q->where('status', 'RECEIVED')
+                    ->orWhereHas('distributionRecords', fn (Builder $distributionQuery) => $distributionQuery->where('status', 'RECEIVED'));
+            }),
             'PARTIALLY_RECEIVED' => $query->whereHas('distributionRecords', fn (Builder $distributionQuery) => $distributionQuery->where('status', 'RECEIVED')),
             'PARTIALLY_RELEASED' => $query->whereHas('distributionRecords', fn (Builder $distributionQuery) => $distributionQuery->whereIn('status', ['RELEASED', 'RECEIVED'])),
             'RELEASED' => $query
@@ -414,19 +417,41 @@ class SupplyRequestController extends Controller
     private function releasedDistributionRecords(SupplyRequest $supplyRequest)
     {
         $followUpSupplyRequestIds = $this->linkedFollowUpSupplyRequestIds($supplyRequest);
+        $allSrIds = array_merge([(int) $supplyRequest->supply_request_id], $followUpSupplyRequestIds);
+
+        $rootSr = $this->followUpService->resolveRootSupplyRequest($supplyRequest);
+        $syncService = app(\App\Services\Procurement\ProcurementStatusSyncService::class);
+        $candidates = $syncService->resolveConsolidatedConstituentSupplyRequests($rootSr);
+        if ($candidates->count() > 1) {
+            $allSrIds = array_merge($allSrIds, $candidates->pluck('supply_request_id')->all());
+        }
+        $allSrIds = array_values(array_unique(array_filter(array_map('intval', $allSrIds))));
 
         return DistributionRecord::query()
-            ->whereIn('supply_request_id', array_merge([(int) $supplyRequest->supply_request_id], $followUpSupplyRequestIds))
+            ->with(['items.item', 'delivery', 'supplyRequest'])
+            ->whereIn('supply_request_id', $allSrIds)
             ->whereIn('status', ['RELEASED', 'RECEIVED'])
             ->latest('distribution_record_id')
-            ->get(['distribution_record_id', 'supply_request_id', 'status', 'storage_location', 'release_date'])
+            ->get()
             ->map(fn (DistributionRecord $record): array => [
                 'distribution_record_id' => (int) $record->distribution_record_id,
                 'supply_request_id' => (int) $record->supply_request_id,
+                'supply_request_code' => (string) ($record->supplyRequest?->request_code ?? ''),
+                'delivery_code' => $record->delivery?->delivery_code,
                 'is_follow_up_fulfillment' => (int) $record->supply_request_id !== (int) $supplyRequest->supply_request_id,
                 'status' => (string) $record->status,
                 'storage_location' => (string) ($record->storage_location ?? ''),
                 'release_date' => optional($record->release_date)?->toDateString(),
+                'items' => $record->items->map(fn ($item): array => [
+                    'distribution_item_id' => (int) $item->distribution_item_id,
+                    'item_id' => (int) $item->item_id,
+                    'item_name' => (string) ($item->item?->item_name ?? 'Item #' . $item->item_id),
+                    'unit' => (string) ($item->item?->default_unit ?? 'unit'),
+                    'quantity_released' => (float) $item->quantity_released,
+                    'quantity_received' => (float) ($item->quantity_received ?? 0),
+                    'quantity_damaged' => (float) ($item->quantity_damaged ?? 0),
+                    'status' => (string) ($item->status ?? ''),
+                ])->values()->all(),
             ])
             ->values();
     }
@@ -631,7 +656,18 @@ class SupplyRequestController extends Controller
      */
     private function linkedFollowUpSupplyRequestIds(SupplyRequest $supplyRequest): array
     {
-        return $this->followUpService->resolveAllFollowUpChildSupplyRequestIds($supplyRequest);
+        $childIds = $this->followUpService->resolveAllFollowUpChildSupplyRequestIds($supplyRequest);
+
+        $rootSr = $this->followUpService->resolveRootSupplyRequest($supplyRequest);
+        $syncService = app(\App\Services\Procurement\ProcurementStatusSyncService::class);
+        $candidates = $syncService->resolveConsolidatedConstituentSupplyRequests($rootSr);
+        if ($candidates->count() > 1) {
+            foreach ($candidates as $cand) {
+                $childIds = array_merge($childIds, $this->followUpService->resolveAllFollowUpChildSupplyRequestIds($cand));
+            }
+        }
+
+        return array_values(array_unique(array_filter(array_map('intval', $childIds))));
     }
 
     /**

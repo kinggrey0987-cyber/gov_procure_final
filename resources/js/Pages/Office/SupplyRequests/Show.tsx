@@ -81,9 +81,23 @@ type Props = {
     };
     distributionRecords: Array<{
         distribution_record_id: number;
+        supply_request_id?: number;
+        supply_request_code?: string;
+        delivery_code?: string | null;
+        is_follow_up_fulfillment?: boolean;
         status: string;
         storage_location?: string | null;
         release_date?: string | null;
+        items?: Array<{
+            distribution_item_id: number;
+            item_id: number;
+            item_name: string;
+            unit?: string | null;
+            quantity_released: number;
+            quantity_received: number;
+            quantity_damaged?: number;
+            status?: string;
+        }>;
     }>;
     canEdit: boolean;
     canSubmit: boolean;
@@ -878,11 +892,73 @@ export default function SupplyRequestShow({
                                 {distributionRecords.length === 0 ? (
                                     <p className="mt-2 text-sm text-slate-600">No related distribution records yet.</p>
                                 ) : (
-                                    <div className="mt-3 space-y-2">
+                                    <div className="mt-3 space-y-3">
                                         {distributionRecords.map((record) => (
-                                            <div key={record.distribution_record_id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2">
-                                                <p className="text-sm font-medium text-slate-800">Distribution #{record.distribution_record_id}</p>
-                                                <p className="text-xs text-slate-600">{record.status.replaceAll('_', ' ')}</p>
+                                            <div key={record.distribution_record_id} className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 transition-all hover:border-slate-300">
+                                                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <span className="text-sm font-bold text-slate-800">
+                                                            Distribution #{record.distribution_record_id}
+                                                        </span>
+                                                        {record.delivery_code ? (
+                                                            <span className="rounded bg-sky-100 px-2 py-0.5 text-xs font-semibold text-sky-800">
+                                                                Delivery: {record.delivery_code}
+                                                            </span>
+                                                        ) : null}
+                                                        {record.is_follow_up_fulfillment ? (
+                                                            <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                                                                Follow-up Batch {record.supply_request_code ? `(${record.supply_request_code})` : ''}
+                                                            </span>
+                                                        ) : null}
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        {record.release_date ? (
+                                                            <span className="text-xs text-slate-500">
+                                                                Released: {record.release_date}
+                                                            </span>
+                                                        ) : null}
+                                                        <StatusBadge status={record.status} />
+                                                    </div>
+                                                </div>
+
+                                                {record.items && record.items.length > 0 ? (
+                                                    <div className="mt-2">
+                                                        <div className="overflow-x-auto">
+                                                            <table className="min-w-full divide-y divide-slate-200 text-xs">
+                                                                <thead>
+                                                                    <tr className="text-left font-medium text-slate-500">
+                                                                        <th className="py-1 pr-3">Item</th>
+                                                                        <th className="py-1 pr-3 text-right">Released</th>
+                                                                        <th className="py-1 pr-3 text-right">Received</th>
+                                                                        {record.items.some(i => (i.quantity_damaged ?? 0) > 0) ? (
+                                                                            <th className="py-1 text-right text-red-600">Damaged</th>
+                                                                        ) : null}
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody className="divide-y divide-slate-100">
+                                                                    {record.items.map((item) => (
+                                                                        <tr key={item.distribution_item_id || item.item_id}>
+                                                                            <td className="py-1 pr-3 font-medium text-slate-800">
+                                                                                {item.item_name}
+                                                                            </td>
+                                                                            <td className="py-1 pr-3 text-right text-slate-700">
+                                                                                {item.quantity_released} {item.unit}
+                                                                            </td>
+                                                                            <td className="py-1 pr-3 text-right font-semibold text-emerald-700">
+                                                                                {item.quantity_received} {item.unit}
+                                                                            </td>
+                                                                            {record.items?.some(i => (i.quantity_damaged ?? 0) > 0) ? (
+                                                                                <td className="py-1 text-right font-medium text-red-600">
+                                                                                    {(item.quantity_damaged ?? 0) > 0 ? `${item.quantity_damaged} ${item.unit}` : '-'}
+                                                                                </td>
+                                                                            ) : null}
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                ) : null}
                                             </div>
                                         ))}
                                     </div>
