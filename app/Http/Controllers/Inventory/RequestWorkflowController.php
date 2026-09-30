@@ -251,8 +251,13 @@ class RequestWorkflowController
         $stockAssessment = ($shortageTotal > 0 || $isQueuedForProcurement) ? 'SHORTAGE_REQUIRES_PROCUREMENT' : 'STOCK_READY';
         $distributionRecordsCount = (int) $request->distribution_records_count;
         $hasDraftDistribution = $request->distributionRecords->contains(fn ($record): bool => (string) $record->status === 'DRAFT');
+        $isDiscrepancyChild = $request->purchaseRequests->contains(
+            fn ($pr) => in_array((string) $pr->source_type, ['PARTIAL_DELIVERY_FOLLOW_UP', 'CLAIM_REPLACEMENT_FOLLOW_UP'], true)
+                || (int) ($pr->source_delivery_id ?? 0) > 0
+                || (int) ($pr->source_claim_id ?? 0) > 0
+        );
         $isSubmitted = (string) $request->status === 'SUBMITTED';
-        $canCreateInventoryDistribution = $isSubmitted && ($stockAssessment === 'STOCK_READY' || $hasAvailableStock) && ! $hasPurchaseRequest && $hasRemainingQuantity && ! $hasDraftDistribution;
+        $canCreateInventoryDistribution = $isSubmitted && ! $isDiscrepancyChild && ($stockAssessment === 'STOCK_READY' || $hasAvailableStock) && ! $hasPurchaseRequest && $hasRemainingQuantity && ! $hasDraftDistribution;
 
         $categoryId = (int) ($request->item_category_id ?: ($request->items->first()?->item?->item_category_id ?? 0));
         $categoryName = (string) (
@@ -782,15 +787,22 @@ class RequestWorkflowController
                 ->with('error', 'All requested quantities have already been released for this request.');
         }
 
-        $lineageIds = $this->followUpService->resolveLineageSupplyRequestIds($supplyRequest);
+        $isFollowUp = $this->followUpService->isFollowUpSupplyRequest($supplyRequest);
         $deliveryIds = $this->followUpService->resolveDeliveryIdsForSupplyRequest($supplyRequest);
+        $targetSrIds = $isFollowUp
+            ? array_values(array_unique(array_filter(array_map('intval', array_merge(
+                [(int) $supplyRequest->supply_request_id],
+                $this->followUpService->resolveAllFollowUpChildSupplyRequestIds($supplyRequest)
+            )))))
+            : $this->followUpService->resolveLineageSupplyRequestIds($supplyRequest);
+
         $verifiedDelivery = Delivery::query()
             ->whereIn('receipt_status', ['VERIFIED', 'PARTIALLY_RECEIVED'])
-            ->where(function ($query) use ($lineageIds, $deliveryIds): void {
+            ->where(function ($query) use ($targetSrIds, $deliveryIds): void {
                 $query->whereIn('delivery_id', $deliveryIds)
-                    ->orWhereHas('purchaseOrder', function ($poQ) use ($lineageIds): void {
-                        $poQ->whereIn('supply_request_id', $lineageIds)
-                            ->orWhereHas('purchaseRequest', fn ($prQ) => $prQ->whereIn('supply_request_id', $lineageIds));
+                    ->orWhereHas('purchaseOrder', function ($poQ) use ($targetSrIds): void {
+                        $poQ->whereIn('supply_request_id', $targetSrIds)
+                            ->orWhereHas('purchaseRequest', fn ($prQ) => $prQ->whereIn('supply_request_id', $targetSrIds));
                     });
             })
             ->whereDoesntHave('distributionRecords', fn ($q) => $q->where('status', 'DRAFT'))
@@ -808,6 +820,20 @@ class RequestWorkflowController
 
                 return $acceptedTotal - $releasedTotal > 0.0001;
             });
+
+        $prs = app(\App\Services\Procurement\ConsolidationTraceabilityService::class)->getPurchaseRequestsForSupplyRequest($supplyRequest);
+        $allPrs = $prs->merge($supplyRequest->purchaseRequests)->unique('purchase_request_id');
+        $isDiscrepancyChild = $allPrs->contains(
+            fn ($pr) => in_array((string) $pr->source_type, ['PARTIAL_DELIVERY_FOLLOW_UP', 'CLAIM_REPLACEMENT_FOLLOW_UP'], true)
+                || (int) ($pr->source_delivery_id ?? 0) > 0
+                || (int) ($pr->source_claim_id ?? 0) > 0
+        );
+
+        if ($isDiscrepancyChild && $verifiedDelivery === null) {
+            return redirect()
+                ->route('inventory.office-supply-requests.index', $request->query())
+                ->with('error', 'This follow-up request is queued for procurement and awaits verified delivery before distribution release.');
+        }
 
         $hasAvailableStock = $verifiedDelivery !== null;
         if (! $hasAvailableStock) {

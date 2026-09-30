@@ -160,12 +160,27 @@ class DistributionRecordController
         $deliveryIds = $deliveries->pluck('delivery_id')->filter()->map(fn ($id): int => (int) $id)->all();
         $downstreamDiscrepanciesByDeliveryId = [];
         if (! empty($deliveryIds)) {
-            $downstreamDiscrepanciesByDeliveryId = PurchaseRequest::query()
-                ->whereIn('source_delivery_id', $deliveryIds)
-                ->get(['source_delivery_id', 'supply_request_id'])
-                ->groupBy(fn ($pr) => (int) $pr->source_delivery_id)
-                ->map(fn ($prs) => $prs->pluck('supply_request_id')->filter()->map(fn ($id) => (int) $id)->all())
-                ->all();
+            $prsWithSource = PurchaseRequest::query()
+                ->where(function ($q) use ($deliveryIds) {
+                    $q->whereIn('source_delivery_id', $deliveryIds)
+                        ->orWhereHas('sourceClaim.distributionRecord', fn ($drQ) => $drQ->whereIn('delivery_id', $deliveryIds));
+                })
+                ->with('sourceClaim.distributionRecord')
+                ->get(['purchase_request_id', 'source_delivery_id', 'source_claim_id', 'supply_request_id']);
+
+            foreach ($prsWithSource as $pr) {
+                $srId = (int) $pr->supply_request_id;
+                if ($srId <= 0) {
+                    continue;
+                }
+                if ((int) $pr->source_delivery_id > 0) {
+                    $downstreamDiscrepanciesByDeliveryId[(int) $pr->source_delivery_id][] = $srId;
+                }
+                $claimDelId = (int) ($pr->sourceClaim?->distributionRecord?->delivery_id ?? 0);
+                if ($claimDelId > 0) {
+                    $downstreamDiscrepanciesByDeliveryId[$claimDelId][] = $srId;
+                }
+            }
         }
 
         return $deliveries
@@ -197,8 +212,9 @@ class DistributionRecordController
         }
 
         $sourceSupplyRequests = collect();
-        $isFollowUpDelivery = (string) ($delivery->purchaseOrder?->purchaseRequest?->source_type ?? '') === 'PARTIAL_DELIVERY_FOLLOW_UP'
-            || (int) ($delivery->purchaseOrder?->purchaseRequest?->source_delivery_id ?? 0) > 0;
+        $isFollowUpDelivery = in_array((string) ($delivery->purchaseOrder?->purchaseRequest?->source_type ?? ''), ['PARTIAL_DELIVERY_FOLLOW_UP', 'CLAIM_REPLACEMENT_FOLLOW_UP'], true)
+            || (int) ($delivery->purchaseOrder?->purchaseRequest?->source_delivery_id ?? 0) > 0
+            || (int) ($delivery->purchaseOrder?->purchaseRequest?->source_claim_id ?? 0) > 0;
 
         if ($isFollowUpDelivery) {
             // A follow-up delivery fulfills its specific child supply request
@@ -237,7 +253,10 @@ class DistributionRecordController
             $downstreamDiscrepancyChildIds = ! empty($preloadedDownstreamChildIds)
                 ? $preloadedDownstreamChildIds
                 : PurchaseRequest::query()
-                    ->where('source_delivery_id', (int) $delivery->delivery_id)
+                    ->where(function ($q) use ($delivery) {
+                        $q->where('source_delivery_id', (int) $delivery->delivery_id)
+                            ->orWhereHas('sourceClaim.distributionRecord', fn ($drQ) => $drQ->where('delivery_id', (int) $delivery->delivery_id));
+                    })
                     ->pluck('supply_request_id')
                     ->filter()
                     ->all();
@@ -303,6 +322,11 @@ class DistributionRecordController
             ->whereIn('status', ['SUBMITTED', 'APPROVED', 'PARTIALLY_RECEIVED', 'FOR_PROCUREMENT'])
             ->whereHas('office', fn ($officeQuery) => $officeQuery->where('code', '!=', 'GSO'))
             ->whereDoesntHave('distributionRecords', fn ($query) => $query->where('status', 'DRAFT'))
+            ->whereDoesntHave('purchaseRequests', function ($prQ) {
+                $prQ->whereIn('source_type', ['PARTIAL_DELIVERY_FOLLOW_UP', 'CLAIM_REPLACEMENT_FOLLOW_UP'])
+                    ->orWhereNotNull('source_delivery_id')
+                    ->orWhereNotNull('source_claim_id');
+            })
             ->when(! empty($excludeSupplyRequestIds), fn ($query) => $query->whereNotIn('supply_request_id', $excludeSupplyRequestIds))
             ->with(['office', 'items.item.inventory', 'distributionRecords.items', 'distributionRecords.delivery.items.purchaseOrderItem', 'purchaseRequests', 'purchaseOrders.items'])
             ->latest('supply_request_id')
@@ -314,14 +338,26 @@ class DistributionRecordController
 
     private function releaseRowFromAvailableInventory(SupplyRequest $request): ?array
     {
+        $prs = $this->traceabilityService->getPurchaseRequestsForSupplyRequest($request);
+        $allPrs = $prs->merge($request->purchaseRequests)->unique('purchase_request_id');
+
+        $isDiscrepancyChild = $allPrs->contains(
+            fn ($pr) => in_array((string) $pr->source_type, ['PARTIAL_DELIVERY_FOLLOW_UP', 'CLAIM_REPLACEMENT_FOLLOW_UP'], true)
+                || (int) ($pr->source_delivery_id ?? 0) > 0
+                || (int) ($pr->source_claim_id ?? 0) > 0
+        );
+
+        if ($isDiscrepancyChild) {
+            return null;
+        }
+
         if (! $this->hasRemainingQuantity($request)) {
             return null;
         }
 
         $hasReleasableStock = false;
         $releasedPool = $this->releasedQuantityByItemId($request);
-        $prs = $this->traceabilityService->getPurchaseRequestsForSupplyRequest($request);
-        $isProcurementBacked = $request->purchaseRequests->isNotEmpty() || $prs->isNotEmpty();
+        $isProcurementBacked = $allPrs->isNotEmpty();
         $request->loadMissing('purchaseOrders.items');
 
         $hasPendingDeliveries = false;
@@ -355,7 +391,13 @@ class DistributionRecordController
             $releasableStock = min($remaining, $available);
 
             if ($isProcurementBacked) {
-                $totalOrdered = (float) $prs
+                $activePrRequested = (float) $allPrs
+                    ->whereNotIn('status', ['CANCELLED', 'REJECTED'])
+                    ->flatMap(fn ($pr) => $pr->items)
+                    ->filter(fn ($pri) => (int) $pri->item_id === $itemId)
+                    ->sum('quantity_requested');
+
+                $totalOrdered = (float) $allPrs
                     ->flatMap(fn ($pr) => $pr->purchaseOrders)
                     ->flatMap(fn ($po) => $po->items)
                     ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
@@ -366,7 +408,8 @@ class DistributionRecordController
                         ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
                         ->sum('quantity_ordered');
                 }
-                $inventoryPortion = max($requested - $totalOrdered, 0.0);
+                $procuredPortion = max($activePrRequested, $totalOrdered);
+                $inventoryPortion = max($requested - $procuredPortion, 0.0);
                 $alreadyReleasedInventory = $this->calculateAlreadyReleasedInventory($request, $itemId);
                 $remainingInventoryPortion = max($inventoryPortion - $alreadyReleasedInventory, 0.0);
 
@@ -580,6 +623,19 @@ class DistributionRecordController
             return 'GSO-origin supply requests are internal logistics records and are not eligible for office distribution release.';
         }
 
+        $prs = $this->traceabilityService->getPurchaseRequestsForSupplyRequest($request);
+        $allPrs = $prs->merge($request->purchaseRequests)->unique('purchase_request_id');
+
+        $isDiscrepancyChild = $allPrs->contains(
+            fn ($pr) => in_array((string) $pr->source_type, ['PARTIAL_DELIVERY_FOLLOW_UP', 'CLAIM_REPLACEMENT_FOLLOW_UP'], true)
+                || (int) ($pr->source_delivery_id ?? 0) > 0
+                || (int) ($pr->source_claim_id ?? 0) > 0
+        );
+
+        if ($isDiscrepancyChild) {
+            return 'This follow-up request is queued for procurement and awaits verified delivery before distribution release.';
+        }
+
         $existingDraftRecord = $request->distributionRecords->firstWhere('status', 'DRAFT');
         if ($existingDraftRecord instanceof DistributionRecord) {
             return 'This request already has a draft distribution record. Continue releasing items in that draft.';
@@ -589,8 +645,7 @@ class DistributionRecordController
             return 'All requested quantities have already been released for this request.';
         }
 
-        $prs = $this->traceabilityService->getPurchaseRequestsForSupplyRequest($request);
-        $hasPurchaseRequest = $request->purchaseRequests->isNotEmpty() || $prs->isNotEmpty();
+        $hasPurchaseRequest = $allPrs->isNotEmpty();
 
         $shortageTotal = 0.0;
         $hasAvailableStock = false;
@@ -628,7 +683,13 @@ class DistributionRecordController
             $releasableStock = min($remaining, $available);
 
             if ($hasPurchaseRequest) {
-                $totalOrdered = (float) $prs
+                $activePrRequested = (float) $allPrs
+                    ->whereNotIn('status', ['CANCELLED', 'REJECTED'])
+                    ->flatMap(fn ($pr) => $pr->items)
+                    ->filter(fn ($pri) => (int) $pri->item_id === $itemId)
+                    ->sum('quantity_requested');
+
+                $totalOrdered = (float) $allPrs
                     ->flatMap(fn ($pr) => $pr->purchaseOrders)
                     ->flatMap(fn ($po) => $po->items)
                     ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
@@ -639,7 +700,8 @@ class DistributionRecordController
                         ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
                         ->sum('quantity_ordered');
                 }
-                $inventoryPortion = max($requested - $totalOrdered, 0.0);
+                $procuredPortion = max($activePrRequested, $totalOrdered);
+                $inventoryPortion = max($requested - $procuredPortion, 0.0);
                 $alreadyReleasedInventory = $this->calculateAlreadyReleasedInventory($request, $itemId);
                 $remainingInventoryPortion = max($inventoryPortion - $alreadyReleasedInventory, 0.0);
 

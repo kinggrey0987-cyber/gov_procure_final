@@ -444,8 +444,21 @@ class DistributionRecordService
         }
 
         $allPrs = $this->traceabilityService->getPurchaseRequestsForSupplyRequest($record->supplyRequest);
-        $isProcurementBacked = $record->supplyRequest->purchaseRequests->isNotEmpty() || $allPrs->isNotEmpty();
+        $mergedPrs = $allPrs->merge($record->supplyRequest->purchaseRequests)->unique('purchase_request_id');
+        $isProcurementBacked = $mergedPrs->isNotEmpty();
         $hasDeliveryContext = $record->delivery_id !== null;
+
+        $isDeliveryDiscrepancyFollowUp = $mergedPrs
+            ->contains(fn ($pr) => in_array((string) $pr->source_type, ['PARTIAL_DELIVERY_FOLLOW_UP', 'CLAIM_REPLACEMENT_FOLLOW_UP'], true)
+                || (int) ($pr->source_delivery_id ?? 0) > 0
+                || (int) ($pr->source_claim_id ?? 0) > 0);
+
+        if (! $hasDeliveryContext && $isDeliveryDiscrepancyFollowUp) {
+            throw ValidationException::withMessages([
+                'supply_request_id' => 'Follow-up supply requests from delivery discrepancies or claims are tied to procurement shortages and can only be distributed from a verified delivery, not from available warehouse inventory.',
+            ]);
+        }
+
         $shortageTotal = 0.0;
         $releasedPool = $this->allFulfillmentDistributionRecords($record->supplyRequest)
             ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
@@ -501,7 +514,14 @@ class DistributionRecordService
                     })
                     ->exists();
 
-                $totalOrdered = (float) $allPrs
+                $mergedPrs = $allPrs->merge($record->supplyRequest->purchaseRequests)->unique('purchase_request_id');
+                $activePrRequested = (float) $mergedPrs
+                    ->whereNotIn('status', ['CANCELLED', 'REJECTED'])
+                    ->flatMap(fn ($pr) => $pr->items)
+                    ->filter(fn ($pri) => (int) $pri->item_id === $itemId)
+                    ->sum('quantity_requested');
+
+                $totalOrdered = (float) $mergedPrs
                     ->flatMap(fn ($pr) => $pr->purchaseOrders)
                     ->flatMap(fn ($po) => $po->items)
                     ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
@@ -512,7 +532,8 @@ class DistributionRecordService
                         ->filter(fn ($poi) => (int) $poi->item_id === $itemId)
                         ->sum('quantity_ordered');
                 }
-                $inventoryPortion = max($requested - $totalOrdered, 0.0);
+                $procuredPortion = max($activePrRequested, $totalOrdered);
+                $inventoryPortion = max($requested - $procuredPortion, 0.0);
                 $alreadyReleasedInventory = $this->calculateAlreadyReleasedInventory($record->supplyRequest, $itemId);
                 $remainingInventoryPortion = max($inventoryPortion - $alreadyReleasedInventory, 0.0);
 

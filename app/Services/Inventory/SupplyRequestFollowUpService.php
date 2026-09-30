@@ -410,28 +410,62 @@ class SupplyRequestFollowUpService
      */
     public function resolveDeliveryIdsForSupplyRequest(SupplyRequest $supplyRequest): array
     {
-        $srIds = $this->resolveLineageSupplyRequestIds($supplyRequest);
-        $requestCode = trim((string) $supplyRequest->request_code);
+        $supplyRequest->loadMissing([
+            'purchaseRequests.sourceClaim.distributionRecord',
+        ]);
 
-        $traceabilityPrIds = app(\App\Services\Procurement\ConsolidationTraceabilityService::class)
-            ->getPurchaseRequestsForSupplyRequest($supplyRequest)
-            ->pluck('purchase_request_id')
+        $requestCode = trim((string) $supplyRequest->request_code);
+        $isFollowUp = $this->isFollowUpSupplyRequest($supplyRequest);
+
+        if ($isFollowUp) {
+            $srIds = array_values(array_unique(array_filter(array_map('intval', array_merge(
+                [(int) $supplyRequest->supply_request_id],
+                $this->resolveAllFollowUpChildSupplyRequestIds($supplyRequest)
+            )))));
+            $traceabilityPrIds = app(\App\Services\Procurement\ConsolidationTraceabilityService::class)
+                ->getPurchaseRequestsForSupplyRequest($supplyRequest)
+                ->filter(fn ($pr) => in_array((int) $pr->supply_request_id, $srIds, true))
+                ->pluck('purchase_request_id')
+                ->filter()
+                ->all();
+        } else {
+            $srIds = $this->resolveLineageSupplyRequestIds($supplyRequest);
+            $traceabilityPrIds = app(\App\Services\Procurement\ConsolidationTraceabilityService::class)
+                ->getPurchaseRequestsForSupplyRequest($supplyRequest)
+                ->pluck('purchase_request_id')
+                ->filter()
+                ->all();
+        }
+
+        $excludedSourceDeliveryIds = $supplyRequest->purchaseRequests
+            ->flatMap(function (PurchaseRequest $pr): array {
+                $ids = [];
+                if ((int) ($pr->source_delivery_id ?? 0) > 0) {
+                    $ids[] = (int) $pr->source_delivery_id;
+                }
+                if ($pr->sourceClaim?->distributionRecord?->delivery_id) {
+                    $ids[] = (int) $pr->sourceClaim->distributionRecord->delivery_id;
+                }
+                return $ids;
+            })
             ->filter()
+            ->unique()
             ->all();
 
         return Delivery::query()
-            ->whereHas('purchaseOrder', function ($query) use ($srIds, $requestCode, $traceabilityPrIds) {
+            ->whereHas('purchaseOrder', function ($query) use ($srIds, $requestCode, $traceabilityPrIds, $isFollowUp) {
                 $query->whereIn('supply_request_id', $srIds)
-                    ->orWhereHas('purchaseRequest', function ($prQ) use ($srIds, $requestCode, $traceabilityPrIds) {
+                    ->orWhereHas('purchaseRequest', function ($prQ) use ($srIds, $requestCode, $traceabilityPrIds, $isFollowUp) {
                         $prQ->whereIn('supply_request_id', $srIds);
                         if (! empty($traceabilityPrIds)) {
                             $prQ->orWhereIn('purchase_request_id', $traceabilityPrIds);
                         }
-                        if ($requestCode !== '') {
+                        if ($requestCode !== '' && ! $isFollowUp) {
                             $prQ->orWhere('remarks', 'like', '%' . $requestCode . '%');
                         }
                     });
             })
+            ->when(! empty($excludedSourceDeliveryIds), fn ($q) => $q->whereNotIn('delivery_id', $excludedSourceDeliveryIds))
             ->pluck('delivery_id')
             ->map(fn ($id): int => (int) $id)
             ->unique()
