@@ -45,3 +45,4 @@ phpstan.neon
 .phpstan.cache/
 run_all_tests.*
 test-evidence/
+GovSupply_Connect_Lifecycle_Fixes_Guide.pdf
