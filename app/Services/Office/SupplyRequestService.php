@@ -82,6 +82,26 @@ class SupplyRequestService
             }
         }
 
+        $newCategoryId = isset($payload['item_category_id']) && $payload['item_category_id'] !== ''
+            ? (int) $payload['item_category_id']
+            : null;
+
+        if ($newCategoryId !== null && $newCategoryId > 0 && (int) ($supplyRequest->item_category_id ?? 0) !== $newCategoryId) {
+            $hasMismatchedCategoryItems = $supplyRequest->items()
+                ->with(['ppmpItem', 'item'])
+                ->get()
+                ->contains(function ($item) use ($newCategoryId): bool {
+                    $itemCatId = (int) ($item->ppmpItem?->item_category_id ?: ($item->item?->item_category_id ?? 0));
+                    return $itemCatId > 0 && $itemCatId !== $newCategoryId;
+                });
+
+            if ($hasMismatchedCategoryItems) {
+                throw ValidationException::withMessages([
+                    'item_category_id' => 'Cannot change category while the request contains items from another category. Remove the existing items first.',
+                ]);
+            }
+        }
+
         return DB::transaction(function () use ($supplyRequest, $actor, $payload): SupplyRequest {
             $oldStatus = (string) $supplyRequest->status;
 
@@ -115,6 +135,23 @@ class SupplyRequestService
             throw ValidationException::withMessages([
                 'items' => 'At least one supply request item is required before submission.',
             ]);
+        }
+
+        $requestCategoryId = (int) ($supplyRequest->item_category_id ?? 0);
+        if ($requestCategoryId > 0) {
+            $hasMismatched = $supplyRequest->items()
+                ->with(['ppmpItem', 'item'])
+                ->get()
+                ->contains(function ($item) use ($requestCategoryId): bool {
+                    $itemCatId = (int) ($item->ppmpItem?->item_category_id ?: ($item->item?->item_category_id ?? 0));
+                    return $itemCatId > 0 && $itemCatId !== $requestCategoryId;
+                });
+
+            if ($hasMismatched) {
+                throw ValidationException::withMessages([
+                    'items' => 'All items in this supply request must belong to the chosen category before submission.',
+                ]);
+            }
         }
 
         return DB::transaction(function () use ($supplyRequest, $actor, $reviewNotes): SupplyRequest {
@@ -253,6 +290,16 @@ class SupplyRequestService
             ]);
         }
 
+        $requestCategoryId = (int) ($supplyRequest->item_category_id ?? 0);
+        if ($requestCategoryId > 0) {
+            $itemCatId = (int) ($ppmpItem->item_category_id ?: ($ppmpItem->item?->item_category_id ?? 0));
+            if ($itemCatId > 0 && $itemCatId !== $requestCategoryId) {
+                throw ValidationException::withMessages([
+                    'ppmp_item_id' => 'Selected item does not belong to the chosen category.',
+                ]);
+            }
+        }
+
         return DB::transaction(function () use ($supplyRequest, $actor, $payload, $ppmpItem): SupplyRequestItem {
             $quantity = (float) $payload['quantity_requested'];
 
@@ -307,6 +354,16 @@ class SupplyRequestService
             throw ValidationException::withMessages([
                 'item_id' => 'Selected item must match the selected PPMP item.',
             ]);
+        }
+
+        $requestCategoryId = (int) ($supplyRequest->item_category_id ?? 0);
+        if ($requestCategoryId > 0) {
+            $itemCatId = (int) ($ppmpItem->item_category_id ?: ($ppmpItem->item?->item_category_id ?? 0));
+            if ($itemCatId > 0 && $itemCatId !== $requestCategoryId) {
+                throw ValidationException::withMessages([
+                    'ppmp_item_id' => 'Selected item does not belong to the chosen category.',
+                ]);
+            }
         }
 
         return DB::transaction(function () use ($supplyRequest, $item, $actor, $payload, $ppmpItem): SupplyRequestItem {

@@ -1123,7 +1123,7 @@ class SupplyRequestController extends Controller
             'ppmpOptions' => $this->service->ppmpOptionsForOffice($officeId),
             'selectedPpmpId' => $selectedPpmpId > 0 ? $selectedPpmpId : null,
             'ppmpItemOptions' => $selectedPpmpId > 0
-                ? $this->service->ppmpItemOptionsForRequestContext($officeId, $selectedPpmpId, (int) ($supplyRequest->item_category_id ?? 0))
+                ? $this->service->ppmpItemOptionsForRequestContext($officeId, $selectedPpmpId)
                 : [],
         ]);
     }

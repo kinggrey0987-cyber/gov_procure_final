@@ -83,6 +83,23 @@ class UpdateSupplyRequestItemRequest extends FormRequest
 
             if (! $isActiveCatalogItem) {
                 $validator->errors()->add('ppmp_item_id', 'This item is currently inactive and cannot be requested.');
+                return;
+            }
+
+            $supplyRequestCategoryId = (int) ($supplyRequest->item_category_id ?? 0);
+            if ($supplyRequestCategoryId > 0) {
+                $ppmpItem = PpmpItem::query()
+                    ->with('item:item_id,item_category_id')
+                    ->where('ppmp_item_id', $ppmpItemId)
+                    ->where('ppmp_id', (int) $supplyRequest->ppmp_id)
+                    ->first();
+
+                if ($ppmpItem) {
+                    $itemCatId = (int) ($ppmpItem->item_category_id ?: ($ppmpItem->item?->item_category_id ?? 0));
+                    if ($itemCatId > 0 && $itemCatId !== $supplyRequestCategoryId) {
+                        $validator->errors()->add('ppmp_item_id', 'Selected item does not belong to the chosen category.');
+                    }
+                }
             }
         });
     }

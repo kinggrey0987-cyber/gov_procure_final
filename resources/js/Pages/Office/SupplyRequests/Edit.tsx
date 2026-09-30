@@ -15,6 +15,8 @@ type Option = {
     ppmp_item_id: number;
     ppmp_id: number;
     item_id: number;
+    item_category_id?: number;
+    category_name?: string;
     item_name: string;
     item_specification?: string | null;
     default_unit?: string | null;
@@ -104,6 +106,28 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
 
     const newItemIsDuplicate = newItem.ppmp_item_id !== '' && existingPpmpItemIds.includes(newItem.ppmp_item_id);
 
+    const filteredItemOptions = useMemo(() => {
+        const selectedCatId = Number(form.data.item_category_id);
+        if (!selectedCatId) {
+            return itemOptions;
+        }
+        return itemOptions.filter((opt) => !opt.item_category_id || opt.item_category_id === selectedCatId);
+    }, [itemOptions, form.data.item_category_id]);
+
+    const mismatchedExistingItems = useMemo(() => {
+        const selectedCatId = Number(form.data.item_category_id);
+        if (!selectedCatId) {
+            return [];
+        }
+
+        return supplyRequest.items.filter((item) => {
+            const row = editingRows[item.supply_request_item_id];
+            const opt = optionById.get(String(row.ppmp_item_id));
+            const catId = opt?.item_category_id;
+            return Boolean(catId && catId !== selectedCatId);
+        });
+    }, [form.data.item_category_id, supplyRequest.items, editingRows, optionById]);
+
     const scheduleMismatchExistingLineCount = useMemo(() => {
         return supplyRequest.items.reduce((count, item) => {
             const row = editingRows[item.supply_request_item_id];
@@ -113,8 +137,34 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
         }, 0);
     }, [editingRows, optionById, supplyRequest.items]);
 
+    const handleCategoryChange = (val: string) => {
+        const cat = categories.find((c) => String(c.item_category_id) === val);
+        if (cat) {
+            form.setData((prev) => ({
+                ...prev,
+                item_category_id: String(cat.item_category_id),
+                request_category: cat.category_name,
+            }));
+        } else {
+            form.setData((prev) => ({
+                ...prev,
+                item_category_id: '',
+                request_category: val,
+            }));
+        }
+        setNewItem({
+            ppmp_item_id: '',
+            item_id: '',
+            item_name_snapshot: '',
+            quantity_requested: '1',
+        });
+    };
+
     const submitHeader = (event: FormEvent) => {
         event.preventDefault();
+        if (mismatchedExistingItems.length > 0) {
+            return;
+        }
         form.put(route('office.supply-requests.update', supplyRequest.supply_request_id));
     };
 
@@ -273,23 +323,11 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                             />
                         </Field>
 
-                        <Field label="Request Category" required error={form.errors.request_category}>
+                        <Field label="Request Category" required error={form.errors.request_category || form.errors.item_category_id}>
                             <select
                                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-red-500 focus:ring-1 focus:ring-red-500 bg-white"
                                 value={form.data.item_category_id || form.data.request_category}
-                                onChange={(event) => {
-                                    const val = event.target.value;
-                                    const cat = categories.find((c) => String(c.item_category_id) === val);
-                                    if (cat) {
-                                        form.setData((prev) => ({
-                                            ...prev,
-                                            item_category_id: String(cat.item_category_id),
-                                            request_category: cat.category_name,
-                                        }));
-                                    } else {
-                                        form.setData('request_category', val);
-                                    }
-                                }}
+                                onChange={(event) => handleCategoryChange(event.target.value)}
                                 required
                             >
                                 <option value="">Select Category</option>
@@ -302,6 +340,19 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                                     <option value={form.data.request_category}>{form.data.request_category}</option>
                                 )}
                             </select>
+                            {mismatchedExistingItems.length > 0 ? (
+                                <div className="rounded-lg border border-rose-300 bg-rose-50 p-3 text-xs text-rose-900 flex items-start gap-2 mt-2">
+                                    <svg className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    <div>
+                                        <p className="font-semibold">Category Mismatch ({mismatchedExistingItems.length} item{mismatchedExistingItems.length > 1 ? 's' : ''})</p>
+                                        <p className="mt-0.5">
+                                            This request already contains {mismatchedExistingItems.length === 1 ? 'an item' : 'items'} ({mismatchedExistingItems.map((i) => i.item_name_snapshot).join(', ')}) from another category. You must remove them before changing to this category.
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : null}
                         </Field>
 
                         <Field label="Priority Level" required error={form.errors.priority_level}>
@@ -344,7 +395,8 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                     <div className="flex justify-end pt-2">
                         <button
                             type="submit"
-                            disabled={form.processing}
+                            disabled={form.processing || mismatchedExistingItems.length > 0}
+                            title={mismatchedExistingItems.length > 0 ? 'Remove mismatched items before changing category' : undefined}
                             className="inline-flex items-center gap-2 rounded-lg bg-red-700 px-5 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-xs hover:bg-red-800 focus:outline-hidden focus:ring-2 focus:ring-red-500/20 active:bg-red-900 transition disabled:opacity-50"
                         >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -547,7 +599,7 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                                             disabled={!hasPpmp}
                                         >
                                             <option value="">-- Choose an approved item --</option>
-                                            {itemOptions.map((option) => {
+                                            {filteredItemOptions.map((option) => {
                                                 const specTag = option.item_specification ? ` — ${option.item_specification}` : '';
                                                 const scheduleTag = option.procurement_schedule ? ` [${option.procurement_schedule}]` : '';
                                                 return (
@@ -557,6 +609,9 @@ export default function SupplyRequestEdit({ supplyRequest, ppmpOptions, selected
                                                 );
                                             })}
                                         </select>
+                                        {filteredItemOptions.length === 0 && hasPpmp && form.data.item_category_id ? (
+                                            <p className="mt-1 text-[11px] font-medium text-amber-700">No approved items found in this PPMP for the selected category.</p>
+                                        ) : null}
                                     </label>
                                 </div>
 

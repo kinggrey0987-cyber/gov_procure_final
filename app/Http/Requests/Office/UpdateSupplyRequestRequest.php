@@ -90,6 +90,24 @@ class UpdateSupplyRequestRequest extends FormRequest
             if ($neededByDate->lt($requestDate)) {
                 $validator->errors()->add('needed_by_date', 'Needed By Date must be on or after the recorded request date.');
             }
+
+            $newCategoryId = $this->filled('item_category_id') ? (int) $this->input('item_category_id') : 0;
+            if ($newCategoryId > 0 && (int) ($supplyRequest->item_category_id ?? 0) !== $newCategoryId) {
+                $hasMismatched = $supplyRequest->items()
+                    ->with(['ppmpItem', 'item'])
+                    ->get()
+                    ->contains(function ($item) use ($newCategoryId): bool {
+                        $itemCatId = (int) ($item->ppmpItem?->item_category_id ?: ($item->item?->item_category_id ?? 0));
+                        return $itemCatId > 0 && $itemCatId !== $newCategoryId;
+                    });
+
+                if ($hasMismatched) {
+                    $validator->errors()->add(
+                        'item_category_id',
+                        'Cannot change category while the request contains items from another category. Remove the existing items first.'
+                    );
+                }
+            }
         });
     }
 }
