@@ -105,8 +105,8 @@ class PurchaseOrderController extends Controller
             ->latest('purchase_request_id')
             ->get(['purchase_request_id', 'pr_number', 'supply_request_id', 'office_id', 'status', 'requested_by', 'created_at', 'source_type', 'source_delivery_id', 'source_claim_id', 'remarks'])
             ->map(function (PurchaseRequest $purchaseRequest): array {
-                $isClaimReplacement = (bool) $purchaseRequest->is_claim_replacement;
-                $isDiscrepancyFollowUp = ! $isClaimReplacement && (bool) $purchaseRequest->is_zero_cost_replacement;
+                $isDiscrepancyFollowUp = (bool) $purchaseRequest->is_zero_cost_replacement;
+                $isClaimReplacement = ! $isDiscrepancyFollowUp && (bool) $purchaseRequest->is_claim_replacement;
                 $sourceDelivery = $isDiscrepancyFollowUp ? $purchaseRequest->sourceDelivery : null;
                 $parentPo = $sourceDelivery?->purchaseOrder;
                 $parentSupplier = $isDiscrepancyFollowUp ? ($sourceDelivery?->supplier ?? $parentPo?->supplier) : null;

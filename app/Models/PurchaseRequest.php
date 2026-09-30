@@ -50,16 +50,23 @@ class PurchaseRequest extends Model
 
      public function getIsZeroCostReplacementAttribute(): bool
      {
+         if ((string) ($this->source_type ?? '') === 'PARTIAL_DELIVERY_FOLLOW_UP') {
+             return true;
+         }
+
          if ($this->is_claim_replacement) {
              return false;
          }
 
-         return (string) ($this->source_type ?? '') === 'PARTIAL_DELIVERY_FOLLOW_UP'
-             || (int) ($this->source_delivery_id ?? 0) > 0;
+         return (int) ($this->source_delivery_id ?? 0) > 0;
      }
 
      public function getIsClaimReplacementAttribute(): bool
      {
+         if ((string) ($this->source_type ?? '') === 'PARTIAL_DELIVERY_FOLLOW_UP') {
+             return false;
+         }
+
          return (string) ($this->source_type ?? '') === 'CLAIM_REPLACEMENT_FOLLOW_UP'
              || (int) ($this->source_claim_id ?? 0) > 0;
      }

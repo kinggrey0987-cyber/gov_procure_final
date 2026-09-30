@@ -267,18 +267,16 @@ export default function PurchaseOrdersShow({
     sourceDiscrepancyDelivery = null,
     attachments = [],
 }: Props) {
-    const isClaimReplacement = Boolean(
-        purchaseOrder.purchase_request?.is_claim_replacement ||
-        purchaseOrder.purchase_request?.source_type === 'CLAIM_REPLACEMENT_FOLLOW_UP' ||
-        Boolean(purchaseOrder.purchase_request?.source_claim_id)
-    );
     const isZeroCostReplacement = Boolean(
-        !isClaimReplacement && (
-            propsIsZeroCostReplacement ||
-            purchaseOrder.is_zero_cost_replacement ||
-            purchaseOrder.purchase_request?.is_zero_cost_replacement ||
-            purchaseOrder.purchase_request?.source_type === 'PARTIAL_DELIVERY_FOLLOW_UP' ||
-            Boolean(purchaseOrder.purchase_request?.source_delivery_id)
+        propsIsZeroCostReplacement ??
+        purchaseOrder.is_zero_cost_replacement ??
+        (purchaseOrder.purchase_request?.source_type === 'PARTIAL_DELIVERY_FOLLOW_UP')
+    );
+    const isClaimReplacement = Boolean(
+        !isZeroCostReplacement && (
+            purchaseOrder.purchase_request?.is_claim_replacement ||
+            purchaseOrder.purchase_request?.source_type === 'CLAIM_REPLACEMENT_FOLLOW_UP' ||
+            Boolean(purchaseOrder.purchase_request?.source_claim_id)
         )
     );
 

@@ -734,7 +734,7 @@ class PurchaseRequestService
                 'source_delivery_id' => (int) $delivery->delivery_id,
                 'source_supply_request_id' => $sourceSupplyRequest ? (int) $sourceSupplyRequest->supply_request_id : null,
                 'source_claim_id' => $sourceClaimId ? (int) $sourceClaimId : null,
-                'source_type' => $sourceClaimId ? 'CLAIM_REPLACEMENT_FOLLOW_UP' : 'PARTIAL_DELIVERY_FOLLOW_UP',
+                'source_type' => 'PARTIAL_DELIVERY_FOLLOW_UP',
                 'status' => 'OPEN',
                 'remarks' => sprintf(
                     'Follow-up procurement generated from delivery %s for %s. %s',
