@@ -26,6 +26,8 @@ type PurchaseOrder = {
         source_type?: string | null;
         source_delivery_id?: number | null;
         source_claim_id?: number | null;
+        is_zero_cost_replacement?: boolean;
+        is_claim_replacement?: boolean;
         office?: {
             id: number;
             code?: string | null;
@@ -75,11 +77,19 @@ export default function PurchaseOrdersEdit({ purchaseOrder, suppliers, isZeroCos
     const requestItems = purchaseOrder.supply_request?.items ?? [];
     const totalQuantity = requestItems.reduce((sum, row) => sum + Number(row.quantity_requested ?? 0), 0);
     const selectedSupplier = suppliers.find((row) => row.supplier_id === Number(form.data.supplier_id)) ?? purchaseOrder.supplier ?? null;
+    const isClaimReplacement = Boolean(
+        purchaseOrder.purchase_request?.is_claim_replacement ||
+        purchaseOrder.purchase_request?.source_type === 'CLAIM_REPLACEMENT_FOLLOW_UP' ||
+        Boolean(purchaseOrder.purchase_request?.source_claim_id)
+    );
     const isZeroCostReplacement = Boolean(
-        purchaseOrder.is_zero_cost_replacement ||
-        propIsZeroCostReplacement ||
-        purchaseOrder.purchase_request?.source_type === 'PARTIAL_DELIVERY_FOLLOW_UP' ||
-        Boolean(purchaseOrder.purchase_request?.source_delivery_id)
+        !isClaimReplacement && (
+            purchaseOrder.is_zero_cost_replacement ||
+            propIsZeroCostReplacement ||
+            purchaseOrder.purchase_request?.is_zero_cost_replacement ||
+            purchaseOrder.purchase_request?.source_type === 'PARTIAL_DELIVERY_FOLLOW_UP' ||
+            Boolean(purchaseOrder.purchase_request?.source_delivery_id)
+        )
     );
 
     useEffect(() => {

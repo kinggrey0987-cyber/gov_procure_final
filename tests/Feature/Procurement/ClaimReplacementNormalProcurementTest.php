@@ -40,9 +40,9 @@ class ClaimReplacementNormalProcurementTest extends TestCase
         $roleProc = Role::query()->firstOrCreate(['code' => UserRole::PROCUREMENT_OFFICER->value], ['name' => 'Procurement Officer']);
 
         $office = Office::query()->create(['name' => 'Planning Office', 'code' => 'MPDO', 'status' => 'ACTIVE']);
-        $officeUser = User::factory()->create(['role_id' => $roleOffice->id, 'office_id' => $office->id, 'name' => 'Office Requester']);
-        $gsoUser = User::factory()->create(['role_id' => $roleGso->id, 'office_id' => $office->id, 'name' => 'GSO Custodian']);
-        $procUser = User::factory()->create(['role_id' => $roleProc->id, 'office_id' => $office->id, 'name' => 'Procurement Staff']);
+        $officeUser = User::factory()->withRole(UserRole::OFFICE_USER)->create(['role_id' => $roleOffice->id, 'office_id' => $office->id, 'name' => 'Office Requester']);
+        $gsoUser = User::factory()->withRole(UserRole::GSO_OFFICER)->create(['role_id' => $roleGso->id, 'office_id' => $office->id, 'name' => 'GSO Custodian']);
+        $procUser = User::factory()->withRole(UserRole::PROCUREMENT_OFFICER)->create(['role_id' => $roleProc->id, 'office_id' => $office->id, 'name' => 'Procurement Staff']);
 
         $supplier = Supplier::query()->create(['supplier_name' => 'Office Depot', 'status' => 'ACTIVE']);
 
@@ -153,8 +153,25 @@ class ClaimReplacementNormalProcurementTest extends TestCase
         $this->assertNotNull($followUpSrItem);
         $this->assertSame((int) $ppmpItem->ppmp_item_id, (int) $followUpSrItem->ppmp_item_id);
 
+        // Verification 1b: PR show page props correctly distinguish claim replacement from zero cost discrepancy
+        $prResponse = $this->actingAs($procUser)->get(route('procurement.purchase-requests.show', $claimPr->purchase_request_id));
+        $prResponse->assertOk();
+        $prProps = $prResponse->viewData('page')['props']['purchaseRequest'];
+        $this->assertTrue((bool) $prProps['is_claim_replacement']);
+        $this->assertFalse((bool) $prProps['is_zero_cost_replacement']);
+
         // 2. Process PR and Create Purchase Order from this PR
         $claimPr->forceFill(['status' => 'PROCESSING'])->save();
+
+        // Verification 1c: PO create page props do NOT treat claim replacement as zero-cost discrepancy follow-up
+        $createResponse = $this->actingAs($procUser)->get(route('procurement.purchase-orders.create', ['pr_id' => $claimPr->purchase_request_id]));
+        $createResponse->assertOk();
+        $eligibleList = collect($createResponse->viewData('page')['props']['eligiblePurchaseRequests']);
+        $eligiblePr = $eligibleList->firstWhere('purchase_request_id', $claimPr->purchase_request_id);
+        $this->assertNotNull($eligiblePr);
+        $this->assertTrue((bool) $eligiblePr['is_claim_replacement']);
+        $this->assertFalse((bool) $eligiblePr['is_discrepancy_follow_up']);
+        $this->assertNull($eligiblePr['suggested_supplier_id']);
 
         $poService = app(PurchaseOrderService::class);
         $po = $poService->create($procUser, [

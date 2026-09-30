@@ -22,6 +22,7 @@ type PurchaseRequest = {
         claim_code?: string;
     } | null;
     is_zero_cost_replacement?: boolean;
+    is_claim_replacement?: boolean;
     office?: {
         name?: string | null;
         code?: string | null;
@@ -150,13 +151,17 @@ export default function PurchaseRequestsShow({ purchaseRequest, traceability, re
         (purchaseRequest.supply_request?.priority_level?.toUpperCase() === 'URGENT') ||
         traceability?.is_urgent
     );
-    const isDeliveryDiscrepancy = Boolean(
-        purchaseRequest.source_type === 'PARTIAL_DELIVERY_FOLLOW_UP' ||
-        Boolean(purchaseRequest.source_delivery_id)
-    );
     const isClaimReplacement = Boolean(
+        purchaseRequest.is_claim_replacement ||
         purchaseRequest.source_type === 'CLAIM_REPLACEMENT_FOLLOW_UP' ||
         Boolean(purchaseRequest.source_claim_id)
+    );
+    const isDeliveryDiscrepancy = Boolean(
+        !isClaimReplacement && (
+            purchaseRequest.is_zero_cost_replacement ||
+            purchaseRequest.source_type === 'PARTIAL_DELIVERY_FOLLOW_UP' ||
+            Boolean(purchaseRequest.source_delivery_id)
+        )
     );
     const isDiscrepancyReplacement = isDeliveryDiscrepancy;
     const processForm = useForm({ action: 'process', remarks: '' });

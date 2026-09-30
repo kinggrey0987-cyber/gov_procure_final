@@ -10,7 +10,9 @@ type PurchaseRequestOption = {
     created_at: string | null;
     source_type?: string | null;
     source_delivery_id?: number | null;
+    source_claim_id?: number | null;
     is_discrepancy_follow_up?: boolean;
+    is_claim_replacement?: boolean;
     is_consolidated?: boolean;
     source_count?: number;
     source_codes?: string[];
@@ -202,6 +204,26 @@ export default function PurchaseOrdersCreate({
                             </div>
                         ) : null}
 
+                        {selectedPurchaseRequest?.is_claim_replacement ? (
+                            <div className="rounded-xl border border-blue-300 bg-blue-50 p-4 text-blue-900 shadow-sm md:col-span-2">
+                                <div className="flex items-start gap-3">
+                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-200 text-blue-900 flex-shrink-0">
+                                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold text-blue-950">
+                                            Office Claim Replacement Procurement Order
+                                        </h4>
+                                        <p className="mt-1 text-xs text-blue-800">
+                                            This purchase order procures replacement goods for an approved office claim due to depleted GSO warehouse stock. Standard procurement procedures apply (registered suppliers with quotes and normal pricing).
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : null}
+
                         <label className="block md:col-span-2">
                             <span className="mb-1 block text-sm font-medium text-slate-700">Select Purchase Request Source</span>
                         <select
@@ -216,6 +238,7 @@ export default function PurchaseOrdersCreate({
                                 eligiblePurchaseRequests.map((row) => (
                                     <option key={row.purchase_request_id} value={row.purchase_request_id}>
                                         {row.is_discrepancy_follow_up ? '[WARRANTY REPLACEMENT] ' : ''}
+                                        {row.is_claim_replacement ? '[CLAIM REPLACEMENT] ' : ''}
                                         {row.is_consolidated ? `[CONSOLIDATED - ${row.source_count} REQUESTS] ` : ''}
                                         PR #{row.purchase_request_id} | {row.is_consolidated ? `Consolidated (${row.source_count} Requests)` : (row.supply_request?.request_code || `SR #${row.supply_request?.supply_request_id ?? '-'}`)} | {row.is_consolidated && row.source_offices?.length ? row.source_offices.join(', ') : (row.office?.code || row.office?.name || 'Unknown Office')}
                                     </option>

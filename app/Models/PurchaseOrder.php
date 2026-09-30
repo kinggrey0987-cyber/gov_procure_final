@@ -79,6 +79,10 @@ class PurchaseOrder extends Model
 
     public function getParentPoAttribute(): ?self
     {
+        if (! $this->is_zero_cost_replacement) {
+            return null;
+        }
+
         return $this->purchaseRequest?->sourceDelivery?->purchaseOrder;
     }
 

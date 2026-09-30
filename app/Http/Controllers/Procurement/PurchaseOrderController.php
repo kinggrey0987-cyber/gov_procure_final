@@ -103,13 +103,13 @@ class PurchaseOrderController extends Controller
                 'sourceDelivery.purchaseOrder.supplier:supplier_id,supplier_name',
             ])
             ->latest('purchase_request_id')
-            ->get(['purchase_request_id', 'pr_number', 'supply_request_id', 'office_id', 'status', 'requested_by', 'created_at', 'source_type', 'source_delivery_id', 'remarks'])
+            ->get(['purchase_request_id', 'pr_number', 'supply_request_id', 'office_id', 'status', 'requested_by', 'created_at', 'source_type', 'source_delivery_id', 'source_claim_id', 'remarks'])
             ->map(function (PurchaseRequest $purchaseRequest): array {
-                $isDiscrepancyFollowUp = (string) $purchaseRequest->source_type === 'PARTIAL_DELIVERY_FOLLOW_UP'
-                    || (int) ($purchaseRequest->source_delivery_id ?? 0) > 0;
-                $sourceDelivery = $purchaseRequest->sourceDelivery;
+                $isClaimReplacement = (bool) $purchaseRequest->is_claim_replacement;
+                $isDiscrepancyFollowUp = ! $isClaimReplacement && (bool) $purchaseRequest->is_zero_cost_replacement;
+                $sourceDelivery = $isDiscrepancyFollowUp ? $purchaseRequest->sourceDelivery : null;
                 $parentPo = $sourceDelivery?->purchaseOrder;
-                $parentSupplier = $sourceDelivery?->supplier ?? $parentPo?->supplier;
+                $parentSupplier = $isDiscrepancyFollowUp ? ($sourceDelivery?->supplier ?? $parentPo?->supplier) : null;
 
                 $sourceRequests = $this->traceabilityService->getSourceSupplyRequests($purchaseRequest);
                 $sourceCount = $sourceRequests->count();
@@ -134,7 +134,9 @@ class PurchaseOrderController extends Controller
                     'created_at' => optional($purchaseRequest->created_at)?->toIso8601String(),
                     'source_type' => (string) ($purchaseRequest->source_type ?? ''),
                     'source_delivery_id' => $purchaseRequest->source_delivery_id ? (int) $purchaseRequest->source_delivery_id : null,
+                    'source_claim_id' => $purchaseRequest->source_claim_id ? (int) $purchaseRequest->source_claim_id : null,
                     'is_discrepancy_follow_up' => $isDiscrepancyFollowUp,
+                    'is_claim_replacement' => $isClaimReplacement,
                     'is_consolidated' => $isConsolidated,
                     'source_count' => $sourceCount,
                     'source_codes' => $sourceCodes,

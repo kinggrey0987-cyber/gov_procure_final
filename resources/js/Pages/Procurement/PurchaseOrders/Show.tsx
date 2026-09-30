@@ -30,6 +30,9 @@ type PurchaseOrder = {
         pr_number?: string | null;
         source_type?: string | null;
         source_delivery_id?: number | null;
+        source_claim_id?: number | null;
+        is_zero_cost_replacement?: boolean;
+        is_claim_replacement?: boolean;
         office?: {
             name?: string | null;
             code?: string | null;
@@ -264,11 +267,19 @@ export default function PurchaseOrdersShow({
     sourceDiscrepancyDelivery = null,
     attachments = [],
 }: Props) {
+    const isClaimReplacement = Boolean(
+        purchaseOrder.purchase_request?.is_claim_replacement ||
+        purchaseOrder.purchase_request?.source_type === 'CLAIM_REPLACEMENT_FOLLOW_UP' ||
+        Boolean(purchaseOrder.purchase_request?.source_claim_id)
+    );
     const isZeroCostReplacement = Boolean(
-        propsIsZeroCostReplacement ||
-        purchaseOrder.is_zero_cost_replacement ||
-        purchaseOrder.purchase_request?.source_type === 'PARTIAL_DELIVERY_FOLLOW_UP' ||
-        Boolean(purchaseOrder.purchase_request?.source_delivery_id)
+        !isClaimReplacement && (
+            propsIsZeroCostReplacement ||
+            purchaseOrder.is_zero_cost_replacement ||
+            purchaseOrder.purchase_request?.is_zero_cost_replacement ||
+            purchaseOrder.purchase_request?.source_type === 'PARTIAL_DELIVERY_FOLLOW_UP' ||
+            Boolean(purchaseOrder.purchase_request?.source_delivery_id)
+        )
     );
 
     const [isExportingPdf, setIsExportingPdf] = useState(false);
@@ -367,6 +378,11 @@ export default function PurchaseOrdersShow({
                                             🛡️ Zero-Cost Warranty Replacement (₱0.00)
                                         </span>
                                     ) : null}
+                                    {isClaimReplacement ? (
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-800">
+                                            📋 Office Claim Replacement PO
+                                        </span>
+                                    ) : null}
                                 </div>
                                 <h3 className="mt-1 text-lg font-semibold text-slate-900">{purchaseOrder.po_number}</h3>
                             </div>
@@ -456,6 +472,15 @@ export default function PurchaseOrdersShow({
                                 <p className="font-semibold">🛡️ Zero-Cost Warranty Replacement Notice (COA & RA 9184 Compliant):</p>
                                 <p className="mt-0.5">
                                     This purchase order rectifies missing or damaged goods under supplier warranty obligations at zero additional municipal cost. No budget is deducted from the requesting office's PPMP allocation. Once GSO accepts the replacement shipment, the linked partial delivery will automatically resolve to <em>VERIFIED</em>.
+                                </p>
+                            </div>
+                        ) : null}
+
+                        {isClaimReplacement ? (
+                            <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900">
+                                <p className="font-semibold">📋 Office Claim Replacement Procurement Notice:</p>
+                                <p className="mt-0.5">
+                                    This purchase order acquires replacement items to replenish supplies for an approved office claim dispute where warehouse stock was depleted. Once delivered and received, these items will fulfill the requesting office's pending claim.
                                 </p>
                             </div>
                         ) : null}
