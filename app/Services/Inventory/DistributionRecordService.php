@@ -220,6 +220,7 @@ class DistributionRecordService
                 'received_by' => $payload['received_by'] ?? $record->received_by,
                 'item_name_snapshot' => $payload['item_name_snapshot'],
                 'quantity_released' => $releasedQuantity,
+                'bundled_warehouse_quantity' => (float) ($payload['bundled_warehouse_quantity'] ?? 0.0),
                 'unit' => $payload['unit'],
                 'remarks' => $payload['remarks'] ?? null,
             ]);
@@ -801,7 +802,14 @@ class DistributionRecordService
                 ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
                 ->flatMap(fn ($distributionRecord) => $distributionRecord->items)
                 ->groupBy(fn ($item) => (int) $item->item_id)
-                ->map(fn ($items): float => (float) $items->sum('quantity_released'));
+                ->map(function ($items, int $itemId) use ($deliveryAcceptedByItemId): float {
+                    $rawReleased = (float) $items->sum('quantity_released');
+                    $bundled = (float) $items->sum('bundled_warehouse_quantity');
+                    $deliveryPortion = max($rawReleased - $bundled, 0.0);
+                    $accepted = (float) ($deliveryAcceptedByItemId->get($itemId) ?? 0.0);
+
+                    return min($deliveryPortion, $accepted);
+                });
 
             $deliveryRemainingByItemId = $deliveryAcceptedByItemId
                 ->map(fn (float $accepted, int $itemId): float => max($accepted - (float) ($deliveryReleasedByItemId->get($itemId) ?? 0.0), 0));

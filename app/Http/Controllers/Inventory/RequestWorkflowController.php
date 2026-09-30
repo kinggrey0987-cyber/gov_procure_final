@@ -809,16 +809,36 @@ class RequestWorkflowController
             ->with(['items.purchaseOrderItem', 'distributionRecords.items'])
             ->latest('delivery_id')
             ->get()
-            ->first(function (Delivery $delivery): bool {
-                $acceptedTotal = (float) $delivery->items->sum(function ($item): float {
-                    return max((float) $item->received_quantity - (float) $item->damaged_quantity, 0);
-                });
-                $releasedTotal = (float) $delivery->distributionRecords
+            ->first(function (Delivery $delivery) use ($supplyRequest): bool {
+                $deliveryAcceptedByItemId = $delivery->items
+                    ->groupBy(fn ($item) => (int) ($item->purchaseOrderItem?->item_id ?? 0))
+                    ->map(fn ($items): float => (float) $items->sum(
+                        fn ($item): float => max((float) $item->received_quantity - (float) $item->damaged_quantity, 0)
+                    ));
+
+                $deliveryReleasedByItemId = $delivery->distributionRecords
                     ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
                     ->flatMap(fn ($record) => $record->items)
-                    ->sum('quantity_released');
+                    ->groupBy(fn ($item) => (int) $item->item_id)
+                    ->map(function ($items, int $itemId) use ($deliveryAcceptedByItemId): float {
+                        $rawReleased = (float) $items->sum('quantity_released');
+                        $bundled = (float) $items->sum('bundled_warehouse_quantity');
+                        $deliveryPortion = max($rawReleased - $bundled, 0.0);
+                        $accepted = (float) ($deliveryAcceptedByItemId->get($itemId) ?? 0.0);
 
-                return $acceptedTotal - $releasedTotal > 0.0001;
+                        return min($deliveryPortion, $accepted);
+                    });
+
+                foreach ($supplyRequest->items as $item) {
+                    $itemId = (int) $item->item_id;
+                    $accepted = (float) ($deliveryAcceptedByItemId->get($itemId) ?? 0.0);
+                    $released = (float) ($deliveryReleasedByItemId->get($itemId) ?? 0.0);
+                    if ($accepted - $released > 0.0001) {
+                        return true;
+                    }
+                }
+
+                return false;
             });
 
         $prs = app(\App\Services\Procurement\ConsolidationTraceabilityService::class)->getPurchaseRequestsForSupplyRequest($supplyRequest);

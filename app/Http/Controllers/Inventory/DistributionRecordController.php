@@ -198,16 +198,19 @@ class DistributionRecordController
      */
     private function releaseRowsFromVerifiedDelivery(Delivery $delivery, array $preloadedDownstreamChildIds = []): Collection
     {
-        $acceptedTotal = (float) $delivery->items->sum(function ($item): float {
-            return max((float) $item->received_quantity - (float) $item->damaged_quantity, 0);
-        });
+        $deliveryAcceptedByItemId = $delivery->items
+            ->groupBy(fn ($item) => (int) ($item->purchaseOrderItem?->item_id ?? 0))
+            ->map(fn ($items): float => (float) $items->sum(
+                fn ($item): float => max((float) $item->received_quantity - (float) $item->damaged_quantity, 0)
+            ));
 
-        $releasedTotal = (float) $delivery->distributionRecords
-            ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
-            ->flatMap(fn ($record) => $record->items)
-            ->sum('quantity_released');
+        $deliveryReleasedByItemId = $this->deliveryReleasedQuantityByItemId($delivery, $deliveryAcceptedByItemId);
 
-        if ($acceptedTotal - $releasedTotal <= 0.0001) {
+        $hasAnyDeliveryRemaining = $deliveryAcceptedByItemId->contains(
+            fn (float $accepted, int $itemId): bool => ($accepted - (float) ($deliveryReleasedByItemId->get($itemId) ?? 0.0)) > 0.0001
+        );
+
+        if (! $hasAnyDeliveryRemaining) {
             return collect();
         }
 
@@ -481,11 +484,7 @@ class DistributionRecordController
                 fn ($item): float => max((float) $item->received_quantity - (float) $item->damaged_quantity, 0)
             ));
 
-        $deliveryReleasedByItem = $delivery->distributionRecords
-            ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
-            ->flatMap(fn ($record) => $record->items)
-            ->groupBy(fn ($item) => (int) $item->item_id)
-            ->map(fn ($items): float => (float) $items->sum('quantity_released'));
+        $deliveryReleasedByItem = $this->deliveryReleasedQuantityByItemId($delivery, $deliveryAcceptedByItem);
 
         $srReleasedByItem = $this->allFulfillmentDistributionRecords($supplyRequest)
             ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
@@ -513,6 +512,22 @@ class DistributionRecordController
         }
 
         return false;
+    }
+
+    private function deliveryReleasedQuantityByItemId(Delivery $delivery, Collection $deliveryAcceptedByItem): Collection
+    {
+        return $delivery->distributionRecords
+            ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
+            ->flatMap(fn ($record) => $record->items)
+            ->groupBy(fn ($item) => (int) $item->item_id)
+            ->map(function ($items, int $itemId) use ($deliveryAcceptedByItem): float {
+                $rawReleased = (float) $items->sum('quantity_released');
+                $bundled = (float) $items->sum('bundled_warehouse_quantity');
+                $deliveryPortion = max($rawReleased - $bundled, 0.0);
+                $accepted = (float) ($deliveryAcceptedByItem->get($itemId) ?? 0.0);
+
+                return min($deliveryPortion, $accepted);
+            });
     }
 
     private function hasRemainingQuantity(SupplyRequest $request): bool
@@ -786,11 +801,7 @@ class DistributionRecordController
                     fn ($item): float => max((float) $item->received_quantity - (float) $item->damaged_quantity, 0)
                 ));
 
-            $deliveryReleasedByItemId = $distribution_record->delivery->distributionRecords
-                ->whereIn('status', ['DRAFT', 'RELEASED', 'RECEIVED'])
-                ->flatMap(fn ($record) => $record->items)
-                ->groupBy(fn ($item) => (int) $item->item_id)
-                ->map(fn ($group) => (float) $group->sum('quantity_released'));
+            $deliveryReleasedByItemId = $this->deliveryReleasedQuantityByItemId($distribution_record->delivery, $deliveryAcceptedByItemId);
 
             $deliveryRemainingByItemId = $deliveryAcceptedByItemId
                 ->map(fn (float $accepted, int $itemId): float => max($accepted - (float) ($deliveryReleasedByItemId->get($itemId) ?? 0.0), 0));
