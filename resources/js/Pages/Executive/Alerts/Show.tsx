@@ -119,6 +119,7 @@ export default function ExecutiveAlertShow({ alert, anomaly_evidence }: Props) {
                                 taxonomy={(anomaly_evidence as any)?.taxonomy}
                                 baselineParams={(anomaly_evidence as any)?.baseline_parameters}
                                 literatureCitation={(anomaly_evidence as any)?.literature_citation}
+                                plainBreakdown={(anomaly_evidence as any)?.plain_english_breakdown}
                             />
                         ) : stockAvailable !== null && stockThreshold !== null ? (
                             <OperationalStockGauge

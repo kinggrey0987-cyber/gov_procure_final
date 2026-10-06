@@ -113,6 +113,7 @@ export default function ExecutiveAnomalyShow({ anomaly, evidence }: Props) {
                             taxonomy={(evidence as any)?.taxonomy}
                             baselineParams={(evidence as any)?.baseline_parameters}
                             literatureCitation={(evidence as any)?.literature_citation}
+                            plainBreakdown={(evidence as any)?.plain_english_breakdown}
                         />
 
                         {/* Mayor's Governance Briefing */}

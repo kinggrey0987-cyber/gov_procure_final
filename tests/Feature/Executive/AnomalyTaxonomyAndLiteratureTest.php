@@ -342,4 +342,87 @@ class AnomalyTaxonomyAndLiteratureTest extends TestCase
         $this->assertEquals(0.0, (float) $anomaly->expected_value);
         $this->assertSame($this->item->item_id, $anomaly->item_id);
     }
+
+    public function test_evidence_service_outputs_excessive_quantity_breakdown_and_derived_baseline_parameters(): void
+    {
+        [$sr, $sri] = $this->createSupplyRequestAndItem();
+
+        $anomaly = Anomaly::query()->create([
+            'anomaly_type' => Anomaly::TYPE_EXCESSIVE_QUANTITY,
+            'reference_type' => SupplyRequest::class,
+            'reference_id' => $sr->supply_request_id,
+            'item_id' => $this->item->item_id,
+            'office_id' => $this->office->id,
+            'detected_value' => 120.00,
+            'expected_value' => 25.00,
+            'threshold_value' => 50.00,
+            'z_score' => 3.12,
+            'severity' => 'HIGH',
+            'detection_method' => 'HISTORICAL_SPIKE_DETECTOR',
+            'remarks' => 'Requested quantity exceeds office historical consumption velocity by 380%.',
+        ]);
+
+        $evidence = app(AnomalyEvidenceService::class)->build($anomaly);
+
+        $this->assertSame('EXCESSIVE_QUANTITY', $evidence['type']);
+        $this->assertArrayHasKey('baseline_parameters', $evidence);
+        $this->assertEquals(25.00, $evidence['baseline_parameters']['mean']);
+        $this->assertNotNull($evidence['baseline_parameters']['std_dev'], 'std_dev should not be null');
+        $this->assertGreaterThan(0, $evidence['baseline_parameters']['std_dev']);
+        $this->assertNotNull($evidence['baseline_parameters']['sample_size'], 'sample_size should not be null');
+        $this->assertNotEmpty($evidence['series'], 'series should contain trend points');
+
+        $this->assertArrayHasKey('plain_english_breakdown', $evidence);
+        $this->assertNotEmpty($evidence['plain_english_breakdown']['what_was_recorded']);
+        $this->assertNotEmpty($evidence['plain_english_breakdown']['what_is_typical']);
+        $this->assertNotEmpty($evidence['plain_english_breakdown']['why_flagged']);
+        $this->assertNotEmpty($evidence['plain_english_breakdown']['recommended_action']);
+    }
+
+    public function test_evidence_service_generates_plain_english_breakdown_for_price_anomaly(): void
+    {
+        [$sr, $sri] = $this->createSupplyRequestAndItem();
+        $pr = PurchaseRequest::query()->create([
+            'pr_number' => 'PR-2026-PRICE-BRK',
+            'supply_request_id' => $sr->supply_request_id,
+            'office_id' => $this->office->id,
+            'requested_by' => $this->gsoUser->id,
+            'status' => 'APPROVED',
+        ]);
+        $po = $this->createPurchaseOrder($pr, $sr, 'PO-PRICE-BRK-1', 'APPROVED', 2450.00);
+        $poItem = PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $po->purchase_order_id,
+            'supply_request_item_id' => $sri->supply_request_item_id,
+            'item_id' => $this->item->item_id,
+            'item_name_snapshot' => $this->item->item_name,
+            'quantity_ordered' => 1,
+            'unit' => 'REAMS',
+            'unit_price' => 2450.00,
+            'total_price' => 2450.00,
+        ]);
+
+        $anomaly = Anomaly::query()->create([
+            'anomaly_type' => Anomaly::TYPE_PRICE_Z_SCORE,
+            'reference_type' => PurchaseOrderItem::class,
+            'reference_id' => $poItem->purchase_order_item_id,
+            'item_id' => $this->item->item_id,
+            'office_id' => $this->office->id,
+            'detected_value' => 2450.00,
+            'expected_value' => 1850.00,
+            'threshold_value' => 2100.00,
+            'z_score' => 2.45,
+            'severity' => 'MEDIUM',
+            'detection_method' => 'STATISTICAL_Z_SCORE',
+            'remarks' => 'Supplier quotation unit cost deviates +32.4% from historical average procurement benchmark.',
+        ]);
+
+        $evidence = app(AnomalyEvidenceService::class)->build($anomaly);
+
+        $this->assertArrayHasKey('plain_english_breakdown', $evidence);
+        $this->assertStringContainsString('2,450.00', $evidence['plain_english_breakdown']['what_was_recorded']);
+        $this->assertStringContainsString('1,850.00', $evidence['plain_english_breakdown']['what_is_typical']);
+        $this->assertNotEmpty($evidence['plain_english_breakdown']['why_flagged']);
+        $this->assertNotEmpty($evidence['plain_english_breakdown']['recommended_action']);
+    }
 }
+
