@@ -10,6 +10,11 @@ type DeliveryRow = {
     delivery_id: number;
     delivery_code: string;
     receipt_status: string;
+    batch_number?: number;
+    total_batches?: number;
+    delivery_schedule_type?: string;
+    is_final_batch?: boolean;
+    batch_label?: string;
     created_at: string;
     purchase_order?: {
         po_number?: string;
@@ -166,6 +171,7 @@ export default function DeliveryIndex({ deliveries, filters, filter_options }: P
                                 <tr>
                                     <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Code</th>
                                     <th className="px-3.5 py-2 text-left font-semibold text-slate-700">PO</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Batch</th>
                                     <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Supplier</th>
                                     <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Receipt Status</th>
                                     <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Received By</th>
@@ -178,6 +184,14 @@ export default function DeliveryIndex({ deliveries, filters, filter_options }: P
                                     <tr key={delivery.delivery_id} className="hover:bg-slate-50/60">
                                         <td className="px-3.5 py-2 font-mono text-[11px] font-semibold text-slate-700">{delivery.delivery_code}</td>
                                         <td className="px-3.5 py-2 text-slate-700">{delivery.purchase_order?.po_number ?? '-'}</td>
+                                        <td className="px-3.5 py-2">
+                                            <span className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 border border-indigo-200">
+                                                {delivery.batch_label || `Batch #${delivery.batch_number ?? 1}`}
+                                                {delivery.is_final_batch && (
+                                                    <span className="text-[10px] font-normal text-indigo-500">(Final)</span>
+                                                )}
+                                            </span>
+                                        </td>
                                         <td className="px-3.5 py-2 text-slate-700">{delivery.supplier?.supplier_name ?? '-'}</td>
                                         <td className="px-3.5 py-2">
                                             <span className={statusClass(delivery.receipt_status)}>{humanizeEnum(delivery.receipt_status)}</span>
@@ -208,7 +222,7 @@ export default function DeliveryIndex({ deliveries, filters, filter_options }: P
                                 ))}
                                 {deliveries.data.length === 0 ? (
                                     <tr>
-                                        <td colSpan={7} className="px-4 py-8 text-center text-xs text-slate-500">
+                                        <td colSpan={8} className="px-4 py-8 text-center text-xs text-slate-500">
                                             No delivery intake records found.
                                         </td>
                                     </tr>

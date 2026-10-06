@@ -23,6 +23,10 @@ class Delivery extends Model
     protected $fillable = [
         'delivery_code',
         'purchase_order_id',
+        'batch_number',
+        'total_batches',
+        'delivery_schedule_type',
+        'is_final_batch',
         'supplier_id',
         'actual_delivery_date',
         'expected_arrival_date',
@@ -37,6 +41,9 @@ class Delivery extends Model
 
     protected $casts = [
         'purchase_order_id' => 'integer',
+        'batch_number' => 'integer',
+        'total_batches' => 'integer',
+        'is_final_batch' => 'boolean',
         'supplier_id' => 'integer',
         'received_by' => 'integer',
         'actual_delivery_date' => 'date',
@@ -47,7 +54,26 @@ class Delivery extends Model
 
     protected $appends = [
         'is_zero_cost_replacement',
+        'batch_label',
     ];
+
+    public function getBatchLabelAttribute(): string
+    {
+        $batch = (int) ($this->batch_number ?: 1);
+        $total = $this->total_batches ? (int) $this->total_batches : null;
+
+        if ($total && $total > 1) {
+            $label = sprintf('Batch #%d of %d', $batch, $total);
+        } else {
+            $label = sprintf('Batch #%d', $batch);
+        }
+
+        if ($this->is_final_batch) {
+            $label .= ' (Final)';
+        }
+
+        return $label;
+    }
 
     public function getIsZeroCostReplacementAttribute(): bool
     {

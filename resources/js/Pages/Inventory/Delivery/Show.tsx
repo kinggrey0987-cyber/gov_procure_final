@@ -53,6 +53,20 @@ type Delivery = {
     delivery_id: number;
     delivery_code: string;
     receipt_status: string;
+    batch_number?: number;
+    total_batches?: number | null;
+    delivery_schedule_type?: string;
+    is_final_batch?: boolean;
+    batch_label?: string;
+    sibling_deliveries?: Array<{
+        delivery_id: number;
+        delivery_code: string;
+        batch_number: number;
+        total_batches?: number | null;
+        receipt_status: string;
+        batch_label: string;
+        is_current: boolean;
+    }>;
     created_at: string;
     delivery_receipt_no?: string | null;
     sales_invoice_no?: string | null;
@@ -168,8 +182,16 @@ export default function DeliveryShow({ delivery }: Props) {
                 <div className="space-y-3">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
-                            <h2 className="text-xl font-semibold leading-tight text-gray-800">Delivery {delivery.delivery_code}</h2>
-                            <p className="mt-0.5 text-xs text-slate-500">Recorded Intake & Verification Details</p>
+                            <div className="flex items-center gap-2">
+                                <h2 className="text-xl font-semibold leading-tight text-gray-800">Delivery {delivery.delivery_code}</h2>
+                                <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-bold text-indigo-800 border border-indigo-200">
+                                    {delivery.batch_label || `Batch #${delivery.batch_number ?? 1}`}
+                                    {delivery.is_final_batch && <span className="text-[10px] text-indigo-600 font-normal">(Final)</span>}
+                                </span>
+                            </div>
+                            <p className="mt-0.5 text-xs text-slate-500">
+                                Recorded Intake & Verification Details • {delivery.delivery_schedule_type === 'STAGGERED_BATCH' ? 'Staggered Batch Delivery Schedule' : 'Single Delivery Schedule'}
+                            </p>
                         </div>
                         <div className="flex flex-wrap gap-2">
                             {canVerify ? (
@@ -242,6 +264,87 @@ export default function DeliveryShow({ delivery }: Props) {
 
                 {activeTab === 'overview' ? (
                     <>
+                        {/* Multi-Batch Delivery Schedule Section */}
+                        <section className="overflow-hidden rounded-xl border border-indigo-200 bg-white shadow-sm">
+                            <div className="flex flex-wrap items-center justify-between border-b border-indigo-100 bg-indigo-50/70 px-6 py-3.5 gap-3">
+                                <div>
+                                    <p className="text-[11px] font-bold uppercase tracking-wider text-indigo-700">Delivery Schedule & Staggered Batches</p>
+                                    <h3 className="text-sm font-extrabold text-indigo-950 flex items-center gap-2">
+                                        <span>📦</span>
+                                        Purchase Order Batch Allocation • {delivery.purchase_order?.po_number ?? 'PO'}
+                                    </h3>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-3 py-1 text-xs font-bold text-indigo-800 border border-indigo-300">
+                                        {delivery.batch_label || `Batch #${delivery.batch_number ?? 1}`}
+                                    </span>
+                                    {delivery.is_final_batch && (
+                                        <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800 border border-emerald-300">
+                                            ✓ Final Batch
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="p-5">
+                                <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4 mb-2">
+                                    <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                                        <p className="text-[11px] font-semibold text-slate-500">Current Intake Batch</p>
+                                        <p className="text-sm font-bold text-slate-900 mt-0.5">
+                                            Batch #{delivery.batch_number ?? 1} {delivery.total_batches ? `of ${delivery.total_batches}` : ''}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                                        <p className="text-[11px] font-semibold text-slate-500">Delivery Schedule Type</p>
+                                        <p className="text-sm font-bold text-slate-900 mt-0.5">
+                                            {delivery.delivery_schedule_type === 'STAGGERED_BATCH' ? 'Staggered Batches' : 'Single Delivery'}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                                        <p className="text-[11px] font-semibold text-slate-500">Associated Purchase Order</p>
+                                        <p className="text-sm font-bold text-slate-900 mt-0.5">
+                                            {delivery.purchase_order ? (
+                                                <Link href={route('procurement.purchase-orders.show', delivery.purchase_order.purchase_order_id)} className="text-blue-600 hover:underline">
+                                                    {delivery.purchase_order.po_number}
+                                                </Link>
+                                            ) : '-'}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                                        <p className="text-[11px] font-semibold text-slate-500">Total Batches for this PO</p>
+                                        <p className="text-sm font-bold text-slate-900 mt-0.5">
+                                            {delivery.sibling_deliveries?.length || 1} Batch{(delivery.sibling_deliveries?.length || 1) > 1 ? 'es' : ''} Recorded
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {delivery.sibling_deliveries && delivery.sibling_deliveries.length > 1 && (
+                                    <div className="mt-4 pt-3 border-t border-slate-100">
+                                        <p className="text-xs font-semibold text-slate-700 mb-2">All Batches for this Purchase Order:</p>
+                                        <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
+                                            {delivery.sibling_deliveries.map((sib) => (
+                                                <Link
+                                                    key={sib.delivery_id}
+                                                    href={route('inventory.deliveries.show', sib.delivery_id)}
+                                                    className={`flex items-center justify-between rounded-lg border p-2.5 text-xs transition ${sib.is_current ? 'border-indigo-500 bg-indigo-50/80 ring-1 ring-indigo-500' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
+                                                >
+                                                    <div>
+                                                        <p className="font-bold text-slate-900 flex items-center gap-1.5">
+                                                            <span>{sib.batch_label || `Batch #${sib.batch_number}`}</span>
+                                                            {sib.is_current && <span className="text-[10px] text-indigo-700 font-semibold">(Current View)</span>}
+                                                        </p>
+                                                        <p className="font-mono text-[11px] text-slate-500 mt-0.5">{sib.delivery_code}</p>
+                                                    </div>
+                                                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${sib.receipt_status === 'VERIFIED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                                                        {sib.receipt_status}
+                                                    </span>
+                                                </Link>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </section>
+
                         {/* 1. Supplier Commercial Documents & Billing (COA Compliance Highlight) */}
                         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                             <div className="flex flex-wrap items-center justify-between border-b border-slate-200 bg-slate-50/80 px-6 py-4 gap-3">

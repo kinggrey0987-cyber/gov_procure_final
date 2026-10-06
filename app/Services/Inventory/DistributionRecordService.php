@@ -446,6 +446,12 @@ class DistributionRecordService
             ]);
         }
 
+        if (in_array((string) ($record->supplyRequest?->status ?? ''), ['REJECTED', 'CANCELLED'], true)) {
+            throw ValidationException::withMessages([
+                'supply_request_id' => 'Disapproved or denied supply requests cannot proceed to warehouse distribution release.',
+            ]);
+        }
+
         $allPrs = $this->traceabilityService->getPurchaseRequestsForSupplyRequest($record->supplyRequest);
         $mergedPrs = $allPrs->merge($record->supplyRequest->purchaseRequests)->unique('purchase_request_id');
         $isProcurementBacked = $mergedPrs->isNotEmpty();

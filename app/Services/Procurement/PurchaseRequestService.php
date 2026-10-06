@@ -46,6 +46,12 @@ class PurchaseRequestService
             ->where('supply_request_id', (int) $payload['supply_request_id'])
             ->firstOrFail();
 
+        if (in_array((string) $supplyRequest->status, ['REJECTED', 'CANCELLED'], true)) {
+            throw ValidationException::withMessages([
+                'supply_request_id' => 'Disapproved or denied supply requests cannot become purchase requests.',
+            ]);
+        }
+
         if ((string) $supplyRequest->status !== 'SUBMITTED') {
             throw ValidationException::withMessages([
                 'supply_request_id' => 'Only SUBMITTED supply requests can become purchase requests.',
@@ -108,6 +114,12 @@ class PurchaseRequestService
         if ((string) ($supplyRequest->office?->code ?? '') === 'GSO') {
             throw ValidationException::withMessages([
                 'supply_request_id' => 'GSO-origin supply requests are internal logistics records and cannot be queued through office procurement routing.',
+            ]);
+        }
+
+        if (in_array((string) $supplyRequest->status, ['REJECTED', 'CANCELLED'], true)) {
+            throw ValidationException::withMessages([
+                'supply_request_id' => 'Disapproved or denied supply requests cannot be queued for procurement.',
             ]);
         }
 
@@ -880,6 +892,12 @@ class PurchaseRequestService
     {
         $this->assertProcurementActor($actor);
 
+        if ((string) $purchaseRequest->status === 'REJECTED') {
+            throw ValidationException::withMessages([
+                'status' => 'Rejected or disapproved purchase requests cannot be moved to processing.',
+            ]);
+        }
+
         if ((string) $purchaseRequest->status !== 'OPEN') {
             throw ValidationException::withMessages([
                 'status' => 'Only OPEN purchase requests can be moved to PROCESSING.',
@@ -1187,6 +1205,12 @@ class PurchaseRequestService
 
     private function assertRequestIsMutable(PurchaseRequest $purchaseRequest): void
     {
+        if ((string) $purchaseRequest->status === 'REJECTED') {
+            throw ValidationException::withMessages([
+                'status' => 'Rejected or disapproved purchase requests cannot be modified.',
+            ]);
+        }
+
         if (! in_array((string) $purchaseRequest->status, ['OPEN', 'PROCESSING', 'RETURNED_FOR_REVISION'], true)) {
             throw ValidationException::withMessages([
                 'status' => 'This purchase request can no longer be modified.',
@@ -1318,6 +1342,13 @@ class PurchaseRequestService
         if ($supplyRequests->isEmpty()) {
             throw ValidationException::withMessages([
                 'supply_request_ids' => 'No supply requests found for the selected office.',
+            ]);
+        }
+
+        $disapprovedRequests = $supplyRequests->filter(fn ($sr) => in_array((string) $sr->status, ['REJECTED', 'CANCELLED'], true));
+        if ($disapprovedRequests->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'supply_request_ids' => 'Disapproved or denied supply requests cannot be consolidated for procurement.',
             ]);
         }
 

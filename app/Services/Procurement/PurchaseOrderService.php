@@ -645,6 +645,12 @@ class PurchaseOrderService
 
     private function assertPurchaseRequestCanCreatePurchaseOrder(PurchaseRequest $purchaseRequest): void
     {
+        if ((string) $purchaseRequest->status === 'REJECTED') {
+            throw ValidationException::withMessages([
+                'purchase_request_id' => 'Cannot issue a purchase order for a rejected or disapproved purchase request.',
+            ]);
+        }
+
         if ((string) $purchaseRequest->status !== 'PROCESSING') {
             throw ValidationException::withMessages([
                 'purchase_request_id' => 'Only PROCESSING purchase requests can be used for purchase order creation.',

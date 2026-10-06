@@ -109,6 +109,10 @@ export default function ExecutiveAnomalyShow({ anomaly, evidence }: Props) {
                             isCurrency={isCurrency}
                             unitLabel={anomalyInfo.unitLabel}
                             percentDelta={percentDelta}
+                            zScore={evidence?.metrics.z_score ?? (anomaly.z_score ? Number(anomaly.z_score) : null)}
+                            taxonomy={(evidence as any)?.taxonomy}
+                            baselineParams={(evidence as any)?.baseline_parameters}
+                            literatureCitation={(evidence as any)?.literature_citation}
                         />
 
                         {/* Mayor's Governance Briefing */}

@@ -35,7 +35,8 @@ class AnomalyDetectionService
             ->merge($this->detectExcessiveQuantityAnomalies($actor))
             ->merge($this->detectPpmpOverRequestAnomalies($actor))
             ->merge($this->detectPpmpEarlyDepletionAnomalies($actor))
-            ->merge($this->detectPpmpFrequencyIrregularities($actor));
+            ->merge($this->detectPpmpFrequencyIrregularities($actor))
+            ->merge($this->detectDeliveryDiscrepancyAnomalies($actor));
 
         $this->anomalyService->collapseActiveDuplicates();
 
@@ -63,9 +64,10 @@ class AnomalyDetectionService
                 continue;
             }
 
-            $mean = $prices->avg();
-            $variance = $prices->map(fn ($price) => ($price - $mean) ** 2)->avg();
-            $std = sqrt((float) $variance);
+            $n = $prices->count();
+            $mean = (float) $prices->avg();
+            $variance = (float) $prices->map(fn ($price) => ($price - $mean) ** 2)->avg();
+            $std = sqrt($variance);
             if ($std <= 0) {
                 continue;
             }
@@ -92,12 +94,18 @@ class AnomalyDetectionService
                 'item_id' => (int) $itemId,
                 'office_id' => $officeId,
                 'detected_value' => $latestPrice,
-                'expected_value' => $mean,
-                'threshold_value' => 2.0,
+                'expected_value' => round($mean, 4),
+                'threshold_value' => round($mean + (2.0 * $std), 4),
                 'z_score' => round($zScore, 4),
                 'detection_method' => 'Z_SCORE',
                 'severity' => abs($zScore) >= 3 ? 'HIGH' : 'MEDIUM',
-                'remarks' => 'Detected procurement-side price outlier using purchase order item pricing.',
+                'remarks' => sprintf(
+                    'Statistical Z-Score outlier (Z=%.2fσ, N=%d). Baseline μ=₱%.2f, σ=₱%.2f versus Grubbs (1969) / Montgomery (2019) 2σ/3σ boundaries.',
+                    $zScore,
+                    $n,
+                    $mean,
+                    $std
+                ),
             ]));
         }
 
@@ -175,9 +183,10 @@ class AnomalyDetectionService
                 continue;
             }
 
-            $mean = $quantities->avg();
-            $variance = $quantities->map(fn ($value) => ($value - $mean) ** 2)->avg();
-            $std = sqrt((float) $variance);
+            $n = $quantities->count();
+            $mean = (float) $quantities->avg();
+            $variance = (float) $quantities->map(fn ($value) => ($value - $mean) ** 2)->avg();
+            $std = sqrt($variance);
             $threshold = $mean + (2 * $std);
 
             $latest = $rows->sortByDesc('supply_request_item_id')->first();
@@ -190,6 +199,8 @@ class AnomalyDetectionService
                 continue;
             }
 
+            $zScore = $std > 0 ? ($latestQty - $mean) / $std : 2.0;
+
             $created->push($this->anomalyService->createOrUpdateSystemDetected([
                 'anomaly_type' => 'EXCESSIVE_QUANTITY',
                 'reference_type' => SupplyRequestItem::class,
@@ -197,12 +208,18 @@ class AnomalyDetectionService
                 'item_id' => (int) $itemId,
                 'office_id' => (int) ($latest->supplyRequest->office_id ?? 0) ?: null,
                 'detected_value' => $latestQty,
-                'expected_value' => $mean,
-                'threshold_value' => $threshold,
-                'z_score' => null,
+                'expected_value' => round($mean, 4),
+                'threshold_value' => round($threshold, 4),
+                'z_score' => round($zScore, 4),
                 'detection_method' => 'MEAN_PLUS_2_SIGMA',
-                'severity' => 'HIGH',
-                'remarks' => 'Requested quantity exceeded mean + 2 sigma threshold.',
+                'severity' => $zScore >= 3.0 ? 'HIGH' : 'MEDIUM',
+                'remarks' => sprintf(
+                    'Requisition quantity exceeds Shewhart 2-sigma control limit (Z=%.2fσ, N=%d). Baseline μ=%.2f, σ=%.2f.',
+                    $zScore,
+                    $n,
+                    $mean,
+                    $std
+                ),
             ]));
         }
 
@@ -423,6 +440,64 @@ class AnomalyDetectionService
                 'detection_method' => 'PPMP_SLIDING_WINDOW_30D',
                 'severity' => $detected >= ($threshold * 1.4) ? 'HIGH' : 'MEDIUM',
                 'remarks' => 'Frequent requests detected against the same PPMP item within 30 days.',
+            ]));
+        }
+
+        return $created;
+    }
+
+    /**
+     * Detects deliveries with elevated discrepancy (shortage / damage) rates under SUPPLY_CHAIN_INTEGRITY taxonomy.
+     *
+     * @return Collection<int, Anomaly>
+     */
+    public function detectDeliveryDiscrepancyAnomalies(User $actor): Collection
+    {
+        $created = collect();
+
+        $discrepantDeliveries = \App\Models\Delivery::query()
+            ->whereHas('items', function ($query): void {
+                $query->where('damaged_quantity', '>', 0)
+                    ->orWhere('missing_quantity', '>', 0);
+            })
+            ->with(['items.purchaseOrderItem', 'purchaseOrder.purchaseRequest', 'supplier'])
+            ->latest('delivery_id')
+            ->take(25)
+            ->get();
+
+        foreach ($discrepantDeliveries as $delivery) {
+            $totalMissing = (float) $delivery->items->sum('missing_quantity');
+            $totalDamaged = (float) $delivery->items->sum('damaged_quantity');
+            $totalDiscrepancy = $totalMissing + $totalDamaged;
+            $totalExpected = (float) $delivery->items->sum('expected_quantity');
+
+            if ($totalDiscrepancy <= 0 || $totalExpected <= 0) {
+                continue;
+            }
+
+            $discrepancyRate = ($totalDiscrepancy / $totalExpected) * 100.0;
+            $firstItemId = (int) ($delivery->items->first()?->purchaseOrderItem?->item_id ?? 0) ?: null;
+
+            $created->push($this->anomalyService->createOrUpdateSystemDetected([
+                'anomaly_type' => Anomaly::TYPE_DELIVERY_DISCREPANCY,
+                'reference_type' => \App\Models\Delivery::class,
+                'reference_id' => (int) $delivery->delivery_id,
+                'item_id' => $firstItemId,
+                'office_id' => (int) ($delivery->purchaseOrder?->purchaseRequest?->office_id ?? 0) ?: null,
+                'detected_value' => round($discrepancyRate, 2),
+                'expected_value' => 0.0,
+                'threshold_value' => 5.0,
+                'z_score' => null,
+                'detection_method' => 'INSPECTION_DEFECT_RATE',
+                'severity' => $discrepancyRate >= 20.0 ? 'HIGH' : 'MEDIUM',
+                'remarks' => sprintf(
+                    'Delivery intake %s exhibited %.1f%% shortage/damage discrepancy (%.2f missing, %.2f damaged of %.2f expected).',
+                    $delivery->delivery_code,
+                    $discrepancyRate,
+                    $totalMissing,
+                    $totalDamaged,
+                    $totalExpected
+                ),
             ]));
         }
 

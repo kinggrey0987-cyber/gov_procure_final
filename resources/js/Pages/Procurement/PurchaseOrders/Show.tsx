@@ -139,6 +139,7 @@ type Traceability = {
 
 type DeliveryItem = {
     delivery_item_id: number;
+    purchase_order_item_id?: number;
     item_name: string;
     expected_quantity: number;
     received_quantity: number;
@@ -169,6 +170,11 @@ type DeliveryVerification = {
 type DeliveryRecord = {
     delivery_id: number;
     delivery_code: string;
+    batch_number?: number;
+    total_batches?: number | null;
+    delivery_schedule_type?: string;
+    is_final_batch?: boolean;
+    batch_label?: string;
     delivery_receipt_no?: string | null;
     sales_invoice_no?: string | null;
     sales_invoice_date?: string | null;
@@ -296,6 +302,25 @@ export default function PurchaseOrdersShow({
     }, [purchaseOrder.items]);
 
     const totalPages = itemPages.length;
+
+    const itemDeliveryProgress = useMemo(() => {
+        return (purchaseOrder.items ?? []).map((poItem) => {
+            const ordered = Number(poItem.quantity_ordered ?? 0);
+            const received = (deliveries ?? []).reduce((acc, del) => {
+                const di = del.items?.find((i) => i.purchase_order_item_id === poItem.purchase_order_item_id);
+                return acc + (di ? Number(di.received_quantity || 0) : 0);
+            }, 0);
+            const remaining = Math.max(0, ordered - received);
+            const pct = ordered > 0 ? Math.min(100, Math.round((received / ordered) * 100)) : 100;
+            return {
+                ...poItem,
+                ordered,
+                received,
+                remaining,
+                pct,
+            };
+        });
+    }, [purchaseOrder.items, deliveries]);
 
     const signatories = useMemo(() => {
         if (traceability?.requisitioning_signatories && traceability.requisitioning_signatories.length > 0) {
@@ -683,6 +708,137 @@ export default function PurchaseOrdersShow({
                             </div>
                         </section>
                     ) : null}
+
+                    {/* Delivery Schedule & Multi-Batch Intake Monitoring */}
+                    {purchaseOrder.status !== 'DRAFT' && (
+                        <section className="rounded-xl border border-indigo-200 bg-white p-5 shadow-sm space-y-4">
+                            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-indigo-100 pb-3">
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h4 className="text-sm font-bold text-indigo-950 flex items-center gap-2">
+                                            <span>🚚</span>
+                                            Delivery Schedule & Multi-Batch Intake Monitoring
+                                        </h4>
+                                        <span className="rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 text-xs font-bold text-indigo-800">
+                                            {deliveries.length} Intake Batch{deliveries.length !== 1 ? 'es' : ''} Recorded
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-slate-500 mt-0.5">
+                                        Municipal procurement tracking for single and staggered delivery schedules under this Purchase Order.
+                                    </p>
+                                </div>
+                                {['PLACED', 'PARTIALLY_DELIVERED'].includes(purchaseOrder.status) && (
+                                    <Link
+                                        href={route('inventory.deliveries.create')}
+                                        className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition"
+                                    >
+                                        + Log Delivery Batch
+                                    </Link>
+                                )}
+                            </div>
+
+                            {deliveries.length > 0 ? (
+                                <>
+                                    {/* Batches Table */}
+                                    <div className="overflow-x-auto">
+                                        <table className="min-w-full divide-y divide-slate-200 text-xs">
+                                            <thead className="bg-slate-50 font-semibold text-slate-700">
+                                                <tr>
+                                                    <th className="px-3 py-2 text-left">Batch</th>
+                                                    <th className="px-3 py-2 text-left">Delivery Code</th>
+                                                    <th className="px-3 py-2 text-left">Schedule Type</th>
+                                                    <th className="px-3 py-2 text-left">DR / Invoice No.</th>
+                                                    <th className="px-3 py-2 text-left">Receipt Status</th>
+                                                    <th className="px-3 py-2 text-left">Intake Date</th>
+                                                    <th className="px-3 py-2 text-right">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {deliveries.map((del) => (
+                                                    <tr key={del.delivery_id} className="hover:bg-slate-50/60">
+                                                        <td className="px-3 py-2 font-semibold text-slate-900">
+                                                            <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-2 py-0.5 text-indigo-700 border border-indigo-200">
+                                                                {del.batch_label || `Batch #${del.batch_number ?? 1}`}
+                                                                {del.is_final_batch && (
+                                                                    <span className="text-[10px] text-indigo-500 font-normal">(Final)</span>
+                                                                )}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-3 py-2 font-mono font-medium text-slate-700">{del.delivery_code}</td>
+                                                        <td className="px-3 py-2 text-slate-600">
+                                                            {del.delivery_schedule_type === 'STAGGERED_BATCH' ? 'Staggered' : 'Single Delivery'}
+                                                        </td>
+                                                        <td className="px-3 py-2 text-slate-700">
+                                                            {del.delivery_receipt_no || del.sales_invoice_no
+                                                                ? `${del.delivery_receipt_no || '-'} / ${del.sales_invoice_no || '-'}`
+                                                                : <span className="text-slate-400 italic">None</span>}
+                                                        </td>
+                                                        <td className="px-3 py-2">
+                                                            <span className={`inline-flex rounded-full px-2 py-0.5 font-bold text-[10px] ${
+                                                                del.receipt_status === 'VERIFIED' ? 'bg-emerald-100 text-emerald-800' :
+                                                                del.receipt_status === 'RECEIVED' ? 'bg-blue-100 text-blue-800' :
+                                                                del.receipt_status === 'PARTIALLY_RECEIVED' ? 'bg-orange-100 text-orange-800' :
+                                                                'bg-amber-100 text-amber-800'
+                                                            }`}>
+                                                                {del.receipt_status}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-3 py-2 text-slate-500">
+                                                            {del.actual_delivery_date || '-'}
+                                                        </td>
+                                                        <td className="px-3 py-2 text-right">
+                                                            <Link
+                                                                href={route('inventory.deliveries.show', del.delivery_id)}
+                                                                className="font-semibold text-indigo-600 hover:text-indigo-800"
+                                                            >
+                                                                View Intake →
+                                                            </Link>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    {/* Cumulative Fulfillment Progress Breakdown */}
+                                    <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-3.5 space-y-2">
+                                        <p className="text-xs font-bold text-slate-700 uppercase tracking-wide">
+                                            Cumulative Delivery Fulfillment Progress
+                                        </p>
+                                        <div className="space-y-2">
+                                            {itemDeliveryProgress.map((item) => (
+                                                <div key={item.purchase_order_item_id} className="rounded-lg bg-white p-2.5 border border-slate-200 text-xs">
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <span className="font-semibold text-slate-900">{item.item_name_snapshot || item.item?.item_name || 'Item'}</span>
+                                                        <span className="font-mono text-slate-600">
+                                                            {item.received.toFixed(2)} / {item.ordered.toFixed(2)} {item.unit || ''} ({item.pct}%)
+                                                        </span>
+                                                    </div>
+                                                    <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                                                        <div
+                                                            className={`h-2 rounded-full transition-all duration-300 ${item.pct >= 100 ? 'bg-emerald-500' : 'bg-indigo-600'}`}
+                                                            style={{ width: `${item.pct}%` }}
+                                                        />
+                                                    </div>
+                                                    <div className="flex justify-between text-[11px] text-slate-500 mt-1">
+                                                        <span>Remaining Balance: {item.remaining.toFixed(2)} {item.unit || ''}</span>
+                                                        <span>{item.pct >= 100 ? '✓ Fully Delivered' : 'Pending Remaining Batches'}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="rounded-lg border border-dashed border-slate-200 p-6 text-center text-xs text-slate-500">
+                                    <p className="font-medium text-slate-700">No delivery intakes recorded yet for this Purchase Order.</p>
+                                    <p className="mt-1 text-slate-400">
+                                        When items are delivered by the supplier, GSO can log either a full delivery or multiple staggered batches.
+                                    </p>
+                                </div>
+                            )}
+                        </section>
+                    )}
 
                     {purchaseOrder.status === 'DRAFT' ? (
                         (purchaseOrder.items ?? []).length > 0 && permissions?.place ? (

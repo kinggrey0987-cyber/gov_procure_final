@@ -55,9 +55,28 @@ class AnomalyEvidenceService
             $percentDelta = round((($detected - $expected) / $expected) * 100, 2);
         }
 
+        $taxonomy = $anomaly->getTaxonomyDetails();
+        $prices = $series->pluck('value')->map(fn ($v) => (float) $v);
+        $sampleSize = $prices->count();
+        $stdDev = null;
+        if ($sampleSize >= 2 && $expected !== null) {
+            $variance = $prices->map(fn ($v) => ($v - $expected) ** 2)->avg();
+            $stdDev = round(sqrt((float) $variance), 4);
+        }
+
+        $baselineParams = [
+            'mean' => $expected,
+            'std_dev' => $stdDev,
+            'sample_size' => $sampleSize,
+            'z_score' => $zScore,
+            'warning_threshold' => $expected !== null && $stdDev !== null ? round($expected + (2.0 * $stdDev), 4) : $threshold,
+            'critical_threshold' => $expected !== null && $stdDev !== null ? round($expected + (3.0 * $stdDev), 4) : null,
+            'confidence_level' => $zScore !== null ? (abs($zScore) >= 3.0 ? '99.73% (Critical 3σ Outlier)' : '95.45% (Warning 2σ Outlier)') : 'Normal Distribution',
+        ];
+
         return [
             'type' => 'PRICE_Z_SCORE',
-            'title' => 'Price Z-Score Evidence',
+            'title' => 'Price Z-Score Evidence (Grubbs / Shewhart Model)',
             'narrative' => $percentDelta === null
                 ? 'Detected price outlier from procurement-side purchase order pricing.'
                 : sprintf(
@@ -72,6 +91,11 @@ class AnomalyEvidenceService
                 'z_score' => $zScore,
                 'percent_delta' => $percentDelta,
             ],
+            'taxonomy' => $taxonomy,
+            'baseline_parameters' => $baselineParams,
+            'literature_citation' => $taxonomy['literature_citation'],
+            'governance_mandate' => $taxonomy['governance_mandate'],
+            'mathematical_model' => $taxonomy['mathematical_model'],
             'series' => $series->all(),
             'comparison' => [
                 [
@@ -90,10 +114,21 @@ class AnomalyEvidenceService
     {
         $detected = $this->toFloat($anomaly->detected_value);
         $expected = $this->toFloat($anomaly->expected_value);
+        $taxonomy = $anomaly->getTaxonomyDetails();
+
+        $baselineParams = [
+            'mean' => $expected,
+            'std_dev' => null,
+            'sample_size' => null,
+            'z_score' => $this->toFloat($anomaly->z_score),
+            'warning_threshold' => $this->toFloat($anomaly->threshold_value),
+            'critical_threshold' => null,
+            'confidence_level' => $anomaly->z_score ? (abs((float) $anomaly->z_score) >= 3.0 ? '99.73% (Critical)' : '95.45% (Warning)') : 'Deterministic Baseline',
+        ];
 
         return [
             'type' => strtoupper((string) $anomaly->anomaly_type),
-            'title' => 'Anomaly Evidence',
+            'title' => Anomaly::humanizeType((string) $anomaly->anomaly_type),
             'narrative' => (string) ($anomaly->remarks ?: 'System detected an anomaly pattern that requires executive review.'),
             'metrics' => [
                 'detected_value' => $detected,
@@ -104,6 +139,11 @@ class AnomalyEvidenceService
                     ? round((($detected - $expected) / $expected) * 100, 2)
                     : null,
             ],
+            'taxonomy' => $taxonomy,
+            'baseline_parameters' => $baselineParams,
+            'literature_citation' => $taxonomy['literature_citation'],
+            'governance_mandate' => $taxonomy['governance_mandate'],
+            'mathematical_model' => $taxonomy['mathematical_model'],
             'series' => [],
             'comparison' => [
                 [

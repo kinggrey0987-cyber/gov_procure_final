@@ -115,6 +115,10 @@ export default function ExecutiveAlertShow({ alert, anomaly_evidence }: Props) {
                                 isCurrency={isCurrency}
                                 unitLabel={alertInfo.unitLabel}
                                 percentDelta={percentDelta}
+                                zScore={anomaly_evidence?.metrics?.z_score ?? null}
+                                taxonomy={(anomaly_evidence as any)?.taxonomy}
+                                baselineParams={(anomaly_evidence as any)?.baseline_parameters}
+                                literatureCitation={(anomaly_evidence as any)?.literature_citation}
                             />
                         ) : stockAvailable !== null && stockThreshold !== null ? (
                             <OperationalStockGauge

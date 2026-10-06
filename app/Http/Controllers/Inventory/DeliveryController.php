@@ -79,9 +79,9 @@ class DeliveryController
         $currentYear = (int) now()->format('Y');
 
         $purchaseOrders = PurchaseOrder::query()
-            ->where('status', 'PLACED')
+            ->whereIn('status', ['PLACED', 'PARTIALLY_DELIVERED'])
             ->whereYear('created_at', $currentYear)
-            ->with('creator')
+            ->with(['creator', 'supplier', 'deliveries.items', 'items.item'])
             ->get();
 
         return Inertia::render('Inventory/Delivery/Create', [
@@ -184,6 +184,24 @@ class DeliveryController
                 'delivery_id' => (int) $delivery->delivery_id,
                 'delivery_code' => (string) $delivery->delivery_code,
                 'receipt_status' => (string) $delivery->receipt_status,
+                'batch_number' => (int) ($delivery->batch_number ?? 1),
+                'total_batches' => $delivery->total_batches ? (int) $delivery->total_batches : null,
+                'delivery_schedule_type' => (string) ($delivery->delivery_schedule_type ?? 'SINGLE_DELIVERY'),
+                'is_final_batch' => (bool) $delivery->is_final_batch,
+                'batch_label' => (string) ($delivery->batch_label ?? sprintf('Batch #%d', (int) ($delivery->batch_number ?? 1))),
+                'sibling_deliveries' => $delivery->purchaseOrder?->deliveries()
+                    ->select(['delivery_id', 'delivery_code', 'batch_number', 'total_batches', 'receipt_status', 'created_at', 'delivery_schedule_type', 'is_final_batch'])
+                    ->orderBy('batch_number')
+                    ->get()
+                    ->map(fn ($del): array => [
+                        'delivery_id' => (int) $del->delivery_id,
+                        'delivery_code' => (string) $del->delivery_code,
+                        'batch_number' => (int) ($del->batch_number ?? 1),
+                        'total_batches' => $del->total_batches ? (int) $del->total_batches : null,
+                        'receipt_status' => (string) $del->receipt_status,
+                        'batch_label' => (string) $del->batch_label,
+                        'is_current' => (int) $del->delivery_id === (int) $delivery->delivery_id,
+                    ]),
                 'created_at' => optional($delivery->created_at)?->toIso8601String(),
                 'purchase_order' => $delivery->purchaseOrder ? [
                     'purchase_order_id' => (int) $delivery->purchaseOrder->purchase_order_id,

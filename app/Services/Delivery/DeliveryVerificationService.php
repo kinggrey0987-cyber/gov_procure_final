@@ -274,11 +274,9 @@ class DeliveryVerificationService
             ->whereNotIn('receipt_status', ['VERIFIED', 'COMPLETED', 'CANCELLED'])
             ->exists();
 
-        if ($hasPendingDeliveries || $po->deliveries->isEmpty()) {
-            return;
-        }
-
-        $verifiedDeliveries = $po->deliveries->where('receipt_status', 'VERIFIED');
+        $verifiedDeliveries = $po->deliveries->whereIn('receipt_status', ['VERIFIED', 'COMPLETED']);
+        $hasShortage = false;
+        $hasAnyReceived = false;
         foreach ($po->items as $poItem) {
             $orderedQty = (float) $poItem->quantity_ordered;
             if ($orderedQty <= 0) {
@@ -290,9 +288,28 @@ class DeliveryVerificationService
                 ->where('purchase_order_item_id', (int) $poItem->purchase_order_item_id)
                 ->sum('received_quantity');
 
-            if ($receivedQty < $orderedQty) {
-                return;
+            if ($receivedQty > 0) {
+                $hasAnyReceived = true;
             }
+            if ($receivedQty < $orderedQty) {
+                $hasShortage = true;
+            }
+        }
+
+        if ($hasPendingDeliveries || $po->deliveries->isEmpty() || $hasShortage) {
+            if ($hasAnyReceived && (string) $po->status === 'PLACED') {
+                $po->forceFill(['status' => 'PARTIALLY_DELIVERED'])->save();
+                StatusHistory::query()->create([
+                    'reference_type' => PurchaseOrder::class,
+                    'reference_id' => (int) $po->purchase_order_id,
+                    'old_status' => 'PLACED',
+                    'new_status' => 'PARTIALLY_DELIVERED',
+                    'changed_by' => (int) $actor->id,
+                    'remarks' => sprintf('Staggered delivery batch verified (%s). Partial items received into inventory.', (string) $delivery->batch_label),
+                    'changed_at' => now(),
+                ]);
+            }
+            return;
         }
 
         if (! in_array((string) $po->status, ['COMPLETED', 'CLOSED'], true)) {

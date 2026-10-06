@@ -415,6 +415,12 @@ class SupplyRequestService
             ]);
         }
 
+        if ((string) $supplyRequest->status === 'REJECTED') {
+            throw ValidationException::withMessages([
+                'status' => 'Disapproved or denied supply requests cannot be modified.',
+            ]);
+        }
+
         if ((string) $supplyRequest->status !== 'DRAFT') {
             throw ValidationException::withMessages([
                 'status' => 'Only DRAFT supply requests can be modified.',

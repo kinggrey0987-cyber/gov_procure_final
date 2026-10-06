@@ -29,6 +29,8 @@ class RequestWorkflowController
         private readonly \App\Services\Inventory\SupplyRequestFollowUpService $followUpService,
         private readonly \App\Services\Inventory\InventoryService $inventoryService,
         private readonly \App\Services\Procurement\ProcurementStatusSyncService $procurementStatusSyncService,
+        private readonly \App\Services\AuditLogService $auditLogService,
+        private readonly \App\Services\NotificationService $notificationService,
     ) {
     }
 
@@ -750,6 +752,12 @@ class RequestWorkflowController
                 ->with('error', 'GSO-origin supply requests are internal logistics records and are not eligible for office distribution release.');
         }
 
+        if ((string) $supplyRequest->status === 'REJECTED') {
+            return redirect()
+                ->route('inventory.office-supply-requests.index', $request->query())
+                ->with('error', 'Disapproved or denied supply requests cannot proceed to warehouse distribution.');
+        }
+
         if ((string) $supplyRequest->status !== 'SUBMITTED') {
             return redirect()
                 ->route('inventory.office-supply-requests.index', $request->query())
@@ -916,6 +924,89 @@ class RequestWorkflowController
             ->with('success', 'Distribution record created and releasable items were released automatically.');
     }
 
+    public function rejectOfficeSupplyRequest(Request $request, SupplyRequest $supplyRequest): RedirectResponse
+    {
+        abort_unless($request->user()?->can('inventory.view-any'), 403);
+
+        $validated = $request->validate([
+            'remarks' => ['required', 'string', 'min:3', 'max:1000'],
+        ], [
+            'remarks.required' => 'Remarks explaining the disapproval reason are required.',
+            'remarks.min' => 'Remarks must be at least 3 characters.',
+        ]);
+
+        $finalRemarks = trim((string) $validated['remarks']);
+
+        if (in_array((string) $supplyRequest->status, ['REJECTED', 'CANCELLED'], true)) {
+            throw ValidationException::withMessages([
+                'status' => 'This supply request has already been disapproved or cancelled.',
+            ]);
+        }
+
+        if (in_array((string) $supplyRequest->status, ['RELEASED', 'COMPLETED', 'RECEIVED'], true)) {
+            throw ValidationException::withMessages([
+                'status' => 'Completed or released supply requests cannot be disapproved.',
+            ]);
+        }
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($request, $supplyRequest, $finalRemarks): void {
+            $oldStatus = (string) $supplyRequest->status;
+
+            $supplyRequest->forceFill([
+                'status' => 'REJECTED',
+                'review_notes' => $finalRemarks,
+                'approved_by' => null,
+                'approved_at' => null,
+            ])->save();
+
+            \App\Models\StatusHistory::query()->create([
+                'reference_type' => SupplyRequest::class,
+                'reference_id' => (int) $supplyRequest->supply_request_id,
+                'old_status' => $oldStatus,
+                'new_status' => 'REJECTED',
+                'changed_by' => (int) $request->user()->id,
+                'remarks' => $finalRemarks,
+                'changed_at' => now(),
+            ]);
+
+            \App\Models\ApprovalHistory::query()->create([
+                'reference_type' => SupplyRequest::class,
+                'reference_id' => (int) $supplyRequest->supply_request_id,
+                'approved_by' => (int) $request->user()->id,
+                'status' => 'REJECTED',
+                'remarks' => $finalRemarks,
+                'approved_at' => now(),
+            ]);
+
+            $this->auditLogService->log(
+                actor: $request->user(),
+                moduleName: 'Inventory.OfficeSupplyRequest',
+                actionType: 'DISAPPROVE',
+                referenceType: SupplyRequest::class,
+                referenceId: (int) $supplyRequest->supply_request_id,
+                details: [
+                    'request_code' => $supplyRequest->request_code,
+                    'old_status' => $oldStatus,
+                    'new_status' => 'REJECTED',
+                    'remarks' => $finalRemarks,
+                ],
+                logDomain: 'BUSINESS',
+                officeId: (int) $supplyRequest->office_id,
+            );
+
+            $this->notificationService->notifySupplyRequestOfficeRequester(
+                supplyRequest: $supplyRequest,
+                title: 'Supply Request Disapproved',
+                message: sprintf('GSO disapproved your supply request %s: %s', (string) $supplyRequest->request_code, $finalRemarks),
+                notificationType: 'OFFICE_SUPPLY_REQUEST_REJECTED',
+            );
+        });
+
+        return redirect()
+            ->route('inventory.office-supply-requests.index', $request->query())
+            ->with('success', 'Supply request disapproved successfully.');
+    }
+
     public function queueProcurement(Request $request, SupplyRequest $supplyRequest): RedirectResponse
     {
         abort_unless($request->user()?->can('inventory.view-any'), 403);
@@ -925,6 +1016,12 @@ class RequestWorkflowController
             return redirect()
                 ->route('inventory.office-supply-requests.index', $request->query())
                 ->with('error', 'GSO-origin supply requests are internal logistics records and cannot be queued through office procurement routing.');
+        }
+
+        if (in_array((string) $supplyRequest->status, ['REJECTED', 'CANCELLED'], true)) {
+            return redirect()
+                ->route('inventory.office-supply-requests.index', $request->query())
+                ->with('error', 'Disapproved or denied supply requests cannot be queued for procurement.');
         }
 
         try {

@@ -116,6 +116,10 @@ export function InfographicVarianceMeter({
     isCurrency = false,
     unitLabel = 'Units',
     percentDelta,
+    zScore,
+    taxonomy,
+    baselineParams,
+    literatureCitation,
 }: {
     detected?: number | null;
     expected?: number | null;
@@ -123,6 +127,25 @@ export function InfographicVarianceMeter({
     isCurrency?: boolean;
     unitLabel?: string;
     percentDelta?: number | null;
+    zScore?: number | null;
+    taxonomy?: {
+        category?: string;
+        category_title?: string;
+        mathematical_model?: string;
+        decision_boundary?: string;
+        literature_citation?: string;
+        governance_mandate?: string;
+    } | null;
+    baselineParams?: {
+        mean?: number | null;
+        std_dev?: number | null;
+        sample_size?: number | null;
+        z_score?: number | null;
+        warning_threshold?: number | null;
+        critical_threshold?: number | null;
+        confidence_level?: string | null;
+    } | null;
+    literatureCitation?: string | null;
 }) {
     const hasDetected = detected !== null && detected !== undefined;
     const hasExpected = expected !== null && expected !== undefined;
@@ -248,6 +271,71 @@ export function InfographicVarianceMeter({
                         </span>
                     )}
                 </div>
+
+                {/* Statistical Model, Baseline Parameters (mu, sigma, Z, N) & Academic Literature Card */}
+                {(zScore !== null && zScore !== undefined || taxonomy || baselineParams) && (
+                    <div className="rounded-xl border border-indigo-100 bg-slate-50/80 p-3 text-xs space-y-2 mt-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 pb-2">
+                            <div className="flex items-center gap-2">
+                                <span className="rounded bg-indigo-700 px-2 py-0.5 text-[10px] font-bold text-white uppercase tracking-wider">
+                                    {taxonomy?.category || 'STATISTICAL MODEL'}
+                                </span>
+                                <span className="font-bold text-slate-800 text-[11px]">
+                                    {taxonomy?.category_title || 'Statistical Parameter Baseline'}
+                                </span>
+                            </div>
+                            {zScore !== null && zScore !== undefined && (
+                                <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-black border ${
+                                    Math.abs(zScore) >= 3 ? 'bg-red-100 text-red-900 border-red-300' : 'bg-amber-100 text-amber-900 border-amber-300'
+                                }`}>
+                                    Z = {zScore >= 0 ? `+${zScore.toFixed(2)}` : zScore.toFixed(2)}σ
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Statistical Formula Badges: mu, sigma, Z, N */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                            <div className="rounded border border-slate-200 bg-white p-2">
+                                <p className="text-[10px] font-semibold text-slate-500">Baseline Mean (μ)</p>
+                                <p className="font-bold text-slate-900 mt-0.5">{formatVal(expected)}</p>
+                            </div>
+                            <div className="rounded border border-slate-200 bg-white p-2">
+                                <p className="text-[10px] font-semibold text-slate-500">Std Deviation (σ)</p>
+                                <p className="font-bold text-slate-900 mt-0.5">
+                                    {baselineParams?.std_dev ? (isCurrency ? `₱${baselineParams.std_dev.toFixed(2)}` : baselineParams.std_dev.toFixed(2)) : 'N/A (Fixed)'}
+                                </p>
+                            </div>
+                            <div className="rounded border border-slate-200 bg-white p-2">
+                                <p className="text-[10px] font-semibold text-slate-500">Sample Size (N)</p>
+                                <p className="font-bold text-slate-900 mt-0.5">
+                                    {baselineParams?.sample_size ? `${baselineParams.sample_size} records` : 'Active Window'}
+                                </p>
+                            </div>
+                            <div className="rounded border border-slate-200 bg-white p-2">
+                                <p className="text-[10px] font-semibold text-slate-500">Decision Limit</p>
+                                <p className="font-bold text-indigo-700 mt-0.5">
+                                    {baselineParams?.confidence_level || (Math.abs(zScore || 0) >= 3 ? 'Critical 3σ' : 'Warning 2σ')}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Academic Literature Citation */}
+                        {(taxonomy?.literature_citation || literatureCitation) && (
+                            <div className="pt-1.5 border-t border-slate-200/60 text-[10px] text-slate-600 flex items-start gap-1.5">
+                                <span className="font-bold text-slate-500 shrink-0">📚 Literature Reference:</span>
+                                <span className="italic leading-normal">
+                                    {taxonomy?.literature_citation || literatureCitation}
+                                </span>
+                            </div>
+                        )}
+                        {taxonomy?.governance_mandate && (
+                            <div className="text-[10px] text-slate-600 flex items-start gap-1.5">
+                                <span className="font-bold text-indigo-700 shrink-0">🏛️ Governance Mandate:</span>
+                                <span className="leading-normal">{taxonomy.governance_mandate}</span>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     );

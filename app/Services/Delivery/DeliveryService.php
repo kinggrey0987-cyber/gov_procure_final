@@ -34,9 +34,9 @@ class DeliveryService
             ->where('purchase_order_id', (int) $payload['purchase_order_id'])
             ->firstOrFail();
 
-        if ((string) $purchaseOrder->status !== 'PLACED') {
+        if (! in_array((string) $purchaseOrder->status, ['PLACED', 'PARTIALLY_DELIVERED'], true)) {
             throw ValidationException::withMessages([
-                'purchase_order_id' => 'Only PLACED purchase orders can receive deliveries.',
+                'purchase_order_id' => 'Only PLACED or PARTIALLY_DELIVERED purchase orders can receive deliveries.',
             ]);
         }
 
@@ -56,10 +56,37 @@ class DeliveryService
                 ? trim((string) $payload['delivery_code'])
                 : $this->generateNextDeliveryCode($targetDate);
 
+            // Compute batch tracking
+            $existingBatchesCount = Delivery::query()
+                ->where('purchase_order_id', (int) $purchaseOrder->purchase_order_id)
+                ->count();
+            $maxBatch = (int) Delivery::query()
+                ->where('purchase_order_id', (int) $purchaseOrder->purchase_order_id)
+                ->max('batch_number');
+
+            $batchNumber = isset($payload['batch_number']) && (int) $payload['batch_number'] > 0
+                ? (int) $payload['batch_number']
+                : ($maxBatch > 0 ? $maxBatch + 1 : 1);
+
+            $deliveryScheduleType = $payload['delivery_schedule_type']
+                ?? ($existingBatchesCount > 0 || (isset($payload['total_batches']) && (int) $payload['total_batches'] > 1) ? 'STAGGERED_BATCH' : 'SINGLE_DELIVERY');
+
+            $totalBatches = isset($payload['total_batches']) && (int) $payload['total_batches'] > 0
+                ? (int) $payload['total_batches']
+                : null;
+
+            $isFinalBatch = isset($payload['is_final_batch'])
+                ? (bool) $payload['is_final_batch']
+                : ($deliveryScheduleType === 'SINGLE_DELIVERY' || ($totalBatches !== null && $batchNumber >= $totalBatches));
+
             $delivery = Delivery::query()->create([
                 'delivery_code' => $deliveryCode,
                 'purchase_order_id' => (int) $purchaseOrder->purchase_order_id,
                 'supplier_id' => (int) $payload['supplier_id'],
+                'batch_number' => $batchNumber,
+                'total_batches' => $totalBatches,
+                'delivery_schedule_type' => $deliveryScheduleType,
+                'is_final_batch' => $isFinalBatch,
                 'actual_delivery_date' => $payload['actual_delivery_date'] ?? null,
                 'expected_arrival_date' => $payload['expected_arrival_date'] ?? null,
                 'received_by' => null,
@@ -67,19 +94,38 @@ class DeliveryService
                 'remarks' => $payload['remarks'] ?? null,
             ]);
 
-            $purchaseOrder->items()->each(function (PurchaseOrderItem $purchaseOrderItem) use ($delivery): void {
+            $payloadItems = collect($payload['items'] ?? [])->keyBy('purchase_order_item_id');
+
+            $purchaseOrder->items()->each(function (PurchaseOrderItem $purchaseOrderItem) use ($delivery, $payloadItems): void {
+                $poItemId = (int) $purchaseOrderItem->purchase_order_item_id;
+
+                if ($payloadItems->has($poItemId)) {
+                    $expectedQty = (float) $payloadItems->get($poItemId)['expected_quantity'];
+                } else {
+                    $priorReceivedQty = (float) DeliveryItem::query()
+                        ->where('purchase_order_item_id', $poItemId)
+                        ->whereHas('delivery', function ($q) use ($delivery) {
+                            $q->where('purchase_order_id', (int) $delivery->purchase_order_id)
+                                ->where('delivery_id', '!=', (int) $delivery->delivery_id);
+                        })
+                        ->sum('received_quantity');
+
+                    $remainingQty = max(0.0, (float) $purchaseOrderItem->quantity_ordered - $priorReceivedQty);
+                    $expectedQty = $priorReceivedQty > 0 ? $remainingQty : (float) $purchaseOrderItem->quantity_ordered;
+                }
+
                 $delivery->items()->create([
-                    'purchase_order_item_id' => (int) $purchaseOrderItem->purchase_order_item_id,
-                    'expected_quantity' => (float) $purchaseOrderItem->quantity_ordered,
+                    'purchase_order_item_id' => $poItemId,
+                    'expected_quantity' => $expectedQty,
                     'received_quantity' => 0,
                     'damaged_quantity' => 0,
                     'missing_quantity' => 0,
                     'item_condition' => 'PENDING_RECEIPT',
-                    'remarks' => 'Auto-populated from purchase order line for receiving inspection.',
+                    'remarks' => sprintf('Batch #%d auto-populated item line for receiving inspection.', (int) $delivery->batch_number),
                 ]);
             });
 
-            $this->recordStatus($delivery, null, 'PENDING', $actor, 'Delivery created.');
+            $this->recordStatus($delivery, null, 'PENDING', $actor, sprintf('Delivery created (%s).', (string) $delivery->batch_label));
             $this->recordAudit($actor, 'CREATE', $delivery);
 
             $purchaseOrder->loadMissing('supplyRequest');
@@ -192,15 +238,28 @@ class DeliveryService
                     continue;
                 }
 
+                $poItemId = (int) $purchaseOrderItem->purchase_order_item_id;
+
+                $priorReceivedQty = (float) DeliveryItem::query()
+                    ->where('purchase_order_item_id', $poItemId)
+                    ->whereHas('delivery', function ($q) use ($delivery) {
+                        $q->where('purchase_order_id', (int) $delivery->purchase_order_id)
+                            ->where('delivery_id', '!=', (int) $delivery->delivery_id);
+                    })
+                    ->sum('received_quantity');
+
+                $remainingQty = max(0.0, (float) $purchaseOrderItem->quantity_ordered - $priorReceivedQty);
+                $expectedQty = $priorReceivedQty > 0 ? $remainingQty : (float) $purchaseOrderItem->quantity_ordered;
+
                 $delivery->items()->firstOrCreate(
-                    ['purchase_order_item_id' => (int) $purchaseOrderItem->purchase_order_item_id],
+                    ['purchase_order_item_id' => $poItemId],
                     [
-                        'expected_quantity' => (float) $purchaseOrderItem->quantity_ordered,
+                        'expected_quantity' => $expectedQty,
                         'received_quantity' => 0,
                         'damaged_quantity' => 0,
                         'missing_quantity' => 0,
                         'item_condition' => 'PENDING_RECEIPT',
-                        'remarks' => 'Auto-populated from purchase order line for receiving inspection.',
+                        'remarks' => sprintf('Batch #%d auto-populated item line for receiving inspection.', (int) ($delivery->batch_number ?? 1)),
                     ],
                 );
             }
@@ -314,6 +373,10 @@ class DeliveryService
                 'delivery_code' => $delivery->delivery_code,
                 'purchase_order_id' => $delivery->purchase_order_id,
                 'supplier_id' => $delivery->supplier_id,
+                'batch_number' => $delivery->batch_number,
+                'total_batches' => $delivery->total_batches,
+                'delivery_schedule_type' => $delivery->delivery_schedule_type,
+                'is_final_batch' => $delivery->is_final_batch,
                 'receipt_status' => $delivery->receipt_status,
             ],
             logDomain: 'BUSINESS',
