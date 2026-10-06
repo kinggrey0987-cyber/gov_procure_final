@@ -89,6 +89,7 @@ class UpdateDeliveryRequest extends FormRequest
             'remarks' => ['nullable', 'string', 'max:500'],
             'items' => ['nullable', 'array', 'min:1'],
             'items.*.delivery_item_id' => ['required_with:items', 'integer', 'exists:delivery_items,delivery_item_id'],
+            'items.*.expected_quantity' => ['nullable', 'numeric', 'min:0'],
             'items.*.received_quantity' => ['required_with:items', 'integer', 'min:0'],
             'items.*.damaged_quantity' => ['nullable', 'integer', 'min:0'],
         ];
@@ -118,7 +119,9 @@ class UpdateDeliveryRequest extends FormRequest
                     continue;
                 }
 
-                $expectedQuantity = (float) $deliveryItem->expected_quantity;
+                $expectedQuantity = isset($row['expected_quantity']) && (float) $row['expected_quantity'] > 0
+                    ? (float) $row['expected_quantity']
+                    : (float) $deliveryItem->expected_quantity;
                 $receivedQuantity = (float) ($row['received_quantity'] ?? 0);
                 $damagedQuantity = (float) ($row['damaged_quantity'] ?? 0);
 

@@ -340,6 +340,11 @@ class DeliveryController
             'delivery' => [
                 'delivery_id' => (int) $delivery->delivery_id,
                 'delivery_code' => (string) $delivery->delivery_code,
+                'batch_number' => $delivery->batch_number ? (int) $delivery->batch_number : 1,
+                'total_batches' => $delivery->total_batches ? (int) $delivery->total_batches : null,
+                'batch_label' => (string) $delivery->batch_label,
+                'delivery_schedule_type' => (string) ($delivery->delivery_schedule_type ?? 'SINGLE_DELIVERY'),
+                'is_final_batch' => (bool) $delivery->is_final_batch,
                 'receipt_status' => (string) $delivery->receipt_status,
                 'actual_delivery_date' => optional($delivery->actual_delivery_date)?->toDateString(),
                 'expected_arrival_date' => optional($delivery->expected_arrival_date)?->toDateString(),

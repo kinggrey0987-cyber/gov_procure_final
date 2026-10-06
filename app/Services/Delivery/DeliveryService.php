@@ -177,7 +177,9 @@ class DeliveryService
 
                     $receivedQuantity = (int) ($itemPayload['received_quantity'] ?? 0);
                     $damagedQuantity = (int) ($itemPayload['damaged_quantity'] ?? 0);
-                    $expectedQuantity = (float) $item->expected_quantity;
+                    $expectedQuantity = isset($itemPayload['expected_quantity']) && (float) $itemPayload['expected_quantity'] > 0
+                        ? (float) $itemPayload['expected_quantity']
+                        : (float) $item->expected_quantity;
                     $missingQuantity = max($expectedQuantity - $receivedQuantity, 0);
 
                     if ($receivedQuantity < 0 || $damagedQuantity < 0 || $receivedQuantity > $expectedQuantity || $damagedQuantity > $receivedQuantity) {
@@ -193,6 +195,7 @@ class DeliveryService
                     };
 
                     $item->forceFill([
+                        'expected_quantity' => $expectedQuantity,
                         'received_quantity' => $receivedQuantity,
                         'damaged_quantity' => $damagedQuantity,
                         'missing_quantity' => $missingQuantity,

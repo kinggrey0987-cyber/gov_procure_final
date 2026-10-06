@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { useEffect, type FormEvent, type ReactNode } from 'react';
+import { type FormEvent, type ReactNode } from 'react';
 
 type PurchaseOrderItem = {
     purchase_order_item_id: number;
@@ -64,6 +64,10 @@ type DeliveryForm = {
     actual_delivery_date: string;
     expected_arrival_date: string;
     remarks: string;
+    items: Array<{
+        purchase_order_item_id: number;
+        expected_quantity: number | string;
+    }>;
 };
 
 export default function DeliveryCreate({ purchaseOrders }: Props) {
@@ -78,6 +82,7 @@ export default function DeliveryCreate({ purchaseOrders }: Props) {
         actual_delivery_date: '',
         expected_arrival_date: '',
         remarks: '',
+        items: [],
     });
 
     const selectedPo = purchaseOrders.find((po) => String(po.purchase_order_id) === data.purchase_order_id);
@@ -88,7 +93,7 @@ export default function DeliveryCreate({ purchaseOrders }: Props) {
     const existingDeliveries = selectedPo?.deliveries ?? [];
     const hasPriorDeliveries = existingDeliveries.length > 0;
 
-    // When PO changes, sync supplier and batch tracking suggestions
+    // When PO changes, sync supplier, batch tracking suggestions, and items
     const handlePoChange = (poId: string) => {
         const foundPo = purchaseOrders.find((po) => String(po.purchase_order_id) === poId);
         const priorBatches = foundPo?.deliveries ?? [];
@@ -97,6 +102,18 @@ export default function DeliveryCreate({ purchaseOrders }: Props) {
             : 1;
         const isStaggered = priorBatches.length > 0;
 
+        const defaultItems = (foundPo?.items ?? []).map((it) => {
+            const priorReceived = priorBatches.reduce((acc, del) => {
+                const di = (del.items ?? []).find((dItem) => Number(dItem.purchase_order_item_id) === Number(it.purchase_order_item_id));
+                return acc + (di ? Number(di.received_quantity || 0) : 0);
+            }, 0);
+            const remaining = Math.max(Number(it.quantity_ordered || 0) - priorReceived, 0);
+            return {
+                purchase_order_item_id: it.purchase_order_item_id,
+                expected_quantity: remaining,
+            };
+        });
+
         setData((prev) => ({
             ...prev,
             purchase_order_id: poId,
@@ -104,7 +121,16 @@ export default function DeliveryCreate({ purchaseOrders }: Props) {
             batch_number: nextBatch,
             delivery_schedule_type: isStaggered ? 'STAGGERED_BATCH' : 'SINGLE_DELIVERY',
             is_final_batch: !isStaggered,
+            items: defaultItems,
         }));
+    };
+
+    const handleItemExpectedChange = (index: number, val: string) => {
+        const next = [...(data.items || [])];
+        if (next[index]) {
+            next[index].expected_quantity = val === '' ? '' : Math.max(0, parseFloat(val) || 0);
+            setData('items', next);
+        }
     };
 
     const submit = (e: FormEvent) => {
@@ -228,7 +254,7 @@ export default function DeliveryCreate({ purchaseOrders }: Props) {
                                     <input
                                         type="number"
                                         min="1"
-                                        placeholder="Optional (e.g. 3)"
+                                        placeholder="Optional (e.g. 2 or 3)"
                                         value={data.total_batches}
                                         onChange={(e) => setData('total_batches', e.target.value)}
                                         className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
@@ -250,6 +276,80 @@ export default function DeliveryCreate({ purchaseOrders }: Props) {
                                 </label>
                             </div>
                         </div>
+
+                        {/* Items for this Batch Table */}
+                        {selectedPo && selectedPo.items && selectedPo.items.length > 0 && (
+                            <div className="rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 space-y-3">
+                                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-200/60 pb-2">
+                                    <div>
+                                        <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-950">
+                                            Planned Intake Items for Batch #{data.batch_number}
+                                        </h4>
+                                        <p className="text-[11px] text-indigo-800">
+                                            Specify how many units arrive in this batch. If this is Batch 1 of a partial delivery (e.g. 40 of 100), entering 40 ensures the unarrived 60 units are deferred to Batch #{Number(data.batch_number) + 1} rather than falsely flagged as missing.
+                                        </p>
+                                    </div>
+                                    <span className="rounded-full bg-indigo-100 border border-indigo-300 px-2.5 py-0.5 text-[10px] font-bold text-indigo-900">
+                                        Batch #{data.batch_number} Target
+                                    </span>
+                                </div>
+
+                                <div className="overflow-x-auto rounded-lg border border-indigo-200 bg-white">
+                                    <table className="min-w-full divide-y divide-indigo-100 text-xs">
+                                        <thead className="bg-indigo-50/80 font-semibold text-indigo-900">
+                                            <tr>
+                                                <th className="px-3 py-2 text-left">Item Description</th>
+                                                <th className="px-3 py-2 text-center">PO Total</th>
+                                                <th className="px-3 py-2 text-center">Prior Received</th>
+                                                <th className="px-3 py-2 text-center">Remaining Balance</th>
+                                                <th className="px-3 py-2 text-right">Planned for Batch #{data.batch_number}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-indigo-50">
+                                            {selectedPo.items.map((it, idx) => {
+                                                const priorReceived = existingDeliveries.reduce((acc, del) => {
+                                                    const di = (del.items ?? []).find((dItem) => Number(dItem.purchase_order_item_id) === Number(it.purchase_order_item_id));
+                                                    return acc + (di ? Number(di.received_quantity || 0) : 0);
+                                                }, 0);
+                                                const remaining = Math.max(Number(it.quantity_ordered || 0) - priorReceived, 0);
+                                                const unit = it.item?.unit || 'Units';
+
+                                                return (
+                                                    <tr key={it.purchase_order_item_id} className="hover:bg-indigo-50/30">
+                                                        <td className="px-3 py-2.5 font-medium text-slate-800">
+                                                            <div>{it.item?.item_name || `PO Item #${it.purchase_order_item_id}`}</div>
+                                                            <div className="text-[10px] text-slate-400 font-normal">Unit: {unit}</div>
+                                                        </td>
+                                                        <td className="px-3 py-2.5 text-center text-slate-600 font-semibold">
+                                                            {it.quantity_ordered} {unit}
+                                                        </td>
+                                                        <td className="px-3 py-2.5 text-center text-slate-600 font-semibold">
+                                                            {priorReceived} {unit}
+                                                        </td>
+                                                        <td className="px-3 py-2.5 text-center font-bold text-indigo-700">
+                                                            {remaining} {unit}
+                                                        </td>
+                                                        <td className="px-3 py-2.5 text-right">
+                                                            <div className="inline-flex items-center gap-1 justify-end">
+                                                                <input
+                                                                    type="number"
+                                                                    min="0"
+                                                                    max={remaining}
+                                                                    value={data.items?.[idx]?.expected_quantity ?? remaining}
+                                                                    onChange={(e) => handleItemExpectedChange(idx, e.target.value)}
+                                                                    className="w-24 rounded-lg border border-slate-300 px-2 py-1.5 text-right text-xs font-bold text-slate-900 focus:border-indigo-500 focus:outline-none ring-1 ring-slate-200"
+                                                                />
+                                                                <span className="text-[11px] text-slate-500 font-medium">{unit}</span>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
 
                         <FormField label="Supplier" required error={errors.supplier_id}>
                             <select

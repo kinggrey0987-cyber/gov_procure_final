@@ -40,6 +40,11 @@ type Delivery = {
     supplier?: {
         supplier_name: string;
     } | null;
+    batch_number?: number | null;
+    total_batches?: number | null;
+    batch_label?: string | null;
+    delivery_schedule_type?: string | null;
+    is_final_batch?: boolean;
     items: DeliveryItem[];
 };
 
@@ -60,6 +65,7 @@ type ReceiveFormData = {
         delivery_item_id: number;
         received_quantity: number | string;
         damaged_quantity: number | string;
+        expected_quantity?: number | string;
     }>;
 };
 
@@ -125,6 +131,7 @@ export default function DeliveryReceive({ delivery }: Props) {
             delivery_item_id: item.delivery_item_id,
             received_quantity: toQuantityInput(item.received_quantity || 0),
             damaged_quantity: toQuantityInput(item.damaged_quantity || 0),
+            expected_quantity: toWholeQuantity(item.expected_quantity),
         })),
     });
 
@@ -218,7 +225,9 @@ export default function DeliveryReceive({ delivery }: Props) {
     data.items.forEach((item, index) => {
         const deliveryItem = delivery.items[index];
         const itemName = deliveryItem?.item?.item_name ?? `Item ${index + 1}`;
-        const expectedQuantity = Number(deliveryItem?.expected_quantity ?? 0);
+        const expectedQuantity = Number(item.expected_quantity !== undefined && item.expected_quantity !== ''
+            ? item.expected_quantity
+            : (deliveryItem?.expected_quantity ?? 0));
         const receivedQuantity = Number(item.received_quantity || 0);
         const damagedQuantity = Number(item.damaged_quantity || 0);
 
@@ -281,6 +290,7 @@ export default function DeliveryReceive({ delivery }: Props) {
                 ...item,
                 received_quantity: toWholeQuantity(item.received_quantity),
                 damaged_quantity: toWholeQuantity(item.damaged_quantity),
+                expected_quantity: toWholeQuantity(item.expected_quantity ?? 0),
             })),
         }));
 
@@ -301,13 +311,31 @@ export default function DeliveryReceive({ delivery }: Props) {
             <div className="py-8">
                 <div className="mx-auto max-w-5xl space-y-6">
                     {/* Delivery Summary Banner */}
-                    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
                         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                             <Info label="Delivery Code" value={delivery.delivery_code} />
                             <Info label="PO Number" value={delivery.purchase_order?.po_number ?? '-'} />
                             <Info label="Supplier" value={delivery.supplier?.supplier_name ?? '-'} />
-                            <Info label="Expected Arrival" value={delivery.expected_arrival_date ?? '-'} />
+                            <Info label="Delivery Batch" value={delivery.batch_label || `Batch ${delivery.batch_number ?? 1}`} />
                         </div>
+
+                        {(delivery.delivery_schedule_type === 'STAGGERED_BATCH' || Boolean(delivery.total_batches && delivery.total_batches > 1)) && (
+                            <div className="rounded-lg border border-blue-200 bg-blue-50/80 p-3.5 text-xs text-blue-900 flex items-start gap-3">
+                                <span className="text-lg">📦</span>
+                                <div>
+                                    <div className="font-bold text-blue-950 flex items-center gap-2">
+                                        <span>Multi-Batch Staggered Intake: {delivery.batch_label || `Batch ${delivery.batch_number ?? 1}`}</span>
+                                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-800 border border-blue-200">
+                                            {delivery.is_final_batch ? 'Final Batch' : 'Staggered Batch'}
+                                        </span>
+                                    </div>
+                                    <p className="mt-0.5 text-blue-800 leading-relaxed">
+                                        Items accepted during this batch intake enter municipal inventory immediately upon inspection.
+                                        Any unfulfilled quantities remain on the Purchase Order balance for subsequent batches without defaulting the vendor or creating missing item follow-up PRs.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Receiving Form */}
@@ -664,7 +692,7 @@ export default function DeliveryReceive({ delivery }: Props) {
                                     <thead className="bg-slate-50">
                                         <tr>
                                             <th className="px-5 py-3 text-left font-semibold text-slate-700">Item Description</th>
-                                            <th className="px-4 py-3 text-center font-semibold text-slate-700">Expected (PO)</th>
+                                            <th className="px-4 py-3 text-center font-semibold text-slate-700">Batch Target</th>
                                             <th className="px-4 py-3 text-center font-semibold text-slate-700">
                                                 <div>Total Delivered</div>
                                                 <div className="text-[10px] font-normal text-slate-500">Gross Dock Count</div>
@@ -678,14 +706,20 @@ export default function DeliveryReceive({ delivery }: Props) {
                                                 <div className="text-[10px] font-normal text-emerald-600">To Inventory</div>
                                             </th>
                                             <th className="px-4 py-3 text-center font-semibold text-slate-700">
-                                                <div>Missing / Shortage</div>
-                                                <div className="text-[10px] font-normal text-amber-600">Undelivered</div>
+                                                <div>{(delivery.delivery_schedule_type === 'STAGGERED_BATCH' || Boolean(delivery.total_batches && delivery.total_batches > 1)) && !delivery.is_final_batch ? 'Deferred to Next Batch' : 'Missing / Shortage'}</div>
+                                                <div className="text-[10px] font-normal text-amber-600">{(delivery.delivery_schedule_type === 'STAGGERED_BATCH' || Boolean(delivery.total_batches && delivery.total_batches > 1)) && !delivery.is_final_batch ? 'Subsequent Intake' : 'Undelivered'}</div>
                                             </th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
                                         {delivery.items.map((item, index) => {
-                                            const expected = toWholeQuantity(item.expected_quantity);
+                                            const poExpected = toWholeQuantity(item.expected_quantity);
+                                            const currentBatchExpected = toWholeQuantity(
+                                                data.items[index]?.expected_quantity !== undefined && data.items[index]?.expected_quantity !== ''
+                                                    ? data.items[index]?.expected_quantity
+                                                    : item.expected_quantity
+                                            );
+                                            const expected = currentBatchExpected;
                                             const received = toWholeQuantity(data.items[index]?.received_quantity || 0);
                                             const damaged = toWholeQuantity(data.items[index]?.damaged_quantity || 0);
                                             const accepted = Math.max(received - damaged, 0);
@@ -693,6 +727,7 @@ export default function DeliveryReceive({ delivery }: Props) {
                                             const unit = item.item?.default_unit || 'unit';
                                             const pPerBox = item.item?.pieces_per_box ?? 1;
                                             const subUnit = item.item?.sub_unit || 'pcs';
+                                            const isStaggeredNonFinal = (delivery.delivery_schedule_type === 'STAGGERED_BATCH' || Boolean(delivery.total_batches && delivery.total_batches > 1)) && !delivery.is_final_batch;
 
                                             return (
                                                 <tr key={item.delivery_item_id} className="hover:bg-slate-50/50">
@@ -704,22 +739,57 @@ export default function DeliveryReceive({ delivery }: Props) {
                                                                 <span className="ml-1 text-slate-500 font-medium">({pPerBox} {subUnit}/{unit})</span>
                                                             )}
                                                         </div>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                const updatedItems = [...data.items];
-                                                                updatedItems[index].received_quantity = String(expected);
-                                                                updatedItems[index].damaged_quantity = '0';
-                                                                setData('items', updatedItems);
-                                                            }}
-                                                            className="mt-1 text-[11px] font-medium text-indigo-600 hover:text-indigo-800 hover:underline"
-                                                        >
-                                                            Pre-fill full expected ({expected} {unit})
-                                                        </button>
+                                                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    const updatedItems = [...data.items];
+                                                                    updatedItems[index].received_quantity = String(expected);
+                                                                    updatedItems[index].damaged_quantity = '0';
+                                                                    setData('items', updatedItems);
+                                                                }}
+                                                                className="text-[11px] font-medium text-indigo-600 hover:text-indigo-800 hover:underline"
+                                                            >
+                                                                Pre-fill batch target ({expected} {unit})
+                                                            </button>
+                                                            {received > 0 && received < poExpected && expected !== received && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const updatedItems = [...data.items];
+                                                                        updatedItems[index].expected_quantity = String(received);
+                                                                        setData('items', updatedItems);
+                                                                    }}
+                                                                    className="inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-bold text-emerald-800 border border-emerald-300 hover:bg-emerald-100 hover:text-emerald-950"
+                                                                    title="Set received count as this batch's target intake so 0 items are marked missing and the remaining items are safely scheduled for subsequent batches"
+                                                                >
+                                                                    <span>✓ Set {received} as Batch Target (0 Missing)</span>
+                                                                </button>
+                                                            )}
+                                                            {expected !== poExpected && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const updatedItems = [...data.items];
+                                                                        updatedItems[index].expected_quantity = String(poExpected);
+                                                                        setData('items', updatedItems);
+                                                                    }}
+                                                                    className="text-[11px] text-slate-500 hover:text-slate-700 hover:underline"
+                                                                >
+                                                                    Reset ({poExpected} {unit})
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                     <td className="px-4 py-4 text-center font-semibold text-slate-700">
                                                         <div>{expected}</div>
-                                                        <div className="text-[10px] font-normal text-slate-500">{unit}</div>
+                                                        {expected < poExpected ? (
+                                                            <div className="text-[10px] font-medium text-indigo-600">
+                                                                (of {poExpected} PO balance)
+                                                            </div>
+                                                        ) : (
+                                                            <div className="text-[10px] font-normal text-slate-500">{unit}</div>
+                                                        )}
                                                     </td>
                                                     <td className="px-4 py-4 text-center">
                                                         <div className="inline-flex items-center gap-1">
@@ -755,7 +825,11 @@ export default function DeliveryReceive({ delivery }: Props) {
                                                         </span>
                                                     </td>
                                                     <td className="px-4 py-4 text-center">
-                                                        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${missing > 0 ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-300' : 'bg-slate-50 text-slate-400'}`}>
+                                                        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${
+                                                            missing > 0 
+                                                                ? (isStaggeredNonFinal ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-300' : 'bg-amber-50 text-amber-700 ring-1 ring-amber-300') 
+                                                                : 'bg-slate-50 text-slate-400'
+                                                        }`}>
                                                             {missing} {unit}
                                                         </span>
                                                     </td>
