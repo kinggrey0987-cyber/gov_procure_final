@@ -69,6 +69,7 @@ $includeItems = @(
     "bootstrap",
     "config",
     "database",
+    "docs",
     "lang",
     "public",
     "resources",
