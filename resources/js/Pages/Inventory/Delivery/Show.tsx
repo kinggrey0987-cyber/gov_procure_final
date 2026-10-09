@@ -199,6 +199,15 @@ export default function DeliveryShow({ delivery }: Props) {
                                     Verify Delivery
                                 </Link>
                             ) : null}
+                            {delivery.purchase_order?.purchase_order_id && ['PLACED', 'PARTIALLY_DELIVERED'].includes(delivery.purchase_order.status || '') && (
+                                <Link
+                                    href={route('inventory.deliveries.create', { po_id: delivery.purchase_order.purchase_order_id })}
+                                    className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition"
+                                >
+                                    <span>+</span>
+                                    <span>Log Next Batch for this PO</span>
+                                </Link>
+                            )}
                             {canCreateFollowUpPurchaseRequest ? (
                                 <button
                                     type="button"

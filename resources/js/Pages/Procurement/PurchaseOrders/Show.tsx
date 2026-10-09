@@ -724,17 +724,15 @@ export default function PurchaseOrdersShow({
                                         </span>
                                     </div>
                                     <p className="text-xs text-slate-500 mt-0.5">
-                                        Municipal procurement tracking for single and staggered delivery schedules under this Purchase Order.
+                                        Municipal procurement tracking for single and staggered deliveries under this Purchase Order. Physical dock receiving, batch logging, and verification are administered by the <strong>General Services Office (GSO)</strong>.
                                     </p>
                                 </div>
-                                {['PLACED', 'PARTIALLY_DELIVERED'].includes(purchaseOrder.status) && (
-                                    <Link
-                                        href={route('inventory.deliveries.create')}
-                                        className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition"
-                                    >
-                                        + Log Delivery Batch
-                                    </Link>
-                                )}
+                                <div className="flex items-center gap-2">
+                                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600">
+                                        <span>🏢</span>
+                                        <span>Receiving Dock: <strong>GSO Custodian</strong></span>
+                                    </span>
+                                </div>
                             </div>
 
                             {deliveries.length > 0 ? (

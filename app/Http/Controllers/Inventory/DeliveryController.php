@@ -86,6 +86,7 @@ class DeliveryController
 
         return Inertia::render('Inventory/Delivery/Create', [
             'purchaseOrders' => $purchaseOrders,
+            'initialPurchaseOrderId' => request()->query('po_id') ? (int) request()->query('po_id') : null,
         ]);
     }
 

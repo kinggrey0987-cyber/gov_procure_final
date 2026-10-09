@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { type FormEvent, type ReactNode } from 'react';
+import { useEffect, type FormEvent, type ReactNode } from 'react';
 
 type PurchaseOrderItem = {
     purchase_order_item_id: number;
@@ -51,6 +51,7 @@ type PurchaseOrder = {
 
 type Props = {
     purchaseOrders: PurchaseOrder[];
+    initialPurchaseOrderId?: number | string | null;
 };
 
 type DeliveryForm = {
@@ -70,7 +71,7 @@ type DeliveryForm = {
     }>;
 };
 
-export default function DeliveryCreate({ purchaseOrders }: Props) {
+export default function DeliveryCreate({ purchaseOrders, initialPurchaseOrderId }: Props) {
     const { data, setData, post, processing, errors } = useForm<DeliveryForm>({
         purchase_order_id: '',
         supplier_id: '',
@@ -124,6 +125,15 @@ export default function DeliveryCreate({ purchaseOrders }: Props) {
             items: defaultItems,
         }));
     };
+
+    useEffect(() => {
+        if (initialPurchaseOrderId) {
+            const poExists = purchaseOrders.some((po) => Number(po.purchase_order_id) === Number(initialPurchaseOrderId));
+            if (poExists) {
+                handlePoChange(String(initialPurchaseOrderId));
+            }
+        }
+    }, [initialPurchaseOrderId]);
 
     const handleItemExpectedChange = (index: number, val: string) => {
         const next = [...(data.items || [])];
