@@ -835,9 +835,9 @@ Route::get('/system-migrate', function () {
     $user = \Illuminate\Support\Facades\Auth::user();
     $isAdmin = $user && ($user->isAdmin() || $user->can('domain.admin-tech.access'));
 
-    $expectedKey = (string) env('DEPLOY_SECRET_KEY', 'deploy-secret-2026');
+    $expectedKey = (string) env('DEPLOY_SECRET_KEY', '');
     $providedKey = (string) request('key', '');
-    $hasValidKey = ($providedKey !== '' && hash_equals($expectedKey, $providedKey));
+    $hasValidKey = ($expectedKey !== '' && $providedKey !== '' && hash_equals($expectedKey, $providedKey));
 
     if (! $isAdmin && ! $hasValidKey) {
         $errorMessage = $providedKey !== '' ? "<div style='background:#450a0a;border:1px solid #dc2626;color:#fecaca;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px;'>❌ Invalid Key. Please check your credentials.</div>" : "";

@@ -14,9 +14,9 @@ $kernel->bootstrap();
 $user = \Illuminate\Support\Facades\Auth::user();
 $isAdmin = $user && ($user->isAdmin() || $user->can('domain.admin-tech.access'));
 
-$secretKey = (string) env('DEPLOY_SECRET_KEY', 'deploy-secret-2026');
+$secretKey = (string) env('DEPLOY_SECRET_KEY', '');
 $providedKey = (string) ($_GET['key'] ?? '');
-$hasValidKey = ($providedKey !== '' && hash_equals($secretKey, $providedKey));
+$hasValidKey = ($secretKey !== '' && $providedKey !== '' && hash_equals($secretKey, $providedKey));
 
 if (! $isAdmin && ! $hasValidKey) {
     http_response_code(403);

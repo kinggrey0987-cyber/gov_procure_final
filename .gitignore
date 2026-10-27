@@ -28,6 +28,7 @@ deployment_packages/
 *.zip
 documents/
 scratch/
+gov_procure_final/
 
 # Automated Testing Frameworks, Caches & Reports
 .pytest_cache/
