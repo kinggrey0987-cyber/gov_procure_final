@@ -164,6 +164,7 @@ class DeliveryService
         }
 
         return DB::transaction(function () use ($delivery, $actor, $payload): Delivery {
+            $hasDeferredRemaining = false;
             if (array_key_exists('items', $payload)) {
                 foreach ((array) $payload['items'] as $itemPayload) {
                     $item = DeliveryItem::query()
@@ -225,7 +226,7 @@ class DeliveryService
                 'remarks' => $payload['remarks'] ?? $delivery->remarks,
             ];
 
-            if ($hasDeferredRemaining && $delivery->is_final_batch) {
+            if ($hasDeferredRemaining && !empty($delivery->is_final_batch)) {
                 $updateData['is_final_batch'] = false;
                 $updateData['delivery_schedule_type'] = 'STAGGERED_BATCH';
             }
