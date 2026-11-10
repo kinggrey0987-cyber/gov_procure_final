@@ -17,7 +17,9 @@ type DeliveryRow = {
     batch_label?: string;
     created_at: string;
     purchase_order?: {
+        purchase_order_id?: number;
         po_number?: string;
+        status?: string;
     };
     supplier?: {
         supplier_name?: string;
@@ -191,46 +193,89 @@ export default function DeliveryIndex({ deliveries, filters, filter_options }: P
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {deliveries.data.map((delivery) => (
-                                    <tr key={delivery.delivery_id} className="hover:bg-slate-50/60">
-                                        <td className="px-3.5 py-2 font-mono text-[11px] font-semibold text-slate-700">{delivery.delivery_code}</td>
-                                        <td className="px-3.5 py-2 text-slate-700">{delivery.purchase_order?.po_number ?? '-'}</td>
-                                        <td className="px-3.5 py-2">
-                                            <span className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 border border-indigo-200">
-                                                {delivery.batch_label || `Batch #${delivery.batch_number ?? 1}`}
-                                                {delivery.is_final_batch && (
-                                                    <span className="text-[10px] font-normal text-indigo-500">(Final)</span>
+                                {deliveries.data.map((delivery) => {
+                                    const isMultiDelivery = delivery.delivery_schedule_type === 'STAGGERED_BATCH'
+                                        || delivery.purchase_order?.status === 'PARTIALLY_DELIVERED'
+                                        || (!delivery.is_final_batch && (delivery.total_batches ? delivery.total_batches > 1 : false));
+
+                                    return (
+                                        <tr key={delivery.delivery_id} className="hover:bg-slate-50/60">
+                                            <td className="px-3.5 py-2 font-mono text-[11px] font-semibold text-slate-700">{delivery.delivery_code}</td>
+                                            <td className="px-3.5 py-2">
+                                                <span className="font-medium text-slate-800">{delivery.purchase_order?.po_number ?? '-'}</span>
+                                                {delivery.purchase_order?.status === 'PARTIALLY_DELIVERED' && (
+                                                    <span className="block text-[10px] font-semibold text-amber-700">
+                                                        Partially Fulfilled
+                                                    </span>
                                                 )}
-                                            </span>
-                                        </td>
-                                        <td className="px-3.5 py-2 text-slate-700">{delivery.supplier?.supplier_name ?? '-'}</td>
-                                        <td className="px-3.5 py-2">
-                                            <span className={statusClass(delivery.receipt_status)}>{humanizeEnum(delivery.receipt_status)}</span>
-                                        </td>
-                                        <td className="px-3.5 py-2 text-slate-700">{delivery.receiver?.name ?? '-'}</td>
-                                        <td className="px-3.5 py-2 text-slate-500">{new Date(delivery.created_at).toLocaleDateString()}</td>
-                                        <td className="px-3.5 py-2 text-right">
-                                            <div className="flex justify-end gap-2 text-xs">
-                                                {delivery.receipt_status === 'PENDING' && (
-                                                    <Link href={route('inventory.deliveries.receive', delivery.delivery_id)} className="font-semibold text-amber-600 hover:text-amber-800">
-                                                        Open Receiving
+                                                {delivery.purchase_order?.status === 'COMPLETED' && (
+                                                    <span className="block text-[10px] font-semibold text-emerald-700">
+                                                        Fully Fulfilled
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="px-3.5 py-2">
+                                                <div className="flex flex-col items-start gap-0.5">
+                                                    <span className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 border border-indigo-200">
+                                                        {delivery.batch_label || `Batch #${delivery.batch_number ?? 1}`}
+                                                        {delivery.is_final_batch && (
+                                                            <span className="text-[10px] font-normal text-indigo-500">(Final)</span>
+                                                        )}
+                                                    </span>
+                                                    {delivery.delivery_schedule_type === 'STAGGERED_BATCH' && (
+                                                        <span className="text-[10px] font-medium text-amber-700">
+                                                            Staggered Stage
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-3.5 py-2 text-slate-700">{delivery.supplier?.supplier_name ?? '-'}</td>
+                                            <td className="px-3.5 py-2">
+                                                <div className="flex flex-col items-start gap-1">
+                                                    <span className={statusClass(delivery.receipt_status)}>
+                                                        {delivery.receipt_status === 'VERIFIED' ? '✓ Verified' : humanizeEnum(delivery.receipt_status)}
+                                                    </span>
+                                                    {delivery.receipt_status === 'VERIFIED' && isMultiDelivery && (
+                                                        <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-800 border border-amber-200">
+                                                            <span>📦 Multi-Delivery Stage</span>
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-3.5 py-2 text-slate-700">{delivery.receiver?.name ?? '-'}</td>
+                                            <td className="px-3.5 py-2 text-slate-500">{new Date(delivery.created_at).toLocaleDateString()}</td>
+                                            <td className="px-3.5 py-2 text-right">
+                                                <div className="flex justify-end items-center gap-2 text-xs">
+                                                    {delivery.receipt_status === 'PENDING' && (
+                                                        <Link href={route('inventory.deliveries.receive', delivery.delivery_id)} className="font-semibold text-amber-600 hover:text-amber-800">
+                                                            Open Receiving
+                                                        </Link>
+                                                    )}
+                                                    {delivery.receipt_status === 'RECEIVED' && (
+                                                        <Link
+                                                            href={route('inventory.delivery-verifications.create', delivery.delivery_id)}
+                                                            className="font-semibold text-emerald-600 hover:text-emerald-800"
+                                                        >
+                                                            Verify
+                                                        </Link>
+                                                    )}
+                                                    {delivery.receipt_status === 'VERIFIED' && delivery.purchase_order?.purchase_order_id && delivery.purchase_order?.status === 'PARTIALLY_DELIVERED' && (
+                                                        <Link
+                                                            href={route('inventory.deliveries.create', { po_id: delivery.purchase_order.purchase_order_id })}
+                                                            className="font-semibold text-indigo-600 hover:text-indigo-800"
+                                                            title="Log next batch delivery"
+                                                        >
+                                                            + Next Batch
+                                                        </Link>
+                                                    )}
+                                                    <Link href={route('inventory.deliveries.show', delivery.delivery_id)} className="font-semibold text-red-600 hover:text-red-800">
+                                                        View
                                                     </Link>
-                                                )}
-                                                {delivery.receipt_status === 'RECEIVED' && (
-                                                    <Link
-                                                        href={route('inventory.delivery-verifications.create', delivery.delivery_id)}
-                                                        className="font-semibold text-emerald-600 hover:text-emerald-800"
-                                                    >
-                                                        Verify
-                                                    </Link>
-                                                )}
-                                                <Link href={route('inventory.deliveries.show', delivery.delivery_id)} className="font-semibold text-red-600 hover:text-red-800">
-                                                    View
-                                                </Link>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                                 {deliveries.data.length === 0 ? (
                                     <tr>
                                         <td colSpan={8} className="px-4 py-8 text-center text-xs text-slate-500">

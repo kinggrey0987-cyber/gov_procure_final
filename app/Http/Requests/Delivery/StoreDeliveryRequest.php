@@ -20,7 +20,14 @@ class StoreDeliveryRequest extends FormRequest
         return [
             'purchase_order_id' => ['required', 'integer', 'exists:purchase_orders,purchase_order_id'],
             'supplier_id' => ['required', 'integer', 'exists:suppliers,supplier_id'],
-            'batch_number' => ['nullable', 'integer', 'min:1'],
+            'batch_number' => [
+                'nullable',
+                'integer',
+                'min:1',
+                Rule::unique('deliveries', 'batch_number')->where(function ($query) {
+                    return $query->where('purchase_order_id', $this->input('purchase_order_id'));
+                }),
+            ],
             'total_batches' => ['nullable', 'integer', 'min:1'],
             'delivery_schedule_type' => ['nullable', 'string', 'in:SINGLE_DELIVERY,STAGGERED_BATCH'],
             'is_final_batch' => ['nullable', 'boolean'],
@@ -42,6 +49,7 @@ class StoreDeliveryRequest extends FormRequest
         return [
             'purchase_order_id.required' => 'Purchase order is required.',
             'purchase_order_id.exists' => 'Selected purchase order does not exist.',
+            'batch_number.unique' => 'Batch number has already been recorded for this Purchase Order. Duplicate batch numbers are not permitted.',
             'supplier_id.required' => 'Supplier is required.',
             'supplier_id.exists' => 'Selected supplier does not exist.',
             'delivery_code.unique' => 'Delivery code must be unique.',

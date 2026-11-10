@@ -47,26 +47,58 @@ class DeliveryService
         }
 
         return DB::transaction(function () use ($actor, $payload, $purchaseOrder): Delivery {
-            // Generate delivery code if not provided
+            // Compute batch tracking
+            $existingBatches = Delivery::query()
+                ->where('purchase_order_id', (int) $purchaseOrder->purchase_order_id)
+                ->orderBy('batch_number')
+                ->orderBy('delivery_id')
+                ->get();
+            $existingBatchesCount = $existingBatches->count();
+            $existingBatchNumbers = $existingBatches->pluck('batch_number')->map(fn ($b) => (int) $b)->all();
+            $maxBatch = !empty($existingBatchNumbers) ? max($existingBatchNumbers) : 0;
+            $nextBatch = $maxBatch + 1;
+
+            if (isset($payload['batch_number']) && in_array((int) $payload['batch_number'], $existingBatchNumbers, true)) {
+                throw ValidationException::withMessages([
+                    'batch_number' => sprintf(
+                        'Batch #%d has already been recorded for Purchase Order %s. Duplicate batch numbers are not permitted. Next available batch is Batch #%d.',
+                        (int) $payload['batch_number'],
+                        (string) $purchaseOrder->po_number,
+                        $nextBatch
+                    ),
+                ]);
+            }
+
+            $batchNumber = isset($payload['batch_number']) && (int) $payload['batch_number'] > 0
+                ? (int) $payload['batch_number']
+                : ($maxBatch > 0 ? $nextBatch : 1);
+
+            // Generate delivery code: auto-link to parent delivery code if subsequent batch
             $targetDate = !empty($payload['actual_delivery_date'])
                 ? Carbon::parse($payload['actual_delivery_date'])
                 : (!empty($payload['expected_arrival_date']) ? Carbon::parse($payload['expected_arrival_date']) : now());
 
-            $deliveryCode = !empty($payload['delivery_code'])
-                ? trim((string) $payload['delivery_code'])
-                : $this->generateNextDeliveryCode($targetDate);
+            if ($existingBatchesCount > 0 && $existingBatches->first()) {
+                $parentCode = preg_replace('/-B\d+.*$/i', '', (string) $existingBatches->first()->delivery_code);
+                $desiredCode = sprintf('%s-B%d', $parentCode, $batchNumber);
 
-            // Compute batch tracking
-            $existingBatchesCount = Delivery::query()
-                ->where('purchase_order_id', (int) $purchaseOrder->purchase_order_id)
-                ->count();
-            $maxBatch = (int) Delivery::query()
-                ->where('purchase_order_id', (int) $purchaseOrder->purchase_order_id)
-                ->max('batch_number');
+                $submittedCode = !empty($payload['delivery_code']) ? trim((string) $payload['delivery_code']) : '';
+                if ($submittedCode === '' || !str_starts_with($submittedCode, $parentCode)) {
+                    $deliveryCode = $desiredCode;
+                } else {
+                    $deliveryCode = $submittedCode;
+                }
 
-            $batchNumber = isset($payload['batch_number']) && (int) $payload['batch_number'] > 0
-                ? (int) $payload['batch_number']
-                : ($maxBatch > 0 ? $maxBatch + 1 : 1);
+                $baseCandidate = $deliveryCode;
+                $codeSuffix = 1;
+                while (Delivery::query()->where('delivery_code', $deliveryCode)->exists()) {
+                    $deliveryCode = sprintf('%s-%d', $baseCandidate, $codeSuffix++);
+                }
+            } else {
+                $deliveryCode = !empty($payload['delivery_code'])
+                    ? trim((string) $payload['delivery_code'])
+                    : $this->generateNextDeliveryCode($targetDate);
+            }
 
             $deliveryScheduleType = $payload['delivery_schedule_type']
                 ?? ($existingBatchesCount > 0 || (isset($payload['total_batches']) && (int) $payload['total_batches'] > 1) ? 'STAGGERED_BATCH' : 'SINGLE_DELIVERY');

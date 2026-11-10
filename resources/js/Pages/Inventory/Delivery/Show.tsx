@@ -249,6 +249,43 @@ export default function DeliveryShow({ delivery }: Props) {
                     </div>
                 ) : null}
 
+                {/* Multi-Delivery Stage Alert Banner for Verified Staggered Deliveries */}
+                {delivery.receipt_status === 'VERIFIED' && (delivery.delivery_schedule_type === 'STAGGERED_BATCH' || delivery.purchase_order?.status === 'PARTIALLY_DELIVERED' || (!delivery.is_final_batch && (delivery.total_batches ? delivery.total_batches > 1 : false))) && (
+                    <div className="rounded-xl border border-indigo-200 bg-gradient-to-r from-indigo-50 via-purple-50 to-blue-50 p-4 shadow-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-4">
+                            <div className="flex items-start gap-3">
+                                <div className="rounded-lg bg-indigo-600 p-2 text-white text-lg shrink-0">
+                                    📦
+                                </div>
+                                <div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <h4 className="text-sm font-bold text-indigo-950">
+                                            Multi-Delivery Stage: {delivery.batch_label || `Batch #${delivery.batch_number ?? 1}`} Verified
+                                        </h4>
+                                        <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-300">
+                                            ✓ Batch Intake Verified & Synced to Inventory
+                                        </span>
+                                        <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-800 border border-amber-300">
+                                            PO In Multiple Delivery Stage
+                                        </span>
+                                    </div>
+                                    <p className="mt-1 text-xs text-indigo-800">
+                                        This delivery batch has been verified and items are recorded in inventory stocks. Purchase Order <strong>{delivery.purchase_order?.po_number}</strong> is in an ongoing staggered delivery schedule. Remaining items await subsequent delivery batches.
+                                    </p>
+                                </div>
+                            </div>
+                            {delivery.purchase_order?.purchase_order_id && ['PLACED', 'PARTIALLY_DELIVERED'].includes(delivery.purchase_order.status || '') && (
+                                <Link
+                                    href={route('inventory.deliveries.create', { po_id: delivery.purchase_order.purchase_order_id })}
+                                    className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition shrink-0"
+                                >
+                                    <span>+ Log Next Delivery Batch</span>
+                                </Link>
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 {/* Tab Navigation */}
                 <section className="rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
                     <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
@@ -328,7 +365,17 @@ export default function DeliveryShow({ delivery }: Props) {
 
                                 {delivery.sibling_deliveries && delivery.sibling_deliveries.length > 1 && (
                                     <div className="mt-4 pt-3 border-t border-slate-100">
-                                        <p className="text-xs font-semibold text-slate-700 mb-2">All Batches for this Purchase Order:</p>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <p className="text-xs font-semibold text-slate-700">All Batches for this Purchase Order (Multi-Delivery Stage):</p>
+                                            {delivery.purchase_order?.purchase_order_id && ['PLACED', 'PARTIALLY_DELIVERED'].includes(delivery.purchase_order.status || '') && (
+                                                <Link
+                                                    href={route('inventory.deliveries.create', { po_id: delivery.purchase_order.purchase_order_id })}
+                                                    className="text-xs font-bold text-indigo-600 hover:text-indigo-800"
+                                                >
+                                                    + Log Next Batch
+                                                </Link>
+                                            )}
+                                        </div>
                                         <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
                                             {delivery.sibling_deliveries.map((sib) => (
                                                 <Link
@@ -343,9 +390,14 @@ export default function DeliveryShow({ delivery }: Props) {
                                                         </p>
                                                         <p className="font-mono text-[11px] text-slate-500 mt-0.5">{sib.delivery_code}</p>
                                                     </div>
-                                                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${sib.receipt_status === 'VERIFIED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                                                        {sib.receipt_status}
-                                                    </span>
+                                                    <div className="flex flex-col items-end gap-0.5">
+                                                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${sib.receipt_status === 'VERIFIED' ? 'bg-emerald-100 text-emerald-800' : sib.receipt_status === 'RECEIVED' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}`}>
+                                                            {sib.receipt_status === 'VERIFIED' ? '✓ Verified' : sib.receipt_status}
+                                                        </span>
+                                                        {sib.receipt_status === 'VERIFIED' && (
+                                                            <span className="text-[9px] font-medium text-emerald-600">In Inventory</span>
+                                                        )}
+                                                    </div>
                                                 </Link>
                                             ))}
                                         </div>

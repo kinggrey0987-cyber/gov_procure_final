@@ -93,6 +93,11 @@ export default function DeliveryCreate({ purchaseOrders, initialPurchaseOrderId 
 
     const existingDeliveries = selectedPo?.deliveries ?? [];
     const hasPriorDeliveries = existingDeliveries.length > 0;
+    const existingBatchNumbers = existingDeliveries.map((d) => Number(d.batch_number || 1));
+    const parentBaseDelivery = existingDeliveries[0];
+    const parentBaseCode = (parentBaseDelivery?.delivery_code || '').replace(/-B\d+.*$/i, '');
+    const autoSuggestedCode = parentBaseCode ? `${parentBaseCode}-B${data.batch_number}` : '';
+    const isBatchDuplicate = hasPriorDeliveries && existingBatchNumbers.includes(Number(data.batch_number));
 
     // When PO changes, sync supplier, batch tracking suggestions, and items
     const handlePoChange = (poId: string) => {
@@ -102,6 +107,9 @@ export default function DeliveryCreate({ purchaseOrders, initialPurchaseOrderId 
             ? Math.max(...priorBatches.map((d) => Number(d.batch_number || 1))) + 1
             : 1;
         const isStaggered = priorBatches.length > 0;
+        const parentDel = priorBatches[0];
+        const parentBase = (parentDel?.delivery_code || '').replace(/-B\d+.*$/i, '');
+        const autoChildCode = isStaggered && parentBase ? `${parentBase}-B${nextBatch}` : '';
 
         const defaultItems = (foundPo?.items ?? []).map((it) => {
             const priorReceived = priorBatches.reduce((acc, del) => {
@@ -119,10 +127,20 @@ export default function DeliveryCreate({ purchaseOrders, initialPurchaseOrderId 
             ...prev,
             purchase_order_id: poId,
             supplier_id: foundPo?.supplier?.supplier_id ? String(foundPo.supplier.supplier_id) : '',
+            delivery_code: autoChildCode,
             batch_number: nextBatch,
             delivery_schedule_type: isStaggered ? 'STAGGERED_BATCH' : 'SINGLE_DELIVERY',
             is_final_batch: !isStaggered,
             items: defaultItems,
+        }));
+    };
+
+    const handleBatchChange = (newBatchVal: number) => {
+        const validBatch = Math.max(1, newBatchVal);
+        setData((prev) => ({
+            ...prev,
+            batch_number: validBatch,
+            delivery_code: hasPriorDeliveries && parentBaseCode ? `${parentBaseCode}-B${validBatch}` : prev.delivery_code,
         }));
     };
 
@@ -145,6 +163,9 @@ export default function DeliveryCreate({ purchaseOrders, initialPurchaseOrderId 
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
+        if (isBatchDuplicate) {
+            return;
+        }
         post(route('inventory.deliveries.store'));
     };
 
@@ -248,14 +269,30 @@ export default function DeliveryCreate({ purchaseOrders, initialPurchaseOrderId 
                                 </div>
 
                                 <div>
-                                    <label className="mb-1 block text-xs font-semibold text-slate-700">Batch Number</label>
+                                    <div className="flex items-center justify-between mb-1">
+                                        <label className="block text-xs font-semibold text-slate-700">Batch Number</label>
+                                        {hasPriorDeliveries && (
+                                            <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded">
+                                                Next in sequence
+                                            </span>
+                                        )}
+                                    </div>
                                     <input
                                         type="number"
-                                        min="1"
+                                        min={hasPriorDeliveries ? Math.max(...existingBatchNumbers) + 1 : 1}
                                         value={data.batch_number}
-                                        onChange={(e) => setData('batch_number', Math.max(1, parseInt(e.target.value) || 1))}
-                                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
+                                        onChange={(e) => handleBatchChange(parseInt(e.target.value) || 1)}
+                                        className={`w-full rounded-lg border px-3 py-2 text-xs focus:outline-none ${
+                                            isBatchDuplicate
+                                                ? 'border-rose-400 bg-rose-50 text-rose-900 focus:border-rose-500 ring-1 ring-rose-300'
+                                                : 'border-slate-300 bg-white text-slate-900 focus:border-blue-500'
+                                        }`}
                                     />
+                                    {isBatchDuplicate && (
+                                        <p className="mt-1 text-xs font-semibold text-rose-600">
+                                            ⚠️ Batch #{data.batch_number} already recorded for this PO. Please use Batch #{Math.max(...existingBatchNumbers) + 1}.
+                                        </p>
+                                    )}
                                     {errors.batch_number && <p className="mt-1 text-xs text-rose-600">{errors.batch_number}</p>}
                                 </div>
 
@@ -377,13 +414,32 @@ export default function DeliveryCreate({ purchaseOrders, initialPurchaseOrderId 
                         </FormField>
 
                         <FormField label="Delivery Code" error={errors.delivery_code}>
-                            <input
-                                type="text"
-                                value={data.delivery_code}
-                                onChange={(e) => setData('delivery_code', e.target.value)}
-                                className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none"
-                                placeholder="Leave blank to auto-generate (e.g. DEL-2026-10-0001)"
-                            />
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    value={data.delivery_code}
+                                    onChange={(e) => setData('delivery_code', e.target.value)}
+                                    className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-mono focus:border-blue-500 focus:outline-none"
+                                    placeholder={hasPriorDeliveries ? (autoSuggestedCode || 'Auto-generated from parent') : 'Leave blank to auto-generate (e.g. DEL-2026-11-0001)'}
+                                />
+                                {hasPriorDeliveries && (
+                                    <span className="absolute right-2.5 top-2.5 inline-flex items-center gap-1 rounded bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-[10px] font-bold text-indigo-700">
+                                        🔗 Auto Parent-Linked
+                                    </span>
+                                )}
+                            </div>
+                            {hasPriorDeliveries ? (
+                                <p className="mt-1.5 text-xs text-indigo-700 font-semibold flex items-center gap-1.5">
+                                    <span>🔗</span>
+                                    <span>
+                                        Staggered Batch Code: Auto-linked to parent delivery <strong>{parentBaseDelivery?.delivery_code}</strong> as <strong>{data.delivery_code || autoSuggestedCode}</strong>.
+                                    </span>
+                                </p>
+                            ) : (
+                                <p className="mt-1 text-xs text-slate-500">
+                                    Leave blank to auto-generate the parent code (e.g. DEL-2026-11-0001).
+                                </p>
+                            )}
                         </FormField>
 
                         <div className="grid gap-5 sm:grid-cols-2">
