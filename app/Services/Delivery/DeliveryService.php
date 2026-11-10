@@ -168,6 +168,7 @@ class DeliveryService
             if (array_key_exists('items', $payload)) {
                 foreach ((array) $payload['items'] as $itemPayload) {
                     $item = DeliveryItem::query()
+                        ->with('purchaseOrderItem')
                         ->where('delivery_id', (int) $delivery->delivery_id)
                         ->where('delivery_item_id', (int) ($itemPayload['delivery_item_id'] ?? 0))
                         ->first();
