@@ -119,7 +119,7 @@ class UpdateDeliveryRequest extends FormRequest
                     continue;
                 }
 
-                $expectedQuantity = isset($row['expected_quantity']) && (float) $row['expected_quantity'] > 0
+                $expectedQuantity = isset($row['expected_quantity']) && is_numeric($row['expected_quantity']) && (float) $row['expected_quantity'] >= 0
                     ? (float) $row['expected_quantity']
                     : (float) $deliveryItem->expected_quantity;
                 $receivedQuantity = (float) ($row['received_quantity'] ?? 0);

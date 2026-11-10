@@ -177,7 +177,7 @@ class DeliveryService
 
                     $receivedQuantity = (int) ($itemPayload['received_quantity'] ?? 0);
                     $damagedQuantity = (int) ($itemPayload['damaged_quantity'] ?? 0);
-                    $expectedQuantity = isset($itemPayload['expected_quantity']) && (float) $itemPayload['expected_quantity'] > 0
+                    $expectedQuantity = isset($itemPayload['expected_quantity']) && is_numeric($itemPayload['expected_quantity']) && (float) $itemPayload['expected_quantity'] >= 0
                         ? (float) $itemPayload['expected_quantity']
                         : (float) $item->expected_quantity;
                     $missingQuantity = max($expectedQuantity - $receivedQuantity, 0);
@@ -186,6 +186,11 @@ class DeliveryService
                         throw ValidationException::withMessages([
                             'items' => 'Received quantity cannot exceed expected quantity, and damaged quantity cannot exceed received quantity.',
                         ]);
+                    }
+
+                    $poOrderedQty = (float) ($item->purchaseOrderItem?->quantity_ordered ?? $item->expected_quantity);
+                    if ($expectedQuantity < $poOrderedQty && $missingQuantity === 0) {
+                        $hasDeferredRemaining = true;
                     }
 
                     $itemCondition = match (true) {
@@ -204,7 +209,7 @@ class DeliveryService
                 }
             }
 
-            $delivery->fill([
+            $updateData = [
                 'actual_delivery_date' => $payload['actual_delivery_date'] ?? $delivery->actual_delivery_date,
                 'expected_arrival_date' => $payload['expected_arrival_date'] ?? $delivery->expected_arrival_date,
                 'delivery_receipt_no' => $payload['delivery_receipt_no'] ?? $delivery->delivery_receipt_no,
@@ -218,7 +223,14 @@ class DeliveryService
                         ? (float) $payload['sales_invoice_amount']
                         : $delivery->sales_invoice_amount),
                 'remarks' => $payload['remarks'] ?? $delivery->remarks,
-            ])->save();
+            ];
+
+            if ($hasDeferredRemaining && $delivery->is_final_batch) {
+                $updateData['is_final_batch'] = false;
+                $updateData['delivery_schedule_type'] = 'STAGGERED_BATCH';
+            }
+
+            $delivery->fill($updateData)->save();
 
             $this->recordStatus($delivery, (string) $delivery->receipt_status, (string) $delivery->receipt_status, $actor, 'Delivery receipt updated.');
             $this->recordAudit($actor, 'UPDATE', $delivery);

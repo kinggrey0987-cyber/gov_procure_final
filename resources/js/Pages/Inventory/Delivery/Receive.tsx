@@ -8,6 +8,7 @@ type DeliveryItem = {
     received_quantity: number;
     damaged_quantity?: number;
     item_condition: string;
+    po_quantity_ordered?: number;
     item?: {
         item_name: string;
         item_id: number;
@@ -135,9 +136,72 @@ export default function DeliveryReceive({ delivery }: Props) {
         })),
     });
 
+    const nextBatchNumber = (delivery.batch_number ? Number(delivery.batch_number) : 1) + 1;
+    const nextBatchText = `Batch #${nextBatchNumber}`;
+
     const handleItemChange = (index: number, field: 'received_quantity' | 'damaged_quantity', value: string | number) => {
         const updatedItems = [...data.items];
         updatedItems[index][field] = toQuantityInput(value);
+
+        if (field === 'received_quantity') {
+            const numVal = toWholeQuantity(value);
+            const curExpected = toWholeQuantity(updatedItems[index].expected_quantity ?? 0);
+            const poExpected = toWholeQuantity(delivery.items[index]?.expected_quantity ?? 0);
+            if (numVal > curExpected && numVal <= poExpected) {
+                updatedItems[index].expected_quantity = numVal;
+            }
+        }
+
+        setData('items', updatedItems);
+    };
+
+    const hasPartialIntake = data.items.some((item, index) => {
+        const deliveryItem = delivery.items[index];
+        const expected = toWholeQuantity(
+            item.expected_quantity !== undefined && item.expected_quantity !== ''
+                ? item.expected_quantity
+                : (deliveryItem?.expected_quantity ?? 0)
+        );
+        const received = toWholeQuantity(item.received_quantity || 0);
+        return received > 0 && received < expected;
+    });
+
+    const hasDeferredUnits = data.items.some((item, index) => {
+        const poExpected = toWholeQuantity(delivery.items[index]?.expected_quantity ?? 0);
+        const currentExpected = toWholeQuantity(
+            item.expected_quantity !== undefined && item.expected_quantity !== ''
+                ? item.expected_quantity
+                : poExpected
+        );
+        return currentExpected < poExpected;
+    });
+
+    const totalDeferredCount = data.items.reduce((sum, item, idx) => {
+        const poExpected = toWholeQuantity(delivery.items[idx]?.expected_quantity ?? 0);
+        const currentExpected = toWholeQuantity(
+            item.expected_quantity !== undefined && item.expected_quantity !== ''
+                ? item.expected_quantity
+                : poExpected
+        );
+        return sum + Math.max(poExpected - currentExpected, 0);
+    }, 0);
+
+    const handleSetAllBatchTargets = () => {
+        const updatedItems = data.items.map((it) => {
+            const received = toWholeQuantity(it.received_quantity || 0);
+            return {
+                ...it,
+                expected_quantity: received,
+            };
+        });
+        setData('items', updatedItems);
+    };
+
+    const handleRevertAllTargets = () => {
+        const updatedItems = data.items.map((it, idx) => ({
+            ...it,
+            expected_quantity: toWholeQuantity(delivery.items[idx]?.expected_quantity ?? 0),
+        }));
         setData('items', updatedItems);
     };
 
@@ -231,8 +295,12 @@ export default function DeliveryReceive({ delivery }: Props) {
         const receivedQuantity = Number(item.received_quantity || 0);
         const damagedQuantity = Number(item.damaged_quantity || 0);
 
-        if (receivedQuantity > expectedQuantity) {
-            lineErrors.push(`${itemName}: Total delivered (${receivedQuantity}) cannot exceed expected PO quantity (${expectedQuantity}).`);
+        const poExpected = toWholeQuantity(deliveryItem?.expected_quantity ?? 0);
+
+        if (receivedQuantity > poExpected) {
+            lineErrors.push(`${itemName}: Total delivered (${receivedQuantity}) cannot exceed expected PO target (${poExpected}).`);
+        } else if (receivedQuantity > expectedQuantity) {
+            lineErrors.push(`${itemName}: Total delivered (${receivedQuantity}) cannot exceed current batch target (${expectedQuantity}).`);
         }
 
         if (damagedQuantity > receivedQuantity) {
@@ -687,6 +755,81 @@ export default function DeliveryReceive({ delivery }: Props) {
                                     </div>
                                 </div>
                             ) : null}
+
+                            {/* Prominent One-Click Batch Sync Banner (Above Items Table) */}
+                            {(hasPartialIntake || hasDeferredUnits) && (
+                                <div
+                                    className={`border-b p-4 sm:p-5 transition-all ${
+                                        hasPartialIntake
+                                            ? 'border-amber-300 bg-amber-50/90 text-amber-950'
+                                            : 'border-emerald-300 bg-emerald-50/90 text-emerald-950'
+                                    }`}
+                                >
+                                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                                        <div className="flex items-start gap-3.5">
+                                            <span
+                                                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xl shadow-xs border ${
+                                                    hasPartialIntake
+                                                        ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                                        : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                                }`}
+                                            >
+                                                {hasPartialIntake ? '⚡' : '✅'}
+                                            </span>
+                                            <div className="space-y-1">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <h4 className="text-sm font-bold sm:text-base">
+                                                        {hasPartialIntake
+                                                            ? 'Partial Delivery Intake Detected'
+                                                            : `✓ Batch Targets Synced (0 Missing • Ready for Verification)`}
+                                                    </h4>
+                                                    <span
+                                                        className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider ${
+                                                            hasPartialIntake
+                                                                ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                                                : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                                        }`}
+                                                    >
+                                                        {hasPartialIntake ? `${nextBatchText} Staggered Flow` : `${nextBatchText} Scheduled`}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs leading-relaxed max-w-2xl">
+                                                    {hasPartialIntake ? (
+                                                        <>
+                                                            Delivered counts are less than the initial expected target. If the remaining units are scheduled to arrive in a later shipment under this Purchase Order, you can cleanly defer unreceived units to <strong>{nextBatchText}</strong> without penalty, defect flags, or false discrepancy rejections.
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            Batch targets are aligned with delivered units. Unreceived balance (<strong>{totalDeferredCount} {totalDeferredCount === 1 ? 'unit' : 'units'}</strong>) is deferred to <strong>{nextBatchText}</strong>. This delivery will be verified with 0 discrepancies (preventing unnecessary Follow-Up PRs), and {nextBatchText} will automatically initialize with the remaining balance.
+                                                        </>
+                                                    )}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-wrap items-center gap-2.5 lg:shrink-0">
+                                            {hasPartialIntake && (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleSetAllBatchTargets}
+                                                    className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-indigo-700 active:bg-indigo-800 transition"
+                                                >
+                                                    <span>⚡</span>
+                                                    <span>Set All as Batch Targets (0 Missing • Schedule {nextBatchText})</span>
+                                                </button>
+                                            )}
+                                            <button
+                                                type="button"
+                                                onClick={handleRevertAllTargets}
+                                                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 hover:text-slate-900 transition"
+                                            >
+                                                <span>Treat as Missing Shortage</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="overflow-x-auto">
                                 <table className="min-w-full divide-y divide-slate-200 text-sm">
                                     <thead className="bg-slate-50">
@@ -706,8 +849,10 @@ export default function DeliveryReceive({ delivery }: Props) {
                                                 <div className="text-[10px] font-normal text-emerald-600">To Inventory</div>
                                             </th>
                                             <th className="px-4 py-3 text-center font-semibold text-slate-700">
-                                                <div>{(delivery.delivery_schedule_type === 'STAGGERED_BATCH' || Boolean(delivery.total_batches && delivery.total_batches > 1)) && !delivery.is_final_batch ? 'Deferred to Next Batch' : 'Missing / Shortage'}</div>
-                                                <div className="text-[10px] font-normal text-amber-600">{(delivery.delivery_schedule_type === 'STAGGERED_BATCH' || Boolean(delivery.total_batches && delivery.total_batches > 1)) && !delivery.is_final_batch ? 'Subsequent Intake' : 'Undelivered'}</div>
+                                                <div>Missing / Shortage</div>
+                                                <div className="text-[10px] font-normal text-slate-500">
+                                                    {hasDeferredUnits ? `Deferred to ${nextBatchText}` : 'Dock Balance'}
+                                                </div>
                                             </th>
                                         </tr>
                                     </thead>
@@ -824,14 +969,54 @@ export default function DeliveryReceive({ delivery }: Props) {
                                                             {accepted} {unit}
                                                         </span>
                                                     </td>
-                                                    <td className="px-4 py-4 text-center">
-                                                        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${
-                                                            missing > 0 
-                                                                ? (isStaggeredNonFinal ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-300' : 'bg-amber-50 text-amber-700 ring-1 ring-amber-300') 
-                                                                : 'bg-slate-50 text-slate-400'
-                                                        }`}>
-                                                            {missing} {unit}
-                                                        </span>
+                                                    <td className="px-4 py-4 text-center align-middle">
+                                                        <div className="flex flex-col items-center justify-center gap-1.5">
+                                                            <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${
+                                                                missing > 0 
+                                                                    ? (isStaggeredNonFinal ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-300' : 'bg-amber-50 text-amber-700 ring-1 ring-amber-300') 
+                                                                    : 'bg-slate-50 text-slate-400'
+                                                            }`}>
+                                                                {missing} {unit}
+                                                            </span>
+
+                                                            {/* If missing > 0 and received > 0, display a direct button: [ Defer to Batch #2 (0 Missing) ] */}
+                                                            {missing > 0 && received > 0 && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const updatedItems = [...data.items];
+                                                                        updatedItems[index].expected_quantity = received;
+                                                                        setData('items', updatedItems);
+                                                                    }}
+                                                                    className="inline-flex items-center gap-1 rounded-md bg-indigo-50 border border-indigo-200 px-2 py-1 text-[11px] font-bold text-indigo-700 shadow-xs hover:bg-indigo-100 hover:text-indigo-900 transition"
+                                                                    title={`Set batch target to ${received} ${unit} (0 missing) and defer remaining ${missing} ${unit} to ${nextBatchText}`}
+                                                                >
+                                                                    <span>⚡</span>
+                                                                    <span>Defer to {nextBatchText} (0 Missing)</span>
+                                                                </button>
+                                                            )}
+
+                                                            {/* When missing === 0 and poExpected > expected, display a green note below the badge: ({poExpected - expected} deferred to Batch #2) */}
+                                                            {missing === 0 && poExpected > expected && (
+                                                                <div className="flex flex-col items-center gap-0.5">
+                                                                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5">
+                                                                        ✓ ({poExpected - expected} deferred to {nextBatchText})
+                                                                    </span>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            const updatedItems = [...data.items];
+                                                                            updatedItems[index].expected_quantity = poExpected;
+                                                                            setData('items', updatedItems);
+                                                                        }}
+                                                                        className="text-[10px] text-slate-400 hover:text-slate-600 underline"
+                                                                        title={`Revert target back to PO expected ${poExpected} ${unit}`}
+                                                                    >
+                                                                        Revert to PO target
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             );

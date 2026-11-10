@@ -315,6 +315,7 @@ class DeliveryController
             $items = $delivery->items->map(fn ($item): array => [
                 'delivery_item_id' => (int) $item->delivery_item_id,
                 'expected_quantity' => (float) $item->expected_quantity,
+                'po_quantity_ordered' => (float) ($item->purchaseOrderItem?->quantity_ordered ?? $item->expected_quantity),
                 'received_quantity' => (float) $item->received_quantity,
                 'item_condition' => (string) ($item->item_condition ?? 'GOOD'),
                 'item' => ($item->relationLoaded('purchaseOrderItem') && $item->purchaseOrderItem && $item->purchaseOrderItem->relationLoaded('item') && $item->purchaseOrderItem->item) ? [
