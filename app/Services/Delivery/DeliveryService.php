@@ -197,6 +197,7 @@ class DeliveryService
 
         return DB::transaction(function () use ($delivery, $actor, $payload): Delivery {
             $hasDeferredRemaining = false;
+            $hasDiscrepancy = false;
             if (array_key_exists('items', $payload)) {
                 foreach ((array) $payload['items'] as $itemPayload) {
                     $item = DeliveryItem::query()
@@ -232,8 +233,12 @@ class DeliveryService
                         })
                         ->sum('received_quantity');
 
-                    if (($priorReceivedQty + $expectedQuantity) < $poOrderedQty && $missingQuantity === 0) {
+                    if (($priorReceivedQty + $expectedQuantity) < $poOrderedQty && $missingQuantity <= 0) {
                         $hasDeferredRemaining = true;
+                    }
+
+                    if ($missingQuantity > 0 || $damagedQuantity > 0) {
+                        $hasDiscrepancy = true;
                     }
 
                     $itemCondition = match (true) {
@@ -268,9 +273,11 @@ class DeliveryService
                 'remarks' => $payload['remarks'] ?? $delivery->remarks,
             ];
 
-            if ($hasDeferredRemaining) {
+            if ($hasDeferredRemaining || $hasDiscrepancy) {
                 $updateData['is_final_batch'] = false;
-                $updateData['delivery_schedule_type'] = 'STAGGERED_BATCH';
+                if ($hasDeferredRemaining) {
+                    $updateData['delivery_schedule_type'] = 'STAGGERED_BATCH';
+                }
             } elseif (array_key_exists('items', $payload)) {
                 $hasPriorBatches = Delivery::query()
                     ->where('purchase_order_id', (int) $delivery->purchase_order_id)

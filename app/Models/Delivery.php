@@ -61,12 +61,14 @@ class Delivery extends Model
     {
         $batch = (int) ($this->batch_number ?: 1);
         $scheduleType = (string) ($this->delivery_schedule_type ?? 'SINGLE_DELIVERY');
+        $explicitTotal = $this->total_batches ? (int) $this->total_batches : null;
         $po = $this->relationLoaded('purchaseOrder') ? $this->purchaseOrder : null;
         $poDeliveriesCount = $po && isset($po->deliveries_count) ? (int) $po->deliveries_count : null;
         $poStatus = $po ? (string) ($po->status ?? '') : '';
 
         $isSingleDelivery = $scheduleType !== 'STAGGERED_BATCH'
             && $batch === 1
+            && ($explicitTotal === null || $explicitTotal <= 1)
             && ($poDeliveriesCount === null || $poDeliveriesCount <= 1)
             && $poStatus !== 'PARTIALLY_DELIVERED';
 
@@ -74,19 +76,26 @@ class Delivery extends Model
             return 'Single Delivery';
         }
 
-        $actualTotal = ($poDeliveriesCount !== null && $poDeliveriesCount > 1 && in_array($poStatus, ['COMPLETED', 'CLOSED'], true))
-            ? $poDeliveriesCount
-            : null;
+        if ($poDeliveriesCount !== null && $poDeliveriesCount > 1 && in_array($poStatus, ['COMPLETED', 'CLOSED'], true)) {
+            $displayTotal = $poDeliveriesCount;
+        } elseif ($explicitTotal !== null && $explicitTotal > 1) {
+            // Preserve declared total batches while expanding gracefully if follow-ups exceed the initial estimate.
+            $displayTotal = max($explicitTotal, $poDeliveriesCount ?? 0, $batch);
+        } else {
+            $displayTotal = null;
+        }
 
-        if ($actualTotal !== null) {
-            $label = sprintf('Batch #%d of %d', $batch, $actualTotal);
+        if ($displayTotal !== null) {
+            $label = sprintf('Batch #%d of %d', $batch, $displayTotal);
         } else {
             $label = sprintf('Batch #%d', $batch);
         }
 
         $maxBatch = $po && isset($po->max_batch_number) ? (int) $po->max_batch_number : null;
-        $isActuallyFinal = in_array($poStatus, ['COMPLETED', 'CLOSED'], true)
-            && ($maxBatch !== null ? $batch === $maxBatch : (bool) $this->is_final_batch);
+        $isPoCompleted = in_array($poStatus, ['COMPLETED', 'CLOSED'], true);
+        $isActuallyFinal = ($isPoCompleted && $maxBatch !== null)
+            ? ($batch === $maxBatch)
+            : (bool) $this->is_final_batch;
 
         if ($isActuallyFinal) {
             $label .= ' (Final)';

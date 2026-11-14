@@ -310,6 +310,174 @@ class MultiBatchDeliveryTrackingTest extends TestCase
         );
     }
 
+    public function test_standard_single_delivery_uses_single_delivery_label(): void
+    {
+        $deliveryService = app(DeliveryService::class);
+
+        $delivery = $deliveryService->create($this->gsoOfficer, [
+            'purchase_order_id' => $this->purchaseOrder->purchase_order_id,
+            'supplier_id' => $this->supplier->supplier_id,
+            'actual_delivery_date' => now()->toDateString(),
+            'remarks' => 'Standard one-time full order delivery',
+        ]);
+
+        $delivery->load(['purchaseOrder' => fn ($q) => $q->withCount('deliveries')->withMax('deliveries as max_batch_number', 'batch_number')]);
+
+        $this->assertSame('SINGLE_DELIVERY', $delivery->delivery_schedule_type);
+        $this->assertSame(1, $delivery->batch_number);
+        $this->assertSame('Single Delivery', $delivery->batch_label);
+    }
+
+    public function test_three_batch_follow_up_chain_auto_codes_links_and_updates_final_label(): void
+    {
+        $deliveryService = app(DeliveryService::class);
+        $verificationService = app(DeliveryVerificationService::class);
+
+        // Batch 1 (40 of 100 units)
+        $batch1 = $deliveryService->create($this->gsoOfficer, [
+            'purchase_order_id' => $this->purchaseOrder->purchase_order_id,
+            'supplier_id' => $this->supplier->supplier_id,
+            'batch_number' => 1,
+            'delivery_schedule_type' => 'STAGGERED_BATCH',
+            'is_final_batch' => false,
+            'actual_delivery_date' => now()->subDays(3)->toDateString(),
+            'items' => [
+                [
+                    'purchase_order_item_id' => $this->purchaseOrderItem->purchase_order_item_id,
+                    'expected_quantity' => 40,
+                ],
+            ],
+        ]);
+        $batch1Item = $batch1->items()->first();
+        $deliveryService->updateReceipt($batch1, $this->gsoOfficer, [
+            'actual_delivery_date' => now()->subDays(3)->toDateString(),
+            'items' => [
+                [
+                    'delivery_item_id' => $batch1Item->delivery_item_id,
+                    'received_quantity' => 40,
+                    'damaged_quantity' => 0,
+                ],
+            ],
+        ]);
+        $batch1 = $deliveryService->markReceived($batch1, $this->gsoOfficer);
+        $verificationService->create($batch1, $this->gsoOfficer, [
+            'verification_status' => 'APPROVED',
+            'verification_date' => now()->subDays(3)->toDateString(),
+            'inspection_notes' => 'Batch 1 accepted',
+        ]);
+
+        // Batch 2 arrives with partial intake (30 of remaining 60) -> should get parent-linked -B2 code and remain non-final
+        $batch2 = $deliveryService->create($this->gsoOfficer, [
+            'purchase_order_id' => $this->purchaseOrder->purchase_order_id,
+            'supplier_id' => $this->supplier->supplier_id,
+            'actual_delivery_date' => now()->subDays(1)->toDateString(),
+        ]);
+
+        $this->assertSame($batch1->delivery_code.'-B2', $batch2->delivery_code);
+        $this->assertSame(2, $batch2->batch_number);
+
+        $batch2Item = $batch2->items()->first();
+        $this->assertEquals(60.0, (float) $batch2Item->expected_quantity);
+
+        $batch2 = $deliveryService->updateReceipt($batch2, $this->gsoOfficer, [
+            'actual_delivery_date' => now()->subDays(1)->toDateString(),
+            'items' => [
+                [
+                    'delivery_item_id' => $batch2Item->delivery_item_id,
+                    'expected_quantity' => 30,
+                    'received_quantity' => 30,
+                    'damaged_quantity' => 0,
+                ],
+            ],
+        ]);
+        $this->assertFalse($batch2->is_final_batch);
+
+        $batch2 = $deliveryService->markReceived($batch2, $this->gsoOfficer);
+        $verificationService->create($batch2, $this->gsoOfficer, [
+            'verification_status' => 'APPROVED',
+            'verification_date' => now()->subDays(1)->toDateString(),
+            'inspection_notes' => 'Batch 2 accepted (30 units)',
+        ]);
+        $this->assertSame('PARTIALLY_DELIVERED', (string) $this->purchaseOrder->fresh()->status);
+
+        // Batch 3 completes the remaining 30 units -> gets -B3 code and transitions PO to COMPLETED
+        $batch3 = $deliveryService->create($this->gsoOfficer, [
+            'purchase_order_id' => $this->purchaseOrder->purchase_order_id,
+            'supplier_id' => $this->supplier->supplier_id,
+            'actual_delivery_date' => now()->toDateString(),
+        ]);
+
+        $this->assertSame($batch1->delivery_code.'-B3', $batch3->delivery_code);
+        $this->assertSame(3, $batch3->batch_number);
+
+        $batch3Item = $batch3->items()->first();
+        $this->assertEquals(30.0, (float) $batch3Item->expected_quantity);
+
+        $batch3 = $deliveryService->updateReceipt($batch3, $this->gsoOfficer, [
+            'actual_delivery_date' => now()->toDateString(),
+            'items' => [
+                [
+                    'delivery_item_id' => $batch3Item->delivery_item_id,
+                    'received_quantity' => 30,
+                    'damaged_quantity' => 0,
+                ],
+            ],
+        ]);
+        $this->assertTrue($batch3->is_final_batch);
+
+        $batch3 = $deliveryService->markReceived($batch3, $this->gsoOfficer);
+        $verificationService->create($batch3, $this->gsoOfficer, [
+            'verification_status' => 'APPROVED',
+            'verification_date' => now()->toDateString(),
+            'inspection_notes' => 'Batch 3 accepted (final 30 units)',
+        ]);
+
+        $this->assertSame('COMPLETED', (string) $this->purchaseOrder->fresh()->status);
+
+        $indexResponse = $this->actingAs($this->gsoOfficer)->get(route('inventory.deliveries.index', ['schedule' => 'STAGGERED']));
+        $indexResponse->assertOk();
+        $indexResponse->assertInertia(function ($page): void {
+            $page->component('Inventory/Delivery/Index')
+                ->has('deliveries.data', 3);
+
+            $rows = collect($page->toArray()['props']['deliveries']['data'])->keyBy('batch_number');
+            $this->assertSame('Batch #1 of 3', $rows[1]['batch_label']);
+            $this->assertSame('Batch #2 of 3', $rows[2]['batch_label']);
+            $this->assertSame('Batch #3 of 3 (Final)', $rows[3]['batch_label']);
+            $this->assertSame(3, $rows[3]['purchase_order']['deliveries_count']);
+            $this->assertSame(3, $rows[3]['purchase_order']['max_batch_number']);
+        });
+
+        $singleFilterResponse = $this->actingAs($this->gsoOfficer)->get(route('inventory.deliveries.index', ['schedule' => 'SINGLE']));
+        $singleFilterResponse->assertOk();
+        $singleFilterResponse->assertInertia(fn ($page) => $page
+            ->component('Inventory/Delivery/Index')
+            ->has('deliveries.data', 0)
+        );
+    }
+
+    public function test_duplicate_batch_number_for_same_purchase_order_is_rejected(): void
+    {
+        $deliveryService = app(DeliveryService::class);
+        $deliveryService->create($this->gsoOfficer, [
+            'purchase_order_id' => $this->purchaseOrder->purchase_order_id,
+            'supplier_id' => $this->supplier->supplier_id,
+            'batch_number' => 1,
+            'delivery_schedule_type' => 'STAGGERED_BATCH',
+            'actual_delivery_date' => now()->toDateString(),
+        ]);
+
+        $response = $this->actingAs($this->gsoOfficer)->post(route('inventory.deliveries.store'), [
+            'purchase_order_id' => $this->purchaseOrder->purchase_order_id,
+            'supplier_id' => $this->supplier->supplier_id,
+            'batch_number' => 1,
+            'delivery_schedule_type' => 'STAGGERED_BATCH',
+            'actual_delivery_date' => now()->toDateString(),
+        ]);
+
+        $response->assertSessionHasErrors(['batch_number']);
+    }
+
     private function createOffice(): Office
     {
         return Office::query()->create([
