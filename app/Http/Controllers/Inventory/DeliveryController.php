@@ -30,6 +30,7 @@ class DeliveryController
         abort_unless(request()->user()->can('delivery.view-any'), 403);
 
         $status = strtoupper(trim((string) $request->input('status', '')));
+        $schedule = strtoupper(trim((string) $request->input('schedule', '')));
         $year = trim((string) $request->input('year', ''));
         $month = trim((string) $request->input('month', ''));
         $search = trim((string) $request->input('search', ''));
@@ -43,8 +44,35 @@ class DeliveryController
             ->values();
 
         $deliveries = Delivery::query()
-            ->with(['purchaseOrder', 'supplier', 'receiver'])
+            ->with([
+                'purchaseOrder' => function ($query): void {
+                    $query->withCount('deliveries')
+                        ->withMax('deliveries as max_batch_number', 'batch_number');
+                },
+                'supplier',
+                'receiver',
+            ])
             ->when($status !== '', fn ($query) => $query->where('receipt_status', $status))
+            ->when($schedule === 'SINGLE', function ($query): void {
+                $query->where('delivery_schedule_type', '!=', 'STAGGERED_BATCH')
+                    ->where(function ($sub): void {
+                        $sub->whereNull('batch_number')->orWhere('batch_number', '<=', 1);
+                    })
+                    ->whereHas('purchaseOrder', function ($po): void {
+                        $po->where('status', '!=', 'PARTIALLY_DELIVERED')
+                            ->has('deliveries', '<=', 1);
+                    });
+            })
+            ->when($schedule === 'STAGGERED', function ($query): void {
+                $query->where(function ($sub): void {
+                    $sub->where('delivery_schedule_type', 'STAGGERED_BATCH')
+                        ->orWhere('batch_number', '>', 1)
+                        ->orWhereHas('purchaseOrder', function ($po): void {
+                            $po->where('status', 'PARTIALLY_DELIVERED')
+                                ->orHas('deliveries', '>', 1);
+                        });
+                });
+            })
             ->when(preg_match('/^\d{4}$/', $year) === 1, fn ($query) => $query->whereYear('created_at', (int) $year))
             ->when(preg_match('/^\d{1,2}$/', $month) === 1, fn ($query) => $query->whereMonth('created_at', (int) $month))
             ->when($search !== '', function ($query) use ($search): void {
@@ -62,6 +90,7 @@ class DeliveryController
             'deliveries' => $deliveries,
             'filters' => [
                 'status' => $status,
+                'schedule' => $schedule,
                 'year' => $year,
                 'month' => $month,
                 'search' => $search,
@@ -107,7 +136,16 @@ class DeliveryController
     {
         abort_unless(request()->user()->can('delivery.view', $delivery), 403);
 
-        $delivery->load(['purchaseOrder', 'supplier', 'receiver', 'items.purchaseOrderItem.item', 'verifications.verifier']);
+        $delivery->load([
+            'purchaseOrder' => function ($query): void {
+                $query->withCount('deliveries')
+                    ->withMax('deliveries as max_batch_number', 'batch_number');
+            },
+            'supplier',
+            'receiver',
+            'items.purchaseOrderItem.item',
+            'verifications.verifier',
+        ]);
 
         $deliveryMovementsByItemId = InventoryMovement::query()
             ->with('inventory:inventory_id,item_id')
@@ -191,23 +229,31 @@ class DeliveryController
                 'is_final_batch' => (bool) $delivery->is_final_batch,
                 'batch_label' => (string) ($delivery->batch_label ?? sprintf('Batch #%d', (int) ($delivery->batch_number ?? 1))),
                 'sibling_deliveries' => $delivery->purchaseOrder?->deliveries()
-                    ->select(['delivery_id', 'delivery_code', 'batch_number', 'total_batches', 'receipt_status', 'created_at', 'delivery_schedule_type', 'is_final_batch'])
+                    ->select(['delivery_id', 'purchase_order_id', 'delivery_code', 'batch_number', 'total_batches', 'receipt_status', 'created_at', 'delivery_schedule_type', 'is_final_batch'])
                     ->orderBy('batch_number')
                     ->get()
-                    ->map(fn ($del): array => [
-                        'delivery_id' => (int) $del->delivery_id,
-                        'delivery_code' => (string) $del->delivery_code,
-                        'batch_number' => (int) ($del->batch_number ?? 1),
-                        'total_batches' => $del->total_batches ? (int) $del->total_batches : null,
-                        'receipt_status' => (string) $del->receipt_status,
-                        'batch_label' => (string) $del->batch_label,
-                        'is_current' => (int) $del->delivery_id === (int) $delivery->delivery_id,
-                    ]),
+                    ->map(function ($del) use ($delivery): array {
+                        if ($delivery->purchaseOrder) {
+                            $del->setRelation('purchaseOrder', $delivery->purchaseOrder);
+                        }
+
+                        return [
+                            'delivery_id' => (int) $del->delivery_id,
+                            'delivery_code' => (string) $del->delivery_code,
+                            'batch_number' => (int) ($del->batch_number ?? 1),
+                            'total_batches' => $del->total_batches ? (int) $del->total_batches : null,
+                            'receipt_status' => (string) $del->receipt_status,
+                            'batch_label' => (string) $del->batch_label,
+                            'is_current' => (int) $del->delivery_id === (int) $delivery->delivery_id,
+                        ];
+                    }),
                 'created_at' => optional($delivery->created_at)?->toIso8601String(),
                 'purchase_order' => $delivery->purchaseOrder ? [
                     'purchase_order_id' => (int) $delivery->purchaseOrder->purchase_order_id,
                     'po_number' => (string) ($delivery->purchaseOrder->po_number ?? ''),
                     'status' => (string) ($delivery->purchaseOrder->status ?? ''),
+                    'deliveries_count' => (int) ($delivery->purchaseOrder->deliveries_count ?? 1),
+                    'max_batch_number' => (int) ($delivery->purchaseOrder->max_batch_number ?? 1),
                 ] : null,
                 'supplier' => $delivery->supplier ? [
                     'supplier_name' => (string) ($delivery->supplier->supplier_name ?? ''),

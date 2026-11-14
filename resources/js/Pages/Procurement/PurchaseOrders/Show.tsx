@@ -752,15 +752,22 @@ export default function PurchaseOrdersShow({
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100">
-                                                {deliveries.map((del) => (
+                                                {deliveries.map((del) => {
+                                                    const isSingleDel = del.batch_label === 'Single Delivery'
+                                                        || (del.delivery_schedule_type !== 'STAGGERED_BATCH' && deliveries.length <= 1);
+                                                    return (
                                                     <tr key={del.delivery_id} className="hover:bg-slate-50/60">
                                                         <td className="px-3 py-2 font-semibold text-slate-900">
-                                                            <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-2 py-0.5 text-indigo-700 border border-indigo-200">
-                                                                {del.batch_label || `Batch #${del.batch_number ?? 1}`}
-                                                                {del.is_final_batch && (
-                                                                    <span className="text-[10px] text-indigo-500 font-normal">(Final)</span>
-                                                                )}
-                                                            </span>
+                                                            {isSingleDel ? (
+                                                                <span className="inline-flex items-center rounded bg-slate-100 px-2 py-0.5 text-slate-700 border border-slate-200 font-medium">
+                                                                    Single Delivery
+                                                                </span>
+                                                            ) : (
+                                                                <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-2 py-0.5 text-indigo-700 border border-indigo-200">
+                                                                    <span>📦</span>
+                                                                    <span>{del.batch_label || `Batch #${del.batch_number ?? 1}`}</span>
+                                                                </span>
+                                                            )}
                                                         </td>
                                                         <td className="px-3 py-2 font-mono font-medium text-slate-700">{del.delivery_code}</td>
                                                         <td className="px-3 py-2 text-slate-600">
@@ -793,7 +800,8 @@ export default function PurchaseOrdersShow({
                                                             </Link>
                                                         </td>
                                                     </tr>
-                                                ))}
+                                                    );
+                                                })}
                                             </tbody>
                                         </table>
                                     </div>

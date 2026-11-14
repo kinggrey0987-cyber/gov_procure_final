@@ -109,6 +109,8 @@ type Delivery = {
         purchase_order_id: number;
         po_number?: string;
         status?: string;
+        deliveries_count?: number;
+        max_batch_number?: number;
     };
     supplier?: {
         supplier_name?: string;
@@ -175,6 +177,13 @@ export default function DeliveryShow({ delivery }: Props) {
     };
 
     const isAuditReady = delivery.audit_status?.is_audit_ready ?? false;
+    const poStatus = delivery.purchase_order?.status ?? '';
+    const poDeliveriesCount = Number(delivery.purchase_order?.deliveries_count ?? delivery.sibling_deliveries?.length ?? 1);
+    const maxBatch = Number(delivery.purchase_order?.max_batch_number ?? delivery.batch_number ?? 1);
+    const isPoCompleted = ['COMPLETED', 'CLOSED'].includes(poStatus);
+    const isPoPartial = poStatus === 'PARTIALLY_DELIVERED';
+    const isSingleDelivery = delivery.batch_label === 'Single Delivery'
+        || (delivery.delivery_schedule_type !== 'STAGGERED_BATCH' && Number(delivery.batch_number ?? 1) <= 1 && poDeliveriesCount <= 1 && !isPoPartial);
 
     return (
         <AuthenticatedLayout
@@ -184,13 +193,19 @@ export default function DeliveryShow({ delivery }: Props) {
                         <div>
                             <div className="flex items-center gap-2">
                                 <h2 className="text-xl font-semibold leading-tight text-gray-800">Delivery {delivery.delivery_code}</h2>
-                                <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-bold text-indigo-800 border border-indigo-200">
-                                    {delivery.batch_label || `Batch #${delivery.batch_number ?? 1}`}
-                                    {delivery.is_final_batch && <span className="text-[10px] text-indigo-600 font-normal">(Final)</span>}
-                                </span>
+                                {isSingleDelivery ? (
+                                    <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 border border-slate-200">
+                                        Single Delivery
+                                    </span>
+                                ) : (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-bold text-indigo-800 border border-indigo-200">
+                                        <span>📦</span>
+                                        <span>{delivery.batch_label || `Batch #${delivery.batch_number ?? 1}`}</span>
+                                    </span>
+                                )}
                             </div>
                             <p className="mt-0.5 text-xs text-slate-500">
-                                Recorded Intake & Verification Details • {delivery.delivery_schedule_type === 'STAGGERED_BATCH' ? 'Staggered Batch Delivery Schedule' : 'Single Delivery Schedule'}
+                                Recorded Intake & Verification Details • {isSingleDelivery ? 'Single Delivery Schedule' : 'Staggered Batch Delivery Schedule'}
                             </p>
                         </div>
                         <div className="flex flex-wrap gap-2">
@@ -249,8 +264,8 @@ export default function DeliveryShow({ delivery }: Props) {
                     </div>
                 ) : null}
 
-                {/* Multi-Delivery Stage Alert Banner for Verified Staggered Deliveries */}
-                {delivery.receipt_status === 'VERIFIED' && (delivery.delivery_schedule_type === 'STAGGERED_BATCH' || delivery.purchase_order?.status === 'PARTIALLY_DELIVERED' || (!delivery.is_final_batch && (delivery.total_batches ? delivery.total_batches > 1 : false))) && (
+                {/* Multi-Delivery Stage Alert Banner for Verified Ongoing Staggered Deliveries */}
+                {delivery.receipt_status === 'VERIFIED' && isPoPartial && (
                     <div className="rounded-xl border border-indigo-200 bg-gradient-to-r from-indigo-50 via-purple-50 to-blue-50 p-4 shadow-sm">
                         <div className="flex flex-wrap items-center justify-between gap-4">
                             <div className="flex items-start gap-3">
@@ -266,11 +281,11 @@ export default function DeliveryShow({ delivery }: Props) {
                                             ✓ Batch Intake Verified & Synced to Inventory
                                         </span>
                                         <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-800 border border-amber-300">
-                                            PO In Multiple Delivery Stage
+                                            ⏳ Awaiting Batch #{maxBatch + 1}
                                         </span>
                                     </div>
                                     <p className="mt-1 text-xs text-indigo-800">
-                                        This delivery batch has been verified and items are recorded in inventory stocks. Purchase Order <strong>{delivery.purchase_order?.po_number}</strong> is in an ongoing staggered delivery schedule. Remaining items await subsequent delivery batches.
+                                        This delivery batch has been verified and items are recorded in inventory stocks. Purchase Order <strong>{delivery.purchase_order?.po_number}</strong> is in an ongoing staggered delivery schedule. Remaining items await Batch #{maxBatch + 1}.
                                     </p>
                                 </div>
                             </div>
@@ -279,7 +294,7 @@ export default function DeliveryShow({ delivery }: Props) {
                                     href={route('inventory.deliveries.create', { po_id: delivery.purchase_order.purchase_order_id })}
                                     className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition shrink-0"
                                 >
-                                    <span>+ Log Next Delivery Batch</span>
+                                    <span>+ Log Batch #{maxBatch + 1}</span>
                                 </Link>
                             )}
                         </div>
@@ -314,19 +329,25 @@ export default function DeliveryShow({ delivery }: Props) {
                         <section className="overflow-hidden rounded-xl border border-indigo-200 bg-white shadow-sm">
                             <div className="flex flex-wrap items-center justify-between border-b border-indigo-100 bg-indigo-50/70 px-6 py-3.5 gap-3">
                                 <div>
-                                    <p className="text-[11px] font-bold uppercase tracking-wider text-indigo-700">Delivery Schedule & Staggered Batches</p>
+                                    <p className="text-[11px] font-bold uppercase tracking-wider text-indigo-700">Delivery Schedule & Batch Allocation</p>
                                     <h3 className="text-sm font-extrabold text-indigo-950 flex items-center gap-2">
                                         <span>📦</span>
-                                        Purchase Order Batch Allocation • {delivery.purchase_order?.po_number ?? 'PO'}
+                                        Purchase Order Delivery Summary • {delivery.purchase_order?.po_number ?? 'PO'}
                                     </h3>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-3 py-1 text-xs font-bold text-indigo-800 border border-indigo-300">
-                                        {delivery.batch_label || `Batch #${delivery.batch_number ?? 1}`}
-                                    </span>
-                                    {delivery.is_final_batch && (
+                                    {isSingleDelivery ? (
+                                        <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 border border-slate-300">
+                                            Single Delivery
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-3 py-1 text-xs font-bold text-indigo-800 border border-indigo-300">
+                                            {delivery.batch_label || `Batch #${delivery.batch_number ?? 1}`}
+                                        </span>
+                                    )}
+                                    {!isSingleDelivery && isPoCompleted && (
                                         <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800 border border-emerald-300">
-                                            ✓ Final Batch
+                                            ✓ All Batches Completed
                                         </span>
                                     )}
                                 </div>
@@ -334,15 +355,17 @@ export default function DeliveryShow({ delivery }: Props) {
                             <div className="p-5">
                                 <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4 mb-2">
                                     <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
-                                        <p className="text-[11px] font-semibold text-slate-500">Current Intake Batch</p>
+                                        <p className="text-[11px] font-semibold text-slate-500">Current Intake Type</p>
                                         <p className="text-sm font-bold text-slate-900 mt-0.5">
-                                            Batch #{delivery.batch_number ?? 1} {delivery.total_batches ? `of ${delivery.total_batches}` : ''}
+                                            {isSingleDelivery
+                                                ? 'Single Delivery'
+                                                : `Batch #${delivery.batch_number ?? 1}${isPoCompleted && poDeliveriesCount > 1 ? ` of ${poDeliveriesCount}` : ''}`}
                                         </p>
                                     </div>
                                     <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
                                         <p className="text-[11px] font-semibold text-slate-500">Delivery Schedule Type</p>
                                         <p className="text-sm font-bold text-slate-900 mt-0.5">
-                                            {delivery.delivery_schedule_type === 'STAGGERED_BATCH' ? 'Staggered Batches' : 'Single Delivery'}
+                                            {isSingleDelivery ? 'Single Delivery' : 'Staggered Batches'}
                                         </p>
                                     </div>
                                     <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">

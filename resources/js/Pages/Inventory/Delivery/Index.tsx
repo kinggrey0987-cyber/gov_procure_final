@@ -20,6 +20,8 @@ type DeliveryRow = {
         purchase_order_id?: number;
         po_number?: string;
         status?: string;
+        deliveries_count?: number;
+        max_batch_number?: number;
     };
     supplier?: {
         supplier_name?: string;
@@ -42,6 +44,7 @@ type Props = {
     };
     filters?: {
         status?: string;
+        schedule?: string;
         year?: string;
         month?: string;
         search?: string;
@@ -53,6 +56,7 @@ type Props = {
 
 export default function DeliveryIndex({ deliveries, filters, filter_options }: Props) {
     const [status, setStatus] = useState(filters?.status ?? '');
+    const [schedule, setSchedule] = useState(filters?.schedule ?? '');
     const [year, setYear] = useState(filters?.year ?? '');
     const [month, setMonth] = useState(filters?.month ?? '');
     const [search, setSearch] = useState(filters?.search ?? '');
@@ -61,19 +65,21 @@ export default function DeliveryIndex({ deliveries, filters, filter_options }: P
 
     useEffect(() => {
         setStatus(filters?.status ?? '');
+        setSchedule(filters?.schedule ?? '');
         setYear(filters?.year ?? '');
         setMonth(filters?.month ?? '');
         setSearch(filters?.search ?? '');
-    }, [filters?.month, filters?.search, filters?.status, filters?.year]);
+    }, [filters?.month, filters?.schedule, filters?.search, filters?.status, filters?.year]);
 
     const activeFilters = useMemo(
         () => ({
             status,
+            schedule,
             year,
             month,
             search: debouncedSearch,
         }),
-        [status, year, month, debouncedSearch],
+        [status, schedule, year, month, debouncedSearch],
     );
 
     useEffect(() => {
@@ -128,6 +134,15 @@ export default function DeliveryIndex({ deliveries, filters, filter_options }: P
                         </select>
                         <select
                             className="h-8 rounded-lg border border-slate-300 pl-2.5 pr-8 text-xs text-slate-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                            value={schedule}
+                            onChange={(event) => setSchedule(event.target.value)}
+                        >
+                            <option value="">All delivery types</option>
+                            <option value="SINGLE">Single Delivery</option>
+                            <option value="STAGGERED">Staggered / Multi-Batch</option>
+                        </select>
+                        <select
+                            className="h-8 rounded-lg border border-slate-300 pl-2.5 pr-8 text-xs text-slate-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
                             value={year}
                             onChange={(event) => setYear(event.target.value)}
                         >
@@ -167,6 +182,7 @@ export default function DeliveryIndex({ deliveries, filters, filter_options }: P
                             onClick={() => {
                                 setSearch('');
                                 setStatus('');
+                                setSchedule('');
                                 setYear('');
                                 setMonth('');
                             }}
@@ -184,7 +200,7 @@ export default function DeliveryIndex({ deliveries, filters, filter_options }: P
                                 <tr>
                                     <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Code</th>
                                     <th className="px-3.5 py-2 text-left font-semibold text-slate-700">PO</th>
-                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Batch</th>
+                                    <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Delivery Type / Batch</th>
                                     <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Supplier</th>
                                     <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Receipt Status</th>
                                     <th className="px-3.5 py-2 text-left font-semibold text-slate-700">Received By</th>
@@ -194,40 +210,58 @@ export default function DeliveryIndex({ deliveries, filters, filter_options }: P
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {deliveries.data.map((delivery) => {
-                                    const isMultiDelivery = delivery.delivery_schedule_type === 'STAGGERED_BATCH'
-                                        || delivery.purchase_order?.status === 'PARTIALLY_DELIVERED'
-                                        || (!delivery.is_final_batch && (delivery.total_batches ? delivery.total_batches > 1 : false));
+                                    const batchNumber = Number(delivery.batch_number ?? 1);
+                                    const poStatus = delivery.purchase_order?.status ?? '';
+                                    const poCount = Number(delivery.purchase_order?.deliveries_count ?? 1);
+                                    const maxBatch = Number(delivery.purchase_order?.max_batch_number ?? batchNumber);
+                                    const isPoCompleted = ['COMPLETED', 'CLOSED'].includes(poStatus);
+                                    const isPoPartial = poStatus === 'PARTIALLY_DELIVERED';
+                                    const isSingleDelivery = delivery.batch_label === 'Single Delivery'
+                                        || (delivery.delivery_schedule_type !== 'STAGGERED_BATCH' && batchNumber <= 1 && poCount <= 1 && !isPoPartial);
+                                    const isLatestBatchForPo = batchNumber >= maxBatch;
+                                    const needsFollowUp = !isSingleDelivery && isPoPartial && isLatestBatchForPo;
+                                    const hasLaterBatches = !isSingleDelivery && isPoPartial && !isLatestBatchForPo;
+                                    const nextBatchNum = maxBatch + 1;
 
                                     return (
                                         <tr key={delivery.delivery_id} className="hover:bg-slate-50/60">
                                             <td className="px-3.5 py-2 font-mono text-[11px] font-semibold text-slate-700">{delivery.delivery_code}</td>
                                             <td className="px-3.5 py-2">
                                                 <span className="font-medium text-slate-800">{delivery.purchase_order?.po_number ?? '-'}</span>
-                                                {delivery.purchase_order?.status === 'PARTIALLY_DELIVERED' && (
+                                                {isPoPartial && (
                                                     <span className="block text-[10px] font-semibold text-amber-700">
                                                         Partially Fulfilled
                                                     </span>
                                                 )}
-                                                {delivery.purchase_order?.status === 'COMPLETED' && (
+                                                {isPoCompleted && (
                                                     <span className="block text-[10px] font-semibold text-emerald-700">
                                                         Fully Fulfilled
                                                     </span>
                                                 )}
                                             </td>
                                             <td className="px-3.5 py-2">
-                                                <div className="flex flex-col items-start gap-0.5">
-                                                    <span className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 border border-indigo-200">
-                                                        {delivery.batch_label || `Batch #${delivery.batch_number ?? 1}`}
-                                                        {delivery.is_final_batch && (
-                                                            <span className="text-[10px] font-normal text-indigo-500">(Final)</span>
-                                                        )}
+                                                {isSingleDelivery ? (
+                                                    <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 border border-slate-200">
+                                                        Single Delivery
                                                     </span>
-                                                    {delivery.delivery_schedule_type === 'STAGGERED_BATCH' && (
-                                                        <span className="text-[10px] font-medium text-amber-700">
-                                                            Staggered Stage
+                                                ) : (
+                                                    <div className="flex flex-col items-start gap-1">
+                                                        <span className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 border border-indigo-200">
+                                                            <span>📦</span>
+                                                            <span>{delivery.batch_label || `Batch #${batchNumber}`}</span>
                                                         </span>
-                                                    )}
-                                                </div>
+                                                        {needsFollowUp && (
+                                                            <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-800 border border-amber-200">
+                                                                ⏳ Follow-up Batch #{nextBatchNum} Pending
+                                                            </span>
+                                                        )}
+                                                        {hasLaterBatches && (
+                                                            <span className="text-[10px] font-medium text-slate-500">
+                                                                ↳ Continued in Batch #{batchNumber + 1}{maxBatch > batchNumber + 1 ? `–#${maxBatch}` : ''}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </td>
                                             <td className="px-3.5 py-2 text-slate-700">{delivery.supplier?.supplier_name ?? '-'}</td>
                                             <td className="px-3.5 py-2">
@@ -235,9 +269,14 @@ export default function DeliveryIndex({ deliveries, filters, filter_options }: P
                                                     <span className={statusClass(delivery.receipt_status)}>
                                                         {delivery.receipt_status === 'VERIFIED' ? '✓ Verified' : humanizeEnum(delivery.receipt_status)}
                                                     </span>
-                                                    {delivery.receipt_status === 'VERIFIED' && isMultiDelivery && (
+                                                    {delivery.receipt_status === 'VERIFIED' && needsFollowUp && (
                                                         <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-800 border border-amber-200">
-                                                            <span>📦 Multi-Delivery Stage</span>
+                                                            <span>📦 PO Partial (Awaiting Batch #{nextBatchNum})</span>
+                                                        </span>
+                                                    )}
+                                                    {delivery.receipt_status === 'VERIFIED' && !isSingleDelivery && isPoCompleted && (
+                                                        <span className="text-[10px] font-semibold text-emerald-700">
+                                                            ✓ All Batches Completed
                                                         </span>
                                                     )}
                                                 </div>
@@ -259,13 +298,13 @@ export default function DeliveryIndex({ deliveries, filters, filter_options }: P
                                                             Verify
                                                         </Link>
                                                     )}
-                                                    {delivery.receipt_status === 'VERIFIED' && delivery.purchase_order?.purchase_order_id && delivery.purchase_order?.status === 'PARTIALLY_DELIVERED' && (
+                                                    {delivery.receipt_status === 'VERIFIED' && delivery.purchase_order?.purchase_order_id && needsFollowUp && (
                                                         <Link
                                                             href={route('inventory.deliveries.create', { po_id: delivery.purchase_order.purchase_order_id })}
                                                             className="font-semibold text-indigo-600 hover:text-indigo-800"
-                                                            title="Log next batch delivery"
+                                                            title={`Log Batch #${nextBatchNum} delivery`}
                                                         >
-                                                            + Next Batch
+                                                            + Batch #{nextBatchNum}
                                                         </Link>
                                                     )}
                                                     <Link href={route('inventory.deliveries.show', delivery.delivery_id)} className="font-semibold text-red-600 hover:text-red-800">

@@ -60,15 +60,35 @@ class Delivery extends Model
     public function getBatchLabelAttribute(): string
     {
         $batch = (int) ($this->batch_number ?: 1);
-        $total = $this->total_batches ? (int) $this->total_batches : null;
+        $scheduleType = (string) ($this->delivery_schedule_type ?? 'SINGLE_DELIVERY');
+        $po = $this->relationLoaded('purchaseOrder') ? $this->purchaseOrder : null;
+        $poDeliveriesCount = $po && isset($po->deliveries_count) ? (int) $po->deliveries_count : null;
+        $poStatus = $po ? (string) ($po->status ?? '') : '';
 
-        if ($total && $total > 1) {
-            $label = sprintf('Batch #%d of %d', $batch, $total);
+        $isSingleDelivery = $scheduleType !== 'STAGGERED_BATCH'
+            && $batch === 1
+            && ($poDeliveriesCount === null || $poDeliveriesCount <= 1)
+            && $poStatus !== 'PARTIALLY_DELIVERED';
+
+        if ($isSingleDelivery) {
+            return 'Single Delivery';
+        }
+
+        $actualTotal = ($poDeliveriesCount !== null && $poDeliveriesCount > 1 && in_array($poStatus, ['COMPLETED', 'CLOSED'], true))
+            ? $poDeliveriesCount
+            : null;
+
+        if ($actualTotal !== null) {
+            $label = sprintf('Batch #%d of %d', $batch, $actualTotal);
         } else {
             $label = sprintf('Batch #%d', $batch);
         }
 
-        if ($this->is_final_batch) {
+        $maxBatch = $po && isset($po->max_batch_number) ? (int) $po->max_batch_number : null;
+        $isActuallyFinal = in_array($poStatus, ['COMPLETED', 'CLOSED'], true)
+            && ($maxBatch !== null ? $batch === $maxBatch : (bool) $this->is_final_batch);
+
+        if ($isActuallyFinal) {
             $label .= ' (Final)';
         }
 

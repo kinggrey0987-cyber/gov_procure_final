@@ -223,7 +223,16 @@ class DeliveryService
                     }
 
                     $poOrderedQty = (float) ($item->purchaseOrderItem?->quantity_ordered ?? $item->expected_quantity);
-                    if ($expectedQuantity < $poOrderedQty && $missingQuantity === 0) {
+                    $priorReceivedQty = (float) DeliveryItem::query()
+                        ->where('purchase_order_item_id', (int) $item->purchase_order_item_id)
+                        ->whereHas('delivery', function ($q) use ($delivery): void {
+                            $q->where('purchase_order_id', (int) $delivery->purchase_order_id)
+                                ->where('delivery_id', '!=', (int) $delivery->delivery_id)
+                                ->whereNotIn('receipt_status', ['CANCELLED']);
+                        })
+                        ->sum('received_quantity');
+
+                    if (($priorReceivedQty + $expectedQuantity) < $poOrderedQty && $missingQuantity === 0) {
                         $hasDeferredRemaining = true;
                     }
 
@@ -259,9 +268,18 @@ class DeliveryService
                 'remarks' => $payload['remarks'] ?? $delivery->remarks,
             ];
 
-            if ($hasDeferredRemaining && !empty($delivery->is_final_batch)) {
+            if ($hasDeferredRemaining) {
                 $updateData['is_final_batch'] = false;
                 $updateData['delivery_schedule_type'] = 'STAGGERED_BATCH';
+            } elseif (array_key_exists('items', $payload)) {
+                $hasPriorBatches = Delivery::query()
+                    ->where('purchase_order_id', (int) $delivery->purchase_order_id)
+                    ->where('delivery_id', '!=', (int) $delivery->delivery_id)
+                    ->exists();
+                if ($hasPriorBatches) {
+                    $updateData['is_final_batch'] = true;
+                    $updateData['delivery_schedule_type'] = 'STAGGERED_BATCH';
+                }
             }
 
             $delivery->fill($updateData)->save();
