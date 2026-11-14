@@ -478,6 +478,39 @@ class MultiBatchDeliveryTrackingTest extends TestCase
         $response->assertSessionHasErrors(['batch_number']);
     }
 
+    public function test_create_screen_provides_preview_code_and_follow_up_locks_to_staggered_batch(): void
+    {
+        $deliveryService = app(DeliveryService::class);
+        $first = $deliveryService->create($this->gsoOfficer, [
+            'purchase_order_id' => $this->purchaseOrder->purchase_order_id,
+            'supplier_id' => $this->supplier->supplier_id,
+            'actual_delivery_date' => now()->toDateString(),
+        ]);
+
+        $createResponse = $this->actingAs($this->gsoOfficer)->get(route('inventory.deliveries.create', [
+            'po_id' => $this->purchaseOrder->purchase_order_id,
+        ]));
+        $createResponse->assertOk();
+        $createResponse->assertInertia(fn ($page) => $page
+            ->component('Inventory/Delivery/Create')
+            ->where('initialPurchaseOrderId', $this->purchaseOrder->purchase_order_id)
+            ->where('nextDeliveryCodePreview', fn ($val) => is_string($val) && str_starts_with($val, 'DEL-'))
+        );
+
+        // Even if a request attempts to submit SINGLE_DELIVERY for a second batch on the same PO,
+        // the service locks it to STAGGERED_BATCH and auto-links the parent delivery code.
+        $second = $deliveryService->create($this->gsoOfficer, [
+            'purchase_order_id' => $this->purchaseOrder->purchase_order_id,
+            'supplier_id' => $this->supplier->supplier_id,
+            'delivery_schedule_type' => 'SINGLE_DELIVERY',
+            'actual_delivery_date' => now()->toDateString(),
+        ]);
+
+        $this->assertSame(2, $second->batch_number);
+        $this->assertSame('STAGGERED_BATCH', $second->delivery_schedule_type);
+        $this->assertSame($first->delivery_code.'-B2', $second->delivery_code);
+    }
+
     private function createOffice(): Office
     {
         return Office::query()->create([

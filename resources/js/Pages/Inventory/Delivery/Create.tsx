@@ -52,13 +52,13 @@ type PurchaseOrder = {
 type Props = {
     purchaseOrders: PurchaseOrder[];
     initialPurchaseOrderId?: number | string | null;
+    nextDeliveryCodePreview?: string;
 };
 
 type DeliveryForm = {
     purchase_order_id: string;
     supplier_id: string;
     batch_number: number;
-    total_batches: string;
     delivery_schedule_type: 'SINGLE_DELIVERY' | 'STAGGERED_BATCH';
     is_final_batch: boolean;
     delivery_code: string;
@@ -71,12 +71,11 @@ type DeliveryForm = {
     }>;
 };
 
-export default function DeliveryCreate({ purchaseOrders, initialPurchaseOrderId }: Props) {
+export default function DeliveryCreate({ purchaseOrders, initialPurchaseOrderId, nextDeliveryCodePreview }: Props) {
     const { data, setData, post, processing, errors } = useForm<DeliveryForm>({
         purchase_order_id: '',
         supplier_id: '',
         batch_number: 1,
-        total_batches: '',
         delivery_schedule_type: 'SINGLE_DELIVERY',
         is_final_batch: true,
         delivery_code: '',
@@ -91,18 +90,25 @@ export default function DeliveryCreate({ purchaseOrders, initialPurchaseOrderId 
         ? [selectedPo.supplier]
         : selectedPo?.suppliers ?? [];
 
-    const existingDeliveries = selectedPo?.deliveries ?? [];
+    const existingDeliveries = [...(selectedPo?.deliveries ?? [])].sort(
+        (a, b) => Number(a.batch_number || 1) - Number(b.batch_number || 1),
+    );
     const hasPriorDeliveries = existingDeliveries.length > 0;
     const existingBatchNumbers = existingDeliveries.map((d) => Number(d.batch_number || 1));
     const parentBaseDelivery = existingDeliveries[0];
     const parentBaseCode = (parentBaseDelivery?.delivery_code || '').replace(/-B\d+.*$/i, '');
     const autoSuggestedCode = parentBaseCode ? `${parentBaseCode}-B${data.batch_number}` : '';
+    const displayedDeliveryCode = hasPriorDeliveries
+        ? (autoSuggestedCode || 'Auto-generated from parent')
+        : (nextDeliveryCodePreview || 'Auto-generated on save');
     const isBatchDuplicate = hasPriorDeliveries && existingBatchNumbers.includes(Number(data.batch_number));
 
-    // When PO changes, sync supplier, batch tracking suggestions, and items
+    // When PO changes, sync supplier, auto-sequenced batch tracking, and remaining item balances
     const handlePoChange = (poId: string) => {
         const foundPo = purchaseOrders.find((po) => String(po.purchase_order_id) === poId);
-        const priorBatches = foundPo?.deliveries ?? [];
+        const priorBatches = [...(foundPo?.deliveries ?? [])].sort(
+            (a, b) => Number(a.batch_number || 1) - Number(b.batch_number || 1),
+        );
         const nextBatch = priorBatches.length > 0
             ? Math.max(...priorBatches.map((d) => Number(d.batch_number || 1))) + 1
             : 1;
@@ -132,15 +138,6 @@ export default function DeliveryCreate({ purchaseOrders, initialPurchaseOrderId 
             delivery_schedule_type: isStaggered ? 'STAGGERED_BATCH' : 'SINGLE_DELIVERY',
             is_final_batch: !isStaggered,
             items: defaultItems,
-        }));
-    };
-
-    const handleBatchChange = (newBatchVal: number) => {
-        const validBatch = Math.max(1, newBatchVal);
-        setData((prev) => ({
-            ...prev,
-            batch_number: validBatch,
-            delivery_code: hasPriorDeliveries && parentBaseCode ? `${parentBaseCode}-B${validBatch}` : prev.delivery_code,
         }));
     };
 
@@ -248,20 +245,32 @@ export default function DeliveryCreate({ purchaseOrders, initialPurchaseOrderId 
                                 Delivery Schedule & Batch Configuration
                             </h4>
 
-                            <div className="grid gap-4 sm:grid-cols-3">
+                            <div className="grid gap-4 sm:grid-cols-2">
                                 <div>
-                                    <label className="mb-1 block text-xs font-semibold text-slate-700">Schedule Type</label>
+                                    <div className="flex items-center justify-between mb-1">
+                                        <label className="block text-xs font-semibold text-slate-700">Schedule Type</label>
+                                        {hasPriorDeliveries && (
+                                            <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded">
+                                                Auto-locked
+                                            </span>
+                                        )}
+                                    </div>
                                     <select
-                                        value={data.delivery_schedule_type}
+                                        value={hasPriorDeliveries ? 'STAGGERED_BATCH' : data.delivery_schedule_type}
+                                        disabled={hasPriorDeliveries}
                                         onChange={(e) => {
                                             const type = e.target.value as 'SINGLE_DELIVERY' | 'STAGGERED_BATCH';
                                             setData((prev) => ({
                                                 ...prev,
                                                 delivery_schedule_type: type,
-                                                is_final_batch: type === 'SINGLE_DELIVERY' ? true : prev.is_final_batch,
+                                                is_final_batch: type === 'SINGLE_DELIVERY',
                                             }));
                                         }}
-                                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
+                                        className={`w-full rounded-lg border px-3 py-2 text-xs focus:outline-none ${
+                                            hasPriorDeliveries
+                                                ? 'border-slate-200 bg-slate-100 text-slate-600 cursor-not-allowed'
+                                                : 'border-slate-300 bg-white text-slate-900 focus:border-blue-500'
+                                        }`}
                                     >
                                         <option value="SINGLE_DELIVERY">Single Delivery (Full Order)</option>
                                         <option value="STAGGERED_BATCH">Staggered Batch (Multi-Delivery)</option>
@@ -271,42 +280,18 @@ export default function DeliveryCreate({ purchaseOrders, initialPurchaseOrderId 
                                 <div>
                                     <div className="flex items-center justify-between mb-1">
                                         <label className="block text-xs font-semibold text-slate-700">Batch Number</label>
-                                        {hasPriorDeliveries && (
-                                            <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded">
-                                                Next in sequence
-                                            </span>
-                                        )}
+                                        <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded">
+                                            {hasPriorDeliveries ? 'Auto-appended' : 'Auto-assigned'}
+                                        </span>
                                     </div>
                                     <input
-                                        type="number"
-                                        min={hasPriorDeliveries ? Math.max(...existingBatchNumbers) + 1 : 1}
-                                        value={data.batch_number}
-                                        onChange={(e) => handleBatchChange(parseInt(e.target.value) || 1)}
-                                        className={`w-full rounded-lg border px-3 py-2 text-xs focus:outline-none ${
-                                            isBatchDuplicate
-                                                ? 'border-rose-400 bg-rose-50 text-rose-900 focus:border-rose-500 ring-1 ring-rose-300'
-                                                : 'border-slate-300 bg-white text-slate-900 focus:border-blue-500'
-                                        }`}
+                                        type="text"
+                                        readOnly
+                                        tabIndex={-1}
+                                        value={`Batch #${data.batch_number}`}
+                                        className="w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 cursor-not-allowed focus:outline-none select-none"
                                     />
-                                    {isBatchDuplicate && (
-                                        <p className="mt-1 text-xs font-semibold text-rose-600">
-                                            ⚠️ Batch #{data.batch_number} already recorded for this PO. Please use Batch #{Math.max(...existingBatchNumbers) + 1}.
-                                        </p>
-                                    )}
                                     {errors.batch_number && <p className="mt-1 text-xs text-rose-600">{errors.batch_number}</p>}
-                                </div>
-
-                                <div>
-                                    <label className="mb-1 block text-xs font-semibold text-slate-700">Total Expected Batches</label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        placeholder="Optional (e.g. 2 or 3)"
-                                        value={data.total_batches}
-                                        onChange={(e) => setData('total_batches', e.target.value)}
-                                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
-                                    />
-                                    {errors.total_batches && <p className="mt-1 text-xs text-rose-600">{errors.total_batches}</p>}
                                 </div>
                             </div>
 
@@ -417,27 +402,25 @@ export default function DeliveryCreate({ purchaseOrders, initialPurchaseOrderId 
                             <div className="relative">
                                 <input
                                     type="text"
-                                    value={data.delivery_code}
-                                    onChange={(e) => setData('delivery_code', e.target.value)}
-                                    className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-mono focus:border-blue-500 focus:outline-none"
-                                    placeholder={hasPriorDeliveries ? (autoSuggestedCode || 'Auto-generated from parent') : 'Leave blank to auto-generate (e.g. DEL-2026-11-0001)'}
+                                    readOnly
+                                    tabIndex={-1}
+                                    value={displayedDeliveryCode}
+                                    className="w-full rounded-lg border border-slate-200 bg-slate-100 px-4 py-2.5 pr-36 text-sm font-mono font-semibold text-slate-700 cursor-not-allowed focus:outline-none select-all"
                                 />
-                                {hasPriorDeliveries && (
-                                    <span className="absolute right-2.5 top-2.5 inline-flex items-center gap-1 rounded bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-[10px] font-bold text-indigo-700">
-                                        🔗 Auto Parent-Linked
-                                    </span>
-                                )}
+                                <span className="absolute right-2.5 top-2.5 inline-flex items-center gap-1 rounded bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-[10px] font-bold text-indigo-700">
+                                    {hasPriorDeliveries ? '🔗 Auto Parent-Linked' : '🔒 Auto-Generated'}
+                                </span>
                             </div>
                             {hasPriorDeliveries ? (
                                 <p className="mt-1.5 text-xs text-indigo-700 font-semibold flex items-center gap-1.5">
                                     <span>🔗</span>
                                     <span>
-                                        Staggered Batch Code: Auto-linked to parent delivery <strong>{parentBaseDelivery?.delivery_code}</strong> as <strong>{data.delivery_code || autoSuggestedCode}</strong>.
+                                        Staggered Batch Code: Auto-linked to parent delivery <strong>{parentBaseDelivery?.delivery_code}</strong> as <strong>{autoSuggestedCode}</strong>.
                                     </span>
                                 </p>
                             ) : (
                                 <p className="mt-1 text-xs text-slate-500">
-                                    Leave blank to auto-generate the parent code (e.g. DEL-2026-11-0001).
+                                    View-only: automatically assigned sequentially when this delivery is saved.
                                 </p>
                             )}
                         </FormField>

@@ -110,12 +110,18 @@ class DeliveryController
         $purchaseOrders = PurchaseOrder::query()
             ->whereIn('status', ['PLACED', 'PARTIALLY_DELIVERED'])
             ->whereYear('created_at', $currentYear)
-            ->with(['creator', 'supplier', 'deliveries.items', 'items.item'])
+            ->with([
+                'creator',
+                'supplier',
+                'deliveries' => fn ($query) => $query->orderBy('batch_number')->orderBy('delivery_id')->with('items'),
+                'items.item',
+            ])
             ->get();
 
         return Inertia::render('Inventory/Delivery/Create', [
             'purchaseOrders' => $purchaseOrders,
             'initialPurchaseOrderId' => request()->query('po_id') ? (int) request()->query('po_id') : null,
+            'nextDeliveryCodePreview' => $this->deliveryService->generateNextDeliveryCode(),
         ]);
     }
 

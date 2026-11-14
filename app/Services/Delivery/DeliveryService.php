@@ -100,8 +100,10 @@ class DeliveryService
                     : $this->generateNextDeliveryCode($targetDate);
             }
 
-            $deliveryScheduleType = $payload['delivery_schedule_type']
-                ?? ($existingBatchesCount > 0 || (isset($payload['total_batches']) && (int) $payload['total_batches'] > 1) ? 'STAGGERED_BATCH' : 'SINGLE_DELIVERY');
+            $deliveryScheduleType = $existingBatchesCount > 0
+                ? 'STAGGERED_BATCH'
+                : ($payload['delivery_schedule_type']
+                    ?? (isset($payload['total_batches']) && (int) $payload['total_batches'] > 1 ? 'STAGGERED_BATCH' : 'SINGLE_DELIVERY'));
 
             $totalBatches = isset($payload['total_batches']) && (int) $payload['total_batches'] > 0
                 ? (int) $payload['total_batches']
